@@ -16,6 +16,7 @@ struct CameraParams{
 }; 
 
 struct Camera{
+    Emergent::CEmergentCamera camera;
     CameraParams camera_params;
     Emergent::CEmergentFrame evtFrame; 
     Emergent::CEmergentFrame evtFrameRecv; 

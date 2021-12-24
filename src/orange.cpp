@@ -13,16 +13,16 @@ int main(int argc, char **args) {
         return 0;
     }
     
-    // Emergent::CEmergentCamera camera;
-    // int ReturnVal = SUCCESS;
-    // // may be pass this in as argument
-    // u16 frame_rate = 100;
-    // u16 gain = 3000; 
-    // u16 exposure = 5000;
+    u16 frame_rate = 100;
+    u16 gain = 3000; 
+    u16 exposure = 5000;
 
-    // CameraParams camera_params = create_camera_params(frame_rate, gain, exposure);
-    // Emergent::CEmergentFrame evtFrame[30], evtFrameRecv;
-    // Camera camera = {camera_params, evtFrame[30], evtFrameRecv};
+    int ReturnVal = SUCCESS;
+
+    Emergent::CEmergentCamera em_camera;
+    CameraParams camera_params = create_camera_params(frame_rate, gain, exposure);
+    Emergent::CEmergentFrame evtFrame[30], evtFrameRecv;
+    //Camera camera = {em_camera, camera_params, evtFrame[30], evtFrameRecv};
 
     return 0;
 }

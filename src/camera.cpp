@@ -1,12 +1,14 @@
 #include "camera.h"
 
 // important camera tuning parameters
-CameraParams create_camera_params(u16 frame_rate, u16 gain, u16 exposure)
+CameraParams create_camera_params(unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp)
 {
     CameraParams camera_params = {};
     camera_params.frame_rate = frame_rate;
     camera_params.gain = gain;
     camera_params.exposure = exposure;
+    camera_params.pixel_format = pixel_format;
+    camera_params.color_temp = color_temp;
     return camera_params;
 }
 
@@ -18,10 +20,11 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     const unsigned long enumBufferSize = 1000;
     unsigned long enumBufferSizeReturn = 0;
     char enumBuffer[enumBufferSize];
+    char* next_token;
+    char* enumMember = strtok_s(enumBuffer, ",", &next_token);
 
     //Order is important as param max/mins get updated.
     Emergent::EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enumBufferSize, &enumBufferSizeReturn);
-    char* enumMember = strtok_s(enumBuffer, ",", &next_token);
     Emergent::EVT_CameraSetEnumParam(camera,      "PixelFormat", enumMember);
 
     Emergent::EVT_CameraSetUInt32Param(camera,    "FrameRate", 30);
@@ -54,8 +57,70 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
 }
 
 
+int set_camera(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
+{
+    //TODO: open camera using xml file after explored on camera settings
+    //ReturnVal = EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
+    // TODO: macro the error message
+    
+    const short SUCCESS {0};
+    int ReturnVal = SUCCESS;
+
+    ReturnVal = EVT_CameraOpen(camera, device_info);      
+
+    configure_factory_defaults(camera);
+
+    unsigned int width_max, height_max;
+    Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max);
+    Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max);
+
+    printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
+
+    const char* pixel_format = camera_params.pixel_format.c_str();
+    ReturnVal = EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format);
+    printf("PixelFormat: \t\t%s\n", pixel_format);
+    if(ReturnVal != SUCCESS)
+    {
+        printf("EVT_CameraSetEnumParam: PixelFormat Error\n");
+        return ReturnVal;
+    }
+
+    const char* color_temp = camera_params.color_temp.c_str();
+    ReturnVal = EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain);
+    ReturnVal = EVT_CameraSetUInt32Param(camera, "Exposure", camera_params.exposure);
+    ReturnVal = EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp);
+
+    unsigned int frame_rate_max, frame_rate_min, frame_rate_inc, frame_rate;
+    EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max);
+    printf("FrameRate Max: \t\t%d\n", frame_rate_max);
+    EVT_CameraGetUInt32ParamMin(camera, "FrameRate", &frame_rate_min);
+    printf("FrameRate Min: \t\t%d\n", frame_rate_min);
+    EVT_CameraGetUInt32ParamInc(camera, "FrameRate", &frame_rate_inc);
+    printf("FrameRate Inc: \t\t%d\n", frame_rate_inc);
+
+    if ((camera_params.frame_rate > frame_rate_min)and (camera_params.frame_rate < frame_rate_max))
+    {
+        EVT_CameraSetUInt32Param(camera, "FrameRate", frame_rate);
+    }
+    else
+    {
+        printf("Invalid frame rate.");
+        return 0;
+    }
+
+    return ReturnVal;
+}
+
+
+void close_camera(Emergent::CEmergentCamera* camera)
+{    
+    EVT_CameraClose(camera);
+    printf("\nClose Camera: \t\tCamera Closed\n");
+}
+
+
 //Find all cameras in system.
-int find_num_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo)
+int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo)
 {
     int cameras_found = 0;
     unsigned int listcam_buf_size = max_cameras;

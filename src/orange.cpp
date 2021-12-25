@@ -2,27 +2,42 @@
 #include "camera.h"
 
 
-#define SUCCESS 0
-#define MAX_CAMERAS 10
-
 int main(int argc, char **args) {
 
+    const short SUCCESS {0};
+    int ReturnVal = SUCCESS;
+
+    short MAX_CAMERAS {10};
     struct GigEVisionDeviceInfo deviceInfo[MAX_CAMERAS];
-    if (!find_num_cameras(MAX_CAMERAS, deviceInfo)) {
-        // take some fatal action
+    if (!get_number_cameras(MAX_CAMERAS, deviceInfo)) 
+    {
         return 0;
     }
     
-    u16 frame_rate = 100;
-    u16 gain = 3000; 
-    u16 exposure = 5000;
+    // popular change to camera settings 
+    unsigned int frame_rate {100};
+    unsigned int gain {3000}; 
+    unsigned int exposure {5000};
+    string pixel_format = "YUV422Packed";
+    string color_temp = "CT_3500K";
 
-    int ReturnVal = SUCCESS;
-
-    Emergent::CEmergentCamera em_camera;
-    CameraParams camera_params = create_camera_params(frame_rate, gain, exposure);
+    // initialize number of cameras based on count, struct vector later
+    Emergent::CEmergentCamera camera;
+    CameraParams camera_params = create_camera_params(frame_rate, gain, exposure, pixel_format, color_temp);
     Emergent::CEmergentFrame evtFrame[30], evtFrameRecv;
-    //Camera camera = {em_camera, camera_params, evtFrame[30], evtFrameRecv};
+    
+    configure_factory_defaults(&camera);
 
+    // use first camera 
+    ReturnVal = set_camera(&camera, &deviceInfo[0], camera_params);
+    
+    if (ReturnVal!= SUCCESS)
+    {
+        close_camera(&camera);
+        return 0;
+    }
+
+
+    close_camera(&camera);
     return 0;
 }

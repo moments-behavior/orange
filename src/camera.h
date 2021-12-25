@@ -5,26 +5,28 @@
 #include <emergentframe.h>
 #include <EvtParamAttribute.h>
 #include <gigevisiondeviceinfo.h>
-#include "types.h"
 
 
 struct CameraParams{
-    u16 frame_rate, frame_rate_max, frame_rate_min, frame_rate_inc;
-    u16 width_max, height_max; 
-    u16 gain;
-    u16 exposure;
+    unsigned int frame_rate;
+    unsigned int gain;
+    unsigned int exposure;
+    string pixel_format;
+    string color_temp;
 }; 
 
-struct Camera{
-    Emergent::CEmergentCamera camera;
-    CameraParams camera_params;
-    Emergent::CEmergentFrame evtFrame; 
-    Emergent::CEmergentFrame evtFrameRecv; 
-};
+// struct Camera{
+//     Emergent::CEmergentCamera* emergent_cam;
+//     CameraParams params;
+//     Emergent::CEmergentFrame* evtFrame; 
+//     Emergent::CEmergentFrame* evtFrameRecv; 
+// };
 
-int find_num_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo);
-CameraParams create_camera_params(u16 frame_rate, u16 gain, u16 exposure);
+CameraParams create_camera_params(unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp);
+int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
+void close_camera(Emergent::CEmergentCamera* camera);
+int set_camera(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
 
 
 #endif

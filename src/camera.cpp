@@ -57,7 +57,7 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
 }
 
 
-int set_camera(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
+int set_camera_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
 {
     //TODO: open camera using xml file after explored on camera settings
     //ReturnVal = EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
@@ -90,7 +90,7 @@ int set_camera(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_i
     ReturnVal = EVT_CameraSetUInt32Param(camera, "Exposure", camera_params.exposure);
     ReturnVal = EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp);
 
-    unsigned int frame_rate_max, frame_rate_min, frame_rate_inc, frame_rate;
+    unsigned int frame_rate_max, frame_rate_min, frame_rate_inc;
     EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max);
     printf("FrameRate Max: \t\t%d\n", frame_rate_max);
     EVT_CameraGetUInt32ParamMin(camera, "FrameRate", &frame_rate_min);
@@ -100,7 +100,8 @@ int set_camera(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_i
 
     if ((camera_params.frame_rate > frame_rate_min)and (camera_params.frame_rate < frame_rate_max))
     {
-        EVT_CameraSetUInt32Param(camera, "FrameRate", frame_rate);
+        printf("FrameRate Set to: \t\t%d\n", camera_params.frame_rate);
+        EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate);
     }
     else
     {

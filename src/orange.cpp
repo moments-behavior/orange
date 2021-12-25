@@ -29,8 +29,17 @@ int main(int argc, char **args) {
     configure_factory_defaults(&camera);
 
     // use first camera 
-    ReturnVal = set_camera(&camera, &deviceInfo[0], camera_params);
+    ReturnVal = set_camera_params(&camera, &deviceInfo[0], camera_params);
     
+    // frame buffer
+    
+
+    // get frame
+
+
+    // 
+    
+ 
     if (ReturnVal!= SUCCESS)
     {
         close_camera(&camera);

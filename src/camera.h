@@ -26,7 +26,7 @@ CameraParams create_camera_params(unsigned int frame_rate, unsigned int gain, un
 int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);
-int set_camera(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
+int set_camera_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
 
 
 #endif

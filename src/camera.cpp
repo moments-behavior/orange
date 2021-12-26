@@ -115,7 +115,7 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 
 void close_camera(Emergent::CEmergentCamera* camera)
 {    
-    EVT_CameraClose(camera);
+    checkCameraErrors(EVT_CameraClose(camera));
     printf("\nClose Camera: \t\tCamera Closed\n");
 }
 
@@ -186,4 +186,18 @@ void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergen
         checkCameraErrors(EVT_AllocateFrameBuffer(camera, &evt_frame[frame_count], EVT_FRAME_BUFFER_ZERO_COPY));
         checkCameraErrors(EVT_CameraQueueFrame(camera, &evt_frame[frame_count]));
     }
+}
+
+
+void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size)
+{
+        //TODO: functionalize this Release frame buffers
+	for(int frame_count=0;frame_count<buffer_size;frame_count++)
+	{
+		checkCameraErrors(EVT_ReleaseFrameBuffer(camera, &evt_frame[frame_count]));
+	}
+
+	//Host side tear down for stream.
+	checkCameraErrors(EVT_CameraCloseStream(camera));
+
 }

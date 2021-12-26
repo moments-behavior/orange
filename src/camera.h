@@ -30,7 +30,7 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size);
-
+void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
 string evtGetErrorString(EVT_ERROR error);
 
 

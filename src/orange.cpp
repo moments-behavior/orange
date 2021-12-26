@@ -22,7 +22,6 @@ int main(int argc, char **args) {
     string pixel_format = "YUV422Packed";
     string color_temp = "CT_3000K";
 
-    // initialize number of cameras based on count, struct vector later
     Emergent::CEmergentCamera camera;
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
     open_camera_with_params(&camera, &device_info[0], camera_params);
@@ -32,26 +31,12 @@ int main(int argc, char **args) {
     Emergent::CEmergentFrame frame_recv;
     allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
 
-    
-    
-    //TODO: functionalize this Release frame buffers
-	for(int frame_count=0;frame_count<buffer_size;frame_count++)
-	{
-		EVT_ReleaseFrameBuffer(&camera, &evt_frame[frame_count]);
-	}
-
-	//Host side tear down for stream.
-	EVT_CameraCloseStream(&camera);
+    // acquisition
 
 
- 
-    if (ReturnVal!= SUCCESS)
-    {
-        close_camera(&camera);
-        return 0;
-    }
-
-
+    // clean 
+    destroy_frame_buffer(&camera, evt_frame, buffer_size);
+    configure_factory_defaults(&camera);
     close_camera(&camera);
     return 0;
 }

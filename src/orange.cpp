@@ -19,7 +19,7 @@ int main(int argc, char **args) {
     unsigned int gain {3000}; 
     unsigned int exposure {5000};
     string pixel_format = "YUV422Packed";
-    string color_temp = "CT_3500K";
+    string color_temp = "CT_3000K";
 
     // initialize number of cameras based on count, struct vector later
     Emergent::CEmergentCamera camera;
@@ -32,12 +32,12 @@ int main(int argc, char **args) {
     ReturnVal = set_camera_params(&camera, &deviceInfo[0], camera_params);
     
     // frame buffer
-    
+
 
     // get frame
 
 
-    // 
+    //
     
  
     if (ReturnVal!= SUCCESS)

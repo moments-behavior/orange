@@ -1,5 +1,26 @@
 #include "camera.h"
 
+// TODO: move this function to a seperate source file, and finish this function.
+string evtGetErrorString(EVT_ERROR error)
+{
+    string error_string; 
+    if(error == EVT_ERROR_SRCH)
+    {
+        error_string = "No such process.";
+    }
+    else if(error == EVT_ERROR_INTR)
+    {
+        error_string = "Parameter not found.";
+
+    }
+    else
+    {
+        error_string = "General error.";
+
+    }
+    return error_string;
+}
+
 // important camera tuning parameters
 CameraParams create_camera_params(unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp)
 {
@@ -66,13 +87,13 @@ int set_camera_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* d
     const short SUCCESS {0};
     int ReturnVal = SUCCESS;
 
-    ReturnVal = EVT_CameraOpen(camera, device_info);      
+    checkCameraErrors(EVT_CameraOpen(camera, device_info));      
 
     configure_factory_defaults(camera);
 
     unsigned int width_max, height_max;
-    Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max);
-    Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max);
+    checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
+    checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
 
     printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
 
@@ -86,21 +107,19 @@ int set_camera_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* d
     }
 
     const char* color_temp = camera_params.color_temp.c_str();
-    ReturnVal = EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain);
-    ReturnVal = EVT_CameraSetUInt32Param(camera, "Exposure", camera_params.exposure);
-    ReturnVal = EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp);
+    checkCameraErrors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
+    checkCameraErrors(EVT_CameraSetUInt32Param(camera, "Exposure", camera_params.exposure));
+    checkCameraErrors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp));
 
-    unsigned int frame_rate_max, frame_rate_min, frame_rate_inc;
+    unsigned int frame_rate_max, frame_rate_min;
     EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max);
     printf("FrameRate Max: \t\t%d\n", frame_rate_max);
     EVT_CameraGetUInt32ParamMin(camera, "FrameRate", &frame_rate_min);
-    printf("FrameRate Min: \t\t%d\n", frame_rate_min);
-    EVT_CameraGetUInt32ParamInc(camera, "FrameRate", &frame_rate_inc);
-    printf("FrameRate Inc: \t\t%d\n", frame_rate_inc);
+
 
     if ((camera_params.frame_rate > frame_rate_min)and (camera_params.frame_rate < frame_rate_max))
     {
-        printf("FrameRate Set to: \t\t%d\n", camera_params.frame_rate);
+        printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
         EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate);
     }
     else

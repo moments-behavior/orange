@@ -8,6 +8,8 @@
 
 
 struct CameraParams{
+    unsigned int width;
+    unsigned int height;
     unsigned int frame_rate;
     unsigned int gain;
     unsigned int exposure;
@@ -22,11 +24,13 @@ struct CameraParams{
 //     Emergent::CEmergentFrame* evtFrameRecv; 
 // };
 
-CameraParams create_camera_params(unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp);
-int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo);
+CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp);
+int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* device_info);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);
-int set_camera_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
+void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
+void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size);
+
 string evtGetErrorString(EVT_ERROR error);
 
 

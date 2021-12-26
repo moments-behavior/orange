@@ -22,9 +22,11 @@ string evtGetErrorString(EVT_ERROR error)
 }
 
 // important camera tuning parameters
-CameraParams create_camera_params(unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp)
+CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp)
 {
     CameraParams camera_params = {};
+    camera_params.width = width;
+    camera_params.height = height;
     camera_params.frame_rate = frame_rate;
     camera_params.gain = gain;
     camera_params.exposure = exposure;
@@ -78,15 +80,11 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
 }
 
 
-int set_camera_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
+void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
 {
     //TODO: open camera using xml file after explored on camera settings
-    //ReturnVal = EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
-    // TODO: macro the error message
+    //EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
     
-    const short SUCCESS {0};
-    int ReturnVal = SUCCESS;
-
     checkCameraErrors(EVT_CameraOpen(camera, device_info));      
 
     configure_factory_defaults(camera);
@@ -94,41 +92,24 @@ int set_camera_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* d
     unsigned int width_max, height_max;
     checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
     checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
-
     printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
 
+
     const char* pixel_format = camera_params.pixel_format.c_str();
-    ReturnVal = EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format);
+    checkCameraErrors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
     printf("PixelFormat: \t\t%s\n", pixel_format);
-    if(ReturnVal != SUCCESS)
-    {
-        printf("EVT_CameraSetEnumParam: PixelFormat Error\n");
-        return ReturnVal;
-    }
 
     const char* color_temp = camera_params.color_temp.c_str();
     checkCameraErrors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
     checkCameraErrors(EVT_CameraSetUInt32Param(camera, "Exposure", camera_params.exposure));
     checkCameraErrors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp));
 
-    unsigned int frame_rate_max, frame_rate_min;
-    EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max);
+    unsigned int frame_rate_max;
+    checkCameraErrors(EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max));
     printf("FrameRate Max: \t\t%d\n", frame_rate_max);
-    EVT_CameraGetUInt32ParamMin(camera, "FrameRate", &frame_rate_min);
 
-
-    if ((camera_params.frame_rate > frame_rate_min)and (camera_params.frame_rate < frame_rate_max))
-    {
-        printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
-        EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate);
-    }
-    else
-    {
-        printf("Invalid frame rate.");
-        return 0;
-    }
-
-    return ReturnVal;
+    checkCameraErrors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate));
+    printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
 }
 
 
@@ -140,13 +121,13 @@ void close_camera(Emergent::CEmergentCamera* camera)
 
 
 //Find all cameras in system.
-int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo)
+int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* device_info)
 {
     int cameras_found = 0;
     unsigned int listcam_buf_size = max_cameras;
     unsigned int count;
     
-    Emergent::EVT_ListDevices(deviceInfo, &listcam_buf_size, &count);
+    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
     if(count==0)
     {
         printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
@@ -158,4 +139,51 @@ int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* deviceInfo)
         return count;
     }
 
+}
+
+void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size)
+{
+
+    // open stream is important to acclocate frame buffer successfully
+    checkCameraErrors(EVT_CameraOpenStream(camera));
+
+    for(int frame_count=0;frame_count<buffer_size;frame_count++)
+    {
+        //Three params used for memory allocation. Worst case covers all models so no recompilation required.   
+        evt_frame[frame_count].size_x = camera_params.width;
+        evt_frame[frame_count].size_y = camera_params.height;
+
+        string pixel_format  = camera_params.pixel_format; 
+        if(pixel_format == "BayerRG8")
+        {
+            evt_frame[frame_count].pixel_type = GVSP_PIX_BAYRG8;
+        }
+        else if(pixel_format == "RGB8Packed")
+        {
+            evt_frame[frame_count].pixel_type = GVSP_PIX_RGB8;
+        }
+        else if(pixel_format == "BGR8Packed")
+        {
+            evt_frame[frame_count].pixel_type = GVSP_PIX_BGR8;
+        }
+        else if(pixel_format == "YUV411Packed")
+        {
+            evt_frame[frame_count].pixel_type = GVSP_PIX_YUV411_PACKED;
+        }
+        else if(pixel_format == "YUV422Packed")
+        {
+            evt_frame[frame_count].pixel_type = GVSP_PIX_YUV422_PACKED;
+        }
+        else if(pixel_format == "YUV444Packed")
+        {
+            evt_frame[frame_count].pixel_type = GVSP_PIX_YUV444_PACKED;
+        }
+    
+        else //Good for default case which covers color and mono as same size bytes/pixel.
+        {    //Note that these settings are used for memory alloc only.
+            evt_frame[frame_count].pixel_type = GVSP_PIX_MONO8;
+        }
+        checkCameraErrors(EVT_AllocateFrameBuffer(camera, &evt_frame[frame_count], EVT_FRAME_BUFFER_ZERO_COPY));
+        checkCameraErrors(EVT_CameraQueueFrame(camera, &evt_frame[frame_count]));
+    }
 }

@@ -1,2 +1,2 @@
 # orange 
-A light weight library for emergent camera
+A light weight C++ library for emergent camera

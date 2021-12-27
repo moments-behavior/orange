@@ -37,48 +37,48 @@ CameraParams create_camera_params(unsigned int width, unsigned int height, unsig
 
 
 //A function to reset to factory defaults for running eSDK examples 
+// TODO: many thing doesn't work with this emergent native code 
 void configure_factory_defaults(Emergent::CEmergentCamera* camera)
 {
     unsigned int width_max, height_max, param_val_max;
-    const unsigned long enumBufferSize = 1000;
-    unsigned long enumBufferSizeReturn = 0;
-    char enumBuffer[enumBufferSize];
-    char* next_token;
-    char* enumMember = strtok_s(enumBuffer, ",", &next_token);
+    //const unsigned long enumBufferSize = 1000;
+    //unsigned long enumBufferSizeReturn = 0;
+    //char enumBuffer[enumBufferSize];
+    //char* next_token;
+    //char* enumMember = strtok_s(enumBuffer, ",", &next_token);
 
     //Order is important as param max/mins get updated.
-    Emergent::EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enumBufferSize, &enumBufferSizeReturn);
-    Emergent::EVT_CameraSetEnumParam(camera,      "PixelFormat", enumMember);
+    //checkCameraErrors(Emergent::EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enumBufferSize, &enumBufferSizeReturn));
+    //checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "PixelFormat", enumMember));
 
-    Emergent::EVT_CameraSetUInt32Param(camera,    "FrameRate", 30);
+    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "FrameRate", 30));
 
-    Emergent::EVT_CameraSetUInt32Param(camera,    "OffsetX", 0);
-    Emergent::EVT_CameraSetUInt32Param(camera,    "OffsetY", 0);
+    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetX", 0));
+    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetY", 0));
 
-    Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max);
-    Emergent::EVT_CameraSetUInt32Param(camera,    "Width", width_max);
+    checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max));
+    //checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "Width", width_max));
 
-    Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max);
-    Emergent::EVT_CameraSetUInt32Param(camera,    "Height", height_max);
+    checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
+    //checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "Height", height_max));
 
-    Emergent::EVT_CameraSetEnumParam(camera,      "AcquisitionMode",        "Continuous");
-    Emergent::EVT_CameraSetUInt32Param(camera,    "AcquisitionFrameCount",  1);
-    Emergent::EVT_CameraSetEnumParam(camera,      "TriggerSelector",        "AcquisitionStart");
-    Emergent::EVT_CameraSetEnumParam(camera,      "TriggerMode",            "Off");
-    Emergent::EVT_CameraSetEnumParam(camera,      "TriggerSource",          "Software");
-    Emergent::EVT_CameraSetEnumParam(camera,      "BufferMode",             "Off");
-    Emergent::EVT_CameraSetUInt32Param(camera,    "BufferNum",              0);
+    checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "AcquisitionMode", "Continuous"));
+    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
+    checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"));
+    checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"));
+    checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+    //checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "BufferMode", "Off"));
+    //checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "BufferNum", 0));
 
-    Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max);
-    Emergent::EVT_CameraSetUInt32Param(camera,    "GevSCPSPacketSize", param_val_max);
+    checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max));
+    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "GevSCPSPacketSize", param_val_max));
 
-    Emergent::EVT_CameraSetUInt32Param(camera,    "Gain", 256);
-    Emergent::EVT_CameraSetUInt32Param(camera,    "Offset", 0);
+    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "Gain", 256));
+    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "Offset", 0));
 
-    Emergent::EVT_CameraSetBoolParam(camera,      "LUTEnable", false);
-    Emergent::EVT_CameraSetBoolParam(camera,      "AutoGain", false);
+    checkCameraErrors(Emergent::EVT_CameraSetBoolParam(camera, "LUTEnable", false));
+    checkCameraErrors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false));
 }
-
 
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
 {

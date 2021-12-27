@@ -36,7 +36,6 @@ int main(int argc, char **args) {
 
     // clean 
     destroy_frame_buffer(&camera, evt_frame, buffer_size);
-    configure_factory_defaults(&camera);
     close_camera(&camera);
     return 0;
 }

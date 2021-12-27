@@ -1,5 +1,6 @@
 #include <iostream>
 #include "camera.h"
+#include "video_capture.h"
 
 int main(int argc, char **args) 
 {
@@ -25,10 +26,11 @@ int main(int argc, char **args)
     
     int buffer_size = 30;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
-    Emergent::CEmergentFrame frame_recv;
     allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
+    Emergent::CEmergentFrame frame_recv;
+    set_frame_buffer(&frame_recv, camera_params);
 
-    int num_frames = 1000;
+    int num_frames = 100;
     aquire_num_frames(&camera, &frame_recv, num_frames);
 
 

@@ -1,6 +1,5 @@
 #include "camera.h"
 #include "camera_driver_helper.h"
-#include "thread.h"
 
 // important camera tuning parameters
 CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp)
@@ -121,6 +120,47 @@ int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* device_info)
 
 }
 
+void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params)
+{
+
+    //Three params used for memory allocation. Worst case covers all models so no recompilation required.   
+    evt_frame->size_x = camera_params.width;
+    evt_frame->size_y = camera_params.height;
+
+    string pixel_format  = camera_params.pixel_format; 
+    if(pixel_format == "BayerRG8")
+    {
+        evt_frame->pixel_type = GVSP_PIX_BAYRG8;
+    }
+    else if(pixel_format == "RGB8Packed")
+    {
+        evt_frame->pixel_type = GVSP_PIX_RGB8;
+    }
+    else if(pixel_format == "BGR8Packed")
+    {
+        evt_frame->pixel_type = GVSP_PIX_BGR8;
+    }
+    else if(pixel_format == "YUV411Packed")
+    {
+        evt_frame->pixel_type = GVSP_PIX_YUV411_PACKED;
+    }
+    else if(pixel_format == "YUV422Packed")
+    {
+        evt_frame->pixel_type = GVSP_PIX_YUV422_PACKED;
+    }
+    else if(pixel_format == "YUV444Packed")
+    {
+        evt_frame->pixel_type = GVSP_PIX_YUV444_PACKED;
+    }
+
+    else //Good for default case which covers color and mono as same size bytes/pixel.
+    {    //Note that these settings are used for memory alloc only.
+        evt_frame->pixel_type = GVSP_PIX_MONO8;
+    }
+
+}
+
+
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size)
 {
 
@@ -129,40 +169,7 @@ void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergen
 
     for(int frame_count=0;frame_count<buffer_size;frame_count++)
     {
-        //Three params used for memory allocation. Worst case covers all models so no recompilation required.   
-        evt_frame[frame_count].size_x = camera_params.width;
-        evt_frame[frame_count].size_y = camera_params.height;
-
-        string pixel_format  = camera_params.pixel_format; 
-        if(pixel_format == "BayerRG8")
-        {
-            evt_frame[frame_count].pixel_type = GVSP_PIX_BAYRG8;
-        }
-        else if(pixel_format == "RGB8Packed")
-        {
-            evt_frame[frame_count].pixel_type = GVSP_PIX_RGB8;
-        }
-        else if(pixel_format == "BGR8Packed")
-        {
-            evt_frame[frame_count].pixel_type = GVSP_PIX_BGR8;
-        }
-        else if(pixel_format == "YUV411Packed")
-        {
-            evt_frame[frame_count].pixel_type = GVSP_PIX_YUV411_PACKED;
-        }
-        else if(pixel_format == "YUV422Packed")
-        {
-            evt_frame[frame_count].pixel_type = GVSP_PIX_YUV422_PACKED;
-        }
-        else if(pixel_format == "YUV444Packed")
-        {
-            evt_frame[frame_count].pixel_type = GVSP_PIX_YUV444_PACKED;
-        }
-    
-        else //Good for default case which covers color and mono as same size bytes/pixel.
-        {    //Note that these settings are used for memory alloc only.
-            evt_frame[frame_count].pixel_type = GVSP_PIX_MONO8;
-        }
+        set_frame_buffer(&evt_frame[frame_count], camera_params);
         check_camera_errors(EVT_AllocateFrameBuffer(camera, &evt_frame[frame_count], EVT_FRAME_BUFFER_ZERO_COPY));
         check_camera_errors(EVT_CameraQueueFrame(camera, &evt_frame[frame_count]));
     }
@@ -184,58 +191,3 @@ void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergent
 
 
 
-void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames)
-{
-    int camera_return {0};
-
-    //aquisition
-    check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
-
-    unsigned short id_prev = 0, dropped_frames = 0;
-    unsigned int frames_recd = 0;   
-
-    float start_time = tick();
-    for(int frame_count=0;frame_count<num_frames;frame_count++)
-    {
-        camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
-        if(!camera_return)
-        {
-            //Counting dropped frames through frame_id as redundant check. 
-            if(((frame_recv->frame_id) != id_prev+1) && (frame_count != 0)) dropped_frames++;
-            else
-            {
-                frames_recd++;
-                // TODO: program what to do with received frame 
-
-            }
-        }
-        else{dropped_frames++; printf("\nEVT_CameraGetFrame Error = %8.8x!\n", camera_return);}
-
-        //In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
-        if(frame_recv->frame_id == 65535)
-            id_prev = 0;
-        else
-            id_prev = frame_recv->frame_id;
-
-        if(camera_return)
-            break; //No requeue reqd
-
-        camera_return = EVT_CameraQueueFrame(camera, frame_recv); //Re-queue.
-        if(camera_return) printf("EVT_CameraQueueFrame Error!\n");
-
-        if(frame_count % 100 == 99) {printf("."); fflush(stdout);}    
-        if(frame_count % 10000 == 9999) printf("\n");
-
-        if(dropped_frames >= 100) break;
-    }
-    float end_time = tick();
-    float time_diff = end_time - start_time;
-
-    check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStop"));
-
-    //Report stats
-    printf("\n");
-    printf("Images Captured: \t%d\n", frames_recd);
-    printf("Dropped Frames: \t%d\n", dropped_frames);
-    printf("Calculated Frame Rate: \t%f\n", frames_recd/time_diff);
-}

@@ -1,6 +1,5 @@
 #include "thread.h"
 #include "video_capture.h"
-#include <iomanip>
 
 void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames)
 {
@@ -64,7 +63,7 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
 
 
 
-void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames, CameraParams camera_params)
+void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames, CameraParams camera_params, FILE* encoder_stream)
 {
     int camera_return {0};
     //aquisition
@@ -73,22 +72,12 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;   
 
-    // encoding using ffmpeg
-    FILE *ffmpeg_pipe;
-    stringstream str_stream;
-    str_stream << "/usr/local/bin/ffmpeg -y -f rawvideo -vcodec rawvideo -s " << camera_params.width << "x" << camera_params.height  <<" -pix_fmt rgb24 -i - -c:v libx264 -shortest my_output.mp4";
-    
     unsigned int size_of_buffer;
     size_of_buffer = frame_recv->CalculateBufferSize();
-
-    if ( !(ffmpeg_pipe = popen(str_stream.str().c_str(), "w")) ) {
-        printf("popen error");
-        // think about more general error handling with camera
-        exit(1);
-    }
-
     
     float start_time = tick();
+
+
     for(int frame_count=0;frame_count<num_frames;frame_count++)
     {
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
@@ -100,7 +89,7 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
             {
                 frames_recd++;
                 // write to pipe
-                fwrite(frame_recv->imagePtr, 1, size_of_buffer, ffmpeg_pipe);
+                fwrite(frame_recv->imagePtr, 1, size_of_buffer, encoder_stream);
             }
         }
         else{dropped_frames++; printf("\nEVT_CameraGetFrame Error = %8.8x!\n", camera_return);}
@@ -116,12 +105,9 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
 
         camera_return = EVT_CameraQueueFrame(camera, frame_recv); //Re-queue.
         if(camera_return) printf("EVT_CameraQueueFrame Error!\n");
-
-        if(frame_count % 100 == 99) {printf("."); fflush(stdout);}    
-        if(frame_count % 10000 == 9999) printf("\n");
-
         if(dropped_frames >= 100) break;
     }
+
     float end_time = tick();
     float time_diff = end_time - start_time;
 
@@ -133,7 +119,6 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd/time_diff);
 
-    fflush(ffmpeg_pipe);
-    fclose(ffmpeg_pipe);
+
     
 }

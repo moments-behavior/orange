@@ -24,14 +24,38 @@ int main(int argc, char **args)
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
     open_camera_with_params(&camera, &device_info[0], camera_params);
     
-    int buffer_size = 30;
+    int buffer_size {30};
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
     allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
     Emergent::CEmergentFrame frame_recv;
     set_frame_buffer(&frame_recv, camera_params);
 
-    int num_frames = 100;
-    aquire_num_frames(&camera, &frame_recv, num_frames);
+    int num_frames {1000};
+    //aquire_num_frames(&camera, &frame_recv, num_frames);
+
+
+    // encoding using ffmpeg
+    FILE *encoder_pipe;
+    stringstream str_stream;
+    
+    // ffmpeg encode
+    string pix_fmt;
+    if (camera_params.pixel_format == "YUV422Packed") pix_fmt = "yuv422p";
+    else if (camera_params.pixel_format  == "BayerRG8") pix_fmt = "bayer_rggb8";    
+    str_stream << "/usr/local/bin/ffmpeg -y -f rawvideo -pix_fmt " << pix_fmt << " -s " << camera_params.width << "x" << camera_params.height  <<" -framerate " << camera_params.frame_rate << " -i - -an -sn -c:v h264_nvenc -r " << camera_params.frame_rate << " my_output.mp4";
+    printf("Debug: %s", str_stream.str().c_str());
+    fflush(stdout);
+    if ( !(encoder_pipe = popen(str_stream.str().c_str(), "w")) ) {
+        printf("popen error");
+        // think about more general error handling with camera
+        exit(1);
+    }
+
+    aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params, encoder_pipe);
+
+
+    fflush(encoder_pipe);
+    fclose(encoder_pipe);
 
 
     // clean 

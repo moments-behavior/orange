@@ -1,11 +1,8 @@
 #include <iostream>
 #include "camera.h"
 
-int main(int argc, char **args) {
-
-    const short SUCCESS {0};
-    int ReturnVal = SUCCESS;
-
+int main(int argc, char **args) 
+{
     short max_cameras {10};
     GigEVisionDeviceInfo device_info[max_cameras];
     if (!get_number_cameras(max_cameras, device_info)) 
@@ -31,8 +28,9 @@ int main(int argc, char **args) {
     Emergent::CEmergentFrame frame_recv;
     allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
 
-    // acquisition
-    
+    int num_frames = 1000;
+    aquire_num_frames(&camera, &frame_recv, num_frames);
+
 
     // clean 
     destroy_frame_buffer(&camera, evt_frame, buffer_size);

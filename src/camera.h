@@ -1,11 +1,7 @@
 #ifndef ORANGE_CAMERA
 #define ORANGE_CAMERA
 
-#include <EmergentCameraAPIs.h>
-#include <emergentframe.h>
-#include <EvtParamAttribute.h>
-#include <gigevisiondeviceinfo.h>
-
+#include "camera_driver_helper.h"
 
 struct CameraParams{
     unsigned int width;
@@ -31,25 +27,5 @@ void close_camera(Emergent::CEmergentCamera* camera);
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
-string evtGetErrorString(EVT_ERROR error);
-
-
-#ifndef checkCameraErrors
-#define checkCameraErrors(err) __checkCameraErrors(err, __FILE__, __LINE__)
-// These are the inline versions for all of the SDK helper functions
-inline void __checkCameraErrors(EVT_ERROR err, const char *file, const int line) {
-  if (EVT_SUCCESS != err) {
-    string error_string;
-    error_string = evtGetErrorString(err);
-    const char*  errorStr = error_string.c_str();
-    fprintf(stderr,
-            "checkCameraErrors() Driver API error = %04d \"%s\" from file <%s>, "
-            "line %i.\n",
-            err, errorStr, file, line);
-    exit(EXIT_FAILURE);
-  }
-}
-#endif
-
 
 #endif

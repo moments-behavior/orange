@@ -32,7 +32,7 @@ int main(int argc, char **args) {
     allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
 
     // acquisition
-
+    
 
     // clean 
     destroy_frame_buffer(&camera, evt_frame, buffer_size);

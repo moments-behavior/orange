@@ -11,9 +11,9 @@
 string get_evt_error_string(EVT_ERROR error);
 
 
-#define checkCameraErrors(err) __checkCameraErrors(err, __FILE__, __LINE__)
+#define check_camera_errors(err) __check_camera_errors(err, __FILE__, __LINE__)
 // These are the inline versions for all of the SDK helper functions
-inline void __checkCameraErrors(EVT_ERROR err, const char *file, const int line) {
+inline void __check_camera_errors(EVT_ERROR err, const char *file, const int line) {
   if (EVT_SUCCESS != err) {
     string error_string;
     error_string = get_evt_error_string(err);

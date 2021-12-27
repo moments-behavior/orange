@@ -28,13 +28,8 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     //char* enumMember = strtok_s(enumBuffer, ",", &next_token);
 
     //Order is important as param max/mins get updated.
-<<<<<<< HEAD
-    checkCameraErrors(Emergent::EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enumBufferSize, &enumBufferSizeReturn));
-    checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "PixelFormat", enumMember));
-=======
     //checkCameraErrors(Emergent::EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enumBufferSize, &enumBufferSizeReturn));
     //checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "PixelFormat", enumMember));
->>>>>>> temp_work
 
     checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "FrameRate", 30));
 
@@ -42,30 +37,18 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetY", 0));
 
     checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max));
-<<<<<<< HEAD
-    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "Width", width_max));
-
-    checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
-    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "Height", height_max));
-=======
     //checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "Width", width_max));
 
     checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
     //checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "Height", height_max));
->>>>>>> temp_work
 
     checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "AcquisitionMode", "Continuous"));
     checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
     checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"));
     checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"));
     checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
-<<<<<<< HEAD
-    checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "BufferMode", "Off"));
-    checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "BufferNum", 0));
-=======
     //checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "BufferMode", "Off"));
     //checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "BufferNum", 0));
->>>>>>> temp_work
 
     checkCameraErrors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max));
     checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera,    "GevSCPSPacketSize", param_val_max));

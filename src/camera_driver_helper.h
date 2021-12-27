@@ -27,3 +27,7 @@ inline void __checkCameraErrors(EVT_ERROR err, const char *file, const int line)
 }
 
 #endif
+<<<<<<< HEAD
+=======
+
+>>>>>>> temp_work

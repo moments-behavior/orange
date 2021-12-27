@@ -30,7 +30,6 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     //Order is important as param max/mins get updated.
     //checkCameraErrors(Emergent::EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enumBufferSize, &enumBufferSizeReturn));
     //checkCameraErrors(Emergent::EVT_CameraSetEnumParam(camera, "PixelFormat", enumMember));
-
     checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "FrameRate", 30));
 
     checkCameraErrors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetX", 0));

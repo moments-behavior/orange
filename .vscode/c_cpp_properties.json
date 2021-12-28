@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/opt/EVT/eSDK/include",
-                "/usr/include"
+                "/usr/include",
+                "/usr/include/opencv4"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
@@ -13,7 +14,8 @@
             "cppStandard": "gnu++14",
             "intelliSenseMode": "linux-gcc-x64",
             "compilerArgs": [
-                "-L/opt/EVT/eSDK/lib/"
+                "-L/opt/EVT/eSDK/lib/",
+                "-L/ "
             ]
         }
     ],

@@ -162,14 +162,15 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
 
     else if (camera_params.pixel_format  == "BayerRG8") 
     {
-        pix_fmt = "bayer_rggb8"; // ffmpeg debayer is pretty slow
+        pix_fmt = "bayer_rggb8"; 
         size_of_buffer = camera_params.height * camera_params.width;
     }
     printf("Buffer size (bytes): \t%d\n ", size_of_buffer);
 
-    string input_string = "/usr/local/bin/ffmpeg -y -f rawvideo -pix_fmt " + pix_fmt + " -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate) + " -i - ";
-    string output_string = " -c:v h264_nvenc -r " + to_string(camera_params.frame_rate) + " video_pipe_ffmpeg.mp4";
-    str_stream << (input_string + output_string);
+    string input_string = "/usr/local/bin/ffmpeg -y -f rawvideo -pixel_format " + pix_fmt + " -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate) + " -i - ";
+    string color_conv_string = "-f rawvideo -pix_fmt yuv420p -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate);
+    string output_string = " -c:v h264_nvenc -r " + to_string(camera_params.frame_rate) + " -preset p1 video_pipe_ffmpeg.mp4";
+    str_stream << (input_string + color_conv_string + output_string);
     //cout  << "Debug: %s", str_stream.str().c_str();
     
     if ( !(encoder_pipe = popen(str_stream.str().c_str(), "w")) ) {
@@ -214,7 +215,11 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
 
         camera_return = EVT_CameraQueueFrame(camera, frame_recv); //Re-queue.
         if(camera_return) printf("EVT_CameraQueueFrame Error!\n");
-        if(dropped_frames >= 100) break;
+        if(dropped_frames >= 100) 
+        {
+            printf("More than 100 dropped frames. Exit.");
+            break;
+        }
     }
 
     float end_time = tick();

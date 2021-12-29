@@ -169,7 +169,7 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
 
     string input_string = "/usr/local/bin/ffmpeg -y -f rawvideo -pixel_format " + pix_fmt + " -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate) + " -i - ";
     string color_conv_string = "-f rawvideo -pix_fmt yuv420p -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate);
-    string output_string = " -c:v h264_nvenc -r " + to_string(camera_params.frame_rate) + " -preset p1 video_pipe_ffmpeg.mp4";
+    string output_string = " -c:v h264_nvenc -r " + to_string(camera_params.frame_rate) + " -preset p1 -f mp4 video_pipe_ffmpeg.mp4";
     str_stream << (input_string + color_conv_string + output_string);
     //cout  << "Debug: %s", str_stream.str().c_str();
     

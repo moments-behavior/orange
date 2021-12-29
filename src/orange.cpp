@@ -17,7 +17,7 @@ int main(int argc, char **args)
     unsigned int frame_rate {100};
     unsigned int gain {3000}; 
     unsigned int exposure {5000};
-    string pixel_format = "YUV422Packed"; // "BayerRG8";   library support these two formats for now
+    string pixel_format = "BayerRG8"; //"YUV422Packed"; library support these two formats for now
     string color_temp = "CT_3000K";
 
     Emergent::CEmergentCamera camera;
@@ -33,8 +33,8 @@ int main(int argc, char **args)
     int num_frames {1000};
     //aquire_num_frames(&camera, &frame_recv, num_frames);
     //aquire_and_display(&camera, &frame_recv, camera_params);
-    //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
-    aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
+    aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
+    //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
 
 
 

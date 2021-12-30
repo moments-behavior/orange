@@ -153,8 +153,6 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
     string pix_fmt;
     unsigned int size_of_buffer;
 
-    string input_string = "/usr/local/bin/ffmpeg -y -f rawvideo -pixel_format " + pix_fmt + " -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate) + " -i - ";
-    string color_conv_string = "-f rawvideo -pix_fmt yuv420p -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate);
     string output_string = " -c:v h264_nvenc -r " + to_string(camera_params.frame_rate) + " -preset p2 -f mp4 video_pipe_ffmpeg.mp4";
 
     //cout  << "Debug: %s", str_stream.str().c_str();
@@ -165,22 +163,25 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
         // note: if it is uyvy422, it donesn't need color conversion, but 420p results in main profile, whre uyvy422 results in high profile, might be better for storage 
         pix_fmt = "uyvy422"; 
         size_of_buffer = camera_params.height * camera_params.width * 2;
+        printf("Buffer size (bytes): \t%d\n ", size_of_buffer);
+        string input_string = "/usr/local/bin/ffmpeg -y -f rawvideo -pixel_format " + pix_fmt + " -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate) + " -i - ";
+        string color_conv_string = "-f rawvideo -pix_fmt yuv420p -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate);
         str_stream << (input_string + output_string);
 
     }
-
     else if (camera_params.pixel_format  == "BayerRG8") 
     {
         pix_fmt = "bayer_rggb8"; 
         size_of_buffer = camera_params.height * camera_params.width;
+        printf("Buffer size (bytes): \t%d\n ", size_of_buffer);
+        string input_string = "/usr/local/bin/ffmpeg -y -f rawvideo -pixel_format " + pix_fmt + " -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate) + " -i - ";
+        string color_conv_string = "-f rawvideo -pix_fmt yuv420p -video_size " + to_string(camera_params.width) + "x" + to_string(camera_params.height) + " -framerate " + to_string(camera_params.frame_rate);
         str_stream << (input_string + color_conv_string + output_string);
     }
     else{
         printf("Color format not supported! \n");
         exit(1);
-
     }
-    printf("Buffer size (bytes): \t%d\n ", size_of_buffer);
 
 
 

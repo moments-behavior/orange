@@ -17,7 +17,7 @@ int main(int argc, char **args)
     unsigned int frame_rate {100};
     unsigned int gain {3000}; 
     unsigned int exposure {5000};
-    string pixel_format = "BayerRG8"; //"YUV422Packed"; library support these two formats for now
+    string pixel_format = "YUV422Packed"; // "BayerRG8"; library support these two formats for now
     string color_temp = "CT_3000K";
 
     Emergent::CEmergentCamera camera;

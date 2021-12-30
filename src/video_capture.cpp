@@ -299,7 +299,8 @@ void aquire_and_encode_gstreamer(Emergent::CEmergentCamera* camera, Emergent::CE
 
         camera_return = EVT_CameraQueueFrame(camera, frame_recv); //Re-queue.
         if(camera_return) printf("EVT_CameraQueueFrame Error!\n");
-        if(dropped_frames >= 100) break;
+        if(dropped_frames >= 100) break;        camera_return = EVT_CameraQueueFrame(camera, frame_recv); //Re-queue.
+
     }
 
     float end_time = tick();

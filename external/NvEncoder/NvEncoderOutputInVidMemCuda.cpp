@@ -9,7 +9,7 @@
 *
 */
 
-#include "NvEncoder/NvEncoderOutputInVidMemCuda.h"
+#include "NvEncoderOutputInVidMemCuda.h"
 
 
 NvEncoderOutputInVidMemCuda::NvEncoderOutputInVidMemCuda(CUcontext cuContext, 

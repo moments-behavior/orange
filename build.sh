@@ -2,9 +2,7 @@
 mkdir -p targets;
 rm -f targets/orange;
 g++ -Ofast -ffast-math -std=c++14 \
-    -o targets/video_capture.o src/video_capture.cpp \
-    -o targets/camera_driver_helper.o src/camera_driver_helper.cpp \
-    -o targets/camera.o src/camera.cpp -o targets/orange src/orange.cpp \
+    -o targets/orange -I ./src/ ./src/*.cpp \
     -I/usr/include/opencv4 -I/opt/EVT/eSDK/include/ -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
     -lm \

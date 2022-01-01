@@ -33,6 +33,7 @@
 
 # Build artifacts
 /targets/*
+/external/targets_nvenc
 *.bmp
 !img/*.bmp
 

@@ -19,7 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <string.h>
-#include "NvEncoder/NvEncoderCuda.h"
+#include "NvEncoderCuda.h"
 
 #define ALIGN_UP(s,a) (((s) + (a) - 1) & ~((a) - 1))
 

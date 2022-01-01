@@ -38,10 +38,13 @@ int main(int argc, char **args)
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
+        
+        destroy_frame_buffer(&camera, evt_frame, buffer_size);
+        close_camera(&camera);
     }
     catch(int &ex)
     {
-        // clean 
+        printf("\nError...");
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }

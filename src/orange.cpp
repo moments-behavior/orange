@@ -20,26 +20,30 @@ int main(int argc, char **args)
     string pixel_format = "YUV422Packed"; // "BayerRG8"; library support these two formats for now
     string color_temp = "CT_3000K";
 
-    Emergent::CEmergentCamera camera;
-    CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
-    open_camera_with_params(&camera, &device_info[0], camera_params);
-    
     int buffer_size {30};
+    Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
-    allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
-    Emergent::CEmergentFrame frame_recv;
-    set_frame_buffer(&frame_recv, camera_params);
-
-    int num_frames {1000};
-    //aquire_num_frames(&camera, &frame_recv, num_frames);
-    //aquire_and_display(&camera, &frame_recv, camera_params);
-    //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
-    aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
 
 
+    try{
+        CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
+        open_camera_with_params(&camera, &device_info[0], camera_params);        
+        allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
 
-    // clean 
-    destroy_frame_buffer(&camera, evt_frame, buffer_size);
-    close_camera(&camera);
+        Emergent::CEmergentFrame frame_recv;
+        set_frame_buffer(&frame_recv, camera_params);
+
+        int num_frames {1000};
+        //aquire_num_frames(&camera, &frame_recv, num_frames);
+        //aquire_and_display(&camera, &frame_recv, camera_params);
+        //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
+        aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
+    }
+    catch(int &ex)
+    {
+        // clean 
+        destroy_frame_buffer(&camera, evt_frame, buffer_size);
+        close_camera(&camera);
+    }
     return 0;
 }

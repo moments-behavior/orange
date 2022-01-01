@@ -180,7 +180,7 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
     }
     else{
         printf("Color format not supported! \n");
-        exit(1);
+        throw(EXIT_FAILURE);
     }
 
 
@@ -188,7 +188,7 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
     if ( !(encoder_pipe = popen(str_stream.str().c_str(), "w")) ) {
         printf("popen error");
         // think about more general error handling with camera
-        exit(1);
+        throw(EXIT_FAILURE);
     }
 
     int camera_return {0};
@@ -260,7 +260,7 @@ void aquire_and_encode_gstreamer(Emergent::CEmergentCamera* camera, Emergent::CE
     if (!(writer.open(gstreamer_option, cv::CAP_GSTREAMER, 0, camera_params.frame_rate, cv::Size(camera_params.width, camera_params.height))))
     {
         cout << "Video writer didn't open. \n";
-        exit(1);
+        throw(EXIT_FAILURE);
     }
 
     int camera_return {0};

@@ -447,7 +447,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 void EncodeCuda(int nWidth, int nHeight, NV_ENC_BUFFER_FORMAT eFormat, NvEncoderInitParam encodeCLIOptions, CUcontext cuContext, std::ifstream &fpIn, std::ofstream &fpOut)
 {
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, nWidth, nHeight, eFormat));
-
+    printf("Frame_efomart: %d\n", eFormat);
     InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
 
     int nFrameSize = pEnc->GetFrameSize();
@@ -467,7 +467,7 @@ void EncodeCuda(int nWidth, int nHeight, NV_ENC_BUFFER_FORMAT eFormat, NvEncoder
             
             //struct timeval start, end;
             //gettimeofday(&start, NULL);
-            auto start = high_resolution_clock::now();
+            //auto start = high_resolution_clock::now();
             NvEncoderCuda::CopyToDeviceFrame(cuContext, pHostFrame.get(), 0, (CUdeviceptr)encoderInputFrame->inputPtr,
                 (int)encoderInputFrame->pitch,
                 pEnc->GetEncodeWidth(),
@@ -476,10 +476,10 @@ void EncodeCuda(int nWidth, int nHeight, NV_ENC_BUFFER_FORMAT eFormat, NvEncoder
                 encoderInputFrame->bufferFormat,
                 encoderInputFrame->chromaOffsets,
                 encoderInputFrame->numChromaPlanes);
-            auto stop = high_resolution_clock::now();
-            auto duration = duration_cast<microseconds>(stop - start);
-            std::cout << "Copy to GPU: " << duration.count() << " us, ";
-            std::cout << "Rate: " << nFrameSize / duration.count() * 1e-3 << " GB/s, ";
+            //auto stop = high_resolution_clock::now();
+            //auto duration = duration_cast<microseconds>(stop - start);
+            //std::cout << "Copy to GPU: " << duration.count() << " us, ";
+            //std::cout << "Rate: " << nFrameSize / duration.count() * 1e-3 << " GB/s, ";
 
 
             //gettimeofday(&end, NULL);
@@ -488,13 +488,13 @@ void EncodeCuda(int nWidth, int nHeight, NV_ENC_BUFFER_FORMAT eFormat, NvEncoder
             //printf("Time for copying to device per frame is %d micros\n", micros);
             
             //gettimeofday(&start, NULL);
-            auto start_enc = high_resolution_clock::now();
+            //auto start_enc = high_resolution_clock::now();
             
             pEnc->EncodeFrame(vPacket);
             
             auto stop_enc = high_resolution_clock::now();
-            auto duration_enc = duration_cast<microseconds>(stop_enc - start_enc);
-            std::cout << "Encode: " << duration_enc.count() << " us."<< std::endl;
+            //auto duration_enc = duration_cast<microseconds>(stop_enc - start_enc);
+            //std::cout << "Encode: " << duration_enc.count() << " us."<< std::endl;
             //gettimeofday(&end, NULL);         
             //printf("Time for encoding per frame %d micros\n", ((end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec) - (start.tv_usec));            
 

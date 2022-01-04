@@ -40,9 +40,10 @@
 # Editor files
 *#*
 
-# Video file
+# Media file
 *.mp4
 *.avi
 *.mpg
-
+*.raw
+*.yuv
 

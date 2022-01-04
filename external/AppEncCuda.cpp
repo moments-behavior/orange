@@ -447,7 +447,6 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 void EncodeCuda(int nWidth, int nHeight, NV_ENC_BUFFER_FORMAT eFormat, NvEncoderInitParam encodeCLIOptions, CUcontext cuContext, std::ifstream &fpIn, std::ofstream &fpOut)
 {
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, nWidth, nHeight, eFormat));
-    printf("Frame_efomart: %d\n", eFormat);
     InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
 
     int nFrameSize = pEnc->GetFrameSize();
@@ -659,7 +658,6 @@ int main(int argc, char **argv)
         }
         else
         {
-            printf("Encode in cuda...\n");
             EncodeCuda(nWidth, nHeight, eFormat, encodeCLIOptions, cuContext, fpIn, fpOut);
         }
         

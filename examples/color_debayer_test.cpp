@@ -2,6 +2,30 @@
 #include <iostream>
 #include <nppi.h>
 #include <cuda_runtime.h>
+#include <iostream>
+#include "helper_cuda.h"
+
+inline int cudaDeviceInit(int argc, const char **argv)
+{
+    int deviceCount;
+    checkCudaErrors(cudaGetDeviceCount(&deviceCount));
+
+    if (deviceCount == 0)
+    {
+        std::cerr << "CUDA error: no devices supporting CUDA." << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    int dev = findCudaDevice(argc, argv);
+
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, dev);
+    std::cerr << "cudaSetDevice GPU" << dev << " = " << deviceProp.name << std::endl;
+
+    checkCudaErrors(cudaSetDevice(dev));
+
+    return dev;
+}
 
 cudaError_t cuda_bayer_to_rgba( uint8_t* input, uchar3* output, size_t width, size_t height)
 {
@@ -31,9 +55,14 @@ cudaError_t cuda_bayer_to_rgba( uint8_t* input, uchar3* output, size_t width, si
     return cudaSuccess;
 }
 
-int main(){
+int main(int argc, char *argv[]){
 
     // find a bayer image input, and test this function
-    
+    printf("%s Starting...\n\n", argv[0]);
+    std::string sFilename;
+    char *filePath {"frame_069.raw"};
+
+    cudaDeviceInit(argc, (const char **)argv);
+
 
 }

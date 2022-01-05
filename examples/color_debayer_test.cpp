@@ -7,32 +7,8 @@
 #include "../UtilNPP/ImagesNPP.h"
 #include "../UtilNPP/ImagesCPU.h"
 #include "../UtilNPP/ImageIO.h"
-
-// Save an color image to disk.
-void saveColoredImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage)
-{
-    // create the result image storage using FreeImage so we can easily
-    // save
-    FIBITMAP *pResultBitmap = FreeImage_Allocate(rImage.width(), rImage.height(), 8);
-    NPP_ASSERT_NOT_NULL(pResultBitmap);
-    unsigned int nDstPitch = FreeImage_GetPitch(pResultBitmap);
-    printf("nDstPitch: %d", nDstPitch);
-    Npp8u *pDstLine = FreeImage_GetBits(pResultBitmap) + nDstPitch * (rImage.height() - 1);
-    const Npp8u *pSrcLine = rImage.data();
-    unsigned int nSrcPitch = rImage.pitch();
-
-    for (size_t iLine = 0; iLine < rImage.height(); ++iLine)
-    {
-        memcpy(pDstLine, pSrcLine, rImage.width() * sizeof(Npp8u));
-        pSrcLine += nSrcPitch;
-        pDstLine -= nDstPitch;
-    }
-
-    // now save the result image
-    bool bSuccess;
-    bSuccess = FreeImage_Save(FIF_PGM, pResultBitmap, rFileName.c_str(), 0) == TRUE;
-    NPP_ASSERT_MSG(bSuccess, "Failed to save result image.");
-}
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 
 inline int cudaDeviceInit(int argc, const char **argv)
@@ -88,7 +64,8 @@ cudaError_t cuda_bayer_to_rgba(uint8_t *input, uint8_t *output, size_t width, si
 
     NppiBayerGridPosition grid;
     grid = NPPI_BAYER_RGGB;
-    Npp8u nAlpha = 1;
+    
+    Npp8u nAlpha = 255;
 
     const NppStatus result = nppiCFAToRGBA_8u_C1AC4R(input, width * sizeof(uint8_t), size, roi,
                                                      output, width * sizeof(uchar4),
@@ -110,13 +87,13 @@ int main(int argc, char *argv[])
 
     try
     {
-        std::string sFilename;
-        char *filePath{"test_image.bmp"};
 
         cudaDeviceInit(argc, (const char **)argv);
 
-        sFilename = filePath;
+        std::string sFilename;
+        char *filePath {"camera_test.bmp"};
 
+        sFilename = filePath;
         // if we specify the filename at the command line, then we only test sFilename[0].
         int file_errors = 0;
         std::ifstream infile(sFilename.data(), std::ifstream::in);
@@ -138,17 +115,6 @@ int main(int argc, char *argv[])
         {
             exit(EXIT_FAILURE);
         }
-
-        std::string sResultFilename = sFilename;
-
-        std::string::size_type dot = sResultFilename.rfind('.');
-
-        if (dot != std::string::npos)
-        {
-            sResultFilename = sResultFilename.substr(0, dot);
-        }
-
-        sResultFilename += "_boxFilter.pgm";
 
         // declare a host image object for an 8-bit grayscale image
         npp::ImageCPU_8u_C1 oHostSrc;
@@ -172,12 +138,10 @@ int main(int argc, char *argv[])
         // and copy the device result data into it
         oDeviceDst.copyTo(oHostDst.data(), oHostDst.pitch());
         printf("\nPitch oHostSrc: %d", oHostSrc.pitch());
-
         printf("\nPitch oHostDst: %d\n", oHostDst.pitch());
 
-        //saveColoredImage(sResultFilename, oHostDst);
-        // std::cout << "Saved image: " << sResultFilename << std::endl;
 
+        stbi_write_bmp("test.png", (int)oDeviceSrc.width(), (int)oDeviceSrc.height(), 4, oHostDst.data());
         nppiFree(oDeviceSrc.data());
         nppiFree(oDeviceDst.data());
 

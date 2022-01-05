@@ -8,6 +8,32 @@
 #include "../UtilNPP/ImagesCPU.h"
 #include "../UtilNPP/ImageIO.h"
 
+// Save an color image to disk.
+void saveColoredImage(const std::string &rFileName, const npp::ImageCPU_8u_C4 &rImage)
+{
+    // create the result image storage using FreeImage so we can easily
+    // save
+    FIBITMAP *pResultBitmap = FreeImage_Allocate(rImage.width(), rImage.height(), 8);
+    NPP_ASSERT_NOT_NULL(pResultBitmap);
+    unsigned int nDstPitch = FreeImage_GetPitch(pResultBitmap);
+    printf("nDstPitch: %d", nDstPitch);
+    Npp8u *pDstLine = FreeImage_GetBits(pResultBitmap) + nDstPitch * (rImage.height() - 1);
+    const Npp8u *pSrcLine = rImage.data();
+    unsigned int nSrcPitch = rImage.pitch();
+
+    for (size_t iLine = 0; iLine < rImage.height(); ++iLine)
+    {
+        memcpy(pDstLine, pSrcLine, rImage.width() * sizeof(Npp8u));
+        pSrcLine += nSrcPitch;
+        pDstLine -= nDstPitch;
+    }
+
+    // now save the result image
+    bool bSuccess;
+    bSuccess = FreeImage_Save(FIF_PGM, pResultBitmap, rFileName.c_str(), 0) == TRUE;
+    NPP_ASSERT_MSG(bSuccess, "Failed to save result image.");
+}
+
 
 inline int cudaDeviceInit(int argc, const char **argv)
 {
@@ -65,12 +91,12 @@ cudaError_t cuda_bayer_to_rgba(uint8_t *input, uint8_t *output, size_t width, si
     Npp8u nAlpha = 1;
 
     const NppStatus result = nppiCFAToRGBA_8u_C1AC4R(input, width * sizeof(uint8_t), size, roi,
-                                                     output, width * sizeof(uchar3),
+                                                     output, width * sizeof(uchar4),
                                                      grid, NPPI_INTER_UNDEFINED, nAlpha);
 
     if (result != 0)
     {
-        printf("cudaBayerToRGB() NPP error %\n", result);
+        printf("\ncudaBayerToRGB() NPP error %d \n", result);
         return cudaErrorUnknown;
     }
     return cudaSuccess;
@@ -85,7 +111,7 @@ int main(int argc, char *argv[])
     try
     {
         std::string sFilename;
-        char *filePath{"raw.RAW"};
+        char *filePath{"test_image.bmp"};
 
         cudaDeviceInit(argc, (const char **)argv);
 
@@ -129,32 +155,28 @@ int main(int argc, char *argv[])
         // load gray-scale image from disk
         npp::loadImage(sFilename, oHostSrc);
 
-
-
-
-
-
         // declare a device image and copy construct from the host image,
         // i.e. upload host to device
         npp::ImageNPP_8u_C1 oDeviceSrc(oHostSrc);
 
-
         NppiSize oSrcSize = {(int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
         // create struct with ROI size
         NppiSize oSizeROI = {(int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
-        // allocate device image of appropriately reduced size
-        npp::ImageNPP_8u_C1 oDeviceDst(oSizeROI.width, oSizeROI.height);
-        // set anchor point inside the mask to (oMaskSize.width / 2, oMaskSize.height / 2)
 
+        // allocate device image of appropriately reduced size
+        npp::ImageNPP_8u_C4 oDeviceDst(oSizeROI.width, oSizeROI.height);
         cuda_bayer_to_rgba(oDeviceSrc.data(), oDeviceDst.data(), oSizeROI.width, oSizeROI.height);
 
         // declare a host image for the result
-        npp::ImageCPU_8u_C1 oHostDst(oDeviceDst.size());
+        npp::ImageCPU_8u_C4 oHostDst(oDeviceDst.size());
         // and copy the device result data into it
         oDeviceDst.copyTo(oHostDst.data(), oHostDst.pitch());
+        printf("\nPitch oHostSrc: %d", oHostSrc.pitch());
 
-        saveImage(sResultFilename, oHostDst);
-        std::cout << "Saved image: " << sResultFilename << std::endl;
+        printf("\nPitch oHostDst: %d\n", oHostDst.pitch());
+
+        //saveColoredImage(sResultFilename, oHostDst);
+        // std::cout << "Saved image: " << sResultFilename << std::endl;
 
         nppiFree(oDeviceSrc.data());
         nppiFree(oDeviceDst.data());

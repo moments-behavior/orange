@@ -8,6 +8,7 @@
 #include "../UtilNPP/ImagesCPU.h"
 #include "../UtilNPP/ImageIO.h"
 
+
 inline int cudaDeviceInit(int argc, const char **argv)
 {
     int deviceCount;
@@ -84,7 +85,7 @@ int main(int argc, char *argv[])
     try
     {
         std::string sFilename;
-        char *filePath{"frame_069.raw"};
+        char *filePath{"raw.RAW"};
 
         cudaDeviceInit(argc, (const char **)argv);
 
@@ -127,6 +128,12 @@ int main(int argc, char *argv[])
         npp::ImageCPU_8u_C1 oHostSrc;
         // load gray-scale image from disk
         npp::loadImage(sFilename, oHostSrc);
+
+
+
+
+
+
         // declare a device image and copy construct from the host image,
         // i.e. upload host to device
         npp::ImageNPP_8u_C1 oDeviceSrc(oHostSrc);

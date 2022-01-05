@@ -47,3 +47,6 @@
 *.raw
 *.yuv
 *.RAW
+*.bgm
+*.png
+*.pgm

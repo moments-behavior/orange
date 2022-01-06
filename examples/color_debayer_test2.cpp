@@ -50,7 +50,7 @@ bool printfNPPinfo(int argc, char *argv[])
     return bVal;
 }
 
-cudaError_t cuda_bayer_to_rgba(uint8_t *input, uint8_t *output, size_t width, size_t height)
+cudaError_t cuda_bayer_to_rgb(uint8_t *input, uint8_t *output, size_t width, size_t height)
 {
     NppiSize size;
     size.width = width;
@@ -59,19 +59,14 @@ cudaError_t cuda_bayer_to_rgba(uint8_t *input, uint8_t *output, size_t width, si
     NppiRect roi;
     roi.x = 0;
     roi.y = 0;
-    roi.width = width-1;
-    roi.height = height-1;
+    roi.width = width;
+    roi.height = height;
 
     NppiBayerGridPosition grid;
     grid = NPPI_BAYER_GRBG; //NPPI_BAYER_RGGB;
-    
-    Npp8u nAlpha = 255;
-
-    printf("\nsize of uchar4 %ld", sizeof(uchar4));
-    printf("\nsize of uint8_t %ld", sizeof(uint8_t));
-    const NppStatus result = nppiCFAToRGBA_8u_C1AC4R(input, width * sizeof(uint8_t), size, roi,
-                                                     output, width * sizeof(uchar4),
-                                                     grid, NPPI_INTER_UNDEFINED, nAlpha);
+    const NppStatus result = nppiCFAToRGB_8u_C1C3R(input, width * sizeof(uint8_t), size, roi,
+                                                     output, width * sizeof(uchar3),
+                                                     grid, NPPI_INTER_UNDEFINED);
 
     if (result != 0)
     {
@@ -123,9 +118,6 @@ int main(int argc, char *argv[])
         // load gray-scale image from disk
         npp::loadImage(sFilename, oHostSrc);
 
-        // loading works
-        stbi_write_bmp("test_loading.bmp", 3208, 2200, 1, oHostSrc.data());
-
         // declare a device image and copy construct from the host image,
         // i.e. upload host to device
         npp::ImageNPP_8u_C1 oDeviceSrc(oHostSrc);
@@ -135,13 +127,13 @@ int main(int argc, char *argv[])
         NppiSize oSizeROI = {(int)oDeviceSrc.width(), (int)oDeviceSrc.height()};
 
         // allocate device image of appropriately reduced size
-        npp::ImageNPP_8u_C4 oDeviceDst(oSizeROI.width, oSizeROI.height);
+        npp::ImageNPP_8u_C3 oDeviceDst(oSizeROI.width, oSizeROI.height);
 
         //printf("\nprint value: %s", oDeviceSrc->data()(0, 0));
-        cuda_bayer_to_rgba((uint8_t *) oDeviceSrc.data(), (uint8_t *) oDeviceDst.data(), oSizeROI.width, oSizeROI.height);
+        cuda_bayer_to_rgb((uint8_t *) oDeviceSrc.data(), (uint8_t *) oDeviceDst.data(), oSizeROI.width, oSizeROI.height);
 
         // declare a host image for the result
-        npp::ImageCPU_8u_C4 oHostDst(oDeviceDst.size() );
+        npp::ImageCPU_8u_C3 oHostDst(oDeviceDst.size() );
         // and copy the device result data into it
         printf("pitch: %u\n", oHostDst.pitch());
         oDeviceDst.copyTo(oHostDst.data(), oHostDst.pitch());
@@ -162,7 +154,7 @@ int main(int argc, char *argv[])
         // *color_test = 255;
         // *(color_test + (3 * sizeof(Npp8u))) = 255;
         // stbi_write_bmp("color_test.bmp", 10, 10, 4, (void *) color_test);
-        stbi_write_bmp("test.bmp", (int)oHostDst.width(), (int)oHostDst.height(), 4, (void *) oHostDst.data());
+        stbi_write_bmp("test.bmp", (int)oHostDst.width(), (int)oHostDst.height(), 3, (void *) oHostDst.data());
         nppiFree(oDeviceSrc.data());
         nppiFree(oDeviceDst.data());
 

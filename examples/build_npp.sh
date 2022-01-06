@@ -1,2 +1,2 @@
-nvcc -ccbin g++ -I ./UtilNPP -I ./ -m64  -gencode arch=compute_80,code=compute_80 -o color_debayer_test color_debayer_test.cpp -I/usr/local/cuda-11.4/include -L/usr/local/cuda-11.4/lib64 \
+nvcc -ccbin g++ -I ./UtilNPP -I ./ -m64  -gencode arch=compute_75,code=compute_75 -o color_debayer_test3 color_debayer_test3.cpp -I/usr/local/cuda-11.4/include -L/usr/local/cuda-11.4/lib64 \
     -lcudart -lcuda -lnvcuvid -lnppisu_static -lnppif_static -lnppc_static -lculibos -lfreeimage -lnppim -lnppig -lnpps -lnppist -lnppc -lnppial -lnppicc

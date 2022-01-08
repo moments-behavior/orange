@@ -29,9 +29,10 @@ int main()
     {
         printf("Cuda Error");
     }
-
+    
+    int output_channels = 4;
     unsigned char *d_debayer;
-    cudaMalloc((void **)&d_debayer, size_pic * 3);
+    cudaMalloc((void **)&d_debayer, size_pic * output_channels);
 
     // debayer
     NppiSize size;
@@ -46,23 +47,23 @@ int main()
 
     NppiBayerGridPosition grid;
     grid = NPPI_BAYER_RGGB;
+    Npp8u nAlpha = 255;
 
     float start_time = tick();
-    const NppStatus npp_result = nppiCFAToRGB_8u_C1C3R(d_orig,
+    const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
                                                        width * sizeof(unsigned char),
                                                        size,
                                                        roi,
                                                        d_debayer,
-                                                       width * sizeof(uchar3),
+                                                       width * sizeof(uchar4),
                                                        grid,
-                                                       NPPI_INTER_UNDEFINED);
+                                                       NPPI_INTER_UNDEFINED,
+                                                       nAlpha);
     
     // not sure if it is just lighting fast for one frame, or ..., how to time it, write a clocl macro? 
     cudaDeviceSynchronize();
     float end_time = tick();
     float time_diff = end_time - start_time;
-    
-    
     printf("time for debayer (us): %.6f", time_diff * 1.0e6);
 
     if (npp_result != 0)
@@ -70,12 +71,12 @@ int main()
         printf("\nNPP error %d \n", npp_result);
     }
 
-    unsigned char *host_back = (unsigned char *)malloc(size_pic * 3);
-    result = cudaMemcpy(host_back, d_debayer, size_pic*3, cudaMemcpyDeviceToHost);
+    unsigned char *host_back = (unsigned char *)malloc(size_pic * output_channels);
+    result = cudaMemcpy(host_back, d_debayer, size_pic*output_channels, cudaMemcpyDeviceToHost);
     if (result != cudaSuccess)
     {
         printf("Cuda Error");
     }
 
-    stbi_write_bmp("picture_memory.bmp", width, height, 3, host_back);
+    stbi_write_bmp("picture_memory.bmp", width, height, output_channels, host_back);
 }

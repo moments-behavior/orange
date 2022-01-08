@@ -193,7 +193,6 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
 
     int camera_return {0};
 
-    //aquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
 
     unsigned short id_prev = 0, dropped_frames = 0;

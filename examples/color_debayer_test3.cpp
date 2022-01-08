@@ -7,6 +7,7 @@
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <nppi.h>
+#include "thread.h"
 
 int main()
 {
@@ -44,6 +45,8 @@ int main()
 
     NppiBayerGridPosition grid;
     grid = NPPI_BAYER_RGGB;
+
+    float start_time = tick();
     const NppStatus npp_result = nppiCFAToRGB_8u_C1C3R(d_orig,
                                                        width * sizeof(unsigned char),
                                                        size,
@@ -52,6 +55,12 @@ int main()
                                                        width * sizeof(uchar3),
                                                        grid,
                                                        NPPI_INTER_UNDEFINED);
+    cudaDeviceSynchronize();
+    float end_time = tick();
+    float time_diff = end_time - start_time;
+    
+    
+    printf("time for debayer (us): %.6f", time_diff * 1.0e6);
 
     if (npp_result != 0)
     {

@@ -2,7 +2,7 @@
 #include "video_capture.h"
 #include <opencv2/opencv.hpp>
 
-void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames)
+void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames, bool save_bmp)
 {
     int camera_return {0};
 
@@ -28,7 +28,12 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
             {
                 frames_recd++;
                 // TODO: program what to do with received frame 
-
+                if (save_bmp)
+                {
+                    string frame_name {};
+                    frame_name = "../frames/frame_%5d_.bmp" + frame_recv->frame_id;
+                    EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_FILETYPE_BMP, EVT_ALIGN_NONE); 
+                }
             }
         }
         else{dropped_frames++; printf("\nEVT_CameraGetFrame Error = %8.8x!\n", camera_return);}

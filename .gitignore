@@ -34,8 +34,6 @@
 # Build artifacts
 /targets/*
 /external/targets_nvenc
-*.bmp
-!img/*.bmp
 
 # Editor files
 *#*
@@ -50,3 +48,4 @@
 *.bgm
 *.png
 *.pgm
+*.bmp

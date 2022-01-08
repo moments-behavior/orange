@@ -72,7 +72,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     printf("\nNPP error %d \n", npp_result);
                 }
                 // encoding
-                       
+                        
 
             }
         }

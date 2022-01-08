@@ -34,10 +34,11 @@ int main(int argc, char **args)
         set_frame_buffer(&frame_recv, camera_params);
 
         int num_frames {1000};
-        //aquire_num_frames(&camera, &frame_recv, num_frames);
+        bool save_bmp_flag = true;
+        aquire_num_frames(&camera, &frame_recv, num_frames, save_bmp_flag);
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
-        aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
+        //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
         
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);

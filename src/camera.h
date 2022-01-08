@@ -2,6 +2,8 @@
 #define ORANGE_CAMERA
 
 #include "camera_driver_helper.h"
+#include <emergentcameradef.h>
+#include <emergentgigevisiondef.h>
 
 struct CameraParams{
     unsigned int width;

@@ -52,7 +52,7 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max));
     check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera,    "GevSCPSPacketSize", param_val_max));
 
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Gain", 256));
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Gain", 1000));
     check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Offset", 0));
 
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "LUTEnable", false));

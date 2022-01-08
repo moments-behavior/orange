@@ -14,11 +14,12 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
-    unsigned int frame_rate {100};
-    unsigned int gain {3000}; 
-    unsigned int exposure {5000};
-    string pixel_format = "YUV422Packed"; // "BayerRG8"; library support these two formats for now
-    string color_temp = "CT_3000K";
+    unsigned int frame_rate {50};
+    unsigned int gain {1000}; 
+    unsigned int exposure {4000};
+    //library support these two formats for now
+    string pixel_format = "BayerRG8"; // "YUV422Packed"; 
+    string color_temp = "CT_2800K";
 
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
@@ -33,9 +34,9 @@ int main(int argc, char **args)
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        int num_frames {1000};
+        int num_frames {100};
         bool save_bmp_flag = true;
-        aquire_num_frames(&camera, &frame_recv, num_frames, save_bmp_flag);
+        aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);

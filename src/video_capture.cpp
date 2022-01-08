@@ -2,7 +2,11 @@
 #include "video_capture.h"
 #include <opencv2/opencv.hpp>
 
-void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames, bool save_bmp)
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
+
+void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames, CameraParams camera_params, bool save_bmp)
 {
     int camera_return {0};
 
@@ -31,8 +35,10 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
                 if (save_bmp)
                 {
                     string frame_name {};
-                    frame_name = "../frames/frame_%5d_.bmp" + frame_recv->frame_id;
-                    EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_FILETYPE_BMP, EVT_ALIGN_NONE); 
+                    frame_name = "frames/frame_" + to_string(frame_recv->frame_id) + ".bmp";
+                    //camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_ALIGN_NONE, EVT_FILETYPE_BMP); 
+                    //if(camera_return){printf("Save failed...%d", camera_return);} 
+                    stbi_write_bmp(frame_name.c_str(), camera_params.width, camera_params.height, 1, frame_recv->imagePtr);
                 }
             }
         }

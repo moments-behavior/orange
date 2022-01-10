@@ -428,6 +428,7 @@ void ParseCommandLine(int argc, char *argv[], char *szInputFileName, int &nWidth
             oss << argv[++i] << " ";
         }
     }
+    printf("input string: %s", oss.str().c_str());
     initParam = NvEncoderInitParam(oss.str().c_str());
 }
 

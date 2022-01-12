@@ -10,6 +10,7 @@
 */
 
 #pragma once
+#include "Logger.h"
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -18,7 +19,6 @@
 #include <iterator>
 #include <cstring>
 #include <functional>
-#include "../Utils/Logger.h"
 
 extern simplelogger::Logger *logger;
 

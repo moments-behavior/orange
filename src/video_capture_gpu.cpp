@@ -1,5 +1,5 @@
 #include "video_capture_gpu.h"
-#include "thread.h"
+
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 

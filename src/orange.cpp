@@ -1,7 +1,7 @@
+#include "video_capture_gpu.h"
 #include <iostream>
 #include "camera.h"
 #include "video_capture.h"
-#include "video_capture_gpu.h"
 
 int main(int argc, char **args) 
 {
@@ -15,7 +15,7 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
-    unsigned int frame_rate {50};
+    unsigned int frame_rate {210};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     //library support these two formats for now
@@ -35,7 +35,7 @@ int main(int argc, char **args)
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        int num_frames {100};
+        int num_frames {1000};
         bool save_bmp_flag = true;
         //aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
         //aquire_and_display(&camera, &frame_recv, camera_params);

@@ -6,8 +6,8 @@
 #include <cuda_runtime_api.h>
 #include <nppi.h>
 #include "NvEncoder/NvEncoderCuda.h"
-#include "../Utils/NvEncoderCLIOptions.h"
-#include "../Utils/NvCodecUtils.h"
+#include "Utils/NvEncoderCLIOptions.h"
+#include "Utils/NvCodecUtils.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -34,7 +34,7 @@ int main()
 
     NV_ENC_BUFFER_FORMAT eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
     int iGpu = 0;
-    NvEncoderInitParam encodeCLIOptions;
+    NvEncoderInitParam encodeCLIOptions = NvEncoderInitParam("-preset p1");
     ck(cuInit(0));
     CUdevice cuDevice = 0;
     ck(cuDeviceGet(&cuDevice, iGpu));
@@ -54,6 +54,7 @@ int main()
     }
 
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, width, height, eFormat));
+
     InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
     // For receiving encoded packets
     std::vector<std::vector<uint8_t>> vPacket;

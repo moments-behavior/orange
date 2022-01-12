@@ -1,6 +1,7 @@
 #include <iostream>
 #include "camera.h"
 #include "video_capture.h"
+#include "video_capture_gpu.h"
 
 int main(int argc, char **args) 
 {
@@ -36,11 +37,12 @@ int main(int argc, char **args)
 
         int num_frames {100};
         bool save_bmp_flag = true;
-        aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
+        //aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-        
+        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params);
+
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }

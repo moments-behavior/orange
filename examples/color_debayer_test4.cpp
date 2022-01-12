@@ -49,7 +49,8 @@ int main()
     grid = NPPI_BAYER_RGGB;
     Npp8u nAlpha = 255;
 
-    float start_time = tick();
+    cudaDeviceSynchronize();
+    float start_time = tick();    
     const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
                                                        width * sizeof(unsigned char),
                                                        size,
@@ -61,11 +62,12 @@ int main()
                                                        nAlpha);
     
     // not sure if it is just lighting fast for one frame, or ..., how to time it, write a clocl macro? 
+    // cpu timer wouldn't work for this, need to gpu timer 
     cudaDeviceSynchronize();
     float end_time = tick();
     float time_diff = end_time - start_time;
-    printf("time for debayer (us): %.6f", time_diff * 1.0e6);
-
+    printf("time for debayer (s): %f \n", time_diff);
+    
     if (npp_result != 0)
     {
         printf("\nNPP error %d \n", npp_result);

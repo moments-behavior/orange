@@ -1,9 +1,26 @@
 #include "video_capture_gpu.h"
 #include "thread.h"
 
+simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
+
+template <class EncoderClass>
+void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, NV_ENC_BUFFER_FORMAT eFormat)
+{
+    NV_ENC_INITIALIZE_PARAMS initializeParams = {NV_ENC_INITIALIZE_PARAMS_VER};
+    NV_ENC_CONFIG encodeConfig = {NV_ENC_CONFIG_VER};
+
+    initializeParams.encodeConfig = &encodeConfig;
+    pEnc->CreateDefaultEncoderParams(&initializeParams, encodeCLIOptions.GetEncodeGUID(), encodeCLIOptions.GetPresetGUID(), encodeCLIOptions.GetTuningInfo());
+    encodeCLIOptions.SetInitParams(&initializeParams, eFormat);
+
+    pEnc->CreateEncoder(&initializeParams);
+}
+
+
 // gpu pipelin, raw bayer images as input
 void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params)
 {
+    
     int camera_return{0};
 
     unsigned int size_of_buffer;
@@ -13,6 +30,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
 
+
+
+    // modularize these parts: 1. debayer; 2. encoding; 3. write to file  
     // gpu: upload raw images and color debayer
     int output_channels = 4;
     unsigned char *d_orig;
@@ -21,8 +41,41 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned char *d_debayer;
     cudaMalloc((void **)&d_debayer, size_pic * output_channels);
 
-    check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
+    // for encoding purpose 
+    NV_ENC_BUFFER_FORMAT eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
+    int iGpu = 0;
+    NvEncoderInitParam encodeCLIOptions = NvEncoderInitParam("-preset p1");
+    ck(cuInit(0));
+    CUdevice cuDevice = 0;
+    ck(cuDeviceGet(&cuDevice, iGpu));
+    char szDeviceName[80];
+    ck(cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice));
+    std::cout << "GPU in use: " << szDeviceName << std::endl;
+    CUcontext cuContext = NULL;
+    ck(cuCtxCreate(&cuContext, 0, cuDevice));
 
+    // Open output file
+    char szOutFilePath[256] = "frames_encode.mp4"; // the header file is a bit wacky
+    std::ofstream fpOut(szOutFilePath, std::ios::out | std::ios::binary);
+    if (!fpOut)
+    {
+        std::ostringstream err;
+        err << "Unable to open output file: " << szOutFilePath << std::endl;
+        throw std::invalid_argument(err.str());
+    }
+
+    std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
+
+    InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
+    // For receiving encoded packets
+    std::vector<std::vector<uint8_t>> vPacket;
+    int num_frame_encode = 0;
+
+
+
+
+    // start acquisition
+    check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     float start_time = tick();
     for (int frame_count = 0; frame_count < num_frames; frame_count++)
     {
@@ -72,8 +125,25 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     printf("\nNPP error %d \n", npp_result);
                 }
                 // encoding
-                        
-
+                const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
+                NvEncoderCuda::CopyToDeviceFrame(cuContext,
+                                                d_debayer,
+                                                0,
+                                                (CUdeviceptr)encoderInputFrame->inputPtr,
+                                                (int)encoderInputFrame->pitch,
+                                                pEnc->GetEncodeWidth(),
+                                                pEnc->GetEncodeHeight(),
+                                                CU_MEMORYTYPE_DEVICE,
+                                                encoderInputFrame->bufferFormat,
+                                                encoderInputFrame->chromaOffsets,
+                                                encoderInputFrame->numChromaPlanes);
+                pEnc->EncodeFrame(vPacket);
+                num_frame_encode += (int)vPacket.size();                        
+                for (std::vector<uint8_t> &packet : vPacket)
+                {
+                    // For each encoded packet
+                    fpOut.write(reinterpret_cast<char *>(packet.data()), packet.size());
+                }
             }
         }
         else

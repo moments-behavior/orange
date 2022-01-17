@@ -72,7 +72,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     int num_frame_encode = 0;
 
 
-
+    // ConcurrentQueue<int> frameFeeder;
 
     // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
@@ -138,7 +138,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                                                 encoderInputFrame->chromaOffsets,
                                                 encoderInputFrame->numChromaPlanes);
                 pEnc->EncodeFrame(vPacket);
-                num_frame_encode += (int)vPacket.size();                        
+                num_frame_encode += (int)vPacket.size(); 
                 for (std::vector<uint8_t> &packet : vPacket)
                 {
                     // For each encoded packet
@@ -180,6 +180,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     float time_diff = end_time - start_time;
 
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStop"));
+    // newly added, need test
+    pEnc->EndEncode(vPacket);
+    pEnc->DestroyEncoder();
 
     //Report stats
     printf("\n");

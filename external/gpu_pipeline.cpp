@@ -8,7 +8,13 @@
 #include "NvEncoder/NvEncoderCuda.h"
 #include "Utils/NvEncoderCLIOptions.h"
 #include "Utils/NvCodecUtils.h"
-#include "Utils/FFmpegStreamer.h"
+#include "Utils/FFmpegWriter.h"
+// extern "C" {
+// #include <libavformat/avformat.h>
+// #include <libavutil/opt.h>
+// #include <libswresample/swresample.h>
+// };
+
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -56,9 +62,59 @@ int main()
 
 
     // try ffmpeg writer 
-    FFmpegStreamer streamer(AV_CODEC_ID_H264, width, height, 25, "tcp://127.0.0.1:8899");
+    const char *szMediaUri = "frames_encode.mp4";
+    FFmpegWriter writer(AV_CODEC_ID_H264, width, height, 30, szMediaUri);
+    // AVFormatContext *oc = NULL;
+    // AVStream *vs = NULL;
+    // int nFps = 0;
+
+    // oc = avformat_alloc_context();
+    //     if (!oc) {
+    //         //LOG(ERROR) << "FFMPEG: avformat_alloc_context error";
+    //         std::cout << "FFMPEG: avformat_alloc_context error" << std::endl;
+    //     }
+
+    //     // Set format on oc
+    //     AVOutputFormat *fmt = av_guess_format("mpegts",  NULL, NULL);
+    //     std::cout << fmt->video_codec << std::endl;
+    //     std::cout << "Here" << std::endl;
+
+    //     //AVOutputFormat *fmt = const_cast<AVOutputFormat *>(const_fmt);
+    //     if (!fmt) {
+    //         // LOG(ERROR) << "Invalid format";
+    //         std::cout << "Invalid format" << std::endl;
+    //     }
+    //     fmt->video_codec = AV_CODEC_ID_H264;
+    //     oc->oformat = fmt;
 
 
+    //     // Add video stream to oc
+    //     vs = avformat_new_stream(oc, NULL);
+    //     if (!vs) {
+    //         //LOG(ERROR) << "FFMPEG: Could not alloc video stream";
+    //         std::cout << "FFMPEG: Could not alloc video stream" << std::endl;
+    //     }
+    //     vs->id = 0;
+
+    //     // Set video parameters
+    //     AVCodecParameters *vpar = vs->codecpar;
+    //     vpar->codec_id = fmt->video_codec;
+    //     vpar->codec_type = AVMEDIA_TYPE_VIDEO;
+    //     vpar->width = width;
+    //     vpar->height = height;
+
+    //     // Everything is ready. Now open the output stream.
+    //     if (avio_open(&oc->pb, szOutFilePath, AVIO_FLAG_WRITE) < 0) {
+    //         //LOG(ERROR) << "FFMPEG: Could not open " << szOutFilePath;
+    //         std::cout << "FFMPEG: Could not open " << std::endl;
+    //     }
+
+    //     // Write the container header
+    //     if (avformat_write_header(oc, NULL)) {
+    //         //LOG(ERROR) << "FFMPEG: avformat_write_header error!";
+    //         std::cout << "FFMPEG: avformat_write_header error!" << std::endl;
+    //     }
+    //     std::cout << "Here" << std::endl;
 
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, width, height, eFormat));
 
@@ -151,7 +207,7 @@ int main()
         {
             // For each encoded packet
             //fpOut.write(reinterpret_cast<char *>(packet.data()), packet.size());
-                streamer.Stream(packet.data(), (int)packet.size(), nFrame++);
+            writer.Write(packet.data(), (int)packet.size(), nFrame++);
 
         }
     }
@@ -162,7 +218,7 @@ int main()
     {
         // For each encoded packet
         //fpOut.write(reinterpret_cast<char *>(packet.data()), packet.size());
-        streamer.Stream(packet.data(), (int)packet.size(), nFrame++);
+        writer.Write(packet.data(), (int)packet.size(), nFrame++);
 
     }
     pEnc->DestroyEncoder();

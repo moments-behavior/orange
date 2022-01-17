@@ -95,7 +95,6 @@ public:
             std::cout << "FFMPEG: Error while writing video frame" << std::endl;
 
         }
-
         return true;
     }
 };

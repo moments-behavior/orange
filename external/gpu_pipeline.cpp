@@ -8,6 +8,7 @@
 #include "NvEncoder/NvEncoderCuda.h"
 #include "Utils/NvEncoderCLIOptions.h"
 #include "Utils/NvCodecUtils.h"
+#include "Utils/FFmpegStreamer.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -45,58 +46,75 @@ int main()
     ck(cuCtxCreate(&cuContext, 0, cuDevice));
 
     // Open output file
-    std::ofstream fpOut(szOutFilePath, std::ios::out | std::ios::binary);
-    if (!fpOut)
-    {
-        std::ostringstream err;
-        err << "Unable to open output file: " << szOutFilePath << std::endl;
-        throw std::invalid_argument(err.str());
-    }
+    // std::ofstream fpOut(szOutFilePath, std::ios::out | std::ios::binary);
+    // if (!fpOut)
+    // {
+    //     std::ostringstream err;
+    //     err << "Unable to open output file: " << szOutFilePath << std::endl;
+    //     throw std::invalid_argument(err.str());
+    // }
+
+
+    // try ffmpeg writer 
+    FFmpegStreamer streamer(AV_CODEC_ID_H264, width, height, 25, "tcp://127.0.0.1:8899");
+
+
 
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, width, height, eFormat));
 
     InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
     // For receiving encoded packets
     std::vector<std::vector<uint8_t>> vPacket;
+    
+    unsigned char *d_orig;
+    int size_pic = width * height * channel * sizeof(unsigned char);
+    cudaMalloc((void **)&d_orig, size_pic);
+    
+    int output_channels = 4;
+    unsigned char *d_debayer;
+    cudaMalloc((void **)&d_debayer, size_pic * output_channels);
+    // debayer
+    NppiSize size;
+    size.width = width;
+    size.height = height;
 
-    int num_frame_encode = 0;
-    for (int frame_id = 1; frame_id <= 100; frame_id++)
+    NppiRect roi;
+    roi.x = 0;
+    roi.y = 0;
+    roi.width = width;
+    roi.height = height;
+
+    NppiBayerGridPosition grid;
+    grid = NPPI_BAYER_RGGB;
+    Npp8u nAlpha = 255;
+
+    // allocate memory for picture array 
+    std::vector<unsigned char*> frame_vector (100);
+
+    std::cout << "Loading" << std::endl;
+    for (int picture_count = 0; picture_count < 100; picture_count++)
     {
+        // load pictures first
+        frame_name = "/home/ash/src/orange/frames/frame_" + std::to_string(picture_count+1) + ".bmp";
+        frame_vector[picture_count] = stbi_load(frame_name.c_str(), &width, &height, &channel, 1);
+    }
 
-        // load next frames
-        frame_name = "/home/ash/src/orange/frames/frame_" + std::to_string(frame_id) + ".bmp";
-        unsigned char *picture_memory = stbi_load(frame_name.c_str(), &width, &height, &channel, 1);
+    //int num_frame_encode = 0;
+    int nFrame = 0;
+    StopWatch w;
+    w.Start();
+    std::cout << "Start encoding..." << std::endl;
+    for (int frame_id = 0; frame_id < 100; frame_id++)
+    {
         channel = 1;
+        // load next frames
+        cudaError_t result = cudaMemcpy(d_orig, frame_vector[frame_id], size_pic, cudaMemcpyHostToDevice);
 
-        unsigned char *d_orig;
-        int size_pic = width * height * channel * sizeof(unsigned char);
-        cudaMalloc((void **)&d_orig, size_pic);
-
-        cudaError_t result = cudaMemcpy(d_orig, picture_memory, size_pic, cudaMemcpyHostToDevice);
-
+        //std::cout << frame_id << std::endl;
         if (result != cudaSuccess)
         {
-            printf("Cuda Error");
+            std::cout << "Cuda Error, here?" << frame_id << std::endl;
         }
-
-        int output_channels = 4;
-        unsigned char *d_debayer;
-        cudaMalloc((void **)&d_debayer, size_pic * output_channels);
-
-        // debayer
-        NppiSize size;
-        size.width = width;
-        size.height = height;
-
-        NppiRect roi;
-        roi.x = 0;
-        roi.y = 0;
-        roi.width = width;
-        roi.height = height;
-
-        NppiBayerGridPosition grid;
-        grid = NPPI_BAYER_RGGB;
-        Npp8u nAlpha = 255;
 
         const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
                                                              width * sizeof(unsigned char),
@@ -111,10 +129,9 @@ int main()
         {
             printf("\nNPP error %d \n", npp_result);
         }
-
+        // cudaDeviceSynchronize();
         // encode
         const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
-
         NvEncoderCuda::CopyToDeviceFrame(cuContext,
                                          d_debayer,
                                          0,
@@ -126,20 +143,31 @@ int main()
                                          encoderInputFrame->bufferFormat,
                                          encoderInputFrame->chromaOffsets,
                                          encoderInputFrame->numChromaPlanes);
+
+
         pEnc->EncodeFrame(vPacket);
-
-        num_frame_encode += (int)vPacket.size();
-
+        //num_frame_encode += (int)vPacket.size();
         for (std::vector<uint8_t> &packet : vPacket)
         {
             // For each encoded packet
-            fpOut.write(reinterpret_cast<char *>(packet.data()), packet.size());
+            //fpOut.write(reinterpret_cast<char *>(packet.data()), packet.size());
+                streamer.Stream(packet.data(), (int)packet.size(), nFrame++);
+
         }
     }
-    pEnc->EndEncode(vPacket);
-    pEnc->DestroyEncoder();
-    std::cout << "Total frames encoded: " << num_frame_encode << std::endl;
-    fpOut.close();
-    std::cout << "Bitstream saved in file " << szOutFilePath << std::endl;
 
+    pEnc->EndEncode(vPacket);
+    //num_frame_encode += (int)vPacket.size();
+    for (std::vector<uint8_t> &packet : vPacket)
+    {
+        // For each encoded packet
+        //fpOut.write(reinterpret_cast<char *>(packet.data()), packet.size());
+        streamer.Stream(packet.data(), (int)packet.size(), nFrame++);
+
+    }
+    pEnc->DestroyEncoder();
+    //fpOut.close();
+    double t = w.Stop();
+    std::cout << "Total frames encoded: " << nFrame << " frames, in: " << t << " seconds, " << "FPS: " << (double)nFrame/t << std::endl;
+    std::cout << "Bitstream saved in file " << szOutFilePath << std::endl;
 }

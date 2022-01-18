@@ -35,7 +35,7 @@ int main()
 
     NV_ENC_BUFFER_FORMAT eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
     int iGpu = 0;
-    NvEncoderInitParam encodeCLIOptions = NvEncoderInitParam("-preset p1");
+    NvEncoderInitParam encodeCLIOptions = NvEncoderInitParam("-preset p1 -fps 50");
     ck(cuInit(0));
     CUdevice cuDevice = 0;
     ck(cuDeviceGet(&cuDevice, iGpu));

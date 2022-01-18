@@ -4,11 +4,18 @@
 #include "video_capture.h"
 #include <thread>
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info)
+void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id)
 {
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
+    
+    string file_name = "camera_" + to_string(thread_id) + ".mp4"; 
+    const char *output_file= file_name.c_str();
+    
+    string encoder_setup = "-preset p1 -fps " + to_string(camera_params.frame_rate);
+    const char *encoder_str = encoder_setup.c_str();
+    // std::cout << encoder_str << std::endl; 
 
     try{
         open_camera_with_params(&camera, device_info, camera_params);        
@@ -23,7 +30,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params);
+        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str);
 
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
@@ -48,7 +55,7 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
-    unsigned int frame_rate {210};
+    unsigned int frame_rate {150};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     //library support these two formats for now
@@ -56,7 +63,7 @@ int main(int argc, char **args)
     string color_temp = "CT_2800K";
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
-    std::thread camera_thread_0(&start_one_camera, camera_params, &device_info[0]);
+    std::thread camera_thread_0(&start_one_camera, camera_params, &device_info[0], 0);
     
     camera_thread_0.join(); 
     return 0;

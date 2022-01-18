@@ -1,4 +1,6 @@
 #include "video_capture_gpu.h"
+#include "FFmpegWriter.h"
+
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -17,9 +19,8 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str)
 {
-    
     int camera_return{0};
 
     unsigned int size_of_buffer;
@@ -29,9 +30,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
 
-
-
-    // modularize these parts: 1. debayer; 2. encoding; 3. write to file  
+    // modularize these parts: 1. debayer; 2. encoding; 
     // gpu: upload raw images and color debayer
     int output_channels = 4;
     unsigned char *d_orig;
@@ -43,7 +42,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     // for encoding purpose 
     NV_ENC_BUFFER_FORMAT eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
     int iGpu = 0;
-    NvEncoderInitParam encodeCLIOptions = NvEncoderInitParam("-preset p1");
+    NvEncoderInitParam encodeCLIOptions = NvEncoderInitParam(encoder_str);
     ck(cuInit(0));
     CUdevice cuDevice = 0;
     ck(cuDeviceGet(&cuDevice, iGpu));
@@ -52,30 +51,35 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     std::cout << "GPU in use: " << szDeviceName << std::endl;
     CUcontext cuContext = NULL;
     ck(cuCtxCreate(&cuContext, 0, cuDevice));
-
-    // Open output file
-    char szOutFilePath[256] = "frames_encode.mp4"; // the header file is a bit wacky
-    std::ofstream fpOut(szOutFilePath, std::ios::out | std::ios::binary);
-    if (!fpOut)
-    {
-        std::ostringstream err;
-        err << "Unable to open output file: " << szOutFilePath << std::endl;
-        throw std::invalid_argument(err.str());
-    }
-
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
+
+    // debayer
+    NppiSize size;
+    size.width = camera_params.width;
+    size.height = camera_params.height;
+    Npp8u nAlpha = 255;
+
+    NppiRect roi;
+    roi.x = 0;
+    roi.y = 0;
+    roi.width = camera_params.width;
+    roi.height = camera_params.height;
+
+    NppiBayerGridPosition grid;
+    grid = NPPI_BAYER_RGGB;
+
 
     InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
     // For receiving encoded packets
     std::vector<std::vector<uint8_t>> vPacket;
     int num_frame_encode = 0;
 
-
-    // ConcurrentQueue<int> frameFeeder;
-
+    // for writing 
+    FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
     // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
-    float start_time = tick();
+    StopWatch w;
+    w.Start();
     for (int frame_count = 0; frame_count < num_frames; frame_count++)
     {
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
@@ -94,22 +98,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     printf("Cuda Error");
                 }
 
-                // debayer
-                NppiSize size;
-                size.width = camera_params.width;
-                size.height = camera_params.height;
-                Npp8u nAlpha = 255;
-
-                NppiRect roi;
-                roi.x = 0;
-                roi.y = 0;
-                roi.width = camera_params.width;
-                roi.height = camera_params.height;
-
-                NppiBayerGridPosition grid;
-                grid = NPPI_BAYER_RGGB;
-
-                float start_time = tick();
                 const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
                                                                      camera_params.width * sizeof(unsigned char),
                                                                      size,
@@ -137,11 +125,12 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                                                 encoderInputFrame->chromaOffsets,
                                                 encoderInputFrame->numChromaPlanes);
                 pEnc->EncodeFrame(vPacket);
-                num_frame_encode += (int)vPacket.size(); 
+                // num_frame_encode += (int)vPacket.size(); 
                 for (std::vector<uint8_t> &packet : vPacket)
                 {
                     // For each encoded packet
-                    fpOut.write(reinterpret_cast<char *>(packet.data()), packet.size());
+                    writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
+
                 }
             }
         }
@@ -175,17 +164,20 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         if (dropped_frames >= 100)
             break;
     }
-    float end_time = tick();
-    float time_diff = end_time - start_time;
 
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStop"));
-    // newly added, need test
     pEnc->EndEncode(vPacket);
-    pEnc->DestroyEncoder();
+    for (std::vector<uint8_t> &packet : vPacket)
+    {
+        writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
 
+    }
+    pEnc->DestroyEncoder();
+    double time_diff = w.Stop();
     //Report stats
     printf("\n");
     printf("Images Captured: \t%d\n", frames_recd);
+    printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
 }

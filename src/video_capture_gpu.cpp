@@ -1,7 +1,6 @@
 #include "video_capture_gpu.h"
 #include "FFmpegWriter.h"
 
-
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
 template <class EncoderClass>
@@ -19,7 +18,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index)
 {
     int camera_return{0};
 
@@ -41,11 +40,13 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // for encoding purpose 
     NV_ENC_BUFFER_FORMAT eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
-    int iGpu = 0;
     NvEncoderInitParam encodeCLIOptions = NvEncoderInitParam(encoder_str);
     ck(cuInit(0));
     CUdevice cuDevice = 0;
-    ck(cuDeviceGet(&cuDevice, iGpu));
+
+    // specify which gpu
+    ck(cuDeviceGet(&cuDevice, gpu_index));
+
     char szDeviceName[80];
     ck(cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice));
     std::cout << "GPU in use: " << szDeviceName << std::endl;

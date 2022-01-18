@@ -10,7 +10,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
     Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
     
-    string file_name = "camera_" + to_string(thread_id) + ".mp4"; 
+    string file_name = "video/camera_" + to_string(thread_id) + ".mp4"; 
     const char *output_file= file_name.c_str();
     
     string encoder_setup = "-preset p1 -fps " + to_string(camera_params.frame_rate);
@@ -30,7 +30,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str);
+        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str, thread_id);
 
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
@@ -63,8 +63,16 @@ int main(int argc, char **args)
     string color_temp = "CT_2800K";
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
-    std::thread camera_thread_0(&start_one_camera, camera_params, &device_info[0], 0);
+
+    int num_cameras = 1;
+    std::vector<thread> camera_threads;
+
+    for(int camera_id = 0; camera_id < num_cameras; camera_id++)
+    {
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id));
+    }
     
-    camera_thread_0.join(); 
+    for (auto& t : camera_threads)
+        t.join();
     return 0;
 }

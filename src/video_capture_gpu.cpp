@@ -29,6 +29,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
 
+    ck(cudaSetDevice(gpu_index));
     // modularize these parts: 1. debayer; 2. encoding; 
     // gpu: upload raw images and color debayer
     int output_channels = 4;

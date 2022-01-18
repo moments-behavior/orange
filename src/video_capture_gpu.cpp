@@ -1,6 +1,5 @@
 #include "video_capture_gpu.h"
 
-
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
 template <class EncoderClass>
@@ -17,7 +16,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 }
 
 
-// gpu pipelin, raw bayer images as input
+// gpu pipeline, raw bayer images as input
 void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params)
 {
     

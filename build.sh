@@ -5,7 +5,7 @@ g++ -Ofast -ffast-math -std=c++14 \
     -o targets/*.o \
     -o targets/orange -I ./src/ src/*.cpp \
     -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
-    -I/home/ash/nvenc_api/include -I/usr/include/opencv4 -I/opt/EVT/eSDK/include/ -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I/usr/local/cuda-11.4/include \
+    -I./nvenc_api/include -I/usr/include/opencv4 -I/opt/EVT/eSDK/include/ -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I/usr/local/cuda-11.4/include \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
     -lm \
     -lpthread \

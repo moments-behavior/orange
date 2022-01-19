@@ -189,5 +189,17 @@ void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergent
 
 }
 
+void force_ip_onto_closed_camera(const char* macAddress, const char* ipAddress, const char* subnetMask, const char* defaultGateway)
+{
+    check_camera_errors(Emergent::EVT_ForceIPEx(macAddress, ipAddress, subnetMask, defaultGateway));
+}
 
 
+// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip.
+void change_camera_ip(GigEVisionDeviceInfo* device_info, int camera_idx, const char* new_ip)
+{
+    const char* mac_address = device_info[camera_idx].macAddress;
+    const char* subnet_mask = device_info[camera_idx].currentSubnetMask;
+    const char* default_gateway = device_info[0].defaultGateway;
+    check_camera_errors(Emergent::EVT_ForceIPEx(mac_address, new_ip, subnet_mask, default_gateway));
+}

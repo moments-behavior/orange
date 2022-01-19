@@ -10,7 +10,13 @@ int main(int argc, char **args)
     {
         return 0;
     }
-    
+
+
+    const char* new_ip = "192.168.1.89";
+    change_camera_ip(device_info, 0, new_ip);
+    print_camera_device_struct(device_info, 0);
+
+
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
@@ -30,11 +36,11 @@ int main(int argc, char **args)
     Emergent::CEmergentFrame frame_recv;
     set_frame_buffer(&frame_recv, camera_params);
 
-    int num_frames {1000};
+    //int num_frames {1000};
     //aquire_num_frames(&camera, &frame_recv, num_frames);
     //aquire_and_display(&camera, &frame_recv, camera_params);
     //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
-    aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
+    //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
 
 
 

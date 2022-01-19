@@ -28,4 +28,5 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size);
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
+void change_camera_ip(GigEVisionDeviceInfo* device_info, int camera_idx, const char* new_ip);
 #endif

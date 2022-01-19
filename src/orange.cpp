@@ -78,7 +78,7 @@ int main(int argc, char **args)
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
 
-    int num_cameras = 4;
+    int num_cameras = 6;
     std::vector<thread> camera_threads;
 
     for(int camera_id = 0; camera_id < num_cameras; camera_id++)

@@ -12,7 +12,7 @@ int main(int argc, char **args)
     }
 
 
-    //const char* new_ip = "192.168.2.39";
+    //const char* new_ip = "192.168.1.89";
     //change_camera_ip(device_info, 0, new_ip);
     print_camera_device_struct(device_info, 0);
 

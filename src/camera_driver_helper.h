@@ -25,6 +25,4 @@ inline void __check_camera_errors(EVT_ERROR err, const char *file, const int lin
   }
 }
 
-void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx);
-
 #endif

@@ -25,30 +25,30 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         gpu_idx = 1;
     }
 
-    // try{
-    //     open_camera_with_params(&camera, device_info, camera_params);        
-    //     allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
+    try{
+        open_camera_with_params(&camera, device_info, camera_params);        
+        allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
 
-    //     Emergent::CEmergentFrame frame_recv;
-    //     set_frame_buffer(&frame_recv, camera_params);
+        Emergent::CEmergentFrame frame_recv;
+        set_frame_buffer(&frame_recv, camera_params);
 
-    //     int num_frames {1000};
-    //     bool save_bmp_flag = true;
-    //     //aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
-    //     //aquire_and_display(&camera, &frame_recv, camera_params);
-    //     //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
-    //     //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-    //     aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str, gpu_idx);
+        int num_frames {1000};
+        bool save_bmp_flag = true;
+        //aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
+        //aquire_and_display(&camera, &frame_recv, camera_params);
+        //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
+        //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
+        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str, gpu_idx);
 
-    //     destroy_frame_buffer(&camera, evt_frame, buffer_size);
-    //     close_camera(&camera);
-    // }
-    // catch(int &ex)
-    // {
-    //     printf("\nError...");
-    //     destroy_frame_buffer(&camera, evt_frame, buffer_size);
-    //     close_camera(&camera);
-    // }
+        destroy_frame_buffer(&camera, evt_frame, buffer_size);
+        close_camera(&camera);
+    }
+    catch(int &ex)
+    {
+        printf("\nError...");
+        destroy_frame_buffer(&camera, evt_frame, buffer_size);
+        close_camera(&camera);
+    }
 }
 
 int main(int argc, char **args) 
@@ -60,16 +60,18 @@ int main(int argc, char **args)
         return 0;
     }
 
-    print_camera_device_struct(device_info, 0);
-    print_camera_device_struct(device_info, 1);
-    print_camera_device_struct(device_info, 2);
-    print_camera_device_struct(device_info, 3);
+    int num_cameras = 4;
+    //set_rigroom_camera_ip(device_info, num_cameras);
 
+    for (int camera_id = 0; camera_id < num_cameras; camera_id ++)
+    {
+        print_camera_device_struct(device_info, camera_id);
+    }
 
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
-    unsigned int frame_rate {100};
+    unsigned int frame_rate {200};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     //library support these two formats for now
@@ -78,7 +80,6 @@ int main(int argc, char **args)
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
 
-    int num_cameras = 6;
     std::vector<thread> camera_threads;
 
     for(int camera_id = 0; camera_id < num_cameras; camera_id++)
@@ -88,5 +89,6 @@ int main(int argc, char **args)
     
     for (auto& t : camera_threads)
         t.join();
+    
     return 0;
 }

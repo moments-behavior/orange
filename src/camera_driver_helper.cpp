@@ -82,11 +82,10 @@ string get_evt_error_string(EVT_ERROR error)
 
 void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx)
 {
-    std::cout << "Camera: " << camera_idx << std::endl;
-    std::cout << "userDefinedName: " << device_info[camera_idx].userDefinedName << std::endl;
-    std::cout << "deviceMode: " << device_info[camera_idx].deviceMode << std::endl;
-    std::cout << "serialNumber: " << device_info[camera_idx].serialNumber << std::endl;
-    std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
-    std::cout << "currentIp: " << device_info[camera_idx].currentIp << std::endl;
-    std::cout << "nic.ip4Address: " << device_info[camera_idx].nic.ip4Address << std::endl;
+    std::cout << "serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp  <<std::endl;
+    //std::cout << "Camera: " << camera_idx << std::endl;
+    //std::cout << "userDefinedName: " << device_info[camera_idx].userDefinedName << std::endl;
+    //std::cout << "deviceMode: " << device_info[camera_idx].deviceMode << std::endl;
+    //std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
+    //std::cout << "nic.ip4Address: " << device_info[camera_idx].nic.ip4Address << std::endl;
 }

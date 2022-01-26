@@ -32,7 +32,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        int num_frames {1000};
+        int num_frames {10000};
         bool save_bmp_flag = true;
         //aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
         //aquire_and_display(&camera, &frame_recv, camera_params);

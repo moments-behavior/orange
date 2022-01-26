@@ -4,7 +4,7 @@
 #include "video_capture.h"
 #include <thread>
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id)
+void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id, int* key_num_ptr)
 {
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
@@ -32,13 +32,11 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        int num_frames {10000};
-        bool save_bmp_flag = true;
         //aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str, gpu_idx);
+        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr);
 
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
@@ -79,16 +77,28 @@ int main(int argc, char **args)
     string color_temp = "CT_2800K";
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
-
     std::vector<thread> camera_threads;
+
+    // esc to exit 
+    int key_num;
+    int* key_num_ptr = &key_num;  
 
     for(int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id));
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id, key_num_ptr));
     }
-    
+
+
+    // main thread event loop
+    while (true){
+        key_num = getchar();
+        if(key_num == 27) break;
+    }
+
+    // wait for threads to join
     for (auto& t : camera_threads)
-        t.join();
+            t.join();
     
+
     return 0;
 }

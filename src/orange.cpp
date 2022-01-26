@@ -58,8 +58,10 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 2;
-    set_rigroom_camera_ip(device_info, num_cameras);
+    int num_cameras = 4;
+
+    // only reset after power cycle 
+    //set_rigroom_camera_ip(device_info, num_cameras); 
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
@@ -88,11 +90,14 @@ int main(int argc, char **args)
         camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id, key_num_ptr));
     }
 
-
     // main thread event loop
     while (true){
         key_num = getchar();
-        if(key_num == 27) break;
+        if(key_num == 27)
+            {
+                std::cout << "ESC pressed. Quit program." << std::endl;
+                break;
+            }
     }
 
     // wait for threads to join

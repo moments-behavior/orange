@@ -248,7 +248,6 @@ void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergen
         if(strcmp(device_info[cam_id].serialNumber, "710032") == 0)
         {
             change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id],"192.168.2.69");
-            check_camera_errors(Emergent::EVT_CameraSetUInt32Param(&camera[cam_id], "userDefinedName", 'camera_0'));
         }
 
         if(strcmp(device_info[cam_id].serialNumber, "710041") == 0)

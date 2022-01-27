@@ -11,7 +11,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 1;
+    int num_cameras = 4;
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
         print_camera_device_struct(device_info, camera_id);
@@ -29,13 +29,21 @@ int main(int argc, char **args)
     Emergent::CEmergentCamera camera[num_cameras];
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
     
-    // for (int camera_id = 0; camera_id < num_cameras; camera_id++)
-    // {
-    //     open_camera_with_params(&camera[camera_id], &device_info[camera_id], camera_params);
-    // }
+    for (int camera_id = 0; camera_id < num_cameras; camera_id++)
+    {
+        open_camera_with_params(&camera[camera_id], &device_info[camera_id], camera_params);
+    }
 
-    // // change ip address in persistent memory
-    // set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
+    // change ip address in persistent memory
+    //set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
+
+    for (int camera_id = 0; camera_id < num_cameras; camera_id++)
+    {
+        close_camera(&camera[camera_id]);
+    }
+
+    return 0;
+
 
     //**************************************
     // legacy
@@ -55,11 +63,4 @@ int main(int argc, char **args)
     // destroy_frame_buffer(&camera, evt_frame, buffer_size);
     //*****************************************
 
-
-    // for (int camera_id = 0; camera_id < num_cameras; camera_id++)
-    // {
-    //     close_camera(&camera[camera_id]);
-    // }
-
-    // return 0;
 }

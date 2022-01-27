@@ -202,7 +202,7 @@ void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_id
 }
 
 
-// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip.
+// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip. non persistent 
 void change_camera_ip(GigEVisionDeviceInfo* device_info, const char* new_ip)
 {
     const char* mac_address = device_info->macAddress;

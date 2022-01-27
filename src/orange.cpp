@@ -4,13 +4,24 @@
 #include "video_capture.h"
 #include <thread>
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id, int* key_num_ptr)
+// Get current date/time, format is YYYY-MM-DD.HH:mm:ss
+const std::string current_date_time() {
+    time_t     now = time(0);
+    struct tm  tstruct;
+    char       buf[80];
+    tstruct = *localtime(&now);
+    strftime(buf, sizeof(buf), "%Y-%m-%d_%X", &tstruct);
+    return buf;
+}
+
+
+void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id, int* key_num_ptr, string folder_name)
 {
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
 
-    string file_name = "video/camera_" + to_string(thread_id) + ".mp4"; 
+    string file_name = folder_name + "/camera_" + to_string(thread_id) + ".mp4"; 
     const char *output_file= file_name.c_str();
     
     string encoder_setup = "-preset p1 -fps " + to_string(camera_params.frame_rate);
@@ -85,9 +96,22 @@ int main(int argc, char **args)
     int key_num;
     int* key_num_ptr = &key_num;  
 
+
+    string folder_string = current_date_time();
+    string folder_name = "/home/red/Videos/" + folder_string;
+    // Creating a directory to save recorded video;
+    if (mkdir(folder_name.c_str(), 0777) == -1)
+    {
+        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
+        return 0;
+    }
+    else
+        std::cout << "Recorded video saves to : " << folder_name << std::endl;
+
+
     for(int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id, key_num_ptr));
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id, key_num_ptr, folder_name));
     }
 
     // main thread event loop

@@ -242,27 +242,28 @@ void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
 
 void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, int num_camera)
 {
-    // set fixed ip for each camera
+    // set fixed ip for each camera, clockwise from experimenter view 
     for(int cam_id = 0; cam_id < num_camera; cam_id++) 
     {
-        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0)
+
+        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0) // center
         {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id],"192.168.2.69");
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.59");
         }
 
-        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0)
+        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0) // far
         {
             change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.89");
         }
 
-        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0)
+        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0) // right 
         {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.99");
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id],"192.168.2.69");
         }
 
-        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0)
+        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0) // left
         {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.59");
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.99");
         }
 
     }

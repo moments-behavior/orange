@@ -15,18 +15,14 @@ const std::string current_date_time() {
 }
 
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id, int* key_num_ptr, string folder_name)
+void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name)
 {
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
-
-    string file_name = folder_name + "/camera_" + to_string(thread_id) + ".mp4"; 
-    const char *output_file= file_name.c_str();
     
     string encoder_setup = "-preset p1 -fps " + to_string(camera_params.frame_rate);
     const char *encoder_str = encoder_setup.c_str();
-    // std::cout << encoder_str << std::endl; 
 
     // determine which gpu to use
     int gpu_idx = 0;
@@ -36,7 +32,11 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         gpu_idx = 1;
     }
 
-    try{
+    try{        
+        char* camera_ip = device_info->currentIp;
+        string file_name = folder_name + "/" + camera_ip + ".mp4"; 
+        const char *output_file= file_name.c_str();
+
         open_camera_with_params(&camera, device_info, camera_params);        
         allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
 
@@ -69,20 +69,18 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 4;
-
-    // only reset after power cycle 
-    //set_rigroom_camera_ip(device_info, num_cameras); 
+    int num_cameras = 7;
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
-        print_camera_device_struct(device_info, camera_id);
+        quick_print_camera(device_info, camera_id);
     }
+
 
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
-    unsigned int frame_rate {100};
+    unsigned int frame_rate {30};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     //library support these two formats for now
@@ -111,7 +109,7 @@ int main(int argc, char **args)
 
     for(int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id, key_num_ptr, folder_name));
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], key_num_ptr, folder_name));
     }
 
     // main thread event loop
@@ -129,5 +127,6 @@ int main(int argc, char **args)
             t.join();
     
 
+    std::cout << folder_name << std::endl;
     return 0;
 }

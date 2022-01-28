@@ -81,7 +81,7 @@ int main(int argc, char **args)
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
     unsigned int frame_rate {30};
-    unsigned int gain {1000}; 
+    unsigned int gain {2000}; 
     unsigned int exposure {4000};
     //library support these two formats for now
     string pixel_format = "BayerRG8"; // "YUV422Packed"; 

@@ -11,7 +11,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 1;
+    int num_cameras = 7;
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
         print_camera_device_struct(device_info, camera_id);

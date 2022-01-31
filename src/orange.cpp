@@ -11,7 +11,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 7;
+    int num_cameras = 2;
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
         print_camera_device_struct(device_info, camera_id);
@@ -37,6 +37,10 @@ int main(int argc, char **args)
 
     // change ip address in persistent memory
     //set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
+
+    // centers
+    //change_camera_ip_persistent(&device_info[0], &camera[0], "192.168.3.100");
+
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {

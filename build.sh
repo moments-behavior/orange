@@ -11,7 +11,6 @@ g++ -Ofast -ffast-math -std=c++14 \
     -lpthread \
     -lopencv_core -lopencv_imgcodecs -lopencv_bgsegm -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio \
     -lgstreamer-1.0 \
-    -lncurses \
     -L/usr/local/cuda-11.4/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
     `PKG_CONFIG_PATH=/path/ffmpeg/lib/pkgconfig/ pkg-config --cflags libavformat libswscale libswresample libavutil libavcodec` `PKG_CONFIG_PATH=/path/ffmpeg/lib/pkgconfig/ pkg-config --libs libavformat libswscale libswresample libavutil libavcodec`
 sudo ./targets/orange;

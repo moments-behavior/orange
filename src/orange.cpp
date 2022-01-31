@@ -69,7 +69,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 7;
+    int num_cameras = 2;
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
@@ -96,7 +96,7 @@ int main(int argc, char **args)
 
 
     string folder_string = current_date_time();
-    string folder_name = "/home/red/Videos/" + folder_string;
+    string folder_name = "/home/rob/Videos/" + folder_string;
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
     {

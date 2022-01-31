@@ -43,10 +43,6 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        //aquire_num_frames(&camera, &frame_recv, num_frames, camera_params, save_bmp_flag);
-        //aquire_and_display(&camera, &frame_recv, camera_params);
-        //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
-        //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
         aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr);
 
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
@@ -69,7 +65,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 4;
+    int num_cameras = 7;
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
@@ -78,13 +74,12 @@ int main(int argc, char **args)
 
 
     // popular change to camera settings 
-    unsigned int width {3208}; // TODO, make this parameters changeble
+    unsigned int width {3208}; 
     unsigned int height {2200};
-    unsigned int frame_rate {50};
+    unsigned int frame_rate {40};
     unsigned int gain {2000}; 
     unsigned int exposure {4000};
-    //library support these two formats for now
-    string pixel_format = "BayerRG8"; // "YUV422Packed"; 
+    string pixel_format = "BayerRG8"; 
     string color_temp = "CT_2800K";
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);

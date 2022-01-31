@@ -80,7 +80,7 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
-    unsigned int frame_rate {210};
+    unsigned int frame_rate {50};
     unsigned int gain {2000}; 
     unsigned int exposure {4000};
     //library support these two formats for now

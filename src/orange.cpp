@@ -47,7 +47,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr);
+        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, 0, key_num_ptr);
 
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);

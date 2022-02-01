@@ -212,29 +212,54 @@ void change_camera_ip(GigEVisionDeviceInfo* device_info, const char* new_ip)
 }
 
 
+
 void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
 {
-    // set fixed ip for each camera
+    // set fixed ip for each camera, clockwise from experimenter view 
     for(int cam_id = 0; cam_id < num_camera; cam_id++) 
     {
-        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0)
+        // centers
+        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0) 
         {
-            change_camera_ip(&device_info[cam_id], "192.168.2.69");
+            change_camera_ip(&device_info[cam_id], "192.168.1.9");
         }
 
-        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0)
+        // far 
+        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0) 
         {
-            change_camera_ip(&device_info[cam_id], "192.168.1.89");
+            change_camera_ip(&device_info[cam_id], "192.168.1.19");
         }
 
-        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0)
+        if(strcmp(device_info[cam_id].serialNumber, "710038") == 0) 
         {
-            change_camera_ip(&device_info[cam_id], "192.168.2.99");
+            change_camera_ip(&device_info[cam_id], "192.168.1.18");
         }
 
-        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0)
+
+        // change to 1 tempararily for testing
+
+        // right
+        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0) 
         {
-            change_camera_ip(&device_info[cam_id], "192.168.1.59");
+            change_camera_ip(&device_info[cam_id], "192.168.1.29");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710039") == 0) 
+        {
+            change_camera_ip(&device_info[cam_id], "192.168.1.28");
+        }
+
+
+        // left
+        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0) 
+        {
+            change_camera_ip(&device_info[cam_id], "192.168.1.39");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710040") == 0) 
+        {
+            printf("was here?");
+            change_camera_ip(&device_info[cam_id], "192.168.1.38");
         }
 
     }

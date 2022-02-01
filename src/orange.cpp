@@ -61,34 +61,34 @@ int main(int argc, char **args)
     }
 
     int num_cameras = 8;
-    set_rigroom_camera_ip(device_info, num_cameras);
+    //set_rigroom_camera_ip(device_info, num_cameras);
 
-    // for (int camera_id = 0; camera_id < num_cameras; camera_id++)
-    // {
-    //     print_camera_device_struct(device_info, camera_id);
-    // }
+    for (int camera_id = 0; camera_id < num_cameras; camera_id++)
+    {
+        print_camera_device_struct(device_info, camera_id);
+    }
 
-    // // popular change to camera settings 
-    // unsigned int width {3208}; // TODO, make this parameters changeble
-    // unsigned int height {2200};
-    // unsigned int frame_rate {200};
-    // unsigned int gain {1000}; 
-    // unsigned int exposure {4000};
-    // //library support these two formats for now
-    // string pixel_format = "BayerRG8"; // "YUV422Packed"; 
-    // string color_temp = "CT_2800K";
+    // popular change to camera settings 
+    unsigned int width {3208}; // TODO, make this parameters changeble
+    unsigned int height {2200};
+    unsigned int frame_rate {210};
+    unsigned int gain {1000}; 
+    unsigned int exposure {4000};
+    //library support these two formats for now
+    string pixel_format = "BayerRG8"; // "YUV422Packed"; 
+    string color_temp = "CT_2800K";
 
-    // CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
+    CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
 
-    // std::vector<thread> camera_threads;
+    std::vector<thread> camera_threads;
 
-    // for(int camera_id = 0; camera_id < num_cameras; camera_id++)
-    // {
-    //     camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id));
-    // }
+    for(int camera_id = 0; camera_id < num_cameras; camera_id++)
+    {
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id));
+    }
     
-    // for (auto& t : camera_threads)
-    //     t.join();
+    for (auto& t : camera_threads)
+        t.join();
     
     return 0;
 }

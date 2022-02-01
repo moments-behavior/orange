@@ -28,9 +28,9 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
         {
             //Counting dropped frames through frame_id as redundant check. 
             if(((frame_recv->frame_id) != id_prev+1) && (frame_count != 0)) dropped_frames++;
-            // else
-            // {
-            //     frames_recd++;
+            else
+            {
+                frames_recd++;
             //     // TODO: program what to do with received frame 
             //     if (save_bmp)
             //     {
@@ -41,7 +41,7 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
             //         //if(camera_return){printf("Save failed...%d", camera_return);} 
             //         stbi_write_bmp(frame_name.c_str(), camera_params.width, camera_params.height, 1, frame_recv->imagePtr);
             //     }
-            // }
+            }
         }
         else{dropped_frames++; printf("\nEVT_CameraGetFrame Error = %8.8x!\n", camera_return);}
 

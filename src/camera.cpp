@@ -235,6 +235,13 @@ void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
             change_camera_ip(&device_info[cam_id], "192.168.1.18");
         }
 
+        // rob's camera
+        if(strcmp(device_info[cam_id].serialNumber, "710042") == 0) 
+        {
+            change_camera_ip(&device_info[cam_id], "192.168.1.100");
+        }
+
+
 
         // change to 1 tempararily for testing
 

@@ -36,7 +36,7 @@ int main(int argc, char **args)
 
 
     // change ip address in persistent memory
-    //set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
+    set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
 
     // centers
     //change_camera_ip_persistent(&device_info[0], &camera[0], "192.168.1.100");

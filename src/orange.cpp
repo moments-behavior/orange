@@ -60,7 +60,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 4;
+    int num_cameras = 8;
     set_rigroom_camera_ip(device_info, num_cameras);
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)

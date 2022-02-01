@@ -39,7 +39,7 @@ int main(int argc, char **args)
     //set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
 
     // centers
-    change_camera_ip_persistent(&device_info[0], &camera[0], "192.168.1.100");
+    //change_camera_ip_persistent(&device_info[0], &camera[0], "192.168.1.100");
 
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)

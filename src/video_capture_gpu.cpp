@@ -1,5 +1,8 @@
 #include "video_capture_gpu.h"
 #include "FFmpegWriter.h"
+#include "FramePresenter.h"
+#include "FramePresenterGLX.h"
+
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -78,6 +81,23 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // for writing 
     FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
+
+    // for streaming 
+    // Presenter need aligned width
+    int nWidth = (camera_params.width + 1) & ~1;
+    int nPitch = nWidth * 4;
+    FramePresenterGLX gInstance(nWidth, camera_params.height);
+
+    int &nFrame = gInstance.nFrame;
+
+    // Check whether we have valid NVIDIA libraries installed
+    if (!gInstance.isVendorNvidia()) {
+        std::cout<<"\nFailed to find NVIDIA libraries\n";
+        return;
+    }
+    CUdeviceptr dpFrame;
+
+
     // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     StopWatch w;
@@ -113,6 +133,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 {
                     printf("\nNPP error %d \n", npp_result);
                 }
+
                 // encoding
                 const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
                 NvEncoderCuda::CopyToDeviceFrame(cuContext,
@@ -127,6 +148,18 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                                                 encoderInputFrame->chromaOffsets,
                                                 encoderInputFrame->numChromaPlanes);
                 pEnc->EncodeFrame(vPacket);
+
+                // streaming 
+                gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
+                // copy from d_debayer to dpFrame
+                cudaError_t cu_result_stream = cudaMemcpy((uint8_t *)dpFrame, d_debayer, size_pic*4, cudaMemcpyDeviceToDevice);
+                if (cu_result_stream != cudaSuccess)
+                {
+                    printf("Cuda Stream Error");
+                }                
+                gInstance.ReleaseDeviceFrameBuffer();
+                nFrame++; 
+
                 // num_frame_encode += (int)vPacket.size(); 
                 for (std::vector<uint8_t> &packet : vPacket)
                 {

@@ -139,7 +139,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 // streaming 
                 gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
                 //copy from d_debayer to dpFrame
-                cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth, camera_params.height, cudaMemcpyDeviceToDevice);
+                cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth*4, camera_params.height, cudaMemcpyDeviceToDevice);
                 gInstance.ReleaseDeviceFrameBuffer();
                 nFrame++; 
 

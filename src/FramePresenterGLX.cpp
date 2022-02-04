@@ -144,8 +144,9 @@ void FramePresenterGLX::Render() {
         glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo[currentRender]);
 
         glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tex[currentRender]);
-        glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
-
+        // glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+        glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+        
         glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 
         glBegin(GL_QUADS);

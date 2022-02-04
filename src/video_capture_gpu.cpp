@@ -56,6 +56,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     std::cout << "GPU in use: " << szDeviceName << std::endl;
     CUcontext cuContext = NULL;
     ck(cuCtxCreate(&cuContext, 0, cuDevice));
+    //ck(cuCtxCreate(&cuContext, CU_CTX_SCHED_BLOCKING_SYNC, cuDevice));
+
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
 
     // debayer
@@ -95,8 +97,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         std::cout<<"\nFailed to find NVIDIA libraries\n";
         return;
     }
-    CUdeviceptr dpFrame;
-
+    CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
 
     // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
@@ -134,6 +135,14 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     printf("\nNPP error %d \n", npp_result);
                 }
 
+
+                // streaming 
+                gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
+                //copy from d_debayer to dpFrame
+                cudaMemcpy2D((uint8_t *)dpFrame, nPitch, d_debayer, nPitch, nWidth, camera_params.height, cudaMemcpyDeviceToDevice);
+                gInstance.ReleaseDeviceFrameBuffer();
+                nFrame++; 
+
                 // encoding
                 const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
                 NvEncoderCuda::CopyToDeviceFrame(cuContext,
@@ -148,17 +157,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                                                 encoderInputFrame->chromaOffsets,
                                                 encoderInputFrame->numChromaPlanes);
                 pEnc->EncodeFrame(vPacket);
-
-                // streaming 
-                gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
-                // copy from d_debayer to dpFrame
-                cudaError_t cu_result_stream = cudaMemcpy((uint8_t *)dpFrame, d_debayer, size_pic*4, cudaMemcpyDeviceToDevice);
-                if (cu_result_stream != cudaSuccess)
-                {
-                    printf("Cuda Stream Error");
-                }                
-                gInstance.ReleaseDeviceFrameBuffer();
-                nFrame++; 
 
                 // num_frame_encode += (int)vPacket.size(); 
                 for (std::vector<uint8_t> &packet : vPacket)

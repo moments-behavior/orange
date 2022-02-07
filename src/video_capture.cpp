@@ -31,16 +31,16 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
             else
             {
                 frames_recd++;
-            //     // TODO: program what to do with received frame 
-            //     if (save_bmp)
-            //     {
-            //         string frame_name {};
-            //         frame_name = "frames/frame_" + to_string(frame_recv->frame_id) + ".bmp";
-            //         // evt frame saver bmp container wired
-            //         //camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_ALIGN_NONE, EVT_FILETYPE_BMP); 
-            //         //if(camera_return){printf("Save failed...%d", camera_return);} 
-            //         stbi_write_bmp(frame_name.c_str(), camera_params.width, camera_params.height, 1, frame_recv->imagePtr);
-            //     }
+                // TODO: program what to do with received frame 
+                if (save_bmp)
+                {
+                    string frame_name {};
+                    frame_name = "frames/frame_" + to_string(frame_recv->frame_id) + ".bmp";
+                    // evt frame saver bmp container wired
+                    //camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_ALIGN_NONE, EVT_FILETYPE_BMP); 
+                    //if(camera_return){printf("Save failed...%d", camera_return);} 
+                    stbi_write_bmp(frame_name.c_str(), camera_params.width, camera_params.height, 1, frame_recv->imagePtr);
+                }
             }
         }
         else{dropped_frames++; printf("\nEVT_CameraGetFrame Error = %8.8x!\n", camera_return);}

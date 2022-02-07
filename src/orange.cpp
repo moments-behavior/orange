@@ -60,7 +60,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 8;
+    int num_cameras = 7;
     //set_rigroom_camera_ip(device_info, num_cameras);
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
@@ -71,11 +71,11 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; // TODO, make this parameters changeble
     unsigned int height {2200};
-    unsigned int frame_rate {210};
+    unsigned int frame_rate {60};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     //library support these two formats for now
-    string pixel_format = "BayerRG8"; // "YUV422Packed"; 
+    string pixel_format = "YUV422Packed"; //"BayerRG8"; 
     string color_temp = "CT_2800K";
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);

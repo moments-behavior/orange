@@ -93,6 +93,42 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 }
 
 
+void sync_camera_PTP(Emergent::CEmergentCamera* camera)
+{
+
+    unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
+    unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_plus_delta_to_start, ptp_time_countdown;
+
+    char ptp_status[100];
+    unsigned long ptp_status_sz_ret;
+
+    EVT_CameraSetEnumParam(camera, "PtpMode", "OneStep");
+    //Just wait a bit for camera to get PTP time. 
+    sleep(5);
+    //Get and print PTP stutus
+    EVT_CameraGetEnumParam(camera, "PtpStatus", ptp_status, sizeof(ptp_status), &ptp_status_sz_ret);
+    printf("PTP Status: %s\n", ptp_status);
+
+    //Get and print current time.    
+    EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
+    EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
+    EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
+    ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
+    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+
+    //Close out and exit.
+    EVT_CameraSetEnumParam(camera, "PtpMode", "Off");
+    EVT_CameraClose(camera);
+    printf("\nClose Camera: \t\tCamera Closed\n");
+
+
+    
+}
+
+
+
+}
+
 void close_camera(Emergent::CEmergentCamera* camera)
 {    
     check_camera_errors(EVT_CameraClose(camera));

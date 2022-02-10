@@ -4,6 +4,7 @@
 #include "camera_driver_helper.h"
 #include <emergentcameradef.h>
 #include <emergentgigevisiondef.h>
+#include <unistd.h>
 
 struct CameraParams{
     unsigned int width;

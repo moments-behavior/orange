@@ -36,18 +36,18 @@ int main(int argc, char **args)
 
 
     // change ip address in persistent memory
-    set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
+    // set_rigroom_camera_ip_persistent(device_info, camera, num_cameras);
 
     // centers
     //change_camera_ip_persistent(&device_info[0], &camera[0], "192.168.1.100");
 
 
-    for (int camera_id = 0; camera_id < num_cameras; camera_id++)
-    {
-        close_camera(&camera[camera_id]);
-    }
+    // for (int camera_id = 0; camera_id < num_cameras; camera_id++)
+    // {
+    //    close_camera(&camera[camera_id]);
+    // }
 
-    return 0;
+    // return 0;
 
 
     //**************************************
@@ -58,12 +58,15 @@ int main(int argc, char **args)
     // Emergent::CEmergentFrame frame_recv;
     // set_frame_buffer(&frame_recv, camera_params);
 
-    //int num_frames {1000};
+    
+    // These functions work -- they are different pipelines for encoding but slower compared to GPU encoding
+    //int num_frames {1000}; 
     //aquire_num_frames(&camera, &frame_recv, num_frames);
     //aquire_and_display(&camera, &frame_recv, camera_params);
     //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
     //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-
+     
+    
     // clean 
     // destroy_frame_buffer(&camera, evt_frame, buffer_size);
     //*****************************************

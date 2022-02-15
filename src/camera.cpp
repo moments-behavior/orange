@@ -120,13 +120,7 @@ void sync_camera_PTP(Emergent::CEmergentCamera* camera)
     EVT_CameraSetEnumParam(camera, "PtpMode", "Off");
     EVT_CameraClose(camera);
     printf("\nClose Camera: \t\tCamera Closed\n");
-
-
     
-}
-
-
-
 }
 
 void close_camera(Emergent::CEmergentCamera* camera)

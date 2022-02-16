@@ -69,13 +69,13 @@ int main(int argc, char **args)
     }
 
     // popular change to camera settings 
-    unsigned int width {3208}; // TODO, make this parameters changeble
-    unsigned int height {2200};
+    unsigned int width {5120}; // TODO, make this parameters changeble, 3208 
+    unsigned int height {4096}; // 2200
     unsigned int frame_rate {60};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     //library support these two formats for now
-    string pixel_format = "BayerRG8"; // "YUV422Packed"; 
+    string pixel_format = "BayerGB8"; // "BayerRG8"; // "YUV422Packed"; 
     string color_temp = "CT_2800K";
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);

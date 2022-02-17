@@ -73,7 +73,7 @@ int main(int argc, char **args)
     unsigned int height {4096}; // 2200
     unsigned int frame_rate {60};
     unsigned int gain {1000}; 
-    unsigned int exposure {4000};
+    unsigned int exposure {1000}; // 4000
     //library support these two formats for now
     string pixel_format = "BayerGB8"; // "BayerRG8"; // "YUV422Packed"; 
     string color_temp = "CT_2800K";

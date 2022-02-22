@@ -104,11 +104,11 @@ void open_camera_with_params_and_sync(Emergent::CEmergentCamera* camera, GigEVis
     configure_factory_defaults(camera);
 
     // ptp triggering configuration settings
-    EVT_CameraSetEnumParam(camera, "TriggerSource", "Software");
-    EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame");
-    EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1);
-    EVT_CameraSetEnumParam(camera, "TriggerMode", "On");
-    EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep");    
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"));
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"));
 
 
     // other settings
@@ -137,10 +137,13 @@ void open_camera_with_params_and_sync(Emergent::CEmergentCamera* camera, GigEVis
 
 
 // use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds  
-unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params, char* ptp_status, unsigned long ptp_status_sz_ret, unsigned int ptp_time_high, unsigned int ptp_time_low, unsigned long long ptp_time)
+unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera)
 {
+
+    char ptp_status[100];
+    unsigned long ptp_status_sz_ret;
+    unsigned int ptp_time_high, ptp_time_low;
     // need to open the camera to get ptp time?
-    open_camera_with_params_and_sync(camera, device_info, camera_params);        
     EVT_CameraGetEnumParam(camera, "PtpStatus", ptp_status, sizeof(ptp_status), &ptp_status_sz_ret);
     printf("PTP Status: %s\n", ptp_status);
 
@@ -148,10 +151,7 @@ unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera, GigEV
     EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
     EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
     EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
-    ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
-    
-    EVT_CameraSetEnumParam(camera, "PtpMode", "Off");
-    EVT_CameraClose(camera);
+    unsigned long long ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));    
     return ptp_time;
 }
 

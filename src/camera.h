@@ -33,5 +33,6 @@ void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_p
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
 void open_camera_with_params_and_sync(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
+unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera);
 int get_camera_id(char* ip_address);
 #endif

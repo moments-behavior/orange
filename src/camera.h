@@ -31,6 +31,7 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size);
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
+void open_camera_with_params_and_sync(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
 int get_camera_id(char* ip_address);
 #endif

@@ -80,13 +80,19 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
 
     // handel sync
-    unsigned int ptp_time_plus_delta_to_start_uint {20};  // TODO: change these to relative to the starting of the program 
-    unsigned long long ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000;
+    int ptp_offset, ptp_offset_sum=0, ptp_offset_prev=0;
+    unsigned int ptp_time_plus_delta_to_start_uint;
+    unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
+    unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_plus_delta_to_start, ptp_time_countdown;
+    unsigned long long frame_ts, frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
     char ptp_status[100];
     unsigned long ptp_status_sz_ret;
-    int ptp_offset, ptp_offset_prev=0, ptp_offset_sum=0;
-    unsigned long long frame_ts, frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
-    unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_countdown;
+
+        
+    ptp_time = get_current_PTP_time(camera);
+    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+    ptp_time_plus_delta_to_start_uint = 100;  // TODO: change these to relative to the starting of the program 
+    ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
 
     EVT_CameraGetEnumParam(camera, "PtpStatus", ptp_status, sizeof(ptp_status), &ptp_status_sz_ret);
     printf("PTP Status: %s\n", ptp_status);
@@ -105,9 +111,10 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
         ptp_offset_prev = ptp_offset;
     }
+
+
     //Offset average.
     printf("Offset Average: %d\n", ptp_offset_sum / 5);
-    unsigned int ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
     ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
     ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
     EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
@@ -120,14 +127,14 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     printf("Grabbing Frames after countdown...\n");
 
-    unsigned long long ptp_time_countdown {0}, ptp_time;
-    unsigned int ptp_time_high, ptp_time_low;
+    ptp_time_countdown = 0;
+
+
     //Countdown code
     do {
         EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
         EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
         EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
-
         ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
 
         if (ptp_time > ptp_time_countdown)
@@ -135,9 +142,11 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
             printf("%llu\n", (ptp_time_plus_delta_to_start - ptp_time) / 1000000000);
             ptp_time_countdown = ptp_time + 1000000000; //1s
         }
+
     } while (ptp_time <= ptp_time_plus_delta_to_start);
     //Countdown done.
     printf("\n");
+
 
     StopWatch w;
     w.Start();

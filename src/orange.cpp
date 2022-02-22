@@ -65,7 +65,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 7;
+    int num_cameras = 1;
 
     for (int camera_id = 0; camera_id < num_cameras; camera_id++)
     {

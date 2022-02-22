@@ -93,19 +93,54 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 }
 
 
-void sync_camera_PTP(Emergent::CEmergentCamera* camera)
+
+void open_camera_with_params_and_sync(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
 {
+    //TODO: open camera using xml file after explored on camera settings
+    //EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
+    
+    check_camera_errors(EVT_CameraOpen(camera, device_info));      
 
-    unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
-    unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_plus_delta_to_start, ptp_time_countdown;
+    configure_factory_defaults(camera);
 
-    char ptp_status[100];
-    unsigned long ptp_status_sz_ret;
+    // ptp triggering configuration settings
+    EVT_CameraSetEnumParam(camera, "TriggerSource", "Software");
+    EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame");
+    EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1);
+    EVT_CameraSetEnumParam(camera, "TriggerMode", "On");
+    EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep");    
 
-    EVT_CameraSetEnumParam(camera, "PtpMode", "OneStep");
-    //Just wait a bit for camera to get PTP time. 
-    sleep(5);
-    //Get and print PTP stutus
+
+    // other settings
+    unsigned int width_max, height_max;
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
+    printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
+
+
+    const char* pixel_format = camera_params.pixel_format.c_str();
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
+    printf("PixelFormat: \t\t%s\n", pixel_format);
+
+    const char* color_temp = camera_params.color_temp.c_str();
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "Exposure", camera_params.exposure));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp));
+
+    unsigned int frame_rate_max;
+    check_camera_errors(EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max));
+    printf("FrameRate Max: \t\t%d\n", frame_rate_max);
+
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate));
+    printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
+}
+
+
+// use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds  
+unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params, char* ptp_status, unsigned long ptp_status_sz_ret, unsigned int ptp_time_high, unsigned int ptp_time_low, unsigned long long ptp_time)
+{
+    // need to open the camera to get ptp time?
+    open_camera_with_params_and_sync(camera, device_info, camera_params);        
     EVT_CameraGetEnumParam(camera, "PtpStatus", ptp_status, sizeof(ptp_status), &ptp_status_sz_ret);
     printf("PTP Status: %s\n", ptp_status);
 
@@ -114,14 +149,12 @@ void sync_camera_PTP(Emergent::CEmergentCamera* camera)
     EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
     EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
     ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
-
-    //Close out and exit.
+    
     EVT_CameraSetEnumParam(camera, "PtpMode", "Off");
     EVT_CameraClose(camera);
-    printf("\nClose Camera: \t\tCamera Closed\n");
-    
+    return ptp_time;
 }
+
 
 void close_camera(Emergent::CEmergentCamera* camera)
 {    

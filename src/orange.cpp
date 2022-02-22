@@ -37,7 +37,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         string file_name = folder_name + "/" + camera_ip + ".mp4"; 
         const char *output_file= file_name.c_str();
 
-        open_camera_with_params(&camera, device_info, camera_params);        
+        open_camera_with_params_and_sync(&camera, device_info, camera_params);        
         allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
 
         Emergent::CEmergentFrame frame_recv;
@@ -71,7 +71,6 @@ int main(int argc, char **args)
     {
         quick_print_camera(device_info, camera_id);
     }
-
 
     // popular change to camera settings 
     unsigned int width {3208}; 

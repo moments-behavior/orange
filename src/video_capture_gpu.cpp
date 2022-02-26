@@ -94,8 +94,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     ptp_time_plus_delta_to_start_uint = 100;  // TODO: change these to relative to the starting of the program 
     ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
 
-    EVT_CameraGetEnumParam(camera, "PtpStatus", ptp_status, sizeof(ptp_status), &ptp_status_sz_ret);
-    printf("PTP Status: %s\n", ptp_status);
+
+    ptp_time = get_current_PTP_time(camera);
+    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
 
 
     //Show raw offsets.
@@ -113,6 +114,10 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
 
 
+    ptp_time = get_current_PTP_time(camera);
+    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+
+
     //Offset average.
     printf("Offset Average: %d\n", ptp_offset_sum / 5);
     ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
@@ -122,10 +127,18 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
 
 
+    ptp_time = get_current_PTP_time(camera);
+    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+
+
     //////////////////////////////PTP time to start in future////////////////////////////////////
     // start streaming
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     printf("Grabbing Frames after countdown...\n");
+
+
+    ptp_time = get_current_PTP_time(camera);
+    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
 
     ptp_time_countdown = 0;
 

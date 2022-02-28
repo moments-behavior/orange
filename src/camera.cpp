@@ -92,49 +92,16 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
 }
 
-
-
-void open_camera_with_params_and_sync(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
+// **********************************************sync***************************************************** 
+void ptp_camera_sync(Emergent::CEmergentCamera* camera)
 {
-    //TODO: open camera using xml file after explored on camera settings
-    //EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
-    
-    check_camera_errors(EVT_CameraOpen(camera, device_info));      
-
-    configure_factory_defaults(camera);
-
     // ptp triggering configuration settings
     check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
     check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"));
     check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
     check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"));
     check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"));
-
-
-    // other settings
-    unsigned int width_max, height_max;
-    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
-    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
-    printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
-
-
-    const char* pixel_format = camera_params.pixel_format.c_str();
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
-    printf("PixelFormat: \t\t%s\n", pixel_format);
-
-    const char* color_temp = camera_params.color_temp.c_str();
-    check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
-    check_camera_errors(EVT_CameraSetUInt32Param(camera, "Exposure", camera_params.exposure));
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp));
-
-    unsigned int frame_rate_max;
-    check_camera_errors(EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max));
-    printf("FrameRate Max: \t\t%d\n", frame_rate_max);
-
-    check_camera_errors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate));
-    printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
 }
-
 
 // use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds  
 unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera)
@@ -153,6 +120,39 @@ unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera)
     EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
     unsigned long long ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));    
     return ptp_time;
+}
+
+
+// test GPO by toggling polarity in manual mode, after open camera, before open streaming  
+void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera)
+{
+    unsigned int count;
+    char gpo_str[20];
+    bool gpo_polarity = 1;
+
+    //Test GPOs by toggling polarity in manual mode.
+    for (count = 0; count < 4; count++)
+    {
+
+        sprintf(gpo_str, "GPO_%d_Mode", count);
+        EVT_CameraSetEnumParam(camera, gpo_str, "GPO");
+    }
+
+    for (count = 0; count < 4; count++)
+    {
+        printf("Toggling GPO %d\t\t", count);
+        sprintf(gpo_str, "GPO_%d_Polarity", count);
+
+        for (int blink_count = 0; blink_count < 20; blink_count++)
+        {
+            EVT_CameraSetBoolParam(camera, gpo_str, gpo_polarity);
+            gpo_polarity = !gpo_polarity;
+            usleep(100 * 1000);
+            printf(".");
+            fflush(stdout);
+        }
+        printf("\n");
+    }
 }
 
 

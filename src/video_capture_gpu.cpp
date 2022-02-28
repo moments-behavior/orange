@@ -308,6 +308,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
-    printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
-    printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
+    //printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
+    //printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }

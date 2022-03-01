@@ -69,21 +69,26 @@ public:
     }
 
     bool Write(uint8_t *pData, int nBytes, int nPts) {
-        AVPacket pkt = {0};
-        av_init_packet(&pkt);
-        pkt.pts = av_rescale_q(nPts++, AVRational {1, nFps}, vs->time_base);
+        //AVPacket pkt = {0};
+        //av_init_packet(&pkt);
+        AVPacket *pkt;
+        pkt = av_packet_alloc();
+
+
+
+        pkt->pts = av_rescale_q(nPts++, AVRational {1, nFps}, vs->time_base);
         // No B-frames
-        pkt.dts = pkt.pts;
-        pkt.stream_index = vs->index;
-        pkt.data = pData;
-        pkt.size = nBytes;
+        pkt->dts = pkt->pts;
+        pkt->stream_index = vs->index;
+        pkt->data = pData;
+        pkt->size = nBytes;
 
         if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
-            pkt.flags |= AV_PKT_FLAG_KEY;
+            pkt->flags |= AV_PKT_FLAG_KEY;
         }
 
         // Write the compressed frame into the output
-        int ret = av_write_frame(oc, &pkt);
+        int ret = av_write_frame(oc, pkt);
         av_write_frame(oc, NULL);
         if (ret < 0) {
             // LOG(ERROR) << "FFMPEG: Error while writing video frame";

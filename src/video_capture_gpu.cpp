@@ -79,86 +79,105 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
 
 
-    // handel sync
-    int ptp_offset, ptp_offset_sum=0, ptp_offset_prev=0;
-    unsigned int ptp_time_plus_delta_to_start_uint;
-    unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
-    unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_plus_delta_to_start, ptp_time_countdown;
-    unsigned long long frame_ts, frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
-    char ptp_status[100];
-    unsigned long ptp_status_sz_ret;
+    // ***************************************GPIO*********************************************************
+
+    EVT_CameraSetEnumParam(camera, "TriggerMode", "On");
+    EVT_CameraSetEnumParam(camera, "TriggerSource", "Hardware");
+
+    //Set the GPI hardware triggering mode to use GPI_4 and select rising edge to start exp and falling edge 
+    //to end exposure. Error check omitted for clarity.
+    EVT_CameraSetEnumParam(camera, "GPI_Start_Exp_Mode",   "GPI_4");
+    EVT_CameraSetEnumParam(camera, "GPI_Start_Exp_Event",  "Rising_Edge");
+    EVT_CameraSetEnumParam(camera, "GPI_End_Exp_Mode",     "GPI_4");
+    EVT_CameraSetEnumParam(camera, "GPI_End_Exp_Event",    "Falling_Edge");
+
+    EVT_CameraSetEnumParam(camera, "GPO_0_Mode", "Test_Generator");
+    EVT_CameraSetUInt32Param(camera, "TG_Frame_Time", 33333); //30fps
+    EVT_CameraSetUInt32Param(camera, "TG_High_Time", 1000);   //1000us
+
+    EVT_CameraSetUInt32Param(camera, "Trigger_Delay", 1000);   //1000us
+
+
+    // //*************************************PTP**************************************************
+    // // handel sync using 
+    // int ptp_offset, ptp_offset_sum=0, ptp_offset_prev=0;
+    // unsigned int ptp_time_plus_delta_to_start_uint;
+    // unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
+    // unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_plus_delta_to_start, ptp_time_countdown;
+    // unsigned long long frame_ts, frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
+    // char ptp_status[100];
+    // unsigned long ptp_status_sz_ret;
 
         
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
-    ptp_time_plus_delta_to_start_uint = 100;  // TODO: change these to relative to the starting of the program 
-    ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
+    // ptp_time = get_current_PTP_time(camera);
+    // printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+    // ptp_time_plus_delta_to_start_uint = 100;  // TODO: change these to relative to the starting of the program 
+    // ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
 
 
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+    // ptp_time = get_current_PTP_time(camera);
+    // printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
 
 
-    //Show raw offsets.
-    for (unsigned int i = 0; i < 5;)
-    {
-        EVT_CameraGetInt32Param(camera, "PtpOffset", &ptp_offset);
-        if (ptp_offset != ptp_offset_prev)
-        {
-            ptp_offset_sum += ptp_offset;
-            i++;
-            printf("Offset %d: %d\n", i, ptp_offset);
-        }
+    // //Show raw offsets.
+    // for (unsigned int i = 0; i < 5;)
+    // {
+    //     EVT_CameraGetInt32Param(camera, "PtpOffset", &ptp_offset);
+    //     if (ptp_offset != ptp_offset_prev)
+    //     {
+    //         ptp_offset_sum += ptp_offset;
+    //         i++;
+    //         printf("Offset %d: %d\n", i, ptp_offset);
+    //     }
 
-        ptp_offset_prev = ptp_offset;
-    }
-
-
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+    //     ptp_offset_prev = ptp_offset;
+    // }
 
 
-    //Offset average.
-    printf("Offset Average: %d\n", ptp_offset_sum / 5);
-    ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
-    ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
-    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
-    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
-    printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
+    // ptp_time = get_current_PTP_time(camera);
+    // printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
 
 
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+    // //Offset average.
+    // printf("Offset Average: %d\n", ptp_offset_sum / 5);
+    // ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
+    // ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
+    // EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
+    // EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
+    // printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
 
 
-    //////////////////////////////PTP time to start in future////////////////////////////////////
-    // start streaming
+    // ptp_time = get_current_PTP_time(camera);
+    // printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+
+
+    // //////////////////////////////PTP time to start in future////////////////////////////////////
+    // // start streaming
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
-    printf("Grabbing Frames after countdown...\n");
+    
+    
+    // printf("Grabbing Frames after countdown...\n");
+    // ptp_time = get_current_PTP_time(camera);
+    // printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+    // ptp_time_countdown = 0;
+    // //Countdown code
+    // do {
+    //     EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
+    //     ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
 
+    //     if (ptp_time > ptp_time_countdown)
+    //     {
+    //         printf("%llu\n", (ptp_time_plus_delta_to_start - ptp_time) / 1000000000);
+    //         ptp_time_countdown = ptp_time + 1000000000; //1s
+    //     }
 
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
+    // } while (ptp_time <= ptp_time_plus_delta_to_start);
+    // //Countdown done.
+    // printf("\n");
+    // //********************************************************************************************
 
-    ptp_time_countdown = 0;
-
-
-    //Countdown code
-    do {
-        EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
-        ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
-
-        if (ptp_time > ptp_time_countdown)
-        {
-            printf("%llu\n", (ptp_time_plus_delta_to_start - ptp_time) / 1000000000);
-            ptp_time_countdown = ptp_time + 1000000000; //1s
-        }
-
-    } while (ptp_time <= ptp_time_plus_delta_to_start);
-    //Countdown done.
-    printf("\n");
 
 
     StopWatch w;
@@ -167,27 +186,28 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     while (*key_num_ptr != 27)
     {
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
-        //////////////////////////////PTP timestamp checking////////////////////////////////////
-        EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
+       
+       
+    //    //////////////////////////////PTP timestamp checking////////////////////////////////////
+    //     EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
 
-        ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
-        frame_ts = frame_recv->timestamp;
+    //     ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
+    //     frame_ts = frame_recv->timestamp;
 
-        if (frame_count != 0)
-        {
-            ptp_time_delta = ptp_time - ptp_time_prev;
-            ptp_time_delta_sum += ptp_time_delta;
+    //     if (frame_count != 0)
+    //     {
+    //         ptp_time_delta = ptp_time - ptp_time_prev;
+    //         ptp_time_delta_sum += ptp_time_delta;
 
-            frame_ts_delta = frame_ts - frame_ts_prev;
-            frame_ts_delta_sum += frame_ts_delta;
-        }
+    //         frame_ts_delta = frame_ts - frame_ts_prev;
+    //         frame_ts_delta_sum += frame_ts_delta;
+    //     }
 
-        ptp_time_prev = ptp_time;
-        frame_ts_prev = frame_ts;
-        //////////////////////////////PTP timestamp checking////////////////////////////////////
-
+    //     ptp_time_prev = ptp_time;
+    //     frame_ts_prev = frame_ts;
+    //     //////////////////////////////PTP timestamp checking////////////////////////////////////
 
         if (!camera_return)
         {
@@ -288,6 +308,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
-    printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
-    printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
+    //printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
+    //printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }

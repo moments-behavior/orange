@@ -33,12 +33,19 @@
 
 # Build artifacts
 /targets/*
-*.bmp
-!img/*.bmp
+/external/targets_nvenc
 
 # Editor files
 *#*
 
-# Video file
+# Media file
 *.mp4
 *.avi
+*.mpg
+*.raw
+*.yuv
+*.RAW
+*.bgm
+#*.png
+*.pgm
+*.bmp

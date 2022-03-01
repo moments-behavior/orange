@@ -2,7 +2,11 @@
 #include "video_capture.h"
 #include <opencv2/opencv.hpp>
 
-void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames)
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
+
+void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_recv, int num_frames, CameraParams camera_params, bool save_bmp)
 {
     int camera_return {0};
 
@@ -28,7 +32,15 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
             {
                 frames_recd++;
                 // TODO: program what to do with received frame 
-
+                if (save_bmp)
+                {
+                    string frame_name {};
+                    frame_name = "frames/frame_" + to_string(frame_recv->frame_id) + ".bmp";
+                    // evt frame saver bmp container wired
+                    //camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_ALIGN_NONE, EVT_FILETYPE_BMP); 
+                    //if(camera_return){printf("Save failed...%d", camera_return);} 
+                    stbi_write_bmp(frame_name.c_str(), camera_params.width, camera_params.height, 1, frame_recv->imagePtr);
+                }
             }
         }
         else{dropped_frames++; printf("\nEVT_CameraGetFrame Error = %8.8x!\n", camera_return);}
@@ -180,7 +192,7 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
     }
     else{
         printf("Color format not supported! \n");
-        exit(1);
+        throw(EXIT_FAILURE);
     }
 
 
@@ -188,12 +200,11 @@ void aquire_and_encode_ffmpeg(Emergent::CEmergentCamera* camera, Emergent::CEmer
     if ( !(encoder_pipe = popen(str_stream.str().c_str(), "w")) ) {
         printf("popen error");
         // think about more general error handling with camera
-        exit(1);
+        throw(EXIT_FAILURE);
     }
 
     int camera_return {0};
 
-    //aquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
 
     unsigned short id_prev = 0, dropped_frames = 0;
@@ -260,7 +271,7 @@ void aquire_and_encode_gstreamer(Emergent::CEmergentCamera* camera, Emergent::CE
     if (!(writer.open(gstreamer_option, cv::CAP_GSTREAMER, 0, camera_params.frame_rate, cv::Size(camera_params.width, camera_params.height))))
     {
         cout << "Video writer didn't open. \n";
-        exit(1);
+        throw(EXIT_FAILURE);
     }
 
     int camera_return {0};

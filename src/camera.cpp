@@ -1,5 +1,6 @@
 #include "camera.h"
 #include "camera_driver_helper.h"
+#include <iostream>
 
 // important camera tuning parameters
 CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp)
@@ -52,7 +53,7 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max));
     check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera,    "GevSCPSPacketSize", param_val_max));
 
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Gain", 256));
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Gain", 1000));
     check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Offset", 0));
 
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "LUTEnable", false));
@@ -210,6 +211,10 @@ void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CE
 
 
 
+void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
+{
+    std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
+}
 
 void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
 {

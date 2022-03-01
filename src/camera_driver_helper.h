@@ -20,7 +20,7 @@ inline void __check_camera_errors(EVT_ERROR err, const char *file, const int lin
             "checkCameraErrors() Driver API error = %04d \"%s\" from file <%s>, "
             "line %i.\n",
             err, errorStr, file, line);
-    exit(EXIT_FAILURE);
+    throw(EXIT_FAILURE);
   }
 }
 

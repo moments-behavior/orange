@@ -282,7 +282,7 @@ void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
 }
 
 
-void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
+void set_temporary_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
 {
     // set fixed ip for each camera, clockwise from experimenter view 
     for(int cam_id = 0; cam_id < num_camera; cam_id++) 

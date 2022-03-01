@@ -10,6 +10,6 @@
 #include "camera.h"
 #include <iostream>
 
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index);
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, CUdeviceptr dpFrame);
 
 #endif 

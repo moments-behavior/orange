@@ -1,7 +1,6 @@
 #include "video_capture_gpu.h"
 #include "FFmpegWriter.h"
-#include "FramePresenter.h"
-#include "FramePresenterGLX.h"
+
 
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
@@ -21,7 +20,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, CUdeviceptr dpFrame)
 {
     int camera_return{0};
 
@@ -31,6 +30,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
+    unsigned long long currentTimestamp, prevTimestamp, deltaTimestamp, prevDisplayTimestamp, deltaDisplayTimestamp;
 
     ck(cudaSetDevice(gpu_index));
     // modularize these parts: 1. debayer; 2. encoding; 
@@ -83,21 +83,10 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // for writing 
     FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
+    
+    // for displaying
+    int nWidth = (camera_params.width + 1) & ~1; // make this a class, and attribute it 
 
-    // for streaming 
-    // Presenter need aligned width
-    int nWidth = (camera_params.width + 1) & ~1;
-    int nPitch = nWidth * 4;
-    FramePresenterGLX gInstance(nWidth, camera_params.height);
-
-    int &nFrame = gInstance.nFrame;
-
-    // Check whether we have valid NVIDIA libraries installed
-    if (!gInstance.isVendorNvidia()) {
-        std::cout<<"\nFailed to find NVIDIA libraries\n";
-        return;
-    }
-    CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
 
     // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
@@ -108,6 +97,14 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
         if (!camera_return)
         {
+            // timestamp 
+            currentTimestamp = frame_recv->timestamp;
+            printf("TimeStamp: %llu", currentTimestamp);
+
+
+            deltaTimestamp =  currentTimestamp - prevTimestamp;
+            prevTimestamp = currentTimestamp;
+
             //Counting dropped frames through frame_id as redundant check.
             if (((frame_recv->frame_id) != id_prev + 1) && (frame_count != 0))
                 dropped_frames++;
@@ -136,12 +133,17 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 }
 
 
-                // streaming 
-                gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
-                //copy from d_debayer to dpFrame
-                cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth*4, camera_params.height, cudaMemcpyDeviceToDevice);
-                gInstance.ReleaseDeviceFrameBuffer();
-                nFrame++; 
+                // display at 60Hz 
+                deltaDisplayTimestamp = currentTimestamp - prevDisplayTimestamp;
+
+                if(deltaDisplayTimestamp > 6666666) // 60Hz monitor update
+                {
+                    prevDisplayTimestamp = prevTimestamp;
+                    cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth*4, camera_params.height, cudaMemcpyDeviceToDevice);
+                }
+
+
+                // copy to the dpFrame with display framerate 
 
                 // encoding
                 const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();

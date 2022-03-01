@@ -3,8 +3,11 @@
 #include "camera.h"
 #include "video_capture.h"
 #include <thread>
+#include "FramePresenter.h"
+#include "FramePresenterGLX.h"
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id)
+
+void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int thread_id, CUdeviceptr dpFrame)
 {
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
@@ -38,7 +41,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         //aquire_and_display(&camera, &frame_recv, camera_params);
         //aquire_and_encode_gstreamer(&camera, &frame_recv, num_frames, camera_params);
         //aquire_and_encode_ffmpeg(&camera, &frame_recv, num_frames, camera_params);
-        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str, gpu_idx);
+        aquire_frames_gpu_encode(&camera, &frame_recv, num_frames, camera_params, output_file, encoder_str, gpu_idx, dpFrame);
 
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
@@ -80,13 +83,36 @@ int main(int argc, char **args)
 
     CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
 
-    std::vector<thread> camera_threads;
 
+    // streaming for multiple cameras 
+    ck(cudaSetDevice(0)); // display on gpu 0
+
+    // Presenter need aligned width
+    int nWidth = (camera_params.width + 1) & ~1;
+    int nPitch = nWidth * 4;
+    FramePresenterGLX gInstance(nWidth, camera_params.height);
+    int &nFrame = gInstance.nFrame;
+    // Check whether we have valid NVIDIA libraries installed
+    if (!gInstance.isVendorNvidia()) {
+        std::cout<<"\nFailed to find NVIDIA libraries\n";
+        return;
+    }
+    CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
+
+
+    std::vector<thread> camera_threads;
     for(int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id));
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], camera_id, dpFrame));
     }
     
+
+    // streaming 
+    gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
+    gInstance.ReleaseDeviceFrameBuffer();
+    nFrame++; 
+
+
     for (auto& t : camera_threads)
         t.join();
     

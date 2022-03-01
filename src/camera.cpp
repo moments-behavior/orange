@@ -60,6 +60,7 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false));
 }
 
+
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
 {
     //TODO: open camera using xml file after explored on camera settings
@@ -120,6 +121,7 @@ int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* device_info)
     }
 
 }
+
 
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params)
 {
@@ -190,6 +192,7 @@ void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergent
 
 }
 
+
 // Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip. non persistent 
 void change_camera_ip(GigEVisionDeviceInfo* device_info, const char* new_ip)
 {
@@ -210,38 +213,9 @@ void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CE
 }
 
 
-
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
 {
     std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
-}
-
-void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
-{
-    // set fixed ip for each camera
-    for(int cam_id = 0; cam_id < num_camera; cam_id++) 
-    {
-        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0)
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.2.69");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0)
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.1.89");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0)
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.2.99");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0)
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.1.59");
-        }
-
-    }
 }
 
 

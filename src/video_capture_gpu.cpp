@@ -18,13 +18,12 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, int num_frames, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr)
 {
     int camera_return{0};
 
     unsigned int size_of_buffer;
     size_of_buffer = frame_recv->CalculateBufferSize();
-    printf("Buffer size (bytes): \t%d\n ", size_of_buffer);
 
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
@@ -78,12 +77,15 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // for writing 
     FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
+
     // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     StopWatch w;
     w.Start();
-    for (int frame_count = 0; frame_count < num_frames; frame_count++)
+    int frame_count = 0;
+    while (*key_num_ptr != 27)
     {
+        frame_count++; 
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
         if (!camera_return)
         {
@@ -97,7 +99,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyHostToDevice);
                 if (cu_result != cudaSuccess)
                 {
-                    printf("Cuda Error");
+                    std::cout << "Cuda Error" << std::endl;
                 }
 
                 const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
@@ -111,7 +113,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                                                                      nAlpha);
                 if (npp_result != 0)
                 {
-                    printf("\nNPP error %d \n", npp_result);
+                    std::cout << "\nNPP error %d \n" << npp_result << std::endl;
                 }
                 // encoding
                 const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
@@ -139,7 +141,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         else
         {
             dropped_frames++;
-            printf("\nEVT_CameraGetFrame Error = %8.8x!\n", camera_return);
+            std::cout << "EVT_CameraGetFrame Error" << camera_return << std::endl;
         }
 
         //In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
@@ -153,7 +155,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
         camera_return = EVT_CameraQueueFrame(camera, frame_recv); //Re-queue.
         if (camera_return)
-            printf("EVT_CameraQueueFrame Error!\n");
+            std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
 
         if (frame_count % 100 == 99)
         {

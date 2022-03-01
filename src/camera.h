@@ -30,7 +30,10 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size);
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
-void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx);
+void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
+int get_camera_id(char* ip_address);
 void change_camera_ip(GigEVisionDeviceInfo* device_info, int camera_idx, const char* new_ip);
+void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip);
 void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera);
+void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, int num_camera);
 #endif

@@ -117,4 +117,6 @@ int main(int argc, char **args)
         t.join();
     
     return 0;
+
+    // a quick test
 }

@@ -190,8 +190,107 @@ void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergent
 
 }
 
+// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip. non persistent 
+void change_camera_ip(GigEVisionDeviceInfo* device_info, const char* new_ip)
+{
+    const char* mac_address = device_info->macAddress;
+    const char* subnet_mask = device_info->currentSubnetMask;
+    const char* default_gateway = device_info->defaultGateway;
+    check_camera_errors(Emergent::EVT_ForceIPEx(mac_address, new_ip, subnet_mask, default_gateway));
+}
+
+
+// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip.
+void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip)
+{
+    const char* mac_address = device_info->macAddress;
+    const char* subnet_mask = device_info->currentSubnetMask;
+    const char* default_gateway = device_info->defaultGateway;
+    check_camera_errors(Emergent::EVT_IPConfig(camera, true, new_ip, subnet_mask, default_gateway));
+}
+
+
 
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
 {
     std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
+}
+
+void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
+{
+    // set fixed ip for each camera
+    for(int cam_id = 0; cam_id < num_camera; cam_id++) 
+    {
+        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0)
+        {
+            change_camera_ip(&device_info[cam_id], "192.168.2.69");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0)
+        {
+            change_camera_ip(&device_info[cam_id], "192.168.1.89");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0)
+        {
+            change_camera_ip(&device_info[cam_id], "192.168.2.99");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0)
+        {
+            change_camera_ip(&device_info[cam_id], "192.168.1.59");
+        }
+
+    }
+}
+
+
+void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, int num_camera)
+{
+    // set fixed ip for each camera, clockwise from experimenter view 
+    for(int cam_id = 0; cam_id < num_camera; cam_id++) 
+    {
+        // centers
+        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.9");
+        }
+
+        // far 
+        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.19");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710038") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.18");
+        }
+
+
+        // right
+        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id],"192.168.2.29");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710039") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.28");
+        }
+
+
+        // left
+        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.39");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710040") == 0) 
+        {
+            printf("was here?");
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.38");
+        }
+
+    }
 }

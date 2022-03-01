@@ -93,6 +93,69 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
 }
 
+// **********************************************sync***************************************************** 
+void ptp_camera_sync(Emergent::CEmergentCamera* camera)
+{
+    // ptp triggering configuration settings
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"));
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"));
+}
+
+// use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds  
+unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera)
+{
+
+    char ptp_status[100];
+    unsigned long ptp_status_sz_ret;
+    unsigned int ptp_time_high, ptp_time_low;
+    // need to open the camera to get ptp time?
+    EVT_CameraGetEnumParam(camera, "PtpStatus", ptp_status, sizeof(ptp_status), &ptp_status_sz_ret);
+    printf("PTP Status: %s\n", ptp_status);
+
+    //Get and print current time.    
+    EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
+    EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
+    EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
+    unsigned long long ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));    
+    return ptp_time;
+}
+
+
+// test GPO by toggling polarity in manual mode, after open camera, before open streaming  
+void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera)
+{
+    unsigned int count;
+    char gpo_str[20];
+    bool gpo_polarity = 1;
+
+    //Test GPOs by toggling polarity in manual mode.
+    for (count = 0; count < 4; count++)
+    {
+
+        sprintf(gpo_str, "GPO_%d_Mode", count);
+        EVT_CameraSetEnumParam(camera, gpo_str, "GPO");
+    }
+
+    for (count = 0; count < 4; count++)
+    {
+        printf("Toggling GPO %d\t\t", count);
+        sprintf(gpo_str, "GPO_%d_Polarity", count);
+
+        for (int blink_count = 0; blink_count < 20; blink_count++)
+        {
+            EVT_CameraSetBoolParam(camera, gpo_str, gpo_polarity);
+            gpo_polarity = !gpo_polarity;
+            usleep(100 * 1000);
+            printf(".");
+            fflush(stdout);
+        }
+        printf("\n");
+    }
+}
+
 
 void close_camera(Emergent::CEmergentCamera* camera)
 {    

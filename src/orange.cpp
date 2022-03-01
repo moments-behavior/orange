@@ -38,11 +38,9 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         const char *output_file= file_name.c_str();
 
         open_camera_with_params(&camera, device_info, camera_params); 
-        // setup sync 
-        // hardware 
-        test_gpo_manual_toggle(&camera);
 
-        // software
+        // sync 
+        // test_gpo_manual_toggle(&camera);
         // ptp_camera_sync(&camera);
 
         allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
@@ -67,17 +65,14 @@ int main(int argc, char **args)
 {
     short max_cameras {10};
     GigEVisionDeviceInfo device_info[max_cameras];
-    if (!get_number_cameras(max_cameras, device_info)) 
+    GigEVisionDeviceInfo ordered_device_info[max_cameras];
+
+    if (!check_cameras(max_cameras, device_info, ordered_device_info)) 
     {
         return 0;
     }
 
     int num_cameras = 1;
-
-    for (int camera_id = 0; camera_id < num_cameras; camera_id++)
-    {
-        quick_print_camera(device_info, camera_id);
-    }
 
     // popular change to camera settings 
     unsigned int width {3208}; 
@@ -110,7 +105,7 @@ int main(int argc, char **args)
 
     for(int camera_id = 0; camera_id < num_cameras; camera_id++)
     {
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], key_num_ptr, folder_name));
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name));
     }
 
     // main thread event loop

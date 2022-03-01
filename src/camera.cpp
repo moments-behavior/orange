@@ -164,25 +164,60 @@ void close_camera(Emergent::CEmergentCamera* camera)
 }
 
 
-//Find all cameras in system.
-int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* device_info)
+int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {
     int cameras_found = 0;
     unsigned int listcam_buf_size = max_cameras;
     unsigned int count;
-    
+
     Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
-    if(count==0)
+
+    if (count == 0)
     {
         printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
         return 0;
     }
     else
     {
-        printf("Found %d cameras. \n", count);
+        for (unsigned int i = 0; i < count; i++)
+        {
+            if (strcmp(device_info[i].serialNumber, "710018") == 0)
+            {
+                ordered_device_info[0] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710041") == 0)
+            {
+                ordered_device_info[1] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710038") == 0)
+            {
+                ordered_device_info[2] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710039") == 0)
+            {
+                ordered_device_info[3] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710032") == 0)
+            {
+                ordered_device_info[4] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710037") == 0)
+            {
+                ordered_device_info[5] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710040") == 0)
+            {
+                ordered_device_info[6] = device_info[i];
+            }
+        }
+
+        for (unsigned int i = 0; i < count; i++)
+        {
+            printf("Found %d cameras. \n", count);
+            quick_print_camera(device_info, i);
+        }
         return count;
     }
-
 }
 
 

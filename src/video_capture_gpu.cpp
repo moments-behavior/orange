@@ -81,21 +81,21 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // ***************************************GPIO*********************************************************
 
-    EVT_CameraSetEnumParam(camera, "TriggerMode", "On");
-    EVT_CameraSetEnumParam(camera, "TriggerSource", "Hardware");
+    // EVT_CameraSetEnumParam(camera, "TriggerMode", "On");
+    // EVT_CameraSetEnumParam(camera, "TriggerSource", "Hardware");
 
-    //Set the GPI hardware triggering mode to use GPI_4 and select rising edge to start exp and falling edge 
-    //to end exposure. Error check omitted for clarity.
-    EVT_CameraSetEnumParam(camera, "GPI_Start_Exp_Mode",   "GPI_4");
-    EVT_CameraSetEnumParam(camera, "GPI_Start_Exp_Event",  "Rising_Edge");
-    EVT_CameraSetEnumParam(camera, "GPI_End_Exp_Mode",     "GPI_4");
-    EVT_CameraSetEnumParam(camera, "GPI_End_Exp_Event",    "Falling_Edge");
+    // //Set the GPI hardware triggering mode to use GPI_4 and select rising edge to start exp and falling edge 
+    // //to end exposure. Error check omitted for clarity.
+    // EVT_CameraSetEnumParam(camera, "GPI_Start_Exp_Mode",   "GPI_4");
+    // EVT_CameraSetEnumParam(camera, "GPI_Start_Exp_Event",  "Rising_Edge");
+    // EVT_CameraSetEnumParam(camera, "GPI_End_Exp_Mode",     "GPI_4");
+    // EVT_CameraSetEnumParam(camera, "GPI_End_Exp_Event",    "Falling_Edge");
 
-    EVT_CameraSetEnumParam(camera, "GPO_0_Mode", "Test_Generator");
-    EVT_CameraSetUInt32Param(camera, "TG_Frame_Time", 33333); //30fps
-    EVT_CameraSetUInt32Param(camera, "TG_High_Time", 1000);   //1000us
+    // EVT_CameraSetEnumParam(camera, "GPO_0_Mode", "Test_Generator");
+    // EVT_CameraSetUInt32Param(camera, "TG_Frame_Time", 33333); //30fps
+    // EVT_CameraSetUInt32Param(camera, "TG_High_Time", 1000);   //1000us
 
-    EVT_CameraSetUInt32Param(camera, "Trigger_Delay", 1000);   //1000us
+    // EVT_CameraSetUInt32Param(camera, "Trigger_Delay", 1000);   //1000us
 
 
     // //*************************************PTP**************************************************

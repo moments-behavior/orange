@@ -1,5 +1,8 @@
 #include "video_capture_gpu.h"
 #include "FFmpegWriter.h"
+#include "FramePresenter.h"
+#include "FramePresenterGLX.h"
+
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -52,6 +55,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     std::cout << "GPU in use: " << szDeviceName << std::endl;
     CUcontext cuContext = NULL;
     ck(cuCtxCreate(&cuContext, 0, cuDevice));
+    //ck(cuCtxCreate(&cuContext, CU_CTX_SCHED_BLOCKING_SYNC, cuDevice));
+
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
 
     // debayer
@@ -153,6 +158,22 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // //////////////////////////////PTP time to start in future////////////////////////////////////
     // // start streaming
+    // for streaming 
+    // Presenter need aligned width
+    int nWidth = (camera_params.width + 1) & ~1;
+    int nPitch = nWidth * 4;
+    FramePresenterGLX gInstance(nWidth, camera_params.height);
+
+    int &nFrame = gInstance.nFrame;
+
+    // Check whether we have valid NVIDIA libraries installed
+    if (!gInstance.isVendorNvidia()) {
+        std::cout<<"\nFailed to find NVIDIA libraries\n";
+        return;
+    }
+    CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
+
+    // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     
     
@@ -237,6 +258,15 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 {
                     std::cout << "\nNPP error %d \n" << npp_result << std::endl;
                 }
+
+
+                // streaming 
+                gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
+                //copy from d_debayer to dpFrame
+                cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth*4, camera_params.height, cudaMemcpyDeviceToDevice);
+                gInstance.ReleaseDeviceFrameBuffer();
+                nFrame++; 
+
                 // encoding
                 const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
                 NvEncoderCuda::CopyToDeviceFrame(cuContext,
@@ -251,6 +281,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                                                 encoderInputFrame->chromaOffsets,
                                                 encoderInputFrame->numChromaPlanes);
                 pEnc->EncodeFrame(vPacket);
+
                 // num_frame_encode += (int)vPacket.size(); 
                 for (std::vector<uint8_t> &packet : vPacket)
                 {

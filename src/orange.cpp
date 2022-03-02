@@ -71,7 +71,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 4;
+    int num_cameras = 1;
 
     // popular change to camera settings 
     unsigned int width {3208}; 

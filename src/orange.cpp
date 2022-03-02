@@ -47,9 +47,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
 
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
-
         aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr);
-
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }
@@ -73,7 +71,7 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 4;
+    int num_cameras = 1;
 
     // popular change to camera settings 
     unsigned int width {3208}; 

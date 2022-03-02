@@ -60,6 +60,7 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false));
 }
 
+
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
 {
     //TODO: open camera using xml file after explored on camera settings
@@ -92,6 +93,69 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
 }
 
+// **********************************************sync***************************************************** 
+void ptp_camera_sync(Emergent::CEmergentCamera* camera)
+{
+    // ptp triggering configuration settings
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"));
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"));
+}
+
+// use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds  
+unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera)
+{
+
+    char ptp_status[100];
+    unsigned long ptp_status_sz_ret;
+    unsigned int ptp_time_high, ptp_time_low;
+    // need to open the camera to get ptp time?
+    EVT_CameraGetEnumParam(camera, "PtpStatus", ptp_status, sizeof(ptp_status), &ptp_status_sz_ret);
+    printf("PTP Status: %s\n", ptp_status);
+
+    //Get and print current time.    
+    EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
+    EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
+    EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
+    unsigned long long ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));    
+    return ptp_time;
+}
+
+
+// test GPO by toggling polarity in manual mode, after open camera, before open streaming  
+void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera)
+{
+    unsigned int count;
+    char gpo_str[20];
+    bool gpo_polarity = 1;
+
+    //Test GPOs by toggling polarity in manual mode.
+    for (count = 0; count < 4; count++)
+    {
+
+        sprintf(gpo_str, "GPO_%d_Mode", count);
+        EVT_CameraSetEnumParam(camera, gpo_str, "GPO");
+    }
+
+    for (count = 0; count < 4; count++)
+    {
+        printf("Toggling GPO %d\t\t", count);
+        sprintf(gpo_str, "GPO_%d_Polarity", count);
+
+        for (int blink_count = 0; blink_count < 20; blink_count++)
+        {
+            EVT_CameraSetBoolParam(camera, gpo_str, gpo_polarity);
+            gpo_polarity = !gpo_polarity;
+            usleep(100 * 1000);
+            printf(".");
+            fflush(stdout);
+        }
+        printf("\n");
+    }
+}
+
 
 void close_camera(Emergent::CEmergentCamera* camera)
 {    
@@ -100,26 +164,62 @@ void close_camera(Emergent::CEmergentCamera* camera)
 }
 
 
-//Find all cameras in system.
-int get_number_cameras(int max_cameras, GigEVisionDeviceInfo* device_info)
+int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {
     int cameras_found = 0;
     unsigned int listcam_buf_size = max_cameras;
     unsigned int count;
-    
+
     Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
-    if(count==0)
+
+    if (count == 0)
     {
         printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
         return 0;
     }
     else
     {
-        printf("Found %d cameras. \n", count);
+        for (unsigned int i = 0; i < count; i++)
+        {
+            if (strcmp(device_info[i].serialNumber, "710018") == 0)
+            {
+                ordered_device_info[0] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710041") == 0)
+            {
+                ordered_device_info[1] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710038") == 0)
+            {
+                ordered_device_info[2] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710039") == 0)
+            {
+                ordered_device_info[3] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710032") == 0)
+            {
+                ordered_device_info[4] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710037") == 0)
+            {
+                ordered_device_info[5] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710040") == 0)
+            {
+                ordered_device_info[6] = device_info[i];
+            }
+        }
+
+        for (unsigned int i = 0; i < count; i++)
+        {
+            printf("Found %d cameras. \n", count);
+            quick_print_camera(device_info, i);
+        }
         return count;
     }
-
 }
+
 
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params)
 {
@@ -191,18 +291,7 @@ void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergent
 }
 
 
-void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx)
-{
-    std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
-    //std::cout << "Camera: " << camera_idx << std::endl;
-    //std::cout << "userDefinedName: " << device_info[camera_idx].userDefinedName << std::endl;
-    //std::cout << "deviceMode: " << device_info[camera_idx].deviceMode << std::endl;
-    //std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
-    //std::cout << "nic.ip4Address: " << device_info[camera_idx].nic.ip4Address << std::endl;
-}
-
-
-// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip.
+// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip. non persistent 
 void change_camera_ip(GigEVisionDeviceInfo* device_info, const char* new_ip)
 {
     const char* mac_address = device_info->macAddress;
@@ -212,8 +301,23 @@ void change_camera_ip(GigEVisionDeviceInfo* device_info, const char* new_ip)
 }
 
 
+// Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip.
+void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip)
+{
+    const char* mac_address = device_info->macAddress;
+    const char* subnet_mask = device_info->currentSubnetMask;
+    const char* default_gateway = device_info->defaultGateway;
+    check_camera_errors(Emergent::EVT_IPConfig(camera, true, new_ip, subnet_mask, default_gateway));
+}
 
-void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
+
+void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
+{
+    std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
+}
+
+
+void set_temporary_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
 {
     // set fixed ip for each camera, clockwise from experimenter view 
     for(int cam_id = 0; cam_id < num_camera; cam_id++) 
@@ -267,6 +371,57 @@ void set_rigroom_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
         {
             printf("was here?");
             change_camera_ip(&device_info[cam_id], "192.168.1.38");
+        }
+
+    }
+}
+
+
+void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, int num_camera)
+{
+    // set fixed ip for each camera, clockwise from experimenter view 
+    for(int cam_id = 0; cam_id < num_camera; cam_id++) 
+    {
+        // centers
+        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.9");
+        }
+
+        // far 
+        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.19");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710038") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.18");
+        }
+
+
+        // right
+        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id],"192.168.2.29");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710039") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.28");
+        }
+
+
+        // left
+        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.39");
+        }
+
+        if(strcmp(device_info[cam_id].serialNumber, "710040") == 0) 
+        {
+            printf("was here?");
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.38");
         }
 
     }

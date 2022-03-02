@@ -72,12 +72,12 @@ int main(int argc, char **args)
         return 0;
     }
 
-    int num_cameras = 1;
+    int num_cameras = 4;
 
     // popular change to camera settings 
     unsigned int width {3208}; 
     unsigned int height {2200};
-    unsigned int frame_rate {40};
+    unsigned int frame_rate {100};
     unsigned int gain {2000}; 
     unsigned int exposure {4000};
     string pixel_format = "BayerRG8"; 
@@ -92,7 +92,9 @@ int main(int argc, char **args)
 
 
     string folder_string = current_date_time();
-    string folder_name = "/home/red/Videos/" + folder_string;
+    //string folder_name = "/home/red/Videos/" + folder_string;
+    string folder_name = "/mnt/md129/videos/" + folder_string;
+    
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
     {
@@ -102,9 +104,13 @@ int main(int argc, char **args)
     else
         std::cout << "Recorded video saves to : " << folder_name << std::endl;
 
+    
 
-    for(int camera_id = 0; camera_id < num_cameras; camera_id++)
+    int selected_cameras[] = {0, 1, 3, 5};  
+    int camera_id {0};
+    for(int i = 0; i < num_cameras; i++)
     {
+        camera_id = selected_cameras[i];
         camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name));
     }
 

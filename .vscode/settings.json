@@ -63,6 +63,9 @@
         "__nullptr": "cpp",
         "ios": "cpp",
         "__locale": "cpp",
-        "avformat.h": "c"
+        "avformat.h": "c",
+        "typeindex": "cpp",
+        "variant": "cpp",
+        "__split_buffer": "cpp"
     }
 }

@@ -61,6 +61,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
     }
 }
 
+
 int main(int argc, char **args) 
 {
     short max_cameras {10};
@@ -78,7 +79,7 @@ int main(int argc, char **args)
     unsigned int width {3208}; 
     unsigned int height {2200};
     unsigned int frame_rate {100};
-    unsigned int gain {2000}; 
+    unsigned int gain {1000}; 
     unsigned int exposure {4000};
     string pixel_format = "BayerRG8"; 
     string color_temp = "CT_2800K";

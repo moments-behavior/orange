@@ -160,6 +160,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     // // start streaming
     // for streaming 
     // Presenter need aligned width
+
+    
     int nWidth = (camera_params.width + 1) & ~1;
     int nPitch = nWidth * 4;
     FramePresenterGLX gInstance(nWidth, camera_params.height);

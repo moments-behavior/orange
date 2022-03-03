@@ -66,12 +66,16 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    if (!check_cameras(max_cameras, device_info, ordered_device_info)) 
+    int num_cameras = 4;
+
+    int cam_count;
+    cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
+    if (cam_count < num_cameras) 
     {
+        printf("Missing cameras...Exit\n");
         return 0;
     }
 
-    int num_cameras = 1;
 
     // popular change to camera settings 
     unsigned int width {3208}; 

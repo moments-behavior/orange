@@ -161,19 +161,20 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     // for streaming 
     // Presenter need aligned width
 
-        
-    int nWidth = (camera_params.width + 1) & ~1;
-    int nPitch = nWidth * 4;
-    FramePresenterGLX gInstance(nWidth, camera_params.height);
 
-    int &nFrame = gInstance.nFrame;
+    // streaming need 
+    // int nWidth = (camera_params.width + 1) & ~1;
+    // int nPitch = nWidth * 4;
+    // FramePresenterGLX gInstance(nWidth, camera_params.height);
 
-    // Check whether we have valid NVIDIA libraries installed
-    if (!gInstance.isVendorNvidia()) {
-        std::cout<<"\nFailed to find NVIDIA libraries\n";
-        return;
-    }
-    CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
+    // int &nFrame = gInstance.nFrame;
+
+    // // Check whether we have valid NVIDIA libraries installed
+    // if (!gInstance.isVendorNvidia()) {
+    //     std::cout<<"\nFailed to find NVIDIA libraries\n";
+    //     return;
+    // }
+    // CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
 
     // start acquisition
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
@@ -262,12 +263,12 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 }
 
 
-                // streaming 
-                gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
-                //copy from d_debayer to dpFrame
-                cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth*4, camera_params.height, cudaMemcpyDeviceToDevice);
-                gInstance.ReleaseDeviceFrameBuffer();
-                nFrame++; 
+                // // streaming 
+                // gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
+                // //copy from d_debayer to dpFrame
+                // cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth*4, camera_params.height, cudaMemcpyDeviceToDevice);
+                // gInstance.ReleaseDeviceFrameBuffer();
+                // nFrame++; 
 
                 // encoding
                 const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();

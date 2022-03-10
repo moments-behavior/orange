@@ -66,7 +66,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 4;
+    int num_cameras = 2;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -76,6 +76,8 @@ int main(int argc, char **args)
         return 0;
     }
 
+
+    set_ip_persistent_with_open_close_camera(device_info, num_cameras);
 
     // popular change to camera settings 
     unsigned int width {3208}; 

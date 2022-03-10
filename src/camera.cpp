@@ -420,9 +420,35 @@ void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergen
 
         if(strcmp(device_info[cam_id].serialNumber, "710040") == 0) 
         {
-            printf("was here?");
             change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.38");
         }
 
+
+        // galvo-mirror camera
+        if(strcmp(device_info[cam_id].serialNumber, "710031") == 0) 
+        {
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.31");
+        }
+
     }
+}
+
+
+void set_ip_persistent_with_open_close_camera(GigEVisionDeviceInfo* device_info, int num_camera)
+{
+    Emergent::CEmergentCamera camera[num_camera];
+
+    // open camera
+    for(int cam_id = 0; cam_id < num_camera; cam_id++)
+    {
+        check_camera_errors(EVT_CameraOpen(&camera[cam_id], &device_info[cam_id]));      
+    }
+
+    set_rigroom_camera_ip_persistent(device_info, camera, num_camera);
+    
+    for(int cam_id = 0; cam_id < num_camera; cam_id++)
+    {
+        close_camera(&camera[cam_id]);      
+    }
+
 }

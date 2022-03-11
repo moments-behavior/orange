@@ -15,7 +15,7 @@ const std::string current_date_time() {
 }
 
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name)
+void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name, int camera_id)
 {
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
@@ -34,26 +34,24 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
 
     try{        
         char* camera_ip = device_info->currentIp;
-        string file_name = folder_name + "/" + camera_ip + ".mp4"; 
+        string file_name = folder_name + "/Cam" + std::to_string(camera_id) + ".mp4"; 
         const char *output_file= file_name.c_str();
 
         open_camera_with_params(&camera, device_info, camera_params); 
 
         // sync 
-        // test_gpo_manual_toggle(&camera);
-        // ptp_camera_sync(&camera);
-
+        ptp_camera_sync(&camera);
         allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
-
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
+
         aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr);
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }
     catch(int &ex)
     {
-        printf("\nError...");
+        printf("\nError...camera_id: %d", camera_id);
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }
@@ -66,7 +64,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 2;
+    int num_cameras = 1;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -75,9 +73,6 @@ int main(int argc, char **args)
         printf("Missing cameras...Exit\n");
         return 0;
     }
-
-
-    set_ip_persistent_with_open_close_camera(device_info, num_cameras);
 
     // popular change to camera settings 
     unsigned int width {3208}; 
@@ -111,12 +106,12 @@ int main(int argc, char **args)
 
     
 
-    int selected_cameras[] = {0, 1, 3, 5};  
+    int camera_orders[] = {0, 1, 3, 5, 2, 4, 6};  
     int camera_id {0};
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_id = selected_cameras[i];
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name));
+        camera_id = camera_orders[i];
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, camera_id));
     }
 
     // main thread event loop

@@ -21,7 +21,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr, )
 {
     int camera_return{0};
 
@@ -109,28 +109,33 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         }
         ptp_offset_prev = ptp_offset;
     }
-
-
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
-
-    unsigned int ptp_time_plus_delta_to_start_uint =  20;
-    unsigned long long ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
-
-    //Offset average.
     printf("Offset Average: %d\n", ptp_offset_sum / 5);
-    ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
-    ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
-    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
-    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
-    printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
-
-
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
 
 
 
+    uint64_t ptp_counter = sync_fetch_and_add(ptp_ready_counter, 1);
+    printf("Wait for all camera getting ready \n");
+    while(ptp_counter < num_cameras){
+        printf(".");
+        fflush(stdout);
+    }
+    
+    if (camera_idx == 0){
+        ptp_time = get_current_PTP_time(camera);
+        unsigned int ptp_time_plus_delta_to_start_uint =  20;
+        unsigned long long ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
+
+        //Offset average.
+        ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
+        ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
+        EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
+        EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
+        printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
+    }
+    
+    
+    
+    
     //*************************************Streaming**************************************************
     // Presenter need aligned width
     // streaming need 
@@ -154,8 +159,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     
     
     printf("Grabbing Frames after countdown...\n");
-    ptp_time = get_current_PTP_time(camera);
-    printf("PTP Current Time(s): %llu\n", ptp_time / 1000000000);
     ptp_time_countdown = 0;
     //Countdown code
     do {

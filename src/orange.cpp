@@ -15,7 +15,7 @@ const std::string current_date_time() {
 }
 
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name, int camera_id)
+void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name, PTPParams* ptp_params)
 {
     int buffer_size {30};
     Emergent::CEmergentCamera camera;
@@ -34,7 +34,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
 
     try{        
         char* camera_ip = device_info->currentIp;
-        string file_name = folder_name + "/Cam" + std::to_string(camera_id) + ".mp4"; 
+        string file_name = folder_name + "/Cam" + std::to_string(camera_params.camera_id) + ".mp4"; 
         const char *output_file= file_name.c_str();
 
         open_camera_with_params(&camera, device_info, camera_params); 
@@ -46,13 +46,13 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr);
+        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr, ptp_params);
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }
     catch(int &ex)
     {
-        printf("\nError...camera_id: %d", camera_id);
+        printf("\nError...camera_id: %d", camera_params.camera_id);
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }
@@ -84,7 +84,6 @@ int main(int argc, char **args)
     string pixel_format = "BayerRG8"; 
     string color_temp = "CT_2800K";
 
-    CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp);
     std::vector<thread> camera_threads;
 
     // esc to exit 
@@ -105,14 +104,19 @@ int main(int argc, char **args)
     else
         std::cout << "Recorded video saves to : " << folder_name << std::endl;
 
-    
+
+    PTPParams* ptp_params  = {};
+    ptp_params->ptp_global_time = 0;
+    ptp_params->ptp_counter = 0;
+
 
     int camera_orders[] = {0, 1, 3, 5, 2, 4, 6};  
     int camera_id {0};
     for(int i = 0; i < num_cameras; i++)
     {
         camera_id = camera_orders[i];
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, camera_id));
+        CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id);
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, ptp_params));
     }
 
     // main thread event loop

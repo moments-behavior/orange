@@ -14,10 +14,17 @@ struct CameraParams{
     unsigned int exposure;
     string pixel_format;
     string color_temp;
+    int camera_id;
 }; 
 
 
-CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp);
+struct PTPParams{
+    unsigned long long ptp_global_time; 
+    uint64_t ptp_counter;
+};
+
+
+CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id);
 int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);

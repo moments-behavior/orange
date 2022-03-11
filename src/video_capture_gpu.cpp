@@ -21,7 +21,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr, )
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr, PTPParams* ptp_params)
 {
     int camera_return{0};
 
@@ -113,6 +113,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
 
 
+    
     uint64_t ptp_counter = sync_fetch_and_add(ptp_ready_counter, 1);
     printf("Wait for all camera getting ready \n");
     while(ptp_counter < num_cameras){

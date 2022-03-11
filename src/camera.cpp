@@ -3,7 +3,7 @@
 #include <iostream>
 
 // important camera tuning parameters
-CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp)
+CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id)
 {
     CameraParams camera_params = {};
     camera_params.width = width;
@@ -13,6 +13,7 @@ CameraParams create_camera_params(unsigned int width, unsigned int height, unsig
     camera_params.exposure = exposure;
     camera_params.pixel_format = pixel_format;
     camera_params.color_temp = color_temp;
+    camera_params.camera_id = camera_id;
     return camera_params;
 }
 

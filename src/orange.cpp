@@ -41,6 +41,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
 
         // sync 
         ptp_camera_sync(&camera);
+
         allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);

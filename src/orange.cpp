@@ -65,7 +65,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 1;
+    int num_cameras = 2;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -105,11 +105,7 @@ int main(int argc, char **args)
         std::cout << "Recorded video saves to : " << folder_name << std::endl;
 
 
-    PTPParams* ptp_params  = {};
-    ptp_params->ptp_global_time = 0;
-    ptp_params->ptp_counter = 0;
-
-
+    PTPParams* ptp_params = new PTPParams{0, 0};
     int camera_orders[] = {0, 1, 3, 5, 2, 4, 6};  
     int camera_id {0};
     for(int i = 0; i < num_cameras; i++)

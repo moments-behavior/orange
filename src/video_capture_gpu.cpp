@@ -94,9 +94,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned long ptp_status_sz_ret;
     
 
-    ptp_time = get_current_PTP_time(camera);
-
-
     //Show raw offsets.
     for (unsigned int i = 0; i < 5;)
     {
@@ -112,29 +109,32 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("Offset Average: %d\n", ptp_offset_sum / 5);
 
 
+    if(ptp_params->ptp_counter == camera_params.num_cameras -1)
+    {
+        ptp_time = get_current_PTP_time(camera);
+        unsigned int ptp_time_plus_delta_to_start_uint =  20;
+        ptp_params->ptp_global_time = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
+    }
+    else
+    {
+        uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
+    }
 
     
-    uint64_t ptp_counter = sync_fetch_and_add(ptp_ready_counter, 1);
-    printf("Wait for all camera getting ready \n");
-    while(ptp_counter < num_cameras){
+    while(ptp_params->ptp_counter != camera_params.num_cameras){
         printf(".");
         fflush(stdout);
     }
     
-    if (camera_idx == 0){
-        ptp_time = get_current_PTP_time(camera);
-        unsigned int ptp_time_plus_delta_to_start_uint =  20;
-        unsigned long long ptp_time_plus_delta_to_start = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
 
-        //Offset average.
-        ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
-        ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
-        EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
-        EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
-        printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
-    }
-    
-    
+    unsigned long long ptp_time_plus_delta_to_start = ptp_params->ptp_counter;
+
+    //Offset average.
+    ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
+    ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
+    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
+    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
+    printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
     
     
     //*************************************Streaming**************************************************

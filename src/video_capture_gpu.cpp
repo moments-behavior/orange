@@ -147,7 +147,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     // }
     // CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
 
-    // start acquisition
+
+
+    //*************************************Streaming**************************************************
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     
     

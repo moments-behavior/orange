@@ -73,12 +73,12 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     unsigned int width_max, height_max;
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
-    printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
+    //printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
 
 
     const char* pixel_format = camera_params.pixel_format.c_str();
     check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
-    printf("PixelFormat: \t\t%s\n", pixel_format);
+    //printf("PixelFormat: \t\t%s\n", pixel_format);
 
     const char* color_temp = camera_params.color_temp.c_str();
     check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
@@ -87,10 +87,10 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 
     unsigned int frame_rate_max;
     check_camera_errors(EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max));
-    printf("FrameRate Max: \t\t%d\n", frame_rate_max);
+    //printf("FrameRate Max: \t\t%d\n", frame_rate_max);
 
     check_camera_errors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate));
-    printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
+    //printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
 }
 
 // **********************************************sync***************************************************** 
@@ -211,9 +211,9 @@ int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVision
             }
         }
 
+        printf("Found %d cameras. \n", count);
         for (unsigned int i = 0; i < count; i++)
         {
-            printf("Found %d cameras. \n", count);
             quick_print_camera(device_info, i);
         }
         return count;

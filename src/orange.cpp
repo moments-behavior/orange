@@ -65,7 +65,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 2;
+    int num_cameras = 4;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);

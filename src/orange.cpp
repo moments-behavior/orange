@@ -115,7 +115,7 @@ int main(int argc, char **args)
     for(int i = 0; i < num_cameras; i++)
     {
         camera_id = camera_orders[i];
-        CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id);
+        CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, num_cameras);
         camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, ptp_params));
     }
 

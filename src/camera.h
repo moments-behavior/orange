@@ -15,6 +15,7 @@ struct CameraParams{
     string pixel_format;
     string color_temp;
     int camera_id;
+    int num_cameras;
 }; 
 
 

@@ -46,7 +46,7 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr, ptp_params);
+        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr, ptp_params, folder_name);
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }
@@ -78,7 +78,7 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; 
     unsigned int height {2200};
-    unsigned int frame_rate {100};
+    unsigned int frame_rate {60};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     string pixel_format = "BayerRG8"; 
@@ -107,6 +107,9 @@ int main(int argc, char **args)
 
     PTPParams* ptp_params = new PTPParams{0, 0};
     int camera_orders[] = {0, 1, 3, 5, 2, 4, 6};  
+    //int camera_orders[] = {0, 2};
+    
+    
     int camera_id {0};
     for(int i = 0; i < num_cameras; i++)
     {

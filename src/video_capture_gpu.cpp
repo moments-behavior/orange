@@ -2,7 +2,8 @@
 #include "FFmpegWriter.h"
 #include "FramePresenter.h"
 #include "FramePresenterGLX.h"
-
+#include <iostream>
+#include <fstream>
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -21,7 +22,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr, PTPParams* ptp_params)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr, PTPParams* ptp_params, string folder_name)
 {
     int camera_return{0};
 
@@ -82,6 +83,16 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // for writing 
     FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
+
+    string metadata_file = folder_name + "/Cam" + std::to_string(camera_params.camera_id) + "_meta.csv";
+    ofstream frame_metadata;
+    frame_metadata.open(metadata_file.c_str());
+    if(!frame_metadata)
+    {
+        std::cout << "File did not open!";
+        exit(1);
+    }
+    frame_metadata << "frame_id,timestamp\n";
 
 
     //*************************************PTP**************************************************
@@ -180,8 +191,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("\n");
     //********************************************************************************************
 
-
-
     StopWatch w;
     w.Start();
     int frame_count = 0;
@@ -197,6 +206,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
         ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
         frame_ts = frame_recv->timestamp;
+        // printf("camera %d, framecount %d, timestamp %f ms \n", camera_params.camera_id, frame_count, frame_ts * 1e-6);
+
 
         if (frame_count != 0)
         {
@@ -218,6 +229,11 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 dropped_frames++;
             else
             {
+
+                //frame_metadata << "frame_id " << frame_recv->frame_id << ", timestamp " << frame_ts << endl;                
+                frame_metadata << frame_recv->frame_id << "," << frame_ts << endl;                
+
+
                 frames_recd++;
                 // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
                 cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyHostToDevice);
@@ -310,16 +326,17 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     for (std::vector<uint8_t> &packet : vPacket)
     {
         writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
-
     }
     pEnc->DestroyEncoder();
+    frame_metadata.close();
     double time_diff = w.Stop();
+
     //Report stats
     printf("\n");
     printf("Images Captured: \t%d\n", frames_recd);
     printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
-    //printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
-    //printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
+    printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
+    printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }

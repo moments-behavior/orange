@@ -149,6 +149,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     strftime(buf, sizeof(buf), "%a, %Y-%m-%d %H:%M:%S %Z", &ts);
     printf("PTP Current Time: %s\n", buf);
 
+
     //*************************************Streaming**************************************************
     // Presenter need aligned width
     // streaming need 

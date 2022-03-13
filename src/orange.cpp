@@ -17,7 +17,7 @@ const std::string current_date_time() {
 
 void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name, PTPParams* ptp_params)
 {
-    int buffer_size {60};
+    int buffer_size {100};
     Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
     

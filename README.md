@@ -1,5 +1,5 @@
 # orange :orange: 
-A light weight C++ library for emergent camera
+A light weight C/C++ library for emergent camera
 
 
 ## Benchmark

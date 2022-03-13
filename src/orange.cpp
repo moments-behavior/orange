@@ -17,7 +17,7 @@ const std::string current_date_time() {
 
 void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name, PTPParams* ptp_params)
 {
-    int buffer_size {30};
+    int buffer_size {100};
     Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[buffer_size]; 
     
@@ -78,7 +78,7 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; 
     unsigned int height {2200};
-    unsigned int frame_rate {60};
+    unsigned int frame_rate {100};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     string pixel_format = "BayerRG8"; 

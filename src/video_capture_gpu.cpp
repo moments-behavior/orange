@@ -333,7 +333,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     //Report stats
     printf("\n");
-    printf("Images Captured: \t%d\n", frames_recd);
+    printf("Frame count: \t%d\n", frame_count);
+    printf("Frame received: \t%d\n", frames_recd);
     printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);

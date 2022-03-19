@@ -1,1 +1,0 @@
-g++ encode_video.cpp -o encode_video `PKG_CONFIG_PATH=/path/ffmpeg/lib/pkgconfig/ pkg-config --cflags libavformat libswscale libswresample libavutil libavcodec` `PKG_CONFIG_PATH=/path/ffmpeg/lib/pkgconfig/ pkg-config --libs libavformat libswscale libswresample libavutil libavcodec` -std=gnu++11

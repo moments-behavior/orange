@@ -13,7 +13,7 @@
 #include <iostream>
 #include <cstring>
 #include <thread>
-#include "NvEncoder/NvCodecUtils.h"
+#include "NvCodecUtils.h"
 /**
  *   @brief  Constructor to initialize GLX, OpenGL and CUDA resources. Also launches rendering thread.
  *   @param  None

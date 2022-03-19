@@ -1,8 +1,8 @@
 #ifndef ORANGE_VIDEO_CAPTURE_GPU
 #define ORANGE_VIDEO_CAPTURE_GPU
-#include "NvEncoder/NvEncoderCuda.h"
-#include "NvEncoder/NvEncoderCLIOptions.h"
-#include "NvEncoder/NvCodecUtils.h"
+#include "NvEncoderCuda.h"
+#include "NvEncoderCLIOptions.h"
+#include "NvCodecUtils.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <nppi.h>

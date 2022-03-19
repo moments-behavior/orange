@@ -65,7 +65,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 4;
+    int num_cameras = 2;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -92,8 +92,8 @@ int main(int argc, char **args)
 
 
     string folder_string = current_date_time();
-    //string folder_name = "/home/red/Videos/" + folder_string;
-    string folder_name = "/mnt/md129/videos/" + folder_string;
+    string folder_name = "/home/jinyao/Videos/dev/" + folder_string;
+    // string folder_name = "/mnt/md129/videos/" + folder_string;
     
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -115,7 +115,8 @@ int main(int argc, char **args)
     {
         camera_id = camera_orders[i];
         CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, num_cameras);
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, ptp_params));
+        // camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, ptp_params));
+        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], key_num_ptr, folder_name, ptp_params));
     }
 
     // main thread event loop

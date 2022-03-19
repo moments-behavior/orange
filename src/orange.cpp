@@ -65,7 +65,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 4;
+    int num_cameras = 1;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -78,7 +78,7 @@ int main(int argc, char **args)
     // popular change to camera settings 
     unsigned int width {3208}; 
     unsigned int height {2200};
-    unsigned int frame_rate {60};
+    unsigned int frame_rate {30};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
     string pixel_format = "BayerRG8"; 

@@ -18,7 +18,7 @@ g++ -Ofast -ffast-math -std=c++11 \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
     -I./third_party/NvEncoder/ ./third_party/NvEncoder/*.cpp \
-    -I./third_party/nvenc_api/include -I/usr/include/opencv4 -I/opt/EVT/eSDK/include/ -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I/usr/local/cuda-11.4/include \
+    -I./third_party/NvEncoder/include -I/usr/include/opencv4 -I/opt/EVT/eSDK/include/ -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I/usr/local/cuda-11.4/include \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
     -lm \
     -lpthread \

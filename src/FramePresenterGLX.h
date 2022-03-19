@@ -19,7 +19,7 @@
 #include <cuda.h>
 #include <cudaGL.h>
 
-#include "NvEncoder/NvCodecUtils.h"
+#include "NvCodecUtils.h"
 #include "FramePresenter.h"
 
 #include <thread>

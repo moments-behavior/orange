@@ -11,4 +11,4 @@ Run `build.sh` in terminal, which will compile and run the tagert.
 
 
 ## Reference 
-Some code inspired by https://github.com/diptodip/yellow
+Some code inspired by a raycast repo [yellow](https://github.com/diptodip/yellow).

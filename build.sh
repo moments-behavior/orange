@@ -15,18 +15,18 @@ g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wf
 g++ -Ofast -ffast-math -std=c++11 \
     -o targets/*.o \
     -o targets/orange -I ./src/ src/*.cpp \
+    -I./third_party/other_lib \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
     -I./third_party/NvEncoder/ ./third_party/NvEncoder/*.cpp \
     -I./third_party/NvEncoder/include -I/usr/include/opencv4 -I/opt/EVT/eSDK/include/ -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I/usr/local/cuda-11.4/include \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
-    -lm \
-    -lpthread \
+    -lm -lpthread \
     -lopencv_core -lopencv_imgcodecs -lopencv_bgsegm -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio \
     -lgstreamer-1.0 \
     -L/usr/local/cuda-11.4/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
-    -lGLEW -lGLU \
-    `pkg-config --cflags glfw3`  -lGL `pkg-config --static --libs glfw3` \
+    -lGLEW -lGLU -lGL \
+    `pkg-config --static --libs glfw3` \
     `pkg-config --cflags --libs x11` \
     `pkg-config --cflags libavformat libswscale libswresample libavutil libavcodec` \
     `pkg-config --libs libavformat libswscale libswresample libavutil libavcodec`

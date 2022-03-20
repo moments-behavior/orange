@@ -22,8 +22,8 @@ DIR_INC += -I$(NVENC)/include -I$(NVENC)
 DIR_INC += -I/usr/include/opencv4 -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I$(CUDA_DIR)/include
 DIR_INC += -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
 
-SOURCES = $(wildcard ./src/*.cpp) 
-SOURCES += $(wildcard ./third_party/NvEncoder/*.cpp) 
+SOURCES = $(wildcard $(DIR_SRC)/*.cpp) 
+SOURCES += $(wildcard $(NVENC)/*.cpp) 
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 

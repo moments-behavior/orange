@@ -81,11 +81,7 @@ int main(int argc, char **args)
 
     glfwDestroyWindow(window);
     glfwTerminate();
-
-    
  
     return 0;
-
-
 
 }

@@ -3,7 +3,10 @@
 
 CXX = g++
 DIR_OUT = targets
-DIR_SRC = src
+$(shell   mkdir -p $(DIR_OUT))
+
+
+DIR_SRC = ./src
 EXE = $(DIR_OUT)/orange
 
 
@@ -20,16 +23,15 @@ DIR_INC += -I/usr/include/opencv4 -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I$(
 DIR_INC += -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
 
 SOURCES = $(wildcard ./src/*.cpp) 
-SOURCES += $(wildcard ./src/*.cpp) 
+SOURCES += $(wildcard ./third_party/NvEncoder/*.cpp) 
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 
 SOURCES_NO_DIR = $(notdir $(SOURCES))
 OBJS_CXX = $(patsubst %.cpp,$(DIR_OUT)/%.o,$(SOURCES_NO_DIR)) 
-$(info    OBJS_CXX is $(OBJS_CXX))
 
 
-CXXFLAGS += -g -Wall -Wformat -std=c++11
+CXXFLAGS += -g -Ofast -ffast-math  -std=c++11
 
 LDLIBS_FLAGS += -lGLEW -lGLU
 LDLIBS_FLAGS += -lGL `pkg-config --static --libs glfw3`
@@ -42,16 +44,32 @@ LDLIBS_FLAGS += -lm -lpthread -lgstreamer-1.0
 LDLIBS_FLAGS += -L$(EMERGENT_DIR)/lib  -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision
 
 
-$(DIR_OUT)/%.o: $(SOURCES)
-	mkdir -p $(DIR_OUT)
-	$(CXX) -c $(CXXFLAGS) $(DIR_INC) $< -o $@
+$(DIR_OUT)/%.o: $(IMGUI_DIR)/%.cpp
+	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
+
+
+$(DIR_OUT)/%.o: $(IMGUI_DIR)/backends/%.cpp
+	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
+
+
+$(DIR_OUT)/%.o: $(NVENC)/%.cpp
+	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
+
+
+$(DIR_OUT)/%.o: $(DIR_SRC)/%.cpp
+	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
+
 
 $(EXE): $(OBJS_CXX)
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LDLIBS_FLAGS)
 
 
 .PHONY:all
-all:  $(EXE)
+all:  
+	$(EXE)
 
 
+.PHONY:clean
+clean:
+	rm -fr $(CXXEXE) $(DIR_OUT)
 

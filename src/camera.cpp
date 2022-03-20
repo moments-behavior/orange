@@ -318,6 +318,21 @@ void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
     std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
 }
 
+void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx)
+{
+    std::cout << "Camera: " << camera_idx << std::endl;
+    std::cout << "userDefinedName: " << device_info[camera_idx].userDefinedName << std::endl;
+    std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
+    std::cout << "deviceMode: " << device_info[camera_idx].deviceMode << std::endl;
+    std::cout << "serialNumber: " << device_info[camera_idx].serialNumber << std::endl;
+    std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
+    std::cout << "currentIp: " << device_info[camera_idx].currentIp << std::endl;
+    std::cout << "currentSubnetMask: " << device_info[camera_idx].currentSubnetMask << std::endl;
+    std::cout << "defaultGateway: " << device_info[camera_idx].defaultGateway << std::endl;
+    std::cout << "nic.ip4Address: " << device_info[camera_idx].nic.ip4Address << std::endl;
+}
+
+
 
 void set_temporary_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
 {

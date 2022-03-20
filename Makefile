@@ -71,5 +71,5 @@ all:
 
 .PHONY:clean
 clean:
-	rm -fr $(CXXEXE) $(DIR_OUT)
+	sudo rm -rf $(CXXEXE) $(DIR_OUT)
 

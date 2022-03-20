@@ -14,9 +14,11 @@ EMERGENT_DIR = /opt/EVT/eSDK
 CUDA_DIR = /usr/local/cuda-11.4
 NVENC = ./third_party/NvEncoder
 IMGUI_DIR = ./third_party/imgui
+OTHER_LIB = ./third_party/other_lib
 
 
 DIR_INC = -I$(DIR_SRC)
+DIR_INC += -I$(OTHER_LIB)
 DIR_INC += -I$(EMERGENT_DIR)/include
 DIR_INC += -I$(NVENC)/include -I$(NVENC) 
 DIR_INC += -I/usr/include/opencv4 -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I$(CUDA_DIR)/include

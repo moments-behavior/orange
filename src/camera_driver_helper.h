@@ -10,6 +10,7 @@
 
 string get_evt_error_string(EVT_ERROR error);
 
+
 #define check_camera_errors(err) __check_camera_errors(err, __FILE__, __LINE__)
 inline void __check_camera_errors(EVT_ERROR err, const char *file, const int line) {
   if (EVT_SUCCESS != err) {
@@ -23,7 +24,5 @@ inline void __check_camera_errors(EVT_ERROR err, const char *file, const int lin
     throw(EXIT_FAILURE);
   }
 }
-
-void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx);
 
 #endif

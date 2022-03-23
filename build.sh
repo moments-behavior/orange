@@ -25,7 +25,7 @@ g++ -Ofast -ffast-math -std=c++11 \
     -lopencv_core -lopencv_imgcodecs -lopencv_bgsegm -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio \
     -lgstreamer-1.0 \
     -L/usr/local/cuda-11.4/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
-    -lGLEW -lGLU -lGL \
+    -lGLEW -lGL \
     `pkg-config --static --libs glfw3` \
     `pkg-config --cflags --libs x11` \
     `pkg-config --cflags libavformat libswscale libswresample libavutil libavcodec` \

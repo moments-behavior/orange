@@ -35,7 +35,7 @@ OBJS_CXX = $(patsubst %.cpp,$(DIR_OUT)/%.o,$(SOURCES_NO_DIR))
 
 CXXFLAGS += -g -Ofast -ffast-math  -std=c++11
 
-LDLIBS_FLAGS += -lGLEW -lGLU
+LDLIBS_FLAGS += -lGLEW
 LDLIBS_FLAGS += -lGL `pkg-config --static --libs glfw3`
 LDLIBS_FLAGS += `pkg-config --cflags --libs x11`
 LDLIBS_FLAGS += `pkg-config --cflags libavformat libswscale libswresample libavutil libavcodec`

@@ -58,7 +58,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     ck(cuCtxCreate(&cuContext, 0, cuDevice));
     //ck(cuCtxCreate(&cuContext, CU_CTX_SCHED_BLOCKING_SYNC, cuDevice));
 
-    std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
+    //std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
 
     // debayer
     NppiSize size;
@@ -73,10 +73,11 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     roi.height = camera_params.height;
 
     NppiBayerGridPosition grid;
-    grid = NPPI_BAYER_RGGB;
+    //grid = NPPI_BAYER_RGGB;
+    grid = NPPI_BAYER_GBRG;
 
 
-    InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
+    //InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
     // For receiving encoded packets
     std::vector<std::vector<uint8_t>> vPacket;
     int num_frame_encode = 0;
@@ -264,27 +265,27 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 nFrame++; 
 
                 // encoding
-                const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
-                NvEncoderCuda::CopyToDeviceFrame(cuContext,
-                                                d_debayer,
-                                                0,
-                                                (CUdeviceptr)encoderInputFrame->inputPtr,
-                                                (int)encoderInputFrame->pitch,
-                                                pEnc->GetEncodeWidth(),
-                                                pEnc->GetEncodeHeight(),
-                                                CU_MEMORYTYPE_DEVICE,
-                                                encoderInputFrame->bufferFormat,
-                                                encoderInputFrame->chromaOffsets,
-                                                encoderInputFrame->numChromaPlanes);
-                pEnc->EncodeFrame(vPacket);
+                // const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
+                // NvEncoderCuda::CopyToDeviceFrame(cuContext,
+                //                                 d_debayer,
+                //                                 0,
+                //                                 (CUdeviceptr)encoderInputFrame->inputPtr,
+                //                                 (int)encoderInputFrame->pitch,
+                //                                 pEnc->GetEncodeWidth(),
+                //                                 pEnc->GetEncodeHeight(),
+                //                                 CU_MEMORYTYPE_DEVICE,
+                //                                 encoderInputFrame->bufferFormat,
+                //                                 encoderInputFrame->chromaOffsets,
+                //                                 encoderInputFrame->numChromaPlanes);
+                // pEnc->EncodeFrame(vPacket);
 
                 // num_frame_encode += (int)vPacket.size(); 
-                for (std::vector<uint8_t> &packet : vPacket)
-                {
-                    // For each encoded packet
-                    writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
+                // for (std::vector<uint8_t> &packet : vPacket)
+                // {
+                //     // For each encoded packet
+                //     writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
 
-                }
+                // }
             }
         }
         else
@@ -321,12 +322,12 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStop"));
-    pEnc->EndEncode(vPacket);
-    for (std::vector<uint8_t> &packet : vPacket)
-    {
-        writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
-    }
-    pEnc->DestroyEncoder();
+    //pEnc->EndEncode(vPacket);
+    // for (std::vector<uint8_t> &packet : vPacket)
+    // {
+    //     writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
+    // }
+    // pEnc->DestroyEncoder();
     frame_metadata.close();
     double time_diff = w.Stop();
 

@@ -260,7 +260,7 @@ void FramePresenterGLX::initWindowSystem() {
     wattr.bit_gravity = StaticGravity;
     wattr.colormap = cmap;
 
-    win = XCreateWindow(display, root, 0, 0, 640, 480, 0,
+    win = XCreateWindow(display, root, 0, 0, 5120, 4096, 0,
                             visinfo->depth, InputOutput,
                             visinfo->visual, wattr_mask, &wattr);
 

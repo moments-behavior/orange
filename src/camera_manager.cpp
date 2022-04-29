@@ -73,8 +73,8 @@ void camera_manager()
     }
 
     // popular change to camera settings 
-    unsigned int width {3200}; //{5120}; //{3208}; 
-    unsigned int height {2200}; //{4096}; //{2200};
+    unsigned int width {5120}; //{3208}; 
+    unsigned int height {4096}; //{2200};
     unsigned int frame_rate {60};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};

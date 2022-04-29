@@ -235,6 +235,10 @@ void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_p
     {
         evt_frame->pixel_type = GVSP_PIX_BAYRG8;
     }
+    else if(pixel_format == "BayerGB8")
+    {
+        evt_frame->pixel_type = GVSP_PIX_BAYGB8;
+    }
     else if(pixel_format == "RGB8Packed")
     {
         evt_frame->pixel_type = GVSP_PIX_RGB8;

@@ -73,12 +73,12 @@ void camera_manager()
     }
 
     // popular change to camera settings 
-    unsigned int width {3208}; 
-    unsigned int height {2200};
+    unsigned int width {3200}; //{5120}; //{3208}; 
+    unsigned int height {2200}; //{4096}; //{2200};
     unsigned int frame_rate {60};
     unsigned int gain {1000}; 
     unsigned int exposure {4000};
-    string pixel_format = "BayerRG8"; 
+    string pixel_format = "BayerGB8"; //"BayerRG8"; 
     string color_temp = "CT_2800K";
 
     std::vector<thread> camera_threads;

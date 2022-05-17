@@ -36,13 +36,15 @@ void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_i
         open_camera_with_params(&camera, device_info, camera_params); 
 
         // sync 
-        ptp_camera_sync(&camera);
+        // ptp_camera_sync(&camera);
 
         allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
         Emergent::CEmergentFrame frame_recv;
         set_frame_buffer(&frame_recv, camera_params);
 
-        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr, ptp_params, folder_name);
+        // aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr, ptp_params, folder_name);
+        aquire_num_frames(&camera, &frame_recv, 100, camera_params, false);
+        
         destroy_frame_buffer(&camera, evt_frame, buffer_size);
         close_camera(&camera);
     }
@@ -75,9 +77,9 @@ void camera_manager()
     // popular change to camera settings 
     unsigned int width {5120}; //{3208}; 
     unsigned int height {4096}; //{2200};
-    unsigned int frame_rate {60};
-    unsigned int gain {1000}; 
-    unsigned int exposure {4000};
+    unsigned int frame_rate {200};
+    unsigned int gain {3000}; 
+    unsigned int exposure {9000};
     string pixel_format = "BayerGB8"; //"BayerRG8"; 
     string color_temp = "CT_2800K";
 

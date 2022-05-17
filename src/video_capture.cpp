@@ -35,11 +35,15 @@ void aquire_num_frames(Emergent::CEmergentCamera* camera, Emergent::CEmergentFra
                 if (save_bmp)
                 {
                     string frame_name {};
-                    frame_name = "frames/frame_" + to_string(frame_recv->frame_id) + ".bmp";
+                    // frame_name = "frames/frame_" + to_string(frame_recv->frame_id) + ".bmp";
                     // evt frame saver bmp container wired
-                    //camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_ALIGN_NONE, EVT_FILETYPE_BMP); 
-                    //if(camera_return){printf("Save failed...%d", camera_return);} 
-                    stbi_write_bmp(frame_name.c_str(), camera_params.width, camera_params.height, 1, frame_recv->imagePtr);
+                    // camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_ALIGN_NONE, EVT_FILETYPE_BMP); 
+                    frame_name = "frames/frame_" + to_string(frame_recv->frame_id) + ".raw";
+                    // camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_ALIGN_NONE, EVT_FILETYPE_RAW); 
+                    camera_return = EVT_FrameSave(frame_recv, frame_name.c_str(), EVT_FILETYPE_RAW, 0, camera->linesReorderHandle); 
+
+                    if(camera_return){printf("Save failed...%d", camera_return);} 
+                    //stbi_write_bmp(frame_name.c_str(), camera_params.width, camera_params.height, 1, frame_recv->imagePtr);
                 }
             }
         }

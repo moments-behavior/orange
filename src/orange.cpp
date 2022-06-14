@@ -1,7 +1,6 @@
 #include "video_capture_gpu.h"
 #include <iostream>
 #include "camera.h"
-#include "video_capture.h"
 #include <thread>
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss

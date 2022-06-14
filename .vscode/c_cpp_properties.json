@@ -6,9 +6,8 @@
                 "${workspaceFolder}/**",
                 "/opt/EVT/eSDK/include",
                 "/usr/include",
-                "/usr/include/opencv4",
                 "/usr/local/include/ffnvcodec",
-                "/usr/local/cuda-11.4/include",
+                "/usr/local/cuda/include",
                 "/usr/local/include"
             ],
             "defines": [],

@@ -64,7 +64,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 1;
+    int num_cameras = 7;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -92,7 +92,9 @@ int main(int argc, char **args)
 
     string folder_string = current_date_time();
     //string folder_name = "/home/red/Videos/" + folder_string;
-    string folder_name = "/mnt/md129/videos/" + folder_string;
+    //string folder_name = "/mnt/md129/videos/" + folder_string;
+    string folder_name = "/home/user/Videos/" + folder_string;
+    
     
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)

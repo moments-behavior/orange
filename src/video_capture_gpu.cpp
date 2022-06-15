@@ -22,7 +22,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int gpu_index, int* key_num_ptr, PTPParams* ptp_params, string folder_name)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name)
 {
     int camera_return{0};
 
@@ -32,7 +32,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
 
-    ck(cudaSetDevice(gpu_index));
+    ck(cudaSetDevice(camera_params.gpu_id));
     // modularize these parts: 1. debayer; 2. encoding; 
     // gpu: upload raw images and color debayer
     int output_channels = 4;

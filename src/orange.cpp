@@ -20,7 +20,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 3;
+    int num_cameras = 1;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -39,16 +39,11 @@ int main(int argc, char **args)
     string pixel_format = "BayerRG8"; 
     string color_temp = "CT_2800K";
 
-    std::vector<thread> camera_threads;
-
     // esc to exit 
     int key_num;
     int* key_num_ptr = &key_num;  
 
-
     string folder_string = current_date_time();
-    //string folder_name = "/home/red/Videos/" + folder_string;
-    //string folder_name = "/mnt/md129/videos/" + folder_string;
     string folder_name = "/home/user/Videos/" + folder_string;
     
     
@@ -63,7 +58,7 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int camera_orders[] = {0, 1, 2, 5, 3, 4, 6};  
+    int camera_orders[] = {0, 1, 2, 3, 4, 5, 6};  
     int camera_gpus[] = {0, 0, 0, 0, 1, 1, 1, };
     
     
@@ -83,48 +78,46 @@ int main(int argc, char **args)
     // init camera resources 
     Emergent::CEmergentCamera camera[num_cameras];
     Emergent::CEmergentFrame evt_frame[num_cameras][buffer_size]; 
+    Emergent::CEmergentFrame frame_recv[num_cameras];
 
     string encoder_setup = "-preset p1 -fps " + to_string(frame_rate);
     const char *encoder_str = encoder_setup.c_str();
+    std::vector<thread> camera_threads;
 
     for(int i = 0; i < num_cameras; i++)
     {
-        string file_name = folder_name + "/Cam" + std::to_string(camera_params[i].camera_id) + ".mp4"; 
-        const char *output_file= file_name.c_str();
-
-        open_camera_with_params(&camera[i], &ordered_device_info[i], camera_params[i]); 
+        //open_camera_with_params(&camera[i], &ordered_device_info[i], camera_params[i]); 
+        open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
 
         // sync 
         ptp_camera_sync(&camera[i]);
 
         allocate_frame_buffer(&camera[i], evt_frame[i], camera_params[i], buffer_size);
-        Emergent::CEmergentFrame frame_recv;
-        set_frame_buffer(&frame_recv, camera_params[i]);
+        set_frame_buffer(&frame_recv[i], camera_params[i]);
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name));
+    }
 
-        //aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, key_num_ptr, ptp_params, folder_name);
+    // main thread event loop
+    while (true){
+        key_num = getchar();
+        if(key_num == 27)
+            {
+                std::cout << "ESC pressed. Quit program." << std::endl;
+                break;
+            }
+    }
+
+    // wait for threads to join
+    for (auto& t : camera_threads)
+            t.join();
+    
+
+    for(int i = 0; i < num_cameras; i++)
+    {
         destroy_frame_buffer(&camera[i], evt_frame[i], buffer_size);
         close_camera(&camera[i]);
     }
 
-    // for(int i = 0; i < num_cameras; i++)
-    // {
-    //     camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, ptp_params));
-    // }
-
-    // main thread event loop
-    // while (true){
-    //     key_num = getchar();
-    //     if(key_num == 27)
-    //         {
-    //             std::cout << "ESC pressed. Quit program." << std::endl;
-    //             break;
-    //         }
-    // }
-
-    // // wait for threads to join
-    // for (auto& t : camera_threads)
-    //         t.join();
-    
 
     std::cout << folder_name << std::endl;
     return 0;

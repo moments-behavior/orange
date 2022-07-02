@@ -22,7 +22,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *output_file, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name)
 {
     int camera_return{0};
 
@@ -49,7 +49,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     CUdevice cuDevice = 0;
 
     // specify which gpu
-    ck(cuDeviceGet(&cuDevice, gpu_index));
+    ck(cuDeviceGet(&cuDevice, camera_params.gpu_id));
 
     char szDeviceName[80];
     ck(cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice));
@@ -82,6 +82,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     int num_frame_encode = 0;
 
     // for writing 
+
+    string video_file = folder_name + "/Cam" + std::to_string(camera_params.camera_id) + ".mp4";
+    const char *output_file = video_file.c_str();
     FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
 
     string metadata_file = folder_name + "/Cam" + std::to_string(camera_params.camera_id) + "_meta.csv";

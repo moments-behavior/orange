@@ -59,7 +59,7 @@ int main(int argc, char **args)
 
     PTPParams* ptp_params = new PTPParams{0, 0};
     int camera_orders[] = {0, 1, 2, 3, 4, 5, 6};  
-    int camera_gpus[] = {0, 0, 0, 0, 1, 1, 1, };
+    int camera_gpus[] = {0, 0, 0, 0, 1, 1, 1};
     
     
     int camera_id {0};

@@ -15,6 +15,8 @@ g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wf
 g++ -Ofast -ffast-math -std=c++14 \
     -o targets/*.o \
     -o targets/orange -I ./src/ src/*.cpp \
+    -I./third_party/imgui \
+    -I./third_party/imgui/backends \
     -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
     -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
@@ -24,5 +26,6 @@ g++ -Ofast -ffast-math -std=c++14 \
     -lGLEW -lGLU -lGL \
     -I/home/user/nvidia/ffmpeg/build/include/ \
     -L/home/user/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    `pkg-config --static --libs glfw3` \
     `pkg-config --cflags --libs x11`
 sudo ./targets/orange;

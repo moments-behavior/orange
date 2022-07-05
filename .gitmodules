@@ -1,3 +1,6 @@
 [submodule "third_party/imgui"]
 	path = third_party/imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "third_party/IconFontCppHeaders"]
+	path = third_party/IconFontCppHeaders
+	url = https://github.com/juliettef/IconFontCppHeaders.git

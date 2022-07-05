@@ -17,6 +17,7 @@ g++ -Ofast -ffast-math -std=c++14 \
     -o targets/orange -I ./src/ src/*.cpp \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
+    -I./third_party/IconFontCppHeaders \
     -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
     -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \

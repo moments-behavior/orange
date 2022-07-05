@@ -8,7 +8,8 @@
                 "/usr/include",
                 "/usr/local/include/ffnvcodec",
                 "/usr/local/cuda/include",
-                "/usr/local/include"
+                "/usr/local/include",
+                "/home/user/nvidia/ffmpeg/build/include/ "
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

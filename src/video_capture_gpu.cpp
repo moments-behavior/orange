@@ -1,7 +1,5 @@
 #include "video_capture_gpu.h"
 #include "FFmpegWriter.h"
-#include "FramePresenter.h"
-#include "FramePresenterGLX.h"
 #include <iostream>
 #include <fstream>
 
@@ -151,23 +149,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     ts =  *localtime (&ptp_info_time);
     strftime(buf, sizeof(buf), "%a, %Y-%m-%d %H:%M:%S %Z", &ts);
     printf("PTP Current Time: %s\n", buf);
-
-
-    //*************************************Streaming**************************************************
-    // Presenter need aligned width
-    // streaming need 
-    // int nWidth = (camera_params.width + 1) & ~1;
-    // int nPitch = nWidth * 4;
-    // FramePresenterGLX gInstance(nWidth, camera_params.height);
-
-    // int &nFrame = gInstance.nFrame;
-
-    // // Check whether we have valid NVIDIA libraries installed
-    // if (!gInstance.isVendorNvidia()) {
-    //     std::cout<<"\nFailed to find NVIDIA libraries\n";
-    //     return;
-    // }
-    // CUdeviceptr dpFrame; //= (CUdeviceptr)d_debayer;
 
 
 

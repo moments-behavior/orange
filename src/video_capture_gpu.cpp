@@ -20,7 +20,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* d_debayer)
 {
     int camera_return{0};
 
@@ -37,8 +37,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned char *d_orig;
     int size_pic = camera_params.width * camera_params.height * 1 * sizeof(unsigned char);
     cudaMalloc((void **)&d_orig, size_pic);
-    unsigned char *d_debayer;
-    cudaMalloc((void **)&d_debayer, size_pic * output_channels);
+    //unsigned char *d_debayer;
+    //cudaMalloc((void **)&d_debayer, size_pic * output_channels);
 
     // for encoding purpose 
     NV_ENC_BUFFER_FORMAT eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
@@ -241,13 +241,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     std::cout << "\nNPP error %d \n" << npp_result << std::endl;
                 }
 
-
-                // // streaming 
-                // gInstance.GetDeviceFrameBuffer(&dpFrame, &nPitch);
-                // //copy from d_debayer to dpFrame
-                // cudaMemcpy2D((uint8_t *)dpFrame, nWidth*4, d_debayer, nWidth*4, nWidth*4, camera_params.height, cudaMemcpyDeviceToDevice);
-                // gInstance.ReleaseDeviceFrameBuffer();
-                // nFrame++; 
 
                 // encoding
                 const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();

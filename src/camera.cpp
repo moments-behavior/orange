@@ -430,7 +430,7 @@ void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergen
         // galvo-mirror camera
         if(strcmp(device_info[cam_id].serialNumber, "710031") == 0) 
         {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.31");
+            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.3.31");
         }
 
     }

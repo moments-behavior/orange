@@ -31,7 +31,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 1;
+    int num_cameras = 2;
 
     int cam_count;
     cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
@@ -40,6 +40,10 @@ int main(int argc, char **args)
         printf("Missing cameras...Exit\n");
         return 0;
     }
+
+
+    // set_ip_persistent_with_open_close_camera(device_info, num_cameras);
+
 
     // popular change to camera settings 
     unsigned int width {3208}; 
@@ -56,7 +60,6 @@ int main(int argc, char **args)
 
     string folder_string = current_date_time();
     string folder_name = "/home/user/Videos/" + folder_string;
-    
     
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -273,7 +276,8 @@ int main(int argc, char **args)
         for (int i = 0; i < num_cameras; i++)
         {
             ImGui::SetNextWindowSize(ImVec2(0, 0), 0); // Setting size to 0, 0 forces auto-fit
-            ImGui::Begin("##no_plot_name");
+            string view_name = "Cam" + std::to_string(i);  
+            ImGui::Begin(view_name.c_str());
             ImGui::Text("pointer = %p", textureColorbuffer[i]);
             ImVec2 avail_size = ImGui::GetContentRegionAvail();
             ImGui::Image((void*)(intptr_t)textureColorbuffer[i], ImVec2(width, height));

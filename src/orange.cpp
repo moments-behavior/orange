@@ -73,7 +73,7 @@ int main(int argc, char **args)
 
     PTPParams* ptp_params = new PTPParams{0, 0};
     int camera_orders[] = {0, 1, 2, 3, 4, 5, 6};  
-    int camera_gpus[] = {0, 0, 0, 0, 1, 1, 1};
+    int camera_gpus[] = {0, 1, 0, 0, 1, 1, 1};
     
     
     int camera_id {0};
@@ -232,35 +232,35 @@ int main(int argc, char **args)
     {
         glfwPollEvents();
 
-        for (int i = 0; i < num_cameras; i++) {
-            // Transfer to PBO then OpenGL texture
-            // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-            map_cuda_resource(&cuda_resource);
-            cuda_pointer_from_resource(&cuda_buffer, &cuda_pbo_storage_buffer_size, &cuda_resource);
-            cudaMemcpy2D(cuda_buffer, width*4, d_debayer[i], width*4, width*4, height, cudaMemcpyDeviceToDevice);
-            unmap_cuda_resource(&cuda_resource);
+        // for (int i = 0; i < num_cameras; i++) {
+        //     // Transfer to PBO then OpenGL texture
+        //     // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
+        //     map_cuda_resource(&cuda_resource);
+        //     cuda_pointer_from_resource(&cuda_buffer, &cuda_pbo_storage_buffer_size, &cuda_resource);
+        //     cudaMemcpy2D(cuda_buffer, width*4, d_debayer[i], width*4, width*4, height, cudaMemcpyDeviceToDevice);
+        //     unmap_cuda_resource(&cuda_resource);
 
-            // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
-            bind_pbo(&pbo);
-            bind_texture(&texture);
-            upload_image_pbo_to_texture(width, height); // Needs no arguments because texture and PBO are bound
-            unbind_texture();
-            unbind_pbo();
+        //     // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
+        //     bind_pbo(&pbo);
+        //     bind_texture(&texture);
+        //     upload_image_pbo_to_texture(width, height); // Needs no arguments because texture and PBO are bound
+        //     unbind_texture();
+        //     unbind_pbo();
 
-            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer[i]);
-            // make sure we clear the framebuffer's content
-            glViewport(0, 0, width, height);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
+        //     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer[i]);
+        //     // make sure we clear the framebuffer's content
+        //     glViewport(0, 0, width, height);
+        //     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        //     glClear(GL_COLOR_BUFFER_BIT);
 
-            screenShader.use();
-            glBindVertexArray(quadVAO);
-            glBindTexture(GL_TEXTURE_2D, texture);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glBindVertexArray(0);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
+        //     screenShader.use();
+        //     glBindVertexArray(quadVAO);
+        //     glBindTexture(GL_TEXTURE_2D, texture);
+        //     glDrawArrays(GL_TRIANGLES, 0, 6);
+        //     glBindTexture(GL_TEXTURE_2D, 0);
+        //     glBindVertexArray(0);
+        //     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -272,17 +272,32 @@ int main(int argc, char **args)
             ImGui::End();
         }
 
+        // {
+        //     ImGui::Begin("Streaming");
+        //     ImGui::SetNextWindowSize(ImVec2(3208, 1100), 0); // Setting size to 0, 0 forces auto-fit
+            
+        //     // left
+        //     {
+        //         ImGui::BeginChild("Cam0", ImVec2(1604, 1100), true);
+        //         ImGui::Text("pointer = %p", textureColorbuffer[0]);
+        //         ImVec2 avail_size = ImGui::GetContentRegionAvail();
+        //         ImGui::Image((void*)(intptr_t)textureColorbuffer[0], avail_size);
+        //         ImGui::EndChild();
+        //     }
+        //     ImGui::SameLine();
 
-        for (int i = 0; i < num_cameras; i++)
-        {
-            ImGui::SetNextWindowSize(ImVec2(0, 0), 0); // Setting size to 0, 0 forces auto-fit
-            string view_name = "Cam" + std::to_string(i);  
-            ImGui::Begin(view_name.c_str());
-            ImGui::Text("pointer = %p", textureColorbuffer[i]);
-            ImVec2 avail_size = ImGui::GetContentRegionAvail();
-            ImGui::Image((void*)(intptr_t)textureColorbuffer[i], ImVec2(width, height));
-            ImGui::End();
-        }
+
+        //     {
+        //         ImGui::BeginChild("Cam1", ImVec2(1604, 1100), true);
+        //         ImGui::Text("pointer = %p", textureColorbuffer[1]);
+        //         ImVec2 avail_size = ImGui::GetContentRegionAvail();
+        //         ImGui::Image((void*)(intptr_t)textureColorbuffer[1], avail_size);
+        //         ImGui::EndChild();
+        //     }
+            
+        //     ImGui::End();
+        // }
+
 
 
         // Rendering

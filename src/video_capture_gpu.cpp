@@ -38,7 +38,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     int size_pic = camera_params.width * camera_params.height * 1 * sizeof(unsigned char);
     cudaMalloc((void **)&d_orig, size_pic);
     //unsigned char *d_debayer;
-    //cudaMalloc((void **)&d_debayer, size_pic * output_channels);
+    // cudaMalloc((void **)&d_debayer, size_pic * output_channels);
 
     // for encoding purpose 
     NV_ENC_BUFFER_FORMAT eFormat = NV_ENC_BUFFER_FORMAT_ABGR;

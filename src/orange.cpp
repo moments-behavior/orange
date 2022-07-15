@@ -86,7 +86,7 @@ int main(int argc, char **args)
     {
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
-        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras);
+        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, false);
     }
 
     // init camera resources 
@@ -225,7 +225,7 @@ int main(int argc, char **args)
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, d_debayer[i]));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, d_debayer[i], false));
     }
 
 
@@ -268,14 +268,9 @@ int main(int argc, char **args)
         ImGui::NewFrame();
 
         {
-            ImGui::Begin("Orange World!");                          
+            ImGui::Begin("Orange Streaming");
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
-        {
-            ImGui::Begin("Streaming");
-            ImGui::SetNextWindowSize(ImVec2(3208, 1100), 0); // Setting size to 0, 0 forces auto-fit
+            ImGui::SetNextWindowSize(ImVec2(0, 0), 0); // Setting size to 0, 0 forces auto-fit
             
             // left
             {

@@ -16,9 +16,10 @@ Run `build.sh` in local folder
 ./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64
 ```
 
-3. Install OpenGL and GLEW
+3. Install OpenGL and GLEW, GLM
 ```
 sudo apt-get install libglfw3
 sudo apt-get install libglfw3-dev
 sudo apt-get install libglew-dev
+sudo apt-get install libglm-dev
 ```

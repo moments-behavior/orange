@@ -17,6 +17,7 @@ struct CameraParams{
     int gpu_id;
     int camera_id;
     int num_cameras;
+    bool gpu_direct;
 }; 
 
 
@@ -26,7 +27,7 @@ struct PTPParams{
 };
 
 
-CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras);
+CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras, bool gpu_direct);
 int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);

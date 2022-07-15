@@ -20,7 +20,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* d_debayer)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* d_debayer, bool encode_flag)
 {
     int camera_return{0};
 
@@ -217,14 +217,22 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
                 //frame_metadata << "frame_id " << frame_recv->frame_id << ", timestamp " << frame_ts << endl;                
                 frame_metadata << frame_recv->frame_id << "," << frame_ts << endl;                
-
-
                 frames_recd++;
-                // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
-                cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyHostToDevice);
-                if (cu_result != cudaSuccess)
-                {
-                    std::cout << "Cuda Error" << std::endl;
+
+                if (camera_params.gpu_direct){
+                    // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
+                    cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
+                    if (cu_result != cudaSuccess)
+                    {
+                        std::cout << "Cuda Error" << std::endl;
+                    }
+                }else{
+                    // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
+                    cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyHostToDevice);
+                    if (cu_result != cudaSuccess)
+                    {
+                        std::cout << "Cuda Error" << std::endl;
+                    }
                 }
 
                 const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
@@ -241,29 +249,31 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     std::cout << "\nNPP error %d \n" << npp_result << std::endl;
                 }
 
+                if(encode_flag){
+                    // encoding
+                    const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
+                    NvEncoderCuda::CopyToDeviceFrame(cuContext,
+                                                    d_debayer,
+                                                    0,
+                                                    (CUdeviceptr)encoderInputFrame->inputPtr,
+                                                    (int)encoderInputFrame->pitch,
+                                                    pEnc->GetEncodeWidth(),
+                                                    pEnc->GetEncodeHeight(),
+                                                    CU_MEMORYTYPE_DEVICE,
+                                                    encoderInputFrame->bufferFormat,
+                                                    encoderInputFrame->chromaOffsets,
+                                                    encoderInputFrame->numChromaPlanes);
+                    pEnc->EncodeFrame(vPacket);
 
-                // encoding
-                const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
-                NvEncoderCuda::CopyToDeviceFrame(cuContext,
-                                                d_debayer,
-                                                0,
-                                                (CUdeviceptr)encoderInputFrame->inputPtr,
-                                                (int)encoderInputFrame->pitch,
-                                                pEnc->GetEncodeWidth(),
-                                                pEnc->GetEncodeHeight(),
-                                                CU_MEMORYTYPE_DEVICE,
-                                                encoderInputFrame->bufferFormat,
-                                                encoderInputFrame->chromaOffsets,
-                                                encoderInputFrame->numChromaPlanes);
-                pEnc->EncodeFrame(vPacket);
+                    // num_frame_encode += (int)vPacket.size(); 
+                    for (std::vector<uint8_t> &packet : vPacket)
+                    {
+                        // For each encoded packet
+                        writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
 
-                // num_frame_encode += (int)vPacket.size(); 
-                for (std::vector<uint8_t> &packet : vPacket)
-                {
-                    // For each encoded packet
-                    writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
-
+                    }
                 }
+
             }
         }
         else

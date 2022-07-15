@@ -3,7 +3,7 @@
 #include <iostream>
 
 // important camera tuning parameters
-CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras)
+CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras, bool gpu_direct)
 {
     CameraParams camera_params = {};
     camera_params.width = width;
@@ -16,6 +16,7 @@ CameraParams create_camera_params(unsigned int width, unsigned int height, unsig
     camera_params.camera_id = camera_id;
     camera_params.gpu_id = gpu_id;
     camera_params.num_cameras = num_cameras;
+    camera_params.gpu_direct = gpu_direct;
     return camera_params;
 }
 
@@ -69,6 +70,10 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     //TODO: open camera using xml file after explored on camera settings
     //EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
     
+    if(camera_params.gpu_direct){
+        camera->gpuDirectDeviceId = camera_params.gpu_id;
+    }
+
     check_camera_errors(EVT_CameraOpen(camera, device_info));      
 
     configure_factory_defaults(camera);

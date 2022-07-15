@@ -17,3 +17,7 @@ Run `build.sh` in local folder
 ```
 
 3. Install OpenGL and GLEW
+```
+sudo apt-get install libglfw3
+sudo apt-get install libglfw3-dev
+```

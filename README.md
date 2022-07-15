@@ -20,4 +20,5 @@ Run `build.sh` in local folder
 ```
 sudo apt-get install libglfw3
 sudo apt-get install libglfw3-dev
+sudo apt-get install libglew-dev
 ```

@@ -11,5 +11,9 @@ Run `build.sh` in local folder
 
 ## Build instructions 
 1. Install Emergent camera SDK
-2. Install FFmpeg as shared library 
+2. Install FFmpeg as shared library
+```
+./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64
+```
+
 3. Install OpenGL and GLEW

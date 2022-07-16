@@ -25,8 +25,8 @@ g++ -Ofast -ffast-math -std=c++14 \
     -lpthread \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
     -lGLEW -lGLU -lGL \
-    -I/home/user/nvidia/ffmpeg/build/include/ \
-    -L/home/user/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I/home/jinyao/nvidia/ffmpeg/build/include/ \
+    -L/home/jinyao/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     `pkg-config --static --libs glfw3` \
     `pkg-config --cflags --libs x11`
 sudo ./targets/orange;

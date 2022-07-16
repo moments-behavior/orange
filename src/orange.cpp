@@ -59,7 +59,7 @@ int main(int argc, char **args)
     int* key_num_ptr = &key_num;  
 
     string folder_string = current_date_time();
-    string folder_name = "/home/user/Videos/" + folder_string;
+    string folder_name = "/home/jinyao/Videos/" + folder_string;
     
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -86,7 +86,7 @@ int main(int argc, char **args)
     {
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
-        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, false);
+        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, true);
     }
 
     // init camera resources 
@@ -225,7 +225,7 @@ int main(int argc, char **args)
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, d_debayer[i], false));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, d_debayer[i], true));
     }
 
 

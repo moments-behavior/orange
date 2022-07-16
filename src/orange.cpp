@@ -86,7 +86,7 @@ int main(int argc, char **args)
     {
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
-        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, false);
+        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, true);
     }
 
     // init camera resources 
@@ -167,16 +167,13 @@ int main(int argc, char **args)
     io.Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAS, 15.0f, &icons_config, icons_ranges);
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 
-
-    // cudaSetDevice(1);
-
     GLuint texture[num_cameras];
     GLuint pbo[num_cameras];
     cudaGraphicsResource_t cuda_resource[num_cameras] {0};
     unsigned char* cuda_buffer[num_cameras];
     size_t cuda_pbo_storage_buffer_size[num_cameras];
-    unsigned char *d_debayer[num_cameras];
     int size_pic = width * height * 4 * sizeof(unsigned char);
+    unsigned char *display_buffer[num_cameras];
 
 
     for(int i = 0; i < num_cameras; i++)
@@ -188,21 +185,15 @@ int main(int argc, char **args)
         register_pbo_to_cuda(&pbo[i], &cuda_resource[i]);
         unbind_texture();
         unbind_pbo();
+        cudaMalloc((void **)&display_buffer[i], size_pic);
     }
-
-    for(int i = 0; i < num_cameras; i++){
-        cudaSetDevice(camera_gpus[i]);
-        cudaMalloc((void **)&d_debayer[i], size_pic);
-    }
-
 
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, d_debayer[i], false));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], true));
     }
 
-    cudaSetDevice(0);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -214,7 +205,7 @@ int main(int argc, char **args)
             // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
             map_cuda_resource(&cuda_resource[i]);
             cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
-            cudaMemcpy2D(cuda_buffer[i], width*4, d_debayer[i], width*4, width*4, height, cudaMemcpyDeviceToDevice);
+            cudaMemcpy2D(cuda_buffer[i], width*4, display_buffer[i], width*4, width*4, height, cudaMemcpyDeviceToDevice);
             unmap_cuda_resource(&cuda_resource[i]);
 
             // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------

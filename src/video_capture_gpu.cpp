@@ -220,7 +220,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 frames_recd++;
 
                 if (camera_params.gpu_direct){
-                    // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
+                    // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
                     cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
                     if (cu_result != cudaSuccess)
                     {

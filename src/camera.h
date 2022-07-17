@@ -18,6 +18,7 @@ struct CameraParams{
     int camera_id;
     int num_cameras;
     bool gpu_direct;
+    bool need_reorder;
 }; 
 
 
@@ -45,4 +46,5 @@ void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CE
 void set_temporary_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera);
 void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, int num_camera);
 void set_ip_persistent_with_open_close_camera(GigEVisionDeviceInfo* device_info, int num_camera);
+int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info);
 #endif

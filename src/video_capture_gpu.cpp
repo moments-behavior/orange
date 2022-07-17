@@ -57,6 +57,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     //ck(cuCtxCreate(&cuContext, CU_CTX_SCHED_BLOCKING_SYNC, cuDevice));
 
     std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
+    
 
     // debayer
     NppiSize size;
@@ -71,10 +72,20 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     roi.height = camera_params.height;
 
     NppiBayerGridPosition grid;
-    grid = NPPI_BAYER_RGGB;
+    
+    if(camera_params.need_reorder)
+    {
+        grid = NPPI_BAYER_GRBG;
+    }
+    else{
+        grid = NPPI_BAYER_RGGB;
+    }
+    
 
+    if(encode_flag){
+        InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
+    }
 
-    InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
     // For receiving encoded packets
     std::vector<std::vector<uint8_t>> vPacket;
     int num_frame_encode = 0;
@@ -94,61 +105,71 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         exit(1);
     }
     frame_metadata << "frame_id,timestamp\n";
-
-
-    //*************************************PTP**************************************************
-    // handel sync using 
-    int ptp_offset, ptp_offset_sum=0, ptp_offset_prev=0;
-    unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
-    unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_countdown;
-    unsigned long long frame_ts, frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
-    char ptp_status[100];
-    unsigned long ptp_status_sz_ret;
     
 
-    //Show raw offsets.
-    for (unsigned int i = 0; i < 5;)
-    {
-        EVT_CameraGetInt32Param(camera, "PtpOffset", &ptp_offset);
-        if (ptp_offset != ptp_offset_prev)
-        {
-            ptp_offset_sum += ptp_offset;
-            i++;
-            //printf("Offset %d: %d\n", i, ptp_offset);
-        }
-        ptp_offset_prev = ptp_offset;
-    }
-    printf("Offset Average: %d\n", ptp_offset_sum / 5);
-
-
-    if(ptp_params->ptp_counter == camera_params.num_cameras -1)
-    {
-        ptp_time = get_current_PTP_time(camera);
-        unsigned int ptp_time_plus_delta_to_start_uint = 10;
-        ptp_params->ptp_global_time = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
-    }
-    uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
-    printf("%lu\n", ptp_counter);
-    while(ptp_params->ptp_counter != camera_params.num_cameras)
-    {
-        printf(".");
-        fflush(stdout);
-    }
+    Emergent::CEmergentFrame FrameConvert;
+    //Five params used for memory allocation for converted frames. Worst case covers all models so no recompilation required.
+    FrameConvert.size_x = 5120;
+    FrameConvert.size_y = 4096;
+    FrameConvert.pixel_type = GVSP_PIX_BAYGB8;
+    FrameConvert.convertColor = EVT_COLOR_CONVERT_NONE;
+    FrameConvert.convertBitDepth = EVT_CONVERT_NONE;
+    EVT_AllocateFrameBuffer(camera, &FrameConvert, EVT_FRAME_BUFFER_DEFAULT);
+    
+    // //*************************************PTP**************************************************
+    // // handel sync using 
+    // int ptp_offset, ptp_offset_sum=0, ptp_offset_prev=0;
+    // unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
+    // unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_countdown;
+    unsigned long long frame_ts; 
+    // unsigned long long frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
+    // char ptp_status[100];
+    // unsigned long ptp_status_sz_ret;
     
 
-    unsigned long long ptp_time_plus_delta_to_start = ptp_params->ptp_global_time;
-    ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
-    ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
-    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
-    EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
-    printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
+    // //Show raw offsets.
+    // for (unsigned int i = 0; i < 5;)
+    // {
+    //     EVT_CameraGetInt32Param(camera, "PtpOffset", &ptp_offset);
+    //     if (ptp_offset != ptp_offset_prev)
+    //     {
+    //         ptp_offset_sum += ptp_offset;
+    //         i++;
+    //         //printf("Offset %d: %d\n", i, ptp_offset);
+    //     }
+    //     ptp_offset_prev = ptp_offset;
+    // }
+    // printf("Offset Average: %d\n", ptp_offset_sum / 5);
+
+
+    // if(ptp_params->ptp_counter == camera_params.num_cameras -1)
+    // {
+    //     ptp_time = get_current_PTP_time(camera);
+    //     unsigned int ptp_time_plus_delta_to_start_uint = 10;
+    //     ptp_params->ptp_global_time = ((unsigned long long)ptp_time_plus_delta_to_start_uint) * 1000000000 + ptp_time;
+    // }
+    // uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
+    // printf("%lu\n", ptp_counter);
+    // while(ptp_params->ptp_counter != camera_params.num_cameras)
+    // {
+    //     printf(".");
+    //     fflush(stdout);
+    // }
     
-    std::time_t ptp_info_time = (ptp_time_plus_delta_to_start/1000000000);
-    struct tm ts;
-    char buf[80];
-    ts =  *localtime (&ptp_info_time);
-    strftime(buf, sizeof(buf), "%a, %Y-%m-%d %H:%M:%S %Z", &ts);
-    printf("PTP Current Time: %s\n", buf);
+
+    // unsigned long long ptp_time_plus_delta_to_start = ptp_params->ptp_global_time;
+    // ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
+    // ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
+    // EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeHigh", ptp_time_plus_delta_to_start_high);
+    // EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
+    // printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
+    
+    // std::time_t ptp_info_time = (ptp_time_plus_delta_to_start/1000000000);
+    // struct tm ts;
+    // char buf[80];
+    // ts =  *localtime (&ptp_info_time);
+    // strftime(buf, sizeof(buf), "%a, %Y-%m-%d %H:%M:%S %Z", &ts);
+    // printf("PTP Current Time: %s\n", buf);
 
 
 
@@ -156,24 +177,24 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     
     
-    printf("Grabbing Frames after countdown...\n");
-    ptp_time_countdown = 0;
-    //Countdown code
-    do {
-        EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
-        ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
+    // printf("Grabbing Frames after countdown...\n");
+    // ptp_time_countdown = 0;
+    // //Countdown code
+    // do {
+    //     EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
+    //     ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
 
-        if (ptp_time > ptp_time_countdown)
-        {
-            printf("%llu\n", (ptp_time_plus_delta_to_start - ptp_time) / 1000000000);
-            ptp_time_countdown = ptp_time + 1000000000; //1s
-        }
+    //     if (ptp_time > ptp_time_countdown)
+    //     {
+    //         printf("%llu\n", (ptp_time_plus_delta_to_start - ptp_time) / 1000000000);
+    //         ptp_time_countdown = ptp_time + 1000000000; //1s
+    //     }
 
-    } while (ptp_time <= ptp_time_plus_delta_to_start);
-    //Countdown done.
-    printf("\n");
+    // } while (ptp_time <= ptp_time_plus_delta_to_start);
+    // //Countdown done.
+    // printf("\n");
     //********************************************************************************************
 
     StopWatch w;
@@ -182,30 +203,29 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     while (*key_num_ptr != 27)
     {
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
-       
-       
-       //////////////////////////////PTP timestamp checking////////////////////////////////////
-        EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
-        EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
+        // printf("get frame\n");
+    //    //////////////////////////////PTP timestamp checking////////////////////////////////////
+    //     EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
+    //     EVT_CameraGetUInt32Param(camera, "GevTimestampValueLow", &ptp_time_low);
 
-        ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
+    //     ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
         frame_ts = frame_recv->timestamp;
-        // printf("camera %d, framecount %d, timestamp %f ms \n", camera_params.camera_id, frame_count, frame_ts * 1e-6);
+    //     // printf("camera %d, framecount %d, timestamp %f ms \n", camera_params.camera_id, frame_count, frame_ts * 1e-6);
 
 
-        if (frame_count != 0)
-        {
-            ptp_time_delta = ptp_time - ptp_time_prev;
-            ptp_time_delta_sum += ptp_time_delta;
+    //     if (frame_count != 0)
+    //     {
+    //         ptp_time_delta = ptp_time - ptp_time_prev;
+    //         ptp_time_delta_sum += ptp_time_delta;
 
-            frame_ts_delta = frame_ts - frame_ts_prev;
-            frame_ts_delta_sum += frame_ts_delta;
-        }
+    //         frame_ts_delta = frame_ts - frame_ts_prev;
+    //         frame_ts_delta_sum += frame_ts_delta;
+    //     }
 
-        ptp_time_prev = ptp_time;
-        frame_ts_prev = frame_ts;
-        //////////////////////////////PTP timestamp checking////////////////////////////////////
+    //     ptp_time_prev = ptp_time;
+    //     frame_ts_prev = frame_ts;
+    //     //////////////////////////////PTP timestamp checking////////////////////////////////////
 
         if (!camera_return)
         {
@@ -219,19 +239,43 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 frame_metadata << frame_recv->frame_id << "," << frame_ts << endl;                
                 frames_recd++;
 
-                if (camera_params.gpu_direct){
-                    // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
-                    cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
-                    if (cu_result != cudaSuccess)
-                    {
-                        std::cout << "Cuda Error" << std::endl;
+                if(camera_params.need_reorder){
+                    EVT_FrameConvert(frame_recv, &FrameConvert, 0, 0, camera->linesReorderHandle);
+
+
+                    if (camera_params.gpu_direct){
+                        // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
+                        cudaError_t cu_result = cudaMemcpy(d_orig, FrameConvert.imagePtr, size_pic, cudaMemcpyDeviceToDevice);
+                        if (cu_result != cudaSuccess)
+                        {
+                            std::cout << "Cuda Error" << std::endl;
+                        }
+                    }else{
+                        // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
+                        cudaError_t cu_result = cudaMemcpy(d_orig, FrameConvert.imagePtr, size_pic, cudaMemcpyHostToDevice);
+                        if (cu_result != cudaSuccess)
+                        {
+                            std::cout << "Cuda Error" << std::endl;
+                        }
                     }
-                }else{
-                    // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
-                    cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyHostToDevice);
-                    if (cu_result != cudaSuccess)
-                    {
-                        std::cout << "Cuda Error" << std::endl;
+
+                }
+                else{
+
+                     if (camera_params.gpu_direct){
+                        // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
+                        cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
+                        if (cu_result != cudaSuccess)
+                        {
+                            std::cout << "Cuda Error" << std::endl;
+                        }
+                    }else{
+                        // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
+                        cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyHostToDevice);
+                        if (cu_result != cudaSuccess)
+                        {
+                            std::cout << "Cuda Error" << std::endl;
+                        }
                     }
                 }
 
@@ -317,12 +361,15 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStop"));
-    pEnc->EndEncode(vPacket);
-    for (std::vector<uint8_t> &packet : vPacket)
-    {
-        writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
+    if(encode_flag){
+
+        pEnc->EndEncode(vPacket);
+        for (std::vector<uint8_t> &packet : vPacket)
+        {
+            writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
+        }
+        pEnc->DestroyEncoder();
     }
-    pEnc->DestroyEncoder();
     frame_metadata.close();
     double time_diff = w.Stop();
 
@@ -333,6 +380,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
-    printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
-    printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
+    // printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
+    // printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }

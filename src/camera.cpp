@@ -2,6 +2,7 @@
 #include "camera_driver_helper.h"
 #include <iostream>
 
+
 // important camera tuning parameters
 CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras, bool gpu_direct)
 {
@@ -81,12 +82,12 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     unsigned int width_max, height_max;
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
-    //printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
+    printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
 
 
     const char* pixel_format = camera_params.pixel_format.c_str();
     check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
-    //printf("PixelFormat: \t\t%s\n", pixel_format);
+    printf("PixelFormat: \t\t%s\n", pixel_format);
 
     const char* color_temp = camera_params.color_temp.c_str();
     check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
@@ -95,7 +96,7 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 
     unsigned int frame_rate_max;
     check_camera_errors(EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max));
-    //printf("FrameRate Max: \t\t%d\n", frame_rate_max);
+    printf("FrameRate Max: \t\t%d\n", frame_rate_max);
 
     check_camera_errors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params.frame_rate));
     //printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
@@ -172,6 +173,8 @@ void close_camera(Emergent::CEmergentCamera* camera)
 }
 
 
+
+// order for rig room 
 int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {
     int cameras_found = 0;
@@ -229,6 +232,49 @@ int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVision
 }
 
 
+// order for rig room 
+int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
+{
+    int cameras_found = 0;
+    unsigned int listcam_buf_size = max_cameras;
+    unsigned int count;
+
+    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
+
+    if (count == 0)
+    {
+        printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
+        return 0;
+    }
+    else
+    {
+        for (unsigned int i = 0; i < count; i++)
+        {
+            if (strcmp(device_info[i].serialNumber, "2001127") == 0)
+            {
+                ordered_device_info[0] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710042") == 0)
+            {
+                ordered_device_info[1] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710031") == 0)
+            {
+                ordered_device_info[2] = device_info[i];
+            }
+        }
+
+        printf("Found %d cameras. \n", count);
+        for (unsigned int i = 0; i < count; i++)
+        {
+            quick_print_camera(device_info, i);
+        }
+        return count;
+    }
+}
+
+
+
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params)
 {
 
@@ -261,7 +307,10 @@ void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_p
     {
         evt_frame->pixel_type = GVSP_PIX_YUV444_PACKED;
     }
-
+    else if (pixel_format == "BayerGB8")
+    {
+        evt_frame->pixel_type = GVSP_PIX_BAYGB8;
+    }
     else //Good for default case which covers color and mono as same size bytes/pixel.
     {    //Note that these settings are used for memory alloc only.
         evt_frame->pixel_type = GVSP_PIX_MONO8;

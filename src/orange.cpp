@@ -24,6 +24,63 @@ const std::string current_date_time() {
 }
 
 
+CameraParams create_100G_camera_params(unsigned int frame_rate, int camera_id, int gpu_id, int num_cameras, bool gpu_direct){
+    // popular change to camera settings 
+    unsigned int width {5120}; // {3208}; 
+    unsigned int height {4096}; // {2200};
+    unsigned int gain {3000}; 
+    unsigned int exposure {10000};
+    string pixel_format = "BayerGB8"; // "BayerRG8"; 
+    string color_temp = "CT_6500K";
+
+    CameraParams camera_params = {};
+    camera_params.width = width;
+    camera_params.height = height;
+    camera_params.frame_rate = frame_rate;
+    camera_params.gain = gain;
+    camera_params.exposure = exposure;
+    camera_params.pixel_format = pixel_format;
+    camera_params.color_temp = color_temp;
+    camera_params.camera_id = camera_id;
+    camera_params.gpu_id = gpu_id;
+    camera_params.num_cameras = num_cameras;
+    camera_params.gpu_direct = gpu_direct;
+    camera_params.need_reorder = true;
+    return camera_params;
+
+}
+
+
+
+CameraParams create_25G_camera_params(unsigned int frame_rate, int camera_id, int gpu_id, int num_cameras, bool gpu_direct){
+
+    // popular change to camera settings 
+    unsigned int width {3208}; 
+    unsigned int height {2200};
+    unsigned int gain {1000}; 
+    unsigned int exposure {3000};
+    string pixel_format = "BayerRG8"; 
+    string color_temp = "CT_2800K";
+
+    CameraParams camera_params = {};
+    camera_params.width = width;
+    camera_params.height = height;
+    camera_params.frame_rate = frame_rate;
+    camera_params.gain = gain;
+    camera_params.exposure = exposure;
+    camera_params.pixel_format = pixel_format;
+    camera_params.color_temp = color_temp;
+    camera_params.camera_id = camera_id;
+    camera_params.gpu_id = gpu_id;
+    camera_params.num_cameras = num_cameras;
+    camera_params.gpu_direct = gpu_direct;
+    camera_params.need_reorder = false;
+    return camera_params;
+
+}
+
+
+
 int main(int argc, char **args) 
 {
     // **************** camera resources ***************************************** 
@@ -31,10 +88,10 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 2;
+    int num_cameras = 3;
 
     int cam_count;
-    cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
+    cam_count = order_for_test_rig(max_cameras, device_info, ordered_device_info);
     if (cam_count < num_cameras) 
     {
         printf("Missing cameras...Exit\n");
@@ -43,16 +100,6 @@ int main(int argc, char **args)
 
 
     // set_ip_persistent_with_open_close_camera(device_info, num_cameras);
-
-
-    // popular change to camera settings 
-    unsigned int width {3208}; 
-    unsigned int height {2200};
-    unsigned int frame_rate {30};
-    unsigned int gain {1000}; 
-    unsigned int exposure {4000};
-    string pixel_format = "BayerRG8"; 
-    string color_temp = "CT_2800K";
 
     // esc to exit 
     int key_num;
@@ -73,20 +120,26 @@ int main(int argc, char **args)
 
     PTPParams* ptp_params = new PTPParams{0, 0};
     int camera_orders[] = {0, 1, 2, 3, 4, 5, 6};  
-    int camera_gpus[] = {0, 1, 0, 0, 1, 1, 1};
+    int camera_gpus[] = {0, 0, 0, 0, 1, 1, 1};
     
     
     int camera_id {0};
     int gpu_id {0};
-    int buffer_size {100};
+    int buffer_size {30};
 
     CameraParams camera_params[num_cameras];
+    unsigned int frame_rate {30};
 
     for(int i = 0; i < num_cameras; i++)
     {
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
-        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, true);
+        if (i==0){
+            camera_params[i] = create_100G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, false);
+        }
+        else{
+            camera_params[i] = create_25G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, false);
+        }
     }
 
     // init camera resources 
@@ -100,15 +153,16 @@ int main(int argc, char **args)
 
     for(int i = 0; i < num_cameras; i++)
     {
-        //open_camera_with_params(&camera[i], &ordered_device_info[i], camera_params[i]); 
-        open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
+        open_camera_with_params(&camera[i], &ordered_device_info[i], camera_params[i]); 
+        // open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
 
         // sync 
-        ptp_camera_sync(&camera[i]);
+        // ptp_camera_sync(&camera[i]);
 
         allocate_frame_buffer(&camera[i], evt_frame[i], camera_params[i], buffer_size);
         set_frame_buffer(&frame_recv[i], camera_params[i]);
     }
+    std::cout << "reorder? " << bool(camera[0].linesReorderHandle) << std::endl;
 
 
     // *********************GUI*****************************************************
@@ -172,14 +226,15 @@ int main(int argc, char **args)
     cudaGraphicsResource_t cuda_resource[num_cameras] {0};
     unsigned char* cuda_buffer[num_cameras];
     size_t cuda_pbo_storage_buffer_size[num_cameras];
-    int size_pic = width * height * 4 * sizeof(unsigned char);
     unsigned char *display_buffer[num_cameras];
 
 
     for(int i = 0; i < num_cameras; i++)
     {
+        int size_pic = camera_params[i].width * camera_params[i].height * 4 * sizeof(unsigned char);
+
         create_texture(&texture[i]);
-        create_pbo(&pbo[i], width, height);
+        create_pbo(&pbo[i], camera_params[i].width, camera_params[i].height);
         bind_pbo(&pbo[i]);
 
         register_pbo_to_cuda(&pbo[i], &cuda_resource[i]);
@@ -191,7 +246,7 @@ int main(int argc, char **args)
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], true));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], false));
     }
 
 
@@ -205,13 +260,13 @@ int main(int argc, char **args)
             // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
             map_cuda_resource(&cuda_resource[i]);
             cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
-            cudaMemcpy2D(cuda_buffer[i], width*4, display_buffer[i], width*4, width*4, height, cudaMemcpyDeviceToDevice);
+            cudaMemcpy2D(cuda_buffer[i], camera_params[i].width*4, display_buffer[i], camera_params[i].width*4, camera_params[i].width*4, camera_params[i].height, cudaMemcpyDeviceToDevice);
             unmap_cuda_resource(&cuda_resource[i]);
 
             // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
             bind_pbo(&pbo[i]);
             bind_texture(&texture[i]);
-            upload_image_pbo_to_texture(width, height); // Needs no arguments because texture and PBO are bound
+            upload_image_pbo_to_texture(camera_params[i].width, camera_params[i].height); // Needs no arguments because texture and PBO are bound
             unbind_texture();
             unbind_pbo();
         }

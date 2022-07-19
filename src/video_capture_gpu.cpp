@@ -2,6 +2,7 @@
 #include "FFmpegWriter.h"
 #include <iostream>
 #include <fstream>
+#include "cuda_line_reorder.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -240,17 +241,18 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 frames_recd++;
 
                 if(camera_params.need_reorder){
-                    EVT_FrameConvert(frame_recv, &FrameConvert, 0, 0, camera->linesReorderHandle);
-
-
                     if (camera_params.gpu_direct){
-                        // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
-                        cudaError_t cu_result = cudaMemcpy(d_orig, FrameConvert.imagePtr, size_pic, cudaMemcpyDeviceToDevice);
-                        if (cu_result != cudaSuccess)
-                        {
-                            std::cout << "Cuda Error" << std::endl;
-                        }
+                        // line reorder using gpu 
+                        GSPRINT4521_Convert(d_orig, (const unsigned char*)frame_recv->imagePtr, 
+                                camera_params.width , camera_params.height, camera_params.width, camera_params.width, 0); // only for  8 bit 
+                    
+                        // cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
+                        // if (cu_result != cudaSuccess)
+                        // {
+                            // std::cout << "Cuda Error" << std::endl;
+                        // }
                     }else{
+                        EVT_FrameConvert(frame_recv, &FrameConvert, 0, 0, camera->linesReorderHandle);
                         // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
                         cudaError_t cu_result = cudaMemcpy(d_orig, FrameConvert.imagePtr, size_pic, cudaMemcpyHostToDevice);
                         if (cu_result != cudaSuccess)
@@ -258,7 +260,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                             std::cout << "Cuda Error" << std::endl;
                         }
                     }
-
                 }
                 else{
 

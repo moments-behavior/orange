@@ -1,6 +1,9 @@
 #!/bin/bash
 mkdir -p targets;
 rm -f targets/orange;
+nvcc -c src/cuda_line_reorder.cu -arch=sm_80 -o targets/cuda_line_reorder.o
+
+
 
 g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui.o ./third_party/imgui/imgui.cpp
 g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_demo.o ./third_party/imgui/imgui_demo.cpp
@@ -13,6 +16,7 @@ g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wf
 
 
 g++ -Ofast -ffast-math -std=c++14 \
+    targets/cuda_line_reorder.o \
     -o targets/*.o \
     -o targets/orange -I ./src/ src/*.cpp \
     -I./third_party/imgui \

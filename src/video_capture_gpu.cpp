@@ -32,6 +32,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned int frames_recd = 0;
 
     ck(cudaSetDevice(camera_params.gpu_id));
+    
     // modularize these parts: 1. debayer; 2. encoding; 
     // gpu: upload raw images and color debayer
     int output_channels = 4;
@@ -262,7 +263,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     }
                 }
                 else{
-
                      if (camera_params.gpu_direct){
                         // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
                         cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
@@ -294,7 +294,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     std::cout << "\nNPP error %d \n" << npp_result << std::endl;
                 }
 
-
+                // copy frame less 
                 cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params.width*4, d_debayer, camera_params.width*4, camera_params.width*4, camera_params.height, cudaMemcpyDeviceToDevice);
                 if (cu_result != cudaSuccess)
                 {

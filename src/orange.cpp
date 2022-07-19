@@ -120,7 +120,7 @@ int main(int argc, char **args)
 
     PTPParams* ptp_params = new PTPParams{0, 0};
     int camera_orders[] = {0, 1, 2, 3, 4, 5, 6};  
-    int camera_gpus[] = {0, 0, 0, 0, 1, 1, 1};
+    int camera_gpus[] = {1, 0, 0, 0, 1, 1, 1};
     
     
     int camera_id {0};
@@ -135,10 +135,10 @@ int main(int argc, char **args)
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
         if (i==0){
-            camera_params[i] = create_100G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, false);
+            camera_params[i] = create_100G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, true);
         }
         else{
-            camera_params[i] = create_25G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, false);
+            camera_params[i] = create_25G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, true);
         }
     }
 

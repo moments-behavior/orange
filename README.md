@@ -23,3 +23,22 @@ sudo apt-get install libglfw3-dev
 sudo apt-get install libglew-dev
 sudo apt-get install libglm-dev
 ```
+
+4. PTP setting 
+
+```
+sudo apt install linuxptp
+```
+```
+sudo vim /etc/ptp4l.conf
+```
+Put following in the file
+```
+[global]
+verbose 1
+boundary_clock_jbod 1 
+```
+
+```
+sudo ptp4l -i enp1s0f0 -i enp1s0f1 -f /etc/ptp4l.conf
+```

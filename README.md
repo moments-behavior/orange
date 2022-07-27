@@ -24,7 +24,7 @@ sudo apt-get install libglew-dev
 sudo apt-get install libglm-dev
 ```
 
-4. PTP setting 
+4. PTP setting for synchronization
 
 ```
 sudo apt install linuxptp

@@ -23,10 +23,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool encode_flag)
 {
     int camera_return{0};
-
-    unsigned int size_of_buffer;
-    size_of_buffer = frame_recv->CalculateBufferSize();
-
+    
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
 
@@ -95,13 +92,14 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
     frame_metadata << "frame_id,timestamp\n";
 
-
+    unsigned long long frame_ts;
+    /*
     //*************************************PTP**************************************************
     // handel sync using 
     int ptp_offset, ptp_offset_sum=0, ptp_offset_prev=0;
     unsigned int ptp_time_low, ptp_time_high, ptp_time_plus_delta_to_start_low, ptp_time_plus_delta_to_start_high;
     unsigned long long ptp_time_delta_sum = 0, ptp_time_delta, ptp_time, ptp_time_prev, ptp_time_countdown;
-    unsigned long long frame_ts, frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
+    unsigned long long frame_ts_prev, frame_ts_delta, frame_ts_delta_sum = 0;
     char ptp_status[100];
     unsigned long ptp_status_sz_ret;
     
@@ -149,13 +147,13 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     ts =  *localtime (&ptp_info_time);
     strftime(buf, sizeof(buf), "%a, %Y-%m-%d %H:%M:%S %Z", &ts);
     printf("PTP Current Time: %s\n", buf);
-
+    */
 
 
     //*************************************Streaming**************************************************
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     
-    
+    /*
     printf("Grabbing Frames after countdown...\n");
     ptp_time_countdown = 0;
     //Countdown code
@@ -174,6 +172,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     } while (ptp_time <= ptp_time_plus_delta_to_start);
     //Countdown done.
     printf("\n");
+    */
     //********************************************************************************************
 
     StopWatch w;
@@ -183,7 +182,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     {
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
        
-       
+       /*
        //////////////////////////////PTP timestamp checking////////////////////////////////////
         EVT_CameraExecuteCommand(camera, "GevTimestampControlLatch");
         EVT_CameraGetUInt32Param(camera, "GevTimestampValueHigh", &ptp_time_high);
@@ -206,6 +205,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         ptp_time_prev = ptp_time;
         frame_ts_prev = frame_ts;
         //////////////////////////////PTP timestamp checking////////////////////////////////////
+        */
 
         if (!camera_return)
         {
@@ -333,6 +333,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
-    printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
-    printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
+    //printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
+    //printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }

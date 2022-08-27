@@ -1,3 +1,7 @@
+#include "stdafx.h"
+#include <stdio.h>
+#include <string.h>
+
 #include "video_capture_gpu.h"
 #include <iostream>
 #include "camera.h"
@@ -10,8 +14,7 @@
 #include "imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-#include "shader_m.h"
-#include "IconsFontAwesome5.h"
+#include "IconsForkAwesome.h"
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const std::string current_date_time() {
@@ -23,18 +26,18 @@ const std::string current_date_time() {
     return buf;
 }
 
+#define max_cameras 10
+#define num_cameras 2
+#define buffer_size 100
 
 int main(int argc, char **args) 
 {
     // **************** camera resources ***************************************** 
-    short max_cameras {10};
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 2;
-
     int cam_count;
-    cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
+    cam_count = check_cameras_jakob(max_cameras, device_info, ordered_device_info);
     if (cam_count < num_cameras) 
     {
         printf("Missing cameras...Exit\n");
@@ -58,18 +61,9 @@ int main(int argc, char **args)
     int key_num;
     int* key_num_ptr = &key_num;  
 
-    string folder_string = current_date_time();
-    string folder_name = "/home/jinyao/Videos/" + folder_string;
+    //string folder_string = current_date_time();
+    string folder_name = "C:/Users/Jakob Voigts/Videos/Recordings";
     
-    // Creating a directory to save recorded video;
-    if (mkdir(folder_name.c_str(), 0777) == -1)
-    {
-        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
-        return 0;
-    }
-    else
-        std::cout << "Recorded video saves to : " << folder_name << std::endl;
-
 
     PTPParams* ptp_params = new PTPParams{0, 0};
     int camera_orders[] = {0, 1, 2, 3, 4, 5, 6};  
@@ -78,7 +72,6 @@ int main(int argc, char **args)
     
     int camera_id {0};
     int gpu_id {0};
-    int buffer_size {100};
 
     CameraParams camera_params[num_cameras];
 
@@ -86,7 +79,7 @@ int main(int argc, char **args)
     {
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
-        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, true);
+        camera_params[i] = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, gpu_id, num_cameras, false);
     }
 
     // init camera resources 
@@ -100,11 +93,11 @@ int main(int argc, char **args)
 
     for(int i = 0; i < num_cameras; i++)
     {
-        //open_camera_with_params(&camera[i], &ordered_device_info[i], camera_params[i]); 
-        open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
+        open_camera_with_params(&camera[i], &ordered_device_info[i], camera_params[i]); 
+        //open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
 
         // sync 
-        ptp_camera_sync(&camera[i]);
+        //ptp_camera_sync(&camera[i]);
 
         allocate_frame_buffer(&camera[i], evt_frame[i], camera_params[i], buffer_size);
         set_frame_buffer(&frame_recv[i], camera_params[i]);
@@ -160,11 +153,11 @@ int main(int argc, char **args)
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load a nice font
-    io.Fonts->AddFontFromFileTTF("Roboto-Regular.ttf", 15.0f);
+    io.Fonts->AddFontFromFileTTF("../fonts/Roboto-Regular.ttf", 15.0f);
     // merge in icons from Font Awesome
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
+    static const ImWchar icons_ranges[] = { ICON_MIN_FK, ICON_MAX_16_FK, 0 };
     ImFontConfig icons_config; icons_config.MergeMode = true; icons_config.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAS, 15.0f, &icons_config, icons_ranges);
+    io.Fonts->AddFontFromFileTTF("../fonts/forkawesome-webfont.ttf", 15.0f, &icons_config, icons_ranges);
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 
     GLuint texture[num_cameras];

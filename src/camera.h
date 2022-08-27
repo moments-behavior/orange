@@ -1,10 +1,15 @@
 #ifndef ORANGE_CAMERA
 #define ORANGE_CAMERA
 
+#ifdef _MSC_VER
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 #include "camera_driver_helper.h"
 #include <emergentcameradef.h>
 #include <emergentgigevisiondef.h>
-#include <unistd.h>
+
 
 struct CameraParams{
     unsigned int width;
@@ -29,6 +34,7 @@ struct PTPParams{
 
 CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras, bool gpu_direct);
 int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info);
+int check_cameras_jakob(int max_cameras, GigEVisionDeviceInfo* device_info, GigEVisionDeviceInfo* ordered_device_info);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
@@ -44,5 +50,4 @@ void change_camera_ip(GigEVisionDeviceInfo* device_info, int camera_idx, const c
 void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip);
 void set_temporary_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera);
 void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, int num_camera);
-void set_ip_persistent_with_open_close_camera(GigEVisionDeviceInfo* device_info, int num_camera);
 #endif

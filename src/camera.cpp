@@ -1,7 +1,6 @@
 #include "camera.h"
 #include "camera_driver_helper.h"
 #include <iostream>
-
 // important camera tuning parameters
 CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras, bool gpu_direct)
 {
@@ -156,7 +155,11 @@ void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera)
         {
             EVT_CameraSetBoolParam(camera, gpo_str, gpo_polarity);
             gpo_polarity = !gpo_polarity;
+#ifdef _MSC_VER
+            Sleep(100);
+#else
             usleep(100 * 1000);
+#endif
             printf(".");
             fflush(stdout);
         }
@@ -169,6 +172,44 @@ void close_camera(Emergent::CEmergentCamera* camera)
 {    
     check_camera_errors(EVT_CameraClose(camera));
     printf("\nClose Camera: \t\tCamera Closed\n");
+}
+
+
+int check_cameras_jakob(int max_cameras, GigEVisionDeviceInfo* device_info, GigEVisionDeviceInfo* ordered_device_info)
+{
+    int cameras_found = 0;
+    unsigned int listcam_buf_size = max_cameras;
+    unsigned int count;
+
+    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
+
+    if (count == 0)
+    {
+        printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
+        return 0;
+    }
+    else
+    {
+        for (unsigned int i = 0; i < count; i++)
+        {
+            if (strcmp(device_info[i].serialNumber, "2002197") == 0)
+            {
+                ordered_device_info[0] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "2002195") == 0)
+            {
+                ordered_device_info[1] = device_info[i];
+            }
+        }
+
+        printf("Found %d cameras. \n", count);
+        for (unsigned int i = 0; i < count; i++)
+        {
+            quick_print_camera(device_info, i);
+        }
+        return count;
+    }
+
 }
 
 
@@ -442,21 +483,4 @@ void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergen
 }
 
 
-void set_ip_persistent_with_open_close_camera(GigEVisionDeviceInfo* device_info, int num_camera)
-{
-    Emergent::CEmergentCamera camera[num_camera];
 
-    // open camera
-    for(int cam_id = 0; cam_id < num_camera; cam_id++)
-    {
-        check_camera_errors(EVT_CameraOpen(&camera[cam_id], &device_info[cam_id]));      
-    }
-
-    set_rigroom_camera_ip_persistent(device_info, camera, num_camera);
-    
-    for(int cam_id = 0; cam_id < num_camera; cam_id++)
-    {
-        close_camera(&camera[cam_id]);      
-    }
-
-}

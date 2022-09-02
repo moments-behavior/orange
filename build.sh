@@ -4,6 +4,10 @@ rm -f targets/orange;
 nvcc -c src/cuda_line_reorder.cu -arch=sm_80 -o targets/cuda_line_reorder.o
 
 
+DIR_IMGUI="third_party/imgui"
+DIR_IMPLOT="third_party/implot"
+
+
 
 g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui.o ./third_party/imgui/imgui.cpp
 g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_demo.o ./third_party/imgui/imgui_demo.cpp
@@ -15,12 +19,19 @@ g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wf
 
 
 
+g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot.o $DIR_IMPLOT/implot.cpp
+g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_items.o $DIR_IMPLOT/implot_items.cpp
+g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
+
+
+
 g++ -Ofast -ffast-math -std=c++14 \
     targets/cuda_line_reorder.o \
     -o targets/*.o \
     -o targets/orange -I ./src/ src/*.cpp \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
+    -I$DIR_IMPLOT \
     -I./third_party/IconFontCppHeaders \
     -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
     -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \

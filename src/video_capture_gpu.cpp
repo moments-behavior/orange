@@ -166,15 +166,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     // EVT_CameraSetUInt32Param(camera, "PtpAcquisitionGateTimeLow", ptp_time_plus_delta_to_start_low);
     // printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
     
-    // std::time_t ptp_info_time = (ptp_time_plus_delta_to_start/1000000000);
-    // struct tm ts;
-    // char buf[80];
-    // ts =  *localtime (&ptp_info_time);
-    // strftime(buf, sizeof(buf), "%a, %Y-%m-%d %H:%M:%S %Z", &ts);
-    // printf("PTP Current Time: %s\n", buf);
-
-
-
+    // std::time_t ptp_info_time = (ptp_time_plus_delta_to_start/100000000push_back
     //*************************************Streaming**************************************************
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStart"));
     
@@ -376,6 +368,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     //Report stats
     printf("\n");
+    printf("Camera id: \t%d\n", camera_params.camera_id);
     printf("Frame count: \t%d\n", frame_count);
     printf("Frame received: \t%d\n", frames_recd);
     printf("Frame encoded: \t%d\n", num_frame_encode);

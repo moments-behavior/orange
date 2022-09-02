@@ -12,6 +12,7 @@
 
 #include "shader_m.h"
 #include "IconsFontAwesome5.h"
+#include "implot.h"
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const std::string current_date_time() {
@@ -52,13 +53,11 @@ CameraParams create_100G_camera_params(unsigned int frame_rate, int camera_id, i
 
 
 
-CameraParams create_25G_camera_params(unsigned int frame_rate, int camera_id, int gpu_id, int num_cameras, bool gpu_direct){
+CameraParams create_25G_camera_params(unsigned int frame_rate, unsigned int exposure, unsigned int gain, int camera_id, int gpu_id, int num_cameras, bool gpu_direct){
 
     // popular change to camera settings 
     unsigned int width {3208}; 
     unsigned int height {2200};
-    unsigned int gain {1000}; 
-    unsigned int exposure {3000};
     string pixel_format = "BayerRG8"; 
     string color_temp = "CT_2800K";
 
@@ -88,10 +87,10 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 3;
+    int num_cameras = 2;
 
     int cam_count;
-    cam_count = order_for_test_rig(max_cameras, device_info, ordered_device_info);
+    cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
     if (cam_count < num_cameras) 
     {
         printf("Missing cameras...Exit\n");
@@ -119,8 +118,8 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int camera_orders[] = {0, 1, 2, 3, 4, 5, 6};  
-    int camera_gpus[] = {1, 0, 0, 0, 1, 1, 1};
+    int camera_orders[] = {0, 1, 2, 3, 4, 5};  
+    int camera_gpus[] = {0, 0, 0, 0, 0, 0};
     
     
     int camera_id {0};
@@ -128,18 +127,23 @@ int main(int argc, char **args)
     int buffer_size {30};
 
     CameraParams camera_params[num_cameras];
-    unsigned int frame_rate {30};
+    unsigned int frame_rate {25};
 
     for(int i = 0; i < num_cameras; i++)
     {
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
-        if (i==0){
-            camera_params[i] = create_100G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, true);
+        // if (i==2){
+        //     camera_params[i] = create_100G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, false);
+        // }
+        // else{
+        if (i==4){
+            camera_params[i] = create_25G_camera_params(frame_rate, 5000, 3000, camera_id, gpu_id, num_cameras, false);
         }
         else{
-            camera_params[i] = create_25G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, true);
+            camera_params[i] = create_25G_camera_params(frame_rate, 3500, 1500, camera_id, gpu_id, num_cameras, false);
         }
+        // }
     }
 
     // init camera resources 
@@ -192,14 +196,18 @@ int main(int argc, char **args)
     // ************* Dear Imgui ********************//
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlotContext* implotCtx = ImPlot::CreateContext();
+
+
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
     // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
 
 
-    ImGui::StyleColorsDark();
+    ImGui::StyleColorsClassic();
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
     ImGuiStyle& style = ImGui::GetStyle();
@@ -285,10 +293,13 @@ int main(int argc, char **args)
         for (int i = 0; i < num_cameras; i++) {
             string window_name = "Cam" + std::to_string(i);            
             ImGui::Begin(window_name.c_str());
-            // ImGui::SetNextWindowSize(ImVec2(0, 0), 0); // Setting size to 0, 0 forces auto-fit
-            ImGui::Text("pointer = %p", texture[i]);
             ImVec2 avail_size = ImGui::GetContentRegionAvail();
-            ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+
+            //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+            if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
+                ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(3208, 2200));
+                ImPlot::EndPlot();
+            }
             ImGui::End();
             
         }

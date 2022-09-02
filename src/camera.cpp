@@ -175,6 +175,61 @@ void close_camera(Emergent::CEmergentCamera* camera)
 
 
 // order for rig room 
+int order_4_ceiling_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
+{
+    int cameras_found = 0;
+    unsigned int listcam_buf_size = max_cameras;
+    unsigned int count;
+
+    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
+
+    if (count == 0)
+    {
+        printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
+        return 0;
+    }
+    else
+    {
+        for (unsigned int i = 0; i < count; i++)
+        {
+            if (strcmp(device_info[i].serialNumber, "710018") == 0)
+            {
+                ordered_device_info[0] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710041") == 0)
+            {
+                ordered_device_info[1] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710039") == 0)
+            {
+                ordered_device_info[2] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710040") == 0)
+            {
+                ordered_device_info[3] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710037") == 0)
+            {
+                ordered_device_info[4] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "710042") == 0)
+            {
+                ordered_device_info[5] = device_info[i];
+            }
+        }
+
+        printf("Found %d cameras. \n", count);
+        for (unsigned int i = 0; i < count; i++)
+        {
+            quick_print_camera(device_info, i);
+        }
+        return count;
+    }
+}
+
+
+
+// order for rig room 
 int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {
     int cameras_found = 0;
@@ -250,17 +305,18 @@ int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEV
     {
         for (unsigned int i = 0; i < count; i++)
         {
+            // 100G camera
             if (strcmp(device_info[i].serialNumber, "2001127") == 0)
             {
-                ordered_device_info[0] = device_info[i];
+                ordered_device_info[2] = device_info[i];
             }
             else if (strcmp(device_info[i].serialNumber, "710042") == 0)
             {
-                ordered_device_info[1] = device_info[i];
+                ordered_device_info[0] = device_info[i];
             }
             else if (strcmp(device_info[i].serialNumber, "710031") == 0)
             {
-                ordered_device_info[2] = device_info[i];
+                ordered_device_info[1] = device_info[i];
             }
         }
 

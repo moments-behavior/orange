@@ -13,6 +13,8 @@
 #include "shader_m.h"
 #include "IconsFontAwesome5.h"
 #include "implot.h"
+#include <imfilebrowser.h>
+
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const std::string current_date_time() {
@@ -87,7 +89,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 2;
+    int num_cameras = 6;
 
     int cam_count;
     cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
@@ -257,6 +259,10 @@ int main(int argc, char **args)
         camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], false));
     }
 
+    ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
+    file_dialog.SetTitle("My files");
+    std::string input_folder;
+
 
     while (!glfwWindowShouldClose(window))
     {
@@ -284,12 +290,63 @@ int main(int argc, char **args)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+
+        if (ImGui::Begin("Orange Streaming",  NULL, ImGuiWindowFlags_MenuBar))
         {
-            ImGui::Begin("Orange Streaming");
+
+            if (ImGui::BeginMenuBar())
+            {
+                if (ImGui::BeginMenu("File"))
+                {
+                    if (ImGui::MenuItem("Open")) { file_dialog.Open(); };
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenuBar();
+            }
+
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
+
+            bool selected[cam_count] = {};
+
+            if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+            {
+                for (int i = 0; i < cam_count; i++)
+                {
+                    char label[32];
+                    sprintf(label, "Camera %d", i);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Selectable(label, &selected[i], ImGuiSelectableFlags_SpanAllColumns);
+                    ImGui::TableNextColumn();
+                    ImGui::Text(device_info[i].serialNumber);
+                    ImGui::TableNextColumn();
+                    ImGui::Text(device_info[i].currentIp);
+                }
+                ImGui::EndTable();
+            }
+            static int slider_i = 50;
+            bool slider_just_changed;
+            slider_just_changed = ImGui::SliderInt("Gain", &slider_i, 0, 5000, "%d");
+            if (slider_just_changed){
+                set_camera_parameters(&camera[5], slider_i);
+            }
+
+            ImGui::End();        
+
+
+
         }
+        file_dialog.Display();
+
         
+        if (file_dialog.HasSelected())
+        {
+            input_folder = file_dialog.GetSelected().string();
+            std::cout << input_folder << std::endl;
+            file_dialog.ClearSelected();
+        }
+
+
         for (int i = 0; i < num_cameras; i++) {
             string window_name = "Cam" + std::to_string(i);            
             ImGui::Begin(window_name.c_str());

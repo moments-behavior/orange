@@ -65,6 +65,37 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false));
 }
 
+int set_camera_parameters(Emergent::CEmergentCamera* camera, int gain_val)
+{
+    unsigned int param_val_min, param_val_inc, param_val_max;
+
+    struct EvtParamAttribute attribute;
+    int ReturnVal {0};
+
+    //Check if gain supported and then set to value as in #define above if within range.
+    ReturnVal = EVT_CameraGetParamAttr(camera, "Gain", &attribute);
+    if (attribute.dataType == EDataTypeUnsupported)
+    {
+        printf("CameraGetParamAttr: Error\n");    
+        return ReturnVal;
+    }
+    else
+    {
+        EVT_CameraGetUInt32ParamMax(camera, "Gain", &param_val_max);
+        printf("Gain Max: \t\t%d\n", param_val_max);
+        EVT_CameraGetUInt32ParamMin(camera, "Gain", &param_val_min);
+        printf("Gain Min: \t\t%d\n", param_val_min);
+        EVT_CameraGetUInt32ParamInc(camera, "Gain", &param_val_inc);
+        printf("Gain Inc: \t\t%d\n", param_val_inc);
+        if(gain_val >= param_val_min && gain_val <= param_val_max)
+        {
+            EVT_CameraSetUInt32Param(camera, "Gain", gain_val);
+            printf("Gain Set: \t\t%d\n", gain_val);
+            return gain_val;
+        }
+        else{ return 0;}
+    }
+}
 
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params)
 {

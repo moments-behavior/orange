@@ -282,38 +282,38 @@ int main(int argc, char **args)
             }
 
 
-
-
             ImGui::Separator();
             ImGui::Spacing();
 
             if (ImGui::TreeNode("Camera Property"))
             {
                 static int selected_camera = 0;
+                static int slider_gain, slider_exposure, slider_frame_rate;
+
                 for (int n = 0; n < cam_count; n++)
                 {
                     char buf[32];
                     sprintf(buf, "Camera %d", n);
                     if (ImGui::Selectable(buf, selected_camera == n))
                         selected_camera = n;
+                        slider_gain = cameras_params[selected_camera].gain;
+                        slider_exposure = cameras_params[selected_camera].exposure;
+                        slider_frame_rate = cameras_params[selected_camera].frame_rate;
                 }
             
 
 
-                static int slider_gain = cameras_params[selected_camera].gain;
                 if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[0].gain_max, "%d"))
                 {
                     update_gain_value(&camera[selected_camera], slider_gain, &cameras_params[selected_camera]);
                 }
 
-                static int slider_exposure = cameras_params[selected_camera].exposure;
                 if(ImGui::SliderInt("Exposure", &slider_exposure, cameras_params[selected_camera].exposure_min, cameras_params[0].exposure_max, "%d"))
                 {
                     update_exposure_value(&camera[selected_camera], slider_exposure, &cameras_params[selected_camera]);
                 }
 
 
-                static int slider_frame_rate = cameras_params[selected_camera].frame_rate;
                 if(ImGui::SliderInt("FrameRate", &slider_frame_rate, cameras_params[selected_camera].frame_rate_min, cameras_params[selected_camera].frame_rate_max, "%d"))
                 {
                     update_frame_rate_value(&camera[selected_camera], slider_frame_rate, &cameras_params[selected_camera]);

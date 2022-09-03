@@ -67,6 +67,10 @@
         "typeindex": "cpp",
         "variant": "cpp",
         "__split_buffer": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "csignal": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "valarray": "cpp"
     }
 }

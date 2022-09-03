@@ -27,57 +27,21 @@ const std::string current_date_time() {
 }
 
 
-CameraParams create_100G_camera_params(unsigned int frame_rate, int camera_id, int gpu_id, int num_cameras, bool gpu_direct){
-    // popular change to camera settings 
-    unsigned int width {5120}; // {3208}; 
-    unsigned int height {4096}; // {2200};
-    unsigned int gain {3000}; 
-    unsigned int exposure {10000};
-    string pixel_format = "BayerGB8"; // "BayerRG8"; 
-    string color_temp = "CT_6500K";
 
-    CameraParams camera_params = {};
-    camera_params.width = width;
-    camera_params.height = height;
-    camera_params.frame_rate = frame_rate;
-    camera_params.gain = gain;
-    camera_params.exposure = exposure;
-    camera_params.pixel_format = pixel_format;
-    camera_params.color_temp = color_temp;
-    camera_params.camera_id = camera_id;
-    camera_params.gpu_id = gpu_id;
-    camera_params.num_cameras = num_cameras;
-    camera_params.gpu_direct = gpu_direct;
-    camera_params.need_reorder = true;
-    return camera_params;
-
-}
-
-
-
-CameraParams create_25G_camera_params(unsigned int frame_rate, unsigned int exposure, unsigned int gain, int camera_id, int gpu_id, int num_cameras, bool gpu_direct){
-
-    // popular change to camera settings 
-    unsigned int width {3208}; 
-    unsigned int height {2200};
-    string pixel_format = "BayerRG8"; 
-    string color_temp = "CT_2800K";
-
-    CameraParams camera_params = {};
-    camera_params.width = width;
-    camera_params.height = height;
-    camera_params.frame_rate = frame_rate;
-    camera_params.gain = gain;
-    camera_params.exposure = exposure;
-    camera_params.pixel_format = pixel_format;
-    camera_params.color_temp = color_temp;
-    camera_params.camera_id = camera_id;
-    camera_params.gpu_id = gpu_id;
-    camera_params.num_cameras = num_cameras;
-    camera_params.gpu_direct = gpu_direct;
-    camera_params.need_reorder = false;
-    return camera_params;
-
+void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras)
+{
+    camera_params->width = 3208;
+    camera_params->height = 2200;
+    camera_params->frame_rate = 30;
+    camera_params->gain = 3500;
+    camera_params->exposure = 1500;
+    camera_params->pixel_format = "BayerRG8";
+    camera_params->color_temp = "CT_3000K";
+    camera_params->camera_id = camera_id;
+    camera_params->gpu_id = 0;
+    camera_params->num_cameras = num_cameras;
+    camera_params->gpu_direct = false;
+    camera_params->need_reorder = false;
 }
 
 
@@ -89,7 +53,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 6;
+    int num_cameras = 2;
 
     int cam_count;
     cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
@@ -128,25 +92,17 @@ int main(int argc, char **args)
     int gpu_id {0};
     int buffer_size {30};
 
-    CameraParams camera_params[num_cameras];
+    CameraParams cameras_params[num_cameras];
     unsigned int frame_rate {25};
+
 
     for(int i = 0; i < num_cameras; i++)
     {
         camera_id = camera_orders[i];
         gpu_id = camera_gpus[camera_id];
-        // if (i==2){
-        //     camera_params[i] = create_100G_camera_params(frame_rate, camera_id, gpu_id, num_cameras, false);
-        // }
-        // else{
-        if (i==4){
-            camera_params[i] = create_25G_camera_params(frame_rate, 5000, 3000, camera_id, gpu_id, num_cameras, false);
-        }
-        else{
-            camera_params[i] = create_25G_camera_params(frame_rate, 3500, 1500, camera_id, gpu_id, num_cameras, false);
-        }
-        // }
+        init_25G_camera_params(&cameras_params[i], camera_id, num_cameras);   
     }
+
 
     // init camera resources 
     Emergent::CEmergentCamera camera[num_cameras];
@@ -159,14 +115,14 @@ int main(int argc, char **args)
 
     for(int i = 0; i < num_cameras; i++)
     {
-        open_camera_with_params(&camera[i], &ordered_device_info[i], camera_params[i]); 
+        open_camera_with_params(&camera[i], &ordered_device_info[i], &cameras_params[i]); 
         // open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
 
         // sync 
         // ptp_camera_sync(&camera[i]);
 
-        allocate_frame_buffer(&camera[i], evt_frame[i], camera_params[i], buffer_size);
-        set_frame_buffer(&frame_recv[i], camera_params[i]);
+        allocate_frame_buffer(&camera[i], evt_frame[i], &cameras_params[i], buffer_size);
+        set_frame_buffer(&frame_recv[i], &cameras_params[i]);
     }
     std::cout << "reorder? " << bool(camera[0].linesReorderHandle) << std::endl;
 
@@ -241,10 +197,10 @@ int main(int argc, char **args)
 
     for(int i = 0; i < num_cameras; i++)
     {
-        int size_pic = camera_params[i].width * camera_params[i].height * 4 * sizeof(unsigned char);
+        int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
 
         create_texture(&texture[i]);
-        create_pbo(&pbo[i], camera_params[i].width, camera_params[i].height);
+        create_pbo(&pbo[i], cameras_params[i].width, cameras_params[i].height);
         bind_pbo(&pbo[i]);
 
         register_pbo_to_cuda(&pbo[i], &cuda_resource[i]);
@@ -256,7 +212,7 @@ int main(int argc, char **args)
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], camera_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], false));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], false));
     }
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
@@ -274,13 +230,13 @@ int main(int argc, char **args)
             // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
             map_cuda_resource(&cuda_resource[i]);
             cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
-            cudaMemcpy2D(cuda_buffer[i], camera_params[i].width*4, display_buffer[i], camera_params[i].width*4, camera_params[i].width*4, camera_params[i].height, cudaMemcpyDeviceToDevice);
+            cudaMemcpy2D(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice);
             unmap_cuda_resource(&cuda_resource[i]);
 
             // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
             bind_pbo(&pbo[i]);
             bind_texture(&texture[i]);
-            upload_image_pbo_to_texture(camera_params[i].width, camera_params[i].height); // Needs no arguments because texture and PBO are bound
+            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
             unbind_texture();
             unbind_pbo();
         }
@@ -324,18 +280,52 @@ int main(int argc, char **args)
                 }
                 ImGui::EndTable();
             }
-            static int slider_i = 50;
-            bool slider_just_changed;
-            slider_just_changed = ImGui::SliderInt("Gain", &slider_i, 0, 5000, "%d");
-            if (slider_just_changed){
-                set_camera_parameters(&camera[5], slider_i);
+
+
+
+
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (ImGui::TreeNode("Camera Property"))
+            {
+                static int selected_camera = 0;
+                for (int n = 0; n < cam_count; n++)
+                {
+                    char buf[32];
+                    sprintf(buf, "Camera %d", n);
+                    if (ImGui::Selectable(buf, selected_camera == n))
+                        selected_camera = n;
+                }
+            
+
+
+                static int slider_gain = cameras_params[selected_camera].gain;
+                if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[0].gain_max, "%d"))
+                {
+                    update_gain_value(&camera[selected_camera], slider_gain, &cameras_params[selected_camera]);
+                }
+
+                static int slider_exposure = cameras_params[selected_camera].exposure;
+                if(ImGui::SliderInt("Exposure", &slider_exposure, cameras_params[selected_camera].exposure_min, cameras_params[0].exposure_max, "%d"))
+                {
+                    update_exposure_value(&camera[selected_camera], slider_exposure, &cameras_params[selected_camera]);
+                }
+
+
+                static int slider_frame_rate = cameras_params[selected_camera].frame_rate;
+                if(ImGui::SliderInt("FrameRate", &slider_frame_rate, cameras_params[selected_camera].frame_rate_min, cameras_params[selected_camera].frame_rate_max, "%d"))
+                {
+                    update_frame_rate_value(&camera[selected_camera], slider_frame_rate, &cameras_params[selected_camera]);
+                }
+                ImGui::TreePop();
+
             }
 
             ImGui::End();        
 
-
-
         }
+
         file_dialog.Display();
 
         

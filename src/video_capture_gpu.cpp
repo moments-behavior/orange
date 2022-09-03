@@ -21,7 +21,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool encode_flag)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool encode_flag)
 {
     int camera_return{0};
 
@@ -31,13 +31,13 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
 
-    ck(cudaSetDevice(camera_params.gpu_id));
+    ck(cudaSetDevice(camera_params->gpu_id));
     
     // modularize these parts: 1. debayer; 2. encoding; 
     // gpu: upload raw images and color debayer
     int output_channels = 4;
     unsigned char *d_orig;
-    int size_pic = camera_params.width * camera_params.height * 1 * sizeof(unsigned char);
+    int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
     cudaMalloc((void **)&d_orig, size_pic);
     unsigned char *d_debayer;
     cudaMalloc((void **)&d_debayer, size_pic * output_channels);
@@ -49,7 +49,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     CUdevice cuDevice = 0;
 
     // specify which gpu
-    ck(cuDeviceGet(&cuDevice, camera_params.gpu_id));
+    ck(cuDeviceGet(&cuDevice, camera_params->gpu_id));
 
     char szDeviceName[80];
     ck(cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice));
@@ -58,24 +58,24 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     ck(cuCtxCreate(&cuContext, 0, cuDevice));
     //ck(cuCtxCreate(&cuContext, CU_CTX_SCHED_BLOCKING_SYNC, cuDevice));
 
-    std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params.width, camera_params.height, eFormat));
+    std::unique_ptr<NvEncoderCuda> pEnc(new NvEncoderCuda(cuContext, camera_params->width, camera_params->height, eFormat));
     
 
     // debayer
     NppiSize size;
-    size.width = camera_params.width;
-    size.height = camera_params.height;
+    size.width = camera_params->width;
+    size.height = camera_params->height;
     Npp8u nAlpha = 255;
 
     NppiRect roi;
     roi.x = 0;
     roi.y = 0;
-    roi.width = camera_params.width;
-    roi.height = camera_params.height;
+    roi.width = camera_params->width;
+    roi.height = camera_params->height;
 
     NppiBayerGridPosition grid;
     
-    if(camera_params.need_reorder)
+    if(camera_params->need_reorder)
     {
         grid = NPPI_BAYER_GRBG;
     }
@@ -94,11 +94,11 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     // for writing 
 
-    string video_file = folder_name + "/Cam" + std::to_string(camera_params.camera_id) + ".mp4";
+    string video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
     const char *output_file = video_file.c_str();
-    FFmpegWriter writer(AV_CODEC_ID_H264, camera_params.width, camera_params.height, camera_params.frame_rate, output_file);
+    FFmpegWriter writer(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, output_file);
 
-    string metadata_file = folder_name + "/Cam" + std::to_string(camera_params.camera_id) + "_meta.csv";
+    string metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
     ofstream frame_metadata;
     frame_metadata.open(metadata_file.c_str());
     if(!frame_metadata)
@@ -233,11 +233,11 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 frame_metadata << frame_recv->frame_id << "," << frame_ts << endl;                
                 frames_recd++;
 
-                if(camera_params.need_reorder){
-                    if (camera_params.gpu_direct){
+                if(camera_params->need_reorder){
+                    if (camera_params->gpu_direct){
                         // line reorder using gpu 
                         GSPRINT4521_Convert(d_orig, (const unsigned char*)frame_recv->imagePtr, 
-                                camera_params.width , camera_params.height, camera_params.width, camera_params.width, 0); // only for  8 bit 
+                                camera_params->width , camera_params->height, camera_params->width, camera_params->width, 0); // only for  8 bit 
                     
                         // cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
                         // if (cu_result != cudaSuccess)
@@ -255,7 +255,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     }
                 }
                 else{
-                     if (camera_params.gpu_direct){
+                     if (camera_params->gpu_direct){
                         // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
                         cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
                         if (cu_result != cudaSuccess)
@@ -273,11 +273,11 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 }
 
                 const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
-                                                                     camera_params.width * sizeof(unsigned char),
+                                                                     camera_params->width * sizeof(unsigned char),
                                                                      size,
                                                                      roi,
                                                                      d_debayer,
-                                                                     camera_params.width * sizeof(uchar4),
+                                                                     camera_params->width * sizeof(uchar4),
                                                                      grid,
                                                                      NPPI_INTER_UNDEFINED,
                                                                      nAlpha);
@@ -287,7 +287,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                 }
 
                 // copy frame less 
-                cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params.width*4, d_debayer, camera_params.width*4, camera_params.width*4, camera_params.height, cudaMemcpyDeviceToDevice);
+                cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
                 if (cu_result != cudaSuccess)
                 {
                     std::cout << "Cuda Error" << std::endl;
@@ -368,7 +368,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
     //Report stats
     printf("\n");
-    printf("Camera id: \t%d\n", camera_params.camera_id);
+    printf("Camera id: \t%d\n", camera_params->camera_id);
     printf("Frame count: \t%d\n", frame_count);
     printf("Frame received: \t%d\n", frames_recd);
     printf("Frame encoded: \t%d\n", num_frame_encode);

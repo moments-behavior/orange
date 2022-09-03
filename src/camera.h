@@ -7,6 +7,7 @@
 #include <EvtParamAttribute.h>
 #include <unistd.h>
 
+
 struct CameraParams{
     unsigned int width;
     unsigned int height;
@@ -20,6 +21,15 @@ struct CameraParams{
     int num_cameras;
     bool gpu_direct;
     bool need_reorder;
+    unsigned int gain_max; 
+    unsigned int gain_min;
+    unsigned int gain_inc;
+    unsigned int exposure_max; 
+    unsigned int exposure_min;
+    unsigned int exposure_inc;
+    unsigned int frame_rate_max; 
+    unsigned int frame_rate_min;
+    unsigned int frame_rate_inc;
 }; 
 
 
@@ -33,9 +43,9 @@ CameraParams create_camera_params(unsigned int width, unsigned int height, unsig
 int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);
-void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams camera_params);
-void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams camera_params, int buffer_size);
-void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams camera_params);
+void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams* camera_params);
+void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params, int buffer_size);
+void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
 void ptp_camera_sync(Emergent::CEmergentCamera* camera);
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
@@ -49,5 +59,7 @@ void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergen
 void set_ip_persistent_with_open_close_camera(GigEVisionDeviceInfo* device_info, int num_camera);
 int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info);
 int order_4_ceiling_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info);
-int set_camera_parameters(Emergent::CEmergentCamera* camera, int gain_val);
+void update_gain_value(Emergent::CEmergentCamera* camera, int gain_val, CameraParams* camera_params);
+void update_exposure_value(Emergent::CEmergentCamera* camera, int exposure_val, CameraParams* camera_params);
+void update_frame_rate_value(Emergent::CEmergentCamera* camera, int frame_rate_val, CameraParams* camera_params);
 #endif

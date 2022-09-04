@@ -21,7 +21,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool encode_flag)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool* encode_flag, bool* capture_pause)
 {
     int camera_return{0};
 
@@ -84,7 +84,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
     
 
-    if(encode_flag){
+    if(*encode_flag){
         InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
     }
 
@@ -196,6 +196,13 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     int frame_count = 0;
     while (*key_num_ptr != 27)
     {
+        // pause capture 
+        while (*capture_pause) {
+            // if the next frame hasn't been displayed, the queue is full, sleep  
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }        
+
+
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
         // printf("get frame\n");
     //    //////////////////////////////PTP timestamp checking////////////////////////////////////
@@ -293,7 +300,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     std::cout << "Cuda Error" << std::endl;
                 }
 
-                if(encode_flag){
+                if(*encode_flag){
                     // encoding
                     const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
                     NvEncoderCuda::CopyToDeviceFrame(cuContext,
@@ -354,7 +361,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStop"));
-    if(encode_flag){
+    if(*encode_flag){
 
         pEnc->EndEncode(vPacket);
         for (std::vector<uint8_t> &packet : vPacket)

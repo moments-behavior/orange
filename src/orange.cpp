@@ -30,7 +30,7 @@ const std::string current_date_time() {
 
 void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras)
 {
-    camera_params->width = 3208;
+    camera_params->width = 2240;
     camera_params->height = 2200;
     camera_params->frame_rate = 30;
     camera_params->gain = 3500;
@@ -288,7 +288,7 @@ int main(int argc, char **args)
             if (ImGui::TreeNode("Camera Property"))
             {
                 static int selected_camera = 0;
-                static int slider_gain, slider_exposure, slider_frame_rate;
+                static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY;
 
                 for (int n = 0; n < cam_count; n++)
                 {
@@ -297,10 +297,40 @@ int main(int argc, char **args)
                     if (ImGui::Selectable(buf, selected_camera == n))
                         selected_camera = n;
                         slider_gain = cameras_params[selected_camera].gain;
+                        slider_width = cameras_params[selected_camera].width;
+                        slider_height = cameras_params[selected_camera].height;
+                        
                         slider_exposure = cameras_params[selected_camera].exposure;
                         slider_frame_rate = cameras_params[selected_camera].frame_rate;
+                        
                 }
             
+
+                if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[0].width_max, "%d"))
+                {
+                    update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
+                }
+
+                if(ImGui::SliderInt("Height", &slider_height, cameras_params[selected_camera].height_min, cameras_params[0].height_max, "%d"))
+                {
+                    update_height_value(&camera[selected_camera], slider_height, &cameras_params[selected_camera]);
+                }
+
+
+                if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[0].offsetx_max, "%d"))
+                {
+                    // round to 16 
+                    OffsetX = (OffsetX / 16) * 16; // round to even number
+                    update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
+                }
+
+
+                if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[0].offsety_max, "%d"))
+                {
+                    // round to 16 
+                    OffsetY = (OffsetY / 16) * 16; // round to even number
+                    update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
+                }
 
 
                 if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[0].gain_max, "%d"))
@@ -344,7 +374,7 @@ int main(int argc, char **args)
 
             //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
             if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
-                ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(3208, 2200));
+                ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
                 ImPlot::EndPlot();
             }
             ImGui::End();

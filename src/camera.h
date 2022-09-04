@@ -30,6 +30,18 @@ struct CameraParams{
     unsigned int frame_rate_max; 
     unsigned int frame_rate_min;
     unsigned int frame_rate_inc;
+    unsigned int width_max; 
+    unsigned int width_min;
+    unsigned int width_inc;
+    unsigned int height_max; 
+    unsigned int height_min;
+    unsigned int height_inc;
+    unsigned int offsetx_max; 
+    unsigned int offsetx_min;
+    unsigned int offsetx_inc;
+    unsigned int offsety_max; 
+    unsigned int offsety_min;
+    unsigned int offsety_inc;
 }; 
 
 
@@ -62,4 +74,8 @@ int order_4_ceiling_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, 
 void update_gain_value(Emergent::CEmergentCamera* camera, int gain_val, CameraParams* camera_params);
 void update_exposure_value(Emergent::CEmergentCamera* camera, int exposure_val, CameraParams* camera_params);
 void update_frame_rate_value(Emergent::CEmergentCamera* camera, int frame_rate_val, CameraParams* camera_params);
+void update_width_value(Emergent::CEmergentCamera* camera, int width_val, CameraParams* camera_params);
+void update_height_value(Emergent::CEmergentCamera* camera, int height_val, CameraParams* camera_params);
+void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, CameraParams* camera_params);
+void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, CameraParams* camera_params);
 #endif

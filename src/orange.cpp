@@ -11,7 +11,7 @@
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
 #include "shader_m.h"
-#include "IconsFontAwesome5.h"
+#include "IconsForkAwesome.h"
 #include "implot.h"
 #include <imfilebrowser.h>
 
@@ -30,11 +30,11 @@ const std::string current_date_time() {
 
 void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras)
 {
-    camera_params->width = 2240;
-    camera_params->height = 2200;
+    camera_params->width = 1280;
+    camera_params->height = 784;
     camera_params->frame_rate = 30;
-    camera_params->gain = 3500;
-    camera_params->exposure = 1500;
+    camera_params->gain = 2000;
+    camera_params->exposure = 2000;
     camera_params->pixel_format = "BayerRG8";
     camera_params->color_temp = "CT_3000K";
     camera_params->camera_id = camera_id;
@@ -53,7 +53,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 2;
+    int num_cameras = 1;
 
     int cam_count;
     cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
@@ -69,6 +69,8 @@ int main(int argc, char **args)
     // esc to exit 
     int key_num;
     int* key_num_ptr = &key_num;  
+    bool* record_video = new bool(false);
+    bool* capture_pause = new bool(false);
 
     string folder_string = current_date_time();
     string folder_name = "/home/jinyao/Videos/" + folder_string;
@@ -124,7 +126,6 @@ int main(int argc, char **args)
         allocate_frame_buffer(&camera[i], evt_frame[i], &cameras_params[i], buffer_size);
         set_frame_buffer(&frame_recv[i], &cameras_params[i]);
     }
-    std::cout << "reorder? " << bool(camera[0].linesReorderHandle) << std::endl;
 
 
     // *********************GUI*****************************************************
@@ -182,9 +183,9 @@ int main(int argc, char **args)
     // Load a nice font
     io.Fonts->AddFontFromFileTTF("Roboto-Regular.ttf", 15.0f);
     // merge in icons from Font Awesome
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
+    static const ImWchar icons_ranges[] = { ICON_MIN_FK, ICON_MAX_16_FK, 0 };
     ImFontConfig icons_config; icons_config.MergeMode = true; icons_config.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAS, 15.0f, &icons_config, icons_ranges);
+    io.Fonts->AddFontFromFileTTF("forkawesome-webfont.ttf", 15.0f, &icons_config, icons_ranges);
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 
     GLuint texture[num_cameras];
@@ -210,9 +211,13 @@ int main(int argc, char **args)
     }
 
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
+    
+    
+    
+    
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], false));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause));
     }
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
@@ -308,11 +313,22 @@ int main(int argc, char **args)
 
                 if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[0].width_max, "%d"))
                 {
+                    slider_width = (slider_width / 16) * 16; // round to even number
+
+                    *capture_pause = true;
                     update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
+                    // set_frame_buffer(&frame_recv[selected_camera], &cameras_params[selected_camera]);
+                    // for(int frame_count=0;frame_count<buffer_size;frame_count++)
+                    // {
+                    //     set_frame_buffer(&evt_frame[selected_camera][frame_count], &cameras_params[selected_camera]);
+                    // }
+                    *capture_pause = false;
+                    
                 }
 
                 if(ImGui::SliderInt("Height", &slider_height, cameras_params[selected_camera].height_min, cameras_params[0].height_max, "%d"))
                 {
+                    slider_height = (slider_height / 16) * 16; // round to even number
                     update_height_value(&camera[selected_camera], slider_height, &cameras_params[selected_camera]);
                 }
 
@@ -351,6 +367,15 @@ int main(int argc, char **args)
                 ImGui::TreePop();
 
             }
+
+            ImGui::Separator();
+            ImGui::Spacing();
+            
+            if (ImGui::Button("Streaming")){}
+            ImGui::SameLine();
+
+            if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){}
+
 
             ImGui::End();        
 

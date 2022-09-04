@@ -79,6 +79,33 @@ void update_gain_value(Emergent::CEmergentCamera* camera, int gain_val, CameraPa
 }
 
 
+void update_width_value(Emergent::CEmergentCamera* camera, int width_val, CameraParams* camera_params)
+{
+    EVT_CameraGetUInt32ParamMax(camera, "Width", &camera_params->width_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Width", &camera_params->width_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Width", &camera_params->width_inc);
+    if(width_val >= camera_params->width_min && width_val <= camera_params->width_max)
+    {
+        EVT_CameraSetUInt32Param(camera, "Width", width_val);
+        camera_params->width = width_val;
+    }
+}
+
+
+void update_height_value(Emergent::CEmergentCamera* camera, int height_val, CameraParams* camera_params)
+{
+    EVT_CameraGetUInt32ParamMax(camera, "Height", &camera_params->height_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Height", &camera_params->height_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Height", &camera_params->height_inc);
+    if(height_val >= camera_params->height_min && height_val <= camera_params->height_max)
+    {
+        EVT_CameraSetUInt32Param(camera, "Height", height_val);
+        camera_params->height = height_val;
+    }
+}
+
+
+
 void update_exposure_value(Emergent::CEmergentCamera* camera, int exposure_val, CameraParams* camera_params)
 {
     EVT_CameraGetUInt32ParamMax(camera, "Exposure", &camera_params->exposure_max);
@@ -105,6 +132,41 @@ void update_frame_rate_value(Emergent::CEmergentCamera* camera, int frame_rate_v
 }
 
 
+void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, CameraParams* camera_params)
+{
+    //Set ROI OffsetX. Now that Width changed we need to check new OffsetX limits
+    EVT_CameraGetUInt32ParamMax(camera, "OffsetX",   &camera_params->offsetx_max);
+    printf("OffsetX Max: \t\t%d\n", camera_params->offsetx_max);
+    EVT_CameraGetUInt32ParamMin(camera, "OffsetX",   &camera_params->offsetx_min);
+    printf("OffsetX Min: \t\t%d\n", camera_params->offsetx_min);
+    EVT_CameraGetUInt32ParamInc(camera, "OffsetX",   &camera_params->offsetx_inc);
+    printf("OffsetX Inc: \t\t%d\n", camera_params->offsetx_inc);
+
+    if(OFFSET_X_VAL >= camera_params->offsetx_min && OFFSET_X_VAL <= camera_params->offsetx_max)
+    {
+    EVT_CameraSetUInt32Param(camera, "OffsetX", OFFSET_X_VAL);
+    printf("OffsetX Set: \t\t%d\n", OFFSET_X_VAL);
+    }
+}
+
+
+void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, CameraParams* camera_params)
+{
+    //Set ROI OffsetX. Now that Width changed we need to check new OffsetX limits
+    EVT_CameraGetUInt32ParamMax(camera, "OffsetY",   &camera_params->offsety_max);
+    printf("OffsetY Max: \t\t%d\n", camera_params->offsety_max);
+    EVT_CameraGetUInt32ParamMin(camera, "OffsetY",   &camera_params->offsety_min);
+    printf("OffsetY Min: \t\t%d\n", camera_params->offsety_min);
+    EVT_CameraGetUInt32ParamInc(camera, "OffsetY",   &camera_params->offsety_inc);
+    printf("OffsetY Inc: \t\t%d\n", camera_params->offsety_inc);
+
+    if(OFFSET_Y_VAL >= camera_params->offsety_min && OFFSET_Y_VAL <= camera_params->offsety_max)
+    {
+        EVT_CameraSetUInt32Param(camera, "OffsetY", OFFSET_Y_VAL);
+        printf("OffsetX Set: \t\t%d\n", OFFSET_Y_VAL);
+    }
+}
+
 
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams* camera_params)
 {
@@ -123,6 +185,13 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
     printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
+
+
+    update_width_value(camera, camera_params->width, camera_params);
+    update_height_value(camera, camera_params->height, camera_params);
+
+    update_offsetX_value(camera, 0, camera_params);
+    update_offsetY_value(camera, 0, camera_params);
 
 
     const char* pixel_format = camera_params->pixel_format.c_str();

@@ -183,7 +183,7 @@ int main(int argc, char **args)
     // merge in icons from Font Awesome
     static const ImWchar icons_ranges[] = { ICON_MIN_FK, ICON_MAX_16_FK, 0 };
     ImFontConfig icons_config; icons_config.MergeMode = true; icons_config.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF("forkawesome-webfont.ttf", 15.0f, &icons_config, icons_ranges);
+    io.Fonts->AddFontFromFileTTF("forkawesome-webfont.ttf", 20.0f, &icons_config, icons_ranges);
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 
     GLuint texture[num_cameras];
@@ -366,13 +366,13 @@ int main(int argc, char **args)
 
             }
 
-            // ImGui::Separator();
-            // ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
             
             // if (ImGui::Button("Streaming")){}
             // ImGui::SameLine();
 
-            if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){
+            if (ImGui::Button(*record_video ? "PAUSE" : "RECORD")){
                 (*record_video) = !(*record_video);
             }
 

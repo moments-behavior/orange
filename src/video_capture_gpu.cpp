@@ -84,9 +84,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
     
 
-    if(*encode_flag){
+    //if(*encode_flag){
         InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
-    }
+    //}
 
     // For receiving encoded packets
     std::vector<std::vector<uint8_t>> vPacket;
@@ -315,7 +315,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                                                     encoderInputFrame->chromaOffsets,
                                                     encoderInputFrame->numChromaPlanes);
                     pEnc->EncodeFrame(vPacket);
-
                     // num_frame_encode += (int)vPacket.size(); 
                     for (std::vector<uint8_t> &packet : vPacket)
                     {

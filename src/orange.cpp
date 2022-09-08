@@ -14,6 +14,7 @@
 #include "IconsForkAwesome.h"
 #include "implot.h"
 #include <imfilebrowser.h>
+#include "FFmpegWriter.h"
 
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
@@ -126,6 +127,16 @@ int main(int argc, char **args)
     }
 
 
+    FFmpegWriter video_writers[num_cameras];
+    FFmpegWriter* writer_ptrs[num_cameras];
+    for(int i = 0; i < num_cameras; i++){
+        // create FFmpegWriter
+        string video_file = folder_name + "/Cam" + std::to_string(cameras_params[i].camera_id) + ".mp4";
+        const char *output_file = video_file.c_str();        
+        writer_ptrs[i] = new FFmpegWriter writer(AV_CODEC_ID_H264, cameras_params[i].width, cameras_params[i].height, cameras_params[i].frame_rate, output_file);
+    }
+
+
     // *********************GUI*****************************************************
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -215,7 +226,7 @@ int main(int argc, char **args)
     
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause, writer_ptrs[i]));
     }
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
@@ -372,7 +383,9 @@ int main(int argc, char **args)
             // if (ImGui::Button("Streaming")){}
             // ImGui::SameLine();
 
-            // if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){}
+            if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){
+                *record_video = !(*record_video);
+            }
 
 
             ImGui::End();        

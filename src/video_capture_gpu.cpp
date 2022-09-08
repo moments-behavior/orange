@@ -1,5 +1,4 @@
 #include "video_capture_gpu.h"
-#include "FFmpegWriter.h"
 #include <iostream>
 #include <fstream>
 #include "cuda_line_reorder.h"
@@ -21,7 +20,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool* encode_flag, bool* capture_pause)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool* encode_flag, bool* capture_pause, FFmpegWriter* writer)
 {
     int camera_return{0};
 
@@ -93,10 +92,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     int num_frame_encode = 0;
 
     // for writing 
-
-    string video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
-    const char *output_file = video_file.c_str();
-    FFmpegWriter writer(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, output_file);
+    // string video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
+    // const char *output_file = video_file.c_str();
+    // FFmpegWriter writer(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, output_file);
 
     string metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
     ofstream frame_metadata;
@@ -320,7 +318,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     for (std::vector<uint8_t> &packet : vPacket)
                     {
                         // For each encoded packet
-                        writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
+                        writer->Write(packet.data(), (int)packet.size(), num_frame_encode++);
 
                     }
                 }
@@ -366,7 +364,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         pEnc->EndEncode(vPacket);
         for (std::vector<uint8_t> &packet : vPacket)
         {
-            writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
+            writer->Write(packet.data(), (int)packet.size(), num_frame_encode++);
         }
         pEnc->DestroyEncoder();
     }

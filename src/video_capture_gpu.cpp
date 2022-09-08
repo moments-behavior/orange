@@ -84,9 +84,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
     
 
-    //if(*encode_flag){
-        InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
-    //}
+    InitializeEncoder(pEnc, encodeCLIOptions, eFormat);
 
     // For receiving encoded packets
     std::vector<std::vector<uint8_t>> vPacket;
@@ -360,15 +358,14 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(camera, "AcquisitionStop"));
-    if(*encode_flag){
 
-        pEnc->EndEncode(vPacket);
-        for (std::vector<uint8_t> &packet : vPacket)
-        {
-            writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
-        }
-        pEnc->DestroyEncoder();
+    pEnc->EndEncode(vPacket);
+    for (std::vector<uint8_t> &packet : vPacket)
+    {
+        writer.Write(packet.data(), (int)packet.size(), num_frame_encode++);
     }
+    pEnc->DestroyEncoder();
+
     frame_metadata.close();
     double time_diff = w.Stop();
 

@@ -372,7 +372,9 @@ int main(int argc, char **args)
             // if (ImGui::Button("Streaming")){}
             // ImGui::SameLine();
 
-            // if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){}
+            if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){
+                (*record_video) = !(*record_video);
+            }
 
 
             ImGui::End();        

@@ -30,8 +30,8 @@ const std::string current_date_time() {
 
 void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras)
 {
-    camera_params->width = 1280;
-    camera_params->height = 784;
+    camera_params->width = 3208;
+    camera_params->height = 2200;
     camera_params->frame_rate = 30;
     camera_params->gain = 2000;
     camera_params->exposure = 2000;
@@ -53,7 +53,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 1;
+    int num_cameras = 4;
 
     int cam_count;
     cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
@@ -86,9 +86,7 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int camera_orders[] = {0, 1, 2, 3, 4, 5};  
-    int camera_gpus[] = {0, 0, 0, 0, 0, 0};
-    
+    int select_camera[] = {2, 3, 4, 5};
     
     int camera_id {0};
     int gpu_id {0};
@@ -100,8 +98,8 @@ int main(int argc, char **args)
 
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_id = camera_orders[i];
-        gpu_id = camera_gpus[camera_id];
+        camera_id = select_camera[i];
+        gpu_id = 0;
         init_25G_camera_params(&cameras_params[i], camera_id, num_cameras);   
     }
 
@@ -117,7 +115,7 @@ int main(int argc, char **args)
 
     for(int i = 0; i < num_cameras; i++)
     {
-        open_camera_with_params(&camera[i], &ordered_device_info[i], &cameras_params[i]); 
+        open_camera_with_params(&camera[i], &ordered_device_info[select_camera[i]], &cameras_params[i]); 
         // open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
 
         // sync 
@@ -271,17 +269,17 @@ int main(int argc, char **args)
 
             if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
-                for (int i = 0; i < cam_count; i++)
+                for (int i = 0; i < num_cameras; i++)
                 {
                     char label[32];
-                    sprintf(label, "Camera %d", i);
+                    sprintf(label, "Camera %d", cameras_params[i].camera_id);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     ImGui::Selectable(label, &selected[i], ImGuiSelectableFlags_SpanAllColumns);
                     ImGui::TableNextColumn();
-                    ImGui::Text(device_info[i].serialNumber);
+                    ImGui::Text(ordered_device_info[select_camera[i]].serialNumber);
                     ImGui::TableNextColumn();
-                    ImGui::Text(device_info[i].currentIp);
+                    ImGui::Text(ordered_device_info[select_camera[i]].currentIp);
                 }
                 ImGui::EndTable();
             }
@@ -295,10 +293,10 @@ int main(int argc, char **args)
                 static int selected_camera = 0;
                 static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY;
 
-                for (int n = 0; n < cam_count; n++)
+                for (int n = 0; n < num_cameras; n++)
                 {
                     char buf[32];
-                    sprintf(buf, "Camera %d", n);
+                    sprintf(buf, "Camera %d", select_camera[n]);
                     if (ImGui::Selectable(buf, selected_camera == n))
                         selected_camera = n;
                         slider_gain = cameras_params[selected_camera].gain;
@@ -311,42 +309,42 @@ int main(int argc, char **args)
                 }
             
 
-                if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[0].width_max, "%d"))
-                {
-                    slider_width = (slider_width / 16) * 16; // round to even number
+                // if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[0].width_max, "%d"))
+                // {
+                //     slider_width = (slider_width / 16) * 16; // round to even number
 
-                    *capture_pause = true;
-                    update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
-                    // set_frame_buffer(&frame_recv[selected_camera], &cameras_params[selected_camera]);
-                    // for(int frame_count=0;frame_count<buffer_size;frame_count++)
-                    // {
-                    //     set_frame_buffer(&evt_frame[selected_camera][frame_count], &cameras_params[selected_camera]);
-                    // }
-                    *capture_pause = false;
+                //     *capture_pause = true;
+                //     update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
+                //     // set_frame_buffer(&frame_recv[selected_camera], &cameras_params[selected_camera]);
+                //     // for(int frame_count=0;frame_count<buffer_size;frame_count++)
+                //     // {
+                //     //     set_frame_buffer(&evt_frame[selected_camera][frame_count], &cameras_params[selected_camera]);
+                //     // }
+                //     *capture_pause = false;
                     
-                }
+                // }
 
-                if(ImGui::SliderInt("Height", &slider_height, cameras_params[selected_camera].height_min, cameras_params[0].height_max, "%d"))
-                {
-                    slider_height = (slider_height / 16) * 16; // round to even number
-                    update_height_value(&camera[selected_camera], slider_height, &cameras_params[selected_camera]);
-                }
-
-
-                if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[0].offsetx_max, "%d"))
-                {
-                    // round to 16 
-                    OffsetX = (OffsetX / 16) * 16; // round to even number
-                    update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
-                }
+                // if(ImGui::SliderInt("Height", &slider_height, cameras_params[selected_camera].height_min, cameras_params[0].height_max, "%d"))
+                // {
+                //     slider_height = (slider_height / 16) * 16; // round to even number
+                //     update_height_value(&camera[selected_camera], slider_height, &cameras_params[selected_camera]);
+                // }
 
 
-                if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[0].offsety_max, "%d"))
-                {
-                    // round to 16 
-                    OffsetY = (OffsetY / 16) * 16; // round to even number
-                    update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
-                }
+                // if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[0].offsetx_max, "%d"))
+                // {
+                //     // round to 16 
+                //     OffsetX = (OffsetX / 16) * 16; // round to even number
+                //     update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
+                // }
+
+
+                // if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[0].offsety_max, "%d"))
+                // {
+                //     // round to 16 
+                //     OffsetY = (OffsetY / 16) * 16; // round to even number
+                //     update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
+                // }
 
 
                 if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[0].gain_max, "%d"))
@@ -368,13 +366,13 @@ int main(int argc, char **args)
 
             }
 
-            ImGui::Separator();
-            ImGui::Spacing();
+            // ImGui::Separator();
+            // ImGui::Spacing();
             
-            if (ImGui::Button("Streaming")){}
-            ImGui::SameLine();
+            // if (ImGui::Button("Streaming")){}
+            // ImGui::SameLine();
 
-            if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){}
+            // if (ImGui::Button(*record_video ? ICON_FK_PAUSE_CIRCLE : ICON_FK_PLAY_CIRCLE_O)){}
 
 
             ImGui::End();        
@@ -393,7 +391,7 @@ int main(int argc, char **args)
 
 
         for (int i = 0; i < num_cameras; i++) {
-            string window_name = "Cam" + std::to_string(i);            
+            string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);            
             ImGui::Begin(window_name.c_str());
             ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

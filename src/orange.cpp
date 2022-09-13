@@ -73,7 +73,7 @@ int main(int argc, char **args)
     bool* capture_pause = new bool(false);
 
     string folder_string = current_date_time();
-    string folder_name = "/home/jinyao/Videos/" + folder_string;
+    string folder_name = "/home/jinyao/Videos/debug/" + folder_string;
     
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -86,7 +86,7 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int select_camera[] = {2, 3, 4, 5};
+    int select_camera[] = {0, 3, 4, 5};
     
     int camera_id {0};
     int gpu_id {0};
@@ -183,7 +183,7 @@ int main(int argc, char **args)
     // merge in icons from Font Awesome
     static const ImWchar icons_ranges[] = { ICON_MIN_FK, ICON_MAX_16_FK, 0 };
     ImFontConfig icons_config; icons_config.MergeMode = true; icons_config.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF("forkawesome-webfont.ttf", 20.0f, &icons_config, icons_ranges);
+    io.Fonts->AddFontFromFileTTF("forkawesome-webfont.ttf", 15.0f, &icons_config, icons_ranges);
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 
     GLuint texture[num_cameras];
@@ -267,28 +267,28 @@ int main(int argc, char **args)
 
             bool selected[cam_count] = {};
 
-            if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
-            {
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    char label[32];
-                    sprintf(label, "Camera %d", cameras_params[i].camera_id);
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::Selectable(label, &selected[i], ImGuiSelectableFlags_SpanAllColumns);
-                    ImGui::TableNextColumn();
-                    ImGui::Text(ordered_device_info[select_camera[i]].serialNumber);
-                    ImGui::TableNextColumn();
-                    ImGui::Text(ordered_device_info[select_camera[i]].currentIp);
-                }
-                ImGui::EndTable();
-            }
+            // if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+            // {
+            //     for (int i = 0; i < num_cameras; i++)
+            //     {
+            //         char label[32];
+            //         sprintf(label, "Camera %d", cameras_params[i].camera_id);
+            //         ImGui::TableNextRow();
+            //         ImGui::TableNextColumn();
+            //         ImGui::Selectable(label, &selected[i], ImGuiSelectableFlags_SpanAllColumns);
+            //         ImGui::TableNextColumn();
+            //         ImGui::Text(ordered_device_info[select_camera[i]].serialNumber);
+            //         ImGui::TableNextColumn();
+            //         ImGui::Text(ordered_device_info[select_camera[i]].currentIp);
+            //     }
+            //     ImGui::EndTable();
+            // }
 
 
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (ImGui::TreeNode("Camera Property"))
+            //if (ImGui::TreeNode("Camera Property"))
             {
                 static int selected_camera = 0;
                 static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY;
@@ -362,7 +362,7 @@ int main(int argc, char **args)
                 {
                     update_frame_rate_value(&camera[selected_camera], slider_frame_rate, &cameras_params[selected_camera]);
                 }
-                ImGui::TreePop();
+                //ImGui::TreePop();
 
             }
 
@@ -372,9 +372,15 @@ int main(int argc, char **args)
             // if (ImGui::Button("Streaming")){}
             // ImGui::SameLine();
 
-            if (ImGui::Button(*record_video ? "PAUSE" : "RECORD")){
+            if (*record_video)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.5f, 0, 0, 1.0f });
+            else
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0, 0.5f, 0, 1.0f });
+
+            if (ImGui::Button(*record_video ? ICON_FK_PAUSE : ICON_FK_PLAY)){
                 (*record_video) = !(*record_video);
             }
+            ImGui::PopStyleColor(1);
 
 
             ImGui::End();        

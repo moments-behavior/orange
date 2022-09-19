@@ -28,13 +28,13 @@ const std::string current_date_time() {
 
 
 
-void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras)
+void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure)
 {
     camera_params->width = 3208;
     camera_params->height = 2200;
     camera_params->frame_rate = 30;
-    camera_params->gain = 2000;
-    camera_params->exposure = 2000;
+    camera_params->gain = gain;
+    camera_params->exposure = exposure;
     camera_params->pixel_format = "BayerRG8";
     camera_params->color_temp = "CT_3000K";
     camera_params->camera_id = camera_id;
@@ -73,7 +73,7 @@ int main(int argc, char **args)
     bool* capture_pause = new bool(false);
 
     string folder_string = current_date_time();
-    string folder_name = "/home/jinyao/Videos/debug/" + folder_string;
+    string folder_name = "/home/jinyao/Videos/" + folder_string;
     
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -100,7 +100,12 @@ int main(int argc, char **args)
     {
         camera_id = select_camera[i];
         gpu_id = 0;
-        init_25G_camera_params(&cameras_params[i], camera_id, num_cameras);   
+        if(camera_id==5){
+            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 3500, 5500);   
+        }
+        else{
+            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 3500);   
+        }
     }
 
 

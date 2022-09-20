@@ -15,6 +15,8 @@
 #include "implot.h"
 #include <imfilebrowser.h>
 
+#include "json.hpp"
+#include "tcp_client.h"
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const std::string current_date_time() {
@@ -386,6 +388,19 @@ int main(int argc, char **args)
                 (*record_video) = !(*record_video);
             }
             ImGui::PopStyleColor(1);
+
+
+
+            // // send json 
+            // if (ImGui::Button("Send coordinate")){            
+            //     nlohmann::json ball_coordinate = {
+            //         {"x", 3.141},
+            //         {"y", 30.141},
+            //         {"z", 300.141}
+            //     };
+            //     std::string str_ball_cord = ball_coordinate.dump();
+            //     connect_and_send_coordinate(str_ball_cord);
+            // }
 
 
             ImGui::End();        

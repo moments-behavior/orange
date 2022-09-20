@@ -34,6 +34,7 @@ g++ -Ofast -ffast-math -std=c++17 \
     -I./third_party/IconFontCppHeaders \
     -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
     -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -Ithird_party/json_cpp \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
     -lm \
     -lpthread \

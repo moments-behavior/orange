@@ -25,9 +25,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 {
     int camera_return{0};
 
-    unsigned int size_of_buffer;
-    size_of_buffer = frame_recv->CalculateBufferSize();
-
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
 

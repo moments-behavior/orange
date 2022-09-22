@@ -17,6 +17,7 @@
 
 #include "json.hpp"
 #include "tcp_client.h"
+#include<chrono>
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const std::string current_date_time() {
@@ -469,15 +470,17 @@ int main(int argc, char **args)
 
     // wait for threads to join
     for (auto& t : camera_threads)
-            t.join();
+        t.join();
     
 
     for(int i = 0; i < num_cameras; i++)
     {
         destroy_frame_buffer(&camera[i], evt_frame[i], buffer_size);
         close_camera(&camera[i]);
-    }
 
+    }
+    
+    
 
     std::cout << folder_name << std::endl;
     return 0;

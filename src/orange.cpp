@@ -14,7 +14,7 @@
 #include "IconsForkAwesome.h"
 #include "implot.h"
 #include <imfilebrowser.h>
-
+#include<unistd.h>
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const std::string current_date_time() {
@@ -125,7 +125,7 @@ int main(int argc, char **args)
 
         // sync 
         // ptp_camera_sync(&camera[i]);
-
+        EVT_CameraOpenStream(&camera[i]);
         allocate_frame_buffer(&camera[i], evt_frame[i], &cameras_params[i], buffer_size);
         set_frame_buffer(&frame_recv[i], &cameras_params[i]);
     }
@@ -316,7 +316,7 @@ int main(int argc, char **args)
 
                 // if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[0].width_max, "%d"))
                 // {
-                //     slider_width = (slider_width / 16) * 16; // round to even number
+                //     slider_width = (slider_width / 16destr) * 16; // round to even number
 
                 //     *capture_pause = true;
                 //     update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
@@ -460,9 +460,9 @@ int main(int argc, char **args)
     for(int i = 0; i < num_cameras; i++)
     {
         destroy_frame_buffer(&camera[i], evt_frame[i], buffer_size);
+        EVT_CameraOpenStream(&camera[i]);
         close_camera(&camera[i]);
     }
-
 
     std::cout << folder_name << std::endl;
     return 0;

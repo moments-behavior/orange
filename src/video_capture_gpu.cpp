@@ -25,8 +25,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 {
     int camera_return{0};
 
-    unsigned int size_of_buffer;
-    size_of_buffer = frame_recv->CalculateBufferSize();
+    // unsigned int size_of_buffer;
+    // size_of_buffer = frame_recv->CalculateBufferSize();
 
     unsigned short id_prev = 0, dropped_frames = 0;
     unsigned int frames_recd = 0;
@@ -377,6 +377,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("Frame encoded: \t%d\n", num_frame_encode);
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
+
     // printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
     // printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }

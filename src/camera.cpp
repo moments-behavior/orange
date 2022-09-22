@@ -496,8 +496,8 @@ void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergen
 {
 
     // open stream is important to acclocate frame buffer successfully
-    check_camera_errors(EVT_CameraOpenStream(camera));
-
+    // check_camera_errors(EVT_CameraOpenStream(camera));
+    
     for(int frame_count=0;frame_count<buffer_size;frame_count++)
     {
         set_frame_buffer(&evt_frame[frame_count], camera_params);
@@ -509,15 +509,13 @@ void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergen
 
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size)
 {
-        //TODO: functionalize this Release frame buffers
 	for(int frame_count=0;frame_count<buffer_size;frame_count++)
 	{
 		check_camera_errors(EVT_ReleaseFrameBuffer(camera, &evt_frame[frame_count]));
 	}
 
 	//Host side tear down for stream.
-	check_camera_errors(EVT_CameraCloseStream(camera));
-
+    // EVT_CameraCloseStream(camera);
 }
 
 

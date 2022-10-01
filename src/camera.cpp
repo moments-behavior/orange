@@ -36,7 +36,7 @@ void configure_factory_defaults(Emergent::CEmergentCamera* camera)
     //Order is important as param max/mins get updated.
     //check_camera_errors(Emergent::EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enumBufferSize, &enumBufferSizeReturn));
     //check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "PixelFormat", enumMember));
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "FrameRate", 30));
+    // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "FrameRate", 30));
 
     check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetX", 0));
     check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetY", 0));
@@ -173,9 +173,9 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     //TODO: open camera using xml file after explored on camera settings
     //EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
     
-    if(camera_params->gpu_direct){
-        camera->gpuDirectDeviceId = camera_params->gpu_id;
-    }
+    // if(camera_params->gpu_direct){
+    //     camera->gpuDirectDeviceId = camera_params->gpu_id;
+    // }
 
     check_camera_errors(EVT_CameraOpen(camera, device_info));      
 

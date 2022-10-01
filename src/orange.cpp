@@ -86,14 +86,13 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int select_camera[] = {0, 3, 4, 5};
+    int select_camera[] = {0, 1, 2, 3}; //, 4, 5};
     
     int camera_id {0};
     int gpu_id {0};
     int buffer_size {30};
 
     CameraParams cameras_params[num_cameras];
-    unsigned int frame_rate {25};
 
 
     for(int i = 0; i < num_cameras; i++)
@@ -101,7 +100,7 @@ int main(int argc, char **args)
         camera_id = select_camera[i];
         gpu_id = 0;
         if(camera_id==5){
-            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 3500, 5500);   
+            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 4000, 9500);   
         }
         else{
             init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 3500);   
@@ -114,7 +113,7 @@ int main(int argc, char **args)
     Emergent::CEmergentFrame evt_frame[num_cameras][buffer_size]; 
     Emergent::CEmergentFrame frame_recv[num_cameras];
 
-    string encoder_setup = "-preset p1 -fps " + to_string(frame_rate);
+    string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
     const char *encoder_str = encoder_setup.c_str();
     std::vector<thread> camera_threads;
 
@@ -124,7 +123,7 @@ int main(int argc, char **args)
         // open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
 
         // sync 
-        // ptp_camera_sync(&camera[i]);
+        ptp_camera_sync(&camera[i]);
         EVT_CameraOpenStream(&camera[i]);
         allocate_frame_buffer(&camera[i], evt_frame[i], &cameras_params[i], buffer_size);
         set_frame_buffer(&frame_recv[i], &cameras_params[i]);

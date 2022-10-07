@@ -86,7 +86,7 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int select_camera[] = {0, 1, 2, 3}; // 4}; //, 4, 5};
+    int select_camera[] = {0, 1, 4, 5}; // 2, 3}; // 4}; //, 4, 5};
     
     int camera_id {0};
     int gpu_id {0};

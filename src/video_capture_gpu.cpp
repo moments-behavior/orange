@@ -24,7 +24,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool* encode_flag, bool* capture_pause)
 {
     int camera_return{0};
-
+    int copy_skip = 0;
     // unsigned int size_of_buffer;
     // size_of_buffer = frame_recv->CalculateBufferSize();
 
@@ -291,7 +291,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     std::cout << "\nNPP error %d \n" << npp_result << std::endl;
                 }
 
-                // copy frame less 
                 cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
                 if (cu_result != cudaSuccess)
                 {

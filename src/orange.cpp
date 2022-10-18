@@ -32,7 +32,7 @@ void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_
 {
     camera_params->width = 3208;
     camera_params->height = 2200;
-    camera_params->frame_rate = 30;
+    camera_params->frame_rate = 200;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
     camera_params->pixel_format = "BayerRG8";
@@ -53,7 +53,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 1;
+    int num_cameras = 4;
 
     int cam_count;
     cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
@@ -86,11 +86,11 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int select_camera[] = {5}; //{0, 1, 2, 3}; // 4, 5};
+    int select_camera[] = {0, 1, 3, 4}; // 4, 5};
     
     int camera_id {0};
     int gpu_id {0};
-    int buffer_size {30};
+    int buffer_size {100};
 
     CameraParams cameras_params[num_cameras];
 
@@ -100,7 +100,7 @@ int main(int argc, char **args)
         camera_id = select_camera[i];
         gpu_id = 0;
         if(camera_id==5){
-            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 4000, 9500);   
+            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 3000, 1500); //4000, 9500);   
         }
         else{
             init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 4000); // 2000, 3500);   
@@ -231,22 +231,22 @@ int main(int argc, char **args)
     {
         glfwPollEvents();
 
-        for (int i = 0; i < num_cameras; i++) {
+        // for (int i = 0; i < num_cameras; i++) {
 
-            // Transfer to PBO then OpenGL texture
-            // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-            map_cuda_resource(&cuda_resource[i]);
-            cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
-            cudaMemcpy2D(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice);
-            unmap_cuda_resource(&cuda_resource[i]);
+        //     // Transfer to PBO then OpenGL texture
+        //     // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
+        //     map_cuda_resource(&cuda_resource[i]);
+        //     cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
+        //     cudaMemcpy2D(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice);
+        //     unmap_cuda_resource(&cuda_resource[i]);
 
-            // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
-            bind_pbo(&pbo[i]);
-            bind_texture(&texture[i]);
-            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
-            unbind_texture();
-            unbind_pbo();
-        }
+        //     // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
+        //     bind_pbo(&pbo[i]);
+        //     bind_texture(&texture[i]);
+        //     upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+        //     unbind_texture();
+        //     unbind_pbo();
+        // }
 
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -402,19 +402,19 @@ int main(int argc, char **args)
         }
 
 
-        for (int i = 0; i < num_cameras; i++) {
-            string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);            
-            ImGui::Begin(window_name.c_str());
-            ImVec2 avail_size = ImGui::GetContentRegionAvail();
+        // for (int i = 0; i < num_cameras; i++) {
+        //     string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);            
+        //     ImGui::Begin(window_name.c_str());
+        //     ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-            //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
-            if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
-                ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
-                ImPlot::EndPlot();
-            }
-            ImGui::End();
+        //     //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+        //     if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
+        //         ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+        //         ImPlot::EndPlot();
+        //     }
+        //     ImGui::End();
             
-        }
+        // }
 
         // Rendering
         ImGui::Render();

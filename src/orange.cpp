@@ -53,7 +53,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 1;
+    int num_cameras = 4;
 
     int cam_count;
     cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
@@ -86,7 +86,7 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int select_camera[] = {5}; //{0, 1, 2, 3}; // 4, 5};
+    int select_camera[] = {0, 1, 2, 4}; // 4, 5};
     
     int camera_id {0};
     int gpu_id {0};

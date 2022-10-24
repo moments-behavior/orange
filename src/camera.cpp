@@ -422,18 +422,18 @@ int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEV
     {
         for (unsigned int i = 0; i < count; i++)
         {
-            // 100G camera
-            if (strcmp(device_info[i].serialNumber, "2001127") == 0)
-            {
-                ordered_device_info[2] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710042") == 0)
+            if (strcmp(device_info[i].serialNumber, "710031") == 0)
             {
                 ordered_device_info[0] = device_info[i];
             }
-            else if (strcmp(device_info[i].serialNumber, "710031") == 0)
+            // 100G camera
+            else if (strcmp(device_info[i].serialNumber, "2002490") == 0)
             {
                 ordered_device_info[1] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "2002743") == 0)
+            {
+                ordered_device_info[2] = device_info[i];
             }
         }
 

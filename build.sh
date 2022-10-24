@@ -8,7 +8,6 @@ DIR_IMGUI="third_party/imgui"
 DIR_IMPLOT="third_party/implot"
 
 
-
 # g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui.o ./third_party/imgui/imgui.cpp
 # g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_demo.o ./third_party/imgui/imgui_demo.cpp
 # g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_draw.o ./third_party/imgui/imgui_draw.cpp
@@ -39,8 +38,8 @@ g++ -Ofast -ffast-math -std=c++17 \
     -lpthread \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
     -lGLEW -lGLU -lGL \
-    -I/home/jinyao/nvidia/ffmpeg/build/include/ \
-    -L/home/jinyao/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I$HOME/Build/nvidia/FFmpeg/build/include/ \
+    -L$HOME/Build/nvidia/FFmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     `pkg-config --static --libs glfw3` \
-    `pkg-config --cflags --libs x11`
+
 sudo ./targets/orange;

@@ -30,8 +30,8 @@ const std::string current_date_time() {
 
 void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure)
 {
-    camera_params->width = 3208;
-    camera_params->height = 2200;
+    camera_params->width = 1280;
+    camera_params->height = 1280;
     camera_params->frame_rate = 30;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
@@ -53,10 +53,10 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 4;
+    int num_cameras = 1;
 
     int cam_count;
-    cam_count = order_4_ceiling_cameras(max_cameras, device_info, ordered_device_info);
+    cam_count = order_for_test_rig(max_cameras, device_info, ordered_device_info);
     if (cam_count < num_cameras) 
     {
         printf("Missing cameras...Exit\n");
@@ -73,7 +73,7 @@ int main(int argc, char **args)
     bool* capture_pause = new bool(false);
 
     string folder_string = current_date_time();
-    string folder_name = "/home/jinyao/Videos/" + folder_string;
+    string folder_name = "/home/red/Videos/" + folder_string;
     
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -315,7 +315,7 @@ int main(int argc, char **args)
 
                 // if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[0].width_max, "%d"))
                 // {
-                //     slider_width = (slider_width / 16destr) * 16; // round to even number
+                //     slider_width = (slider_width / 16) * 16; // round to even number
 
                 //     *capture_pause = true;
                 //     update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
@@ -335,20 +335,20 @@ int main(int argc, char **args)
                 // }
 
 
-                // if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[0].offsetx_max, "%d"))
-                // {
-                //     // round to 16 
-                //     OffsetX = (OffsetX / 16) * 16; // round to even number
-                //     update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
-                // }
+                if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[0].offsetx_max, "%d"))
+                {
+                    // round to 16 
+                    OffsetX = (OffsetX / 16) * 16; // round to even number
+                    update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
+                }
 
 
-                // if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[0].offsety_max, "%d"))
-                // {
-                //     // round to 16 
-                //     OffsetY = (OffsetY / 16) * 16; // round to even number
-                //     update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
-                // }
+                if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[0].offsety_max, "%d"))
+                {
+                    // round to 16 
+                    OffsetY = (OffsetY / 16) * 16; // round to even number
+                    update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
+                }
 
 
                 if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[0].gain_max, "%d"))

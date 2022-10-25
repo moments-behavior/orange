@@ -32,13 +32,13 @@ void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_
 {
     camera_params->width = 1280;
     camera_params->height = 1280;
-    camera_params->frame_rate = 30;
+    camera_params->frame_rate = 100;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
     camera_params->pixel_format = "BayerRG8";
     camera_params->color_temp = "CT_3000K";
     camera_params->camera_id = camera_id;
-    camera_params->gpu_id = 0;
+    camera_params->gpu_id = 1;
     camera_params->num_cameras = num_cameras;
     camera_params->gpu_direct = false;
     camera_params->need_reorder = false;
@@ -88,22 +88,18 @@ int main(int argc, char **args)
     PTPParams* ptp_params = new PTPParams{0, 0};
     int select_camera[] = {0, 1, 2, 4}; // 4, 5};
     
-    int camera_id {0};
-    int gpu_id {0};
     int buffer_size {30};
-
     CameraParams cameras_params[num_cameras];
 
 
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_id = select_camera[i];
-        gpu_id = 0;
+        int camera_id = select_camera[i];
         if(camera_id==5){
             init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 4000, 9500);   
         }
         else{
-            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 4000); // 2000, 3500);   
+            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 1000); // 2000, 3500);   
         }
     }
 
@@ -148,7 +144,7 @@ int main(int argc, char **args)
         return 1;
 
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    glfwSwapInterval(0); // Enable vsync
 
     // Initialize OpenGL functions with GLEW
     glew_error_callback(glewInit());
@@ -197,9 +193,11 @@ int main(int argc, char **args)
     size_t cuda_pbo_storage_buffer_size[num_cameras];
     unsigned char *display_buffer[num_cameras];
 
+    cudaStream_t streams[num_cameras];
 
     for(int i = 0; i < num_cameras; i++)
     {
+        cudaStreamCreate(&streams[i]);
         int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
 
         create_texture(&texture[i]);
@@ -214,12 +212,12 @@ int main(int argc, char **args)
 
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     
-    
+
     
     
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause, &cuda_buffer[i], &cuda_resource[i], &cuda_pbo_storage_buffer_size[i], &pbo[i], &texture[i]));
     }
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
@@ -227,19 +225,18 @@ int main(int argc, char **args)
     std::string input_folder;
 
 
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
 
         for (int i = 0; i < num_cameras; i++) {
-
             // Transfer to PBO then OpenGL texture
             // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
             map_cuda_resource(&cuda_resource[i]);
             cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
-            cudaMemcpy2D(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice);
+            cudaMemcpy2DAsync(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice, streams[i]);
             unmap_cuda_resource(&cuda_resource[i]);
-
             // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
             bind_pbo(&pbo[i]);
             bind_texture(&texture[i]);
@@ -247,7 +244,7 @@ int main(int argc, char **args)
             unbind_texture();
             unbind_pbo();
         }
-
+        cudaDeviceSynchronize();
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -339,7 +336,9 @@ int main(int argc, char **args)
                 {
                     // round to 16 
                     OffsetX = (OffsetX / 16) * 16; // round to even number
-                    update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
+                    // update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
+                    EVT_CameraSetUInt32Param(camera, "OffsetX", OffsetX);
+
                 }
 
 
@@ -347,7 +346,9 @@ int main(int argc, char **args)
                 {
                     // round to 16 
                     OffsetY = (OffsetY / 16) * 16; // round to even number
-                    update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
+                    // update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
+                    EVT_CameraSetUInt32Param(camera, "OffsetY", OffsetY);
+
                 }
 
 
@@ -464,5 +465,6 @@ int main(int argc, char **args)
     }
 
     std::cout << folder_name << std::endl;
+    cudaDeviceReset();
     return 0;
 }

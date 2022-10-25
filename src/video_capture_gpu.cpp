@@ -20,8 +20,9 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 }
 
 
+
 // gpu pipeline, raw bayer images as input
-void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool* encode_flag, bool* capture_pause)
+void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *frame_recv, CameraParams* camera_params, const char *encoder_str, int* key_num_ptr, PTPParams* ptp_params, string folder_name, unsigned char* display_buffer, bool* encode_flag, bool* capture_pause, unsigned char** cuda_buffer, cudaGraphicsResource_t* cuda_resource, size_t *cuda_pbo_storage_buffer_size, GLuint *pbo, GLuint *texture)
 {
     int camera_return{0};
     int copy_skip = 0;
@@ -189,6 +190,50 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("\n");
     //********************************************************************************************
 
+
+
+    //*********************************************************************************************
+    
+    // streaming thread
+    cudaStream_t stream1;
+    cudaError_t cu_result;
+    cu_result = cudaStreamCreate(&stream1);
+
+    std::chrono::steady_clock::time_point steady_start, steady_end;
+    std::thread t_stream;
+    t_stream = std::thread([&](){
+        while(*key_num_ptr != 27){
+            steady_end = std::chrono::steady_clock::now();
+            float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
+            if (time_sec >= 0.01){
+                // cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
+                cu_result = cudaMemcpy2DAsync(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice, stream1);
+                if (cu_result != cudaSuccess)
+                {
+                    std::cout << "Cuda Error" << std::endl;
+                }
+
+                // map_cuda_resource(cuda_resource);
+                // cuda_pointer_from_resource(cuda_buffer, cuda_pbo_storage_buffer_size, cuda_resource);
+                // cudaMemcpy2D(cuda_buffer, camera_params->width*4, display_buffer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
+                // unmap_cuda_resource(cuda_resource);
+            
+            
+                // bind_pbo(pbo);
+                // bind_texture(texture);
+                // upload_image_pbo_to_texture(camera_params->width, camera_params->height); // Needs no arguments because texture and PBO are bound
+                // unbind_texture();
+                // unbind_pbo();
+
+                steady_start = steady_end;
+            }
+            else{
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+    });    
+
+
     StopWatch w;
     w.Start();
     int frame_count = 0;
@@ -199,6 +244,12 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
             // if the next frame hasn't been displayed, the queue is full, sleep  
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }        
+
+        // set roi 
+        int OFFSET_X_VAL = frame_count % 2560;
+        int OFFSET_Y_VAL = frame_count % 1560;
+        EVT_CameraSetUInt32Param(camera, "OffsetX", OFFSET_X_VAL);
+        EVT_CameraSetUInt32Param(camera, "OffsetY", OFFSET_Y_VAL);
 
 
         camera_return = EVT_CameraGetFrame(camera, frame_recv, EVT_INFINITE);
@@ -211,7 +262,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         ptp_time = (((unsigned long long)(ptp_time_high)) << 32) | ((unsigned long long)(ptp_time_low));
         frame_ts = frame_recv->timestamp;
         // printf("camera %d, framecount %d, timestamp %f ms \n", camera_params.camera_id, frame_count, frame_ts * 1e-6);
-
 
         if (frame_count != 0)
         {
@@ -291,11 +341,13 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
                     std::cout << "\nNPP error %d \n" << npp_result << std::endl;
                 }
 
-                cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
-                if (cu_result != cudaSuccess)
-                {
-                    std::cout << "Cuda Error" << std::endl;
-                }
+                // // put this onto a different thread
+                // // cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
+                // cu_result = cudaMemcpy2DAsync(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice, stream1);
+                // if (cu_result != cudaSuccess)
+                // {
+                //     std::cout << "Cuda Error" << std::endl;
+                // }
 
                 if(*encode_flag){
                     // encoding
@@ -377,6 +429,8 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     printf("Dropped Frames: \t%d\n", dropped_frames);
     printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
 
+    if (t_stream.joinable()) t_stream.join();
+    cudaStreamDestroy(stream1);
     // printf("Frame Rate Meas2: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(ptp_time_delta_sum)));
     // printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }

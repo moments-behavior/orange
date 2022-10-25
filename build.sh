@@ -40,6 +40,6 @@ g++ -Ofast -ffast-math -std=c++17 \
     -lGLEW -lGLU -lGL \
     -I$HOME/Build/nvidia/FFmpeg/build/include/ \
     -L$HOME/Build/nvidia/FFmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
-    `pkg-config --static --libs glfw3` \
+    `pkg-config --static --libs glfw3`
 
 sudo ./targets/orange;

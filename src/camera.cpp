@@ -144,10 +144,11 @@ void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, C
 
     if(OFFSET_X_VAL >= camera_params->offsetx_min && OFFSET_X_VAL <= camera_params->offsetx_max)
     {
-    EVT_CameraSetUInt32Param(camera, "OffsetX", OFFSET_X_VAL);
-    printf("OffsetX Set: \t\t%d\n", OFFSET_X_VAL);
+        EVT_CameraSetUInt32Param(camera, "OffsetX", OFFSET_X_VAL);
+        printf("OffsetX Set: \t\t%d\n", OFFSET_X_VAL);
     }
 }
+
 
 
 void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, CameraParams* camera_params)

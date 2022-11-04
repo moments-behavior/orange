@@ -14,6 +14,7 @@ struct CameraParams{
     unsigned int frame_rate;
     unsigned int gain;
     unsigned int exposure;
+    unsigned int focus;
     string pixel_format;
     string color_temp;
     int gpu_id;
@@ -42,6 +43,9 @@ struct CameraParams{
     unsigned int offsety_max; 
     unsigned int offsety_min;
     unsigned int offsety_inc;
+    unsigned int focus_max; 
+    unsigned int focus_min;
+    unsigned int focus_inc;
 }; 
 
 
@@ -78,4 +82,5 @@ void update_width_value(Emergent::CEmergentCamera* camera, int width_val, Camera
 void update_height_value(Emergent::CEmergentCamera* camera, int height_val, CameraParams* camera_params);
 void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, CameraParams* camera_params);
 void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, CameraParams* camera_params);
+void update_focus_value(Emergent::CEmergentCamera* camera, int focus_value, CameraParams* camera_params);
 #endif

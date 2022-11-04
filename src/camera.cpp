@@ -79,6 +79,21 @@ void update_gain_value(Emergent::CEmergentCamera* camera, int gain_val, CameraPa
 }
 
 
+
+void update_focus_value(Emergent::CEmergentCamera* camera, int focus_value, CameraParams* camera_params)
+{
+    EVT_CameraGetUInt32ParamMax(camera, "Focus", &camera_params->focus_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Focus", &camera_params->focus_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Focus", &camera_params->focus_inc);
+    if(focus_value >= camera_params->focus_min && focus_value <= camera_params->focus_max)
+    {
+        EVT_CameraSetUInt32Param(camera, "Focus", focus_value);
+        camera_params->focus = focus_value;
+    }
+}
+
+
+
 void update_width_value(Emergent::CEmergentCamera* camera, int width_val, CameraParams* camera_params)
 {
     EVT_CameraGetUInt32ParamMax(camera, "Width", &camera_params->width_max);
@@ -217,6 +232,8 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     //check_camera_errors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params->frame_rate));
     //printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
     update_frame_rate_value(camera, camera_params->frame_rate, camera_params);
+    update_focus_value(camera, camera_params->focus, camera_params);
+
 
 }
 
@@ -423,19 +440,30 @@ int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEV
     {
         for (unsigned int i = 0; i < count; i++)
         {
-            if (strcmp(device_info[i].serialNumber, "710031") == 0)
+           
+            if (strcmp(device_info[i].serialNumber, "2002490") == 0)
             {
                 ordered_device_info[0] = device_info[i];
             }
-            // 100G camera
-            else if (strcmp(device_info[i].serialNumber, "2002490") == 0)
+            else if (strcmp(device_info[i].serialNumber, "2002496") == 0)
             {
                 ordered_device_info[1] = device_info[i];
             }
-            else if (strcmp(device_info[i].serialNumber, "2002743") == 0)
+            else if (strcmp(device_info[i].serialNumber, "2002488") == 0)
             {
                 ordered_device_info[2] = device_info[i];
             }
+            else if (strcmp(device_info[i].serialNumber, "2002489") == 0)
+            {
+                ordered_device_info[3] = device_info[i];
+            }
+        
+            // center one
+            else if (strcmp(device_info[i].serialNumber, "2002494") == 0)
+            {
+                ordered_device_info[4] = device_info[i];
+            }
+
         }
 
         printf("Found %d cameras. \n", count);

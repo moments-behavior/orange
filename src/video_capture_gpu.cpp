@@ -193,7 +193,6 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
 
     //*********************************************************************************************
-    
     // streaming thread
     cudaStream_t stream1;
     cudaError_t cu_result;
@@ -205,7 +204,7 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
         while(*key_num_ptr != 27){
             steady_end = std::chrono::steady_clock::now();
             float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
-            if (time_sec >= 0.01){
+            if (time_sec >= 0.03){
                 // cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
                 cu_result = cudaMemcpy2DAsync(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice, stream1);
                 if (cu_result != cudaSuccess)
@@ -285,7 +284,9 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
             {
 
                 //frame_metadata << "frame_id " << frame_recv->frame_id << ", timestamp " << frame_ts << endl;                
-                frame_metadata << frame_recv->frame_id << "," << frame_ts << endl;                
+                if(*encode_flag){
+                    frame_metadata << frame_recv->frame_id << "," << frame_ts << endl;                
+                }
                 frames_recd++;
 
                 if(camera_params->need_reorder){

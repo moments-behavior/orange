@@ -27,8 +27,7 @@ const std::string current_date_time() {
 }
 
 
-
-void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure)
+void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure)
 {
     camera_params->width = 1280;
     camera_params->height = 1280;
@@ -46,6 +45,27 @@ void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_
 
 
 
+
+void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id)
+{
+    camera_params->width = 3208;
+    camera_params->height = 2200;
+    camera_params->frame_rate = 25;
+    camera_params->gain = gain;
+    camera_params->exposure = exposure;
+    camera_params->pixel_format = "BayerRG8";
+    camera_params->color_temp = "CT_3000K";
+    camera_params->camera_id = camera_id;
+    camera_params->gpu_id = gpu_id;
+    camera_params->num_cameras = num_cameras;
+    camera_params->gpu_direct = false;
+    camera_params->need_reorder = false;
+    camera_params->focus = 320;
+
+}
+
+
+
 int main(int argc, char **args) 
 {
     // **************** camera resources ***************************************** 
@@ -53,7 +73,7 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
-    int num_cameras = 1;
+    int num_cameras = 4;
 
     int cam_count;
     cam_count = order_for_test_rig(max_cameras, device_info, ordered_device_info);
@@ -86,21 +106,19 @@ int main(int argc, char **args)
 
 
     PTPParams* ptp_params = new PTPParams{0, 0};
-    int select_camera[] = {0, 1, 2, 4}; // 4, 5};
-    
-    int buffer_size {30};
+    int select_camera[] = {0, 1, 2, 3}; 
+    int encode_gpu[] = {1, 1, 1, 1};
+
+
+    int buffer_size {500};
     CameraParams cameras_params[num_cameras];
 
 
     for(int i = 0; i < num_cameras; i++)
     {
         int camera_id = select_camera[i];
-        if(camera_id==5){
-            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 4000, 9500);   
-        }
-        else{
-            init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 1000); // 2000, 3500);   
-        }
+        int gpu_id = encode_gpu[i];
+        init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 3000, gpu_id);   
     }
 
 
@@ -144,7 +162,7 @@ int main(int argc, char **args)
         return 1;
 
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(0); // Enable vsync
+    glfwSwapInterval(1); // Enable vsync
 
     // Initialize OpenGL functions with GLEW
     glew_error_callback(glewInit());
@@ -292,7 +310,7 @@ int main(int argc, char **args)
             //if (ImGui::TreeNode("Camera Property"))
             {
                 static int selected_camera = 0;
-                static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY;
+                static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY, slider_focus;
 
                 for (int n = 0; n < num_cameras; n++)
                 {
@@ -301,12 +319,11 @@ int main(int argc, char **args)
                     if (ImGui::Selectable(buf, selected_camera == n))
                         selected_camera = n;
                         slider_gain = cameras_params[selected_camera].gain;
+                        slider_focus = cameras_params[selected_camera].focus;
                         slider_width = cameras_params[selected_camera].width;
                         slider_height = cameras_params[selected_camera].height;
-                        
                         slider_exposure = cameras_params[selected_camera].exposure;
-                        slider_frame_rate = cameras_params[selected_camera].frame_rate;
-                        
+                        slider_frame_rate = cameras_params[selected_camera].frame_rate; 
                 }
             
 
@@ -332,7 +349,7 @@ int main(int argc, char **args)
                 // }
 
 
-                if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[0].offsetx_max, "%d"))
+                if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[selected_camera].offsetx_max, "%d"))
                 {
                     // round to 16 
                     OffsetX = (OffsetX / 16) * 16; // round to even number
@@ -342,7 +359,7 @@ int main(int argc, char **args)
                 }
 
 
-                if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[0].offsety_max, "%d"))
+                if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[selected_camera].offsety_max, "%d"))
                 {
                     // round to 16 
                     OffsetY = (OffsetY / 16) * 16; // round to even number
@@ -352,12 +369,19 @@ int main(int argc, char **args)
                 }
 
 
-                if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[0].gain_max, "%d"))
+                if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[selected_camera].gain_max, "%d"))
                 {
                     update_gain_value(&camera[selected_camera], slider_gain, &cameras_params[selected_camera]);
                 }
 
-                if(ImGui::SliderInt("Exposure", &slider_exposure, cameras_params[selected_camera].exposure_min, cameras_params[0].exposure_max, "%d"))
+
+                if(ImGui::SliderInt("Focus", &slider_focus, cameras_params[selected_camera].focus_min, cameras_params[selected_camera].focus_max, "%d"))
+                {
+                    update_focus_value(&camera[selected_camera], slider_focus, &cameras_params[selected_camera]);
+                }
+
+
+                if(ImGui::SliderInt("Exposure", &slider_exposure, cameras_params[selected_camera].exposure_min, cameras_params[selected_camera].exposure_max, "%d"))
                 {
                     update_exposure_value(&camera[selected_camera], slider_exposure, &cameras_params[selected_camera]);
                 }

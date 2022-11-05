@@ -4,6 +4,3 @@
 [submodule "third_party/IconFontCppHeaders"]
 	path = third_party/IconFontCppHeaders
 	url = https://github.com/juliettef/IconFontCppHeaders.git
-[submodule "vcpkg"]
-	path = vcpkg
-	url = https://github.com/microsoft/vcpkg

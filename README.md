@@ -10,10 +10,14 @@ Run `build.sh` in local folder
 
 ## Build instructions (Windows)
 
-1. Install Visual Studio 2022
-2. Install CMake
-3. Install CUDA 11.6
-4. Install Emergent camera SDK 2.36.01
+1. Update submodules
+```
+git submodule update --init
+```
+2. Install Visual Studio 2022
+3. Install CMake
+4. Install CUDA 11.6
+5. Install Emergent camera SDK 2.36.01
 
 ## Build instructions 
 1. Install Emergent camera SDK

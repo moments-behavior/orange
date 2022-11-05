@@ -8,6 +8,12 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 ![encoding_benchmark](images/encoding_benchmark.png)
 Run `build.sh` in local folder
 
+## Build instructions (Windows)
+
+1. Install Visual Studio 2022
+2. Install CMake
+3. Install CUDA 11.6
+4. Install Emergent camera SDK 2.36.01
 
 ## Build instructions 
 1. Install Emergent camera SDK

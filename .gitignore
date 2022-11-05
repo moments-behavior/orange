@@ -35,6 +35,7 @@
 /targets/*
 /external/targets_nvenc
 .vscode
+build
 
 # Editor files
 *#*

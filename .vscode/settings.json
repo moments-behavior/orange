@@ -68,5 +68,11 @@
         "variant": "cpp",
         "__split_buffer": "cpp",
         "locale": "cpp"
+    },
+    "cmake.configureOnOpen": true,
+    "cmake.configureSettings": {
+        "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "VCPKG_BUILD_TYPE": "release"
     }
 }

@@ -71,8 +71,9 @@
     },
     "cmake.configureOnOpen": true,
     "cmake.configureSettings": {
-        "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_ARCHITECTURE": "x64",
+        "VCPKG_CRT_LINKAGE": "static",
         "VCPKG_BUILD_TYPE": "release"
     }
 }

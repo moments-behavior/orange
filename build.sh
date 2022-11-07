@@ -40,6 +40,10 @@ g++ -Ofast -ffast-math -std=c++17 \
     -lGLEW -lGLU -lGL \
     -I$HOME/Build/nvidia/FFmpeg/build/include/ \
     -L$HOME/Build/nvidia/FFmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I/usr/local/include/opencv4 \
+    -I/home/red/src/darknet/include \
+    -L/home/red/src/darknet/build_release -ldarknet \
+    -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d \
     `pkg-config --static --libs glfw3`
 
 sudo ./targets/orange;

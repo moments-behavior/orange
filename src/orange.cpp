@@ -235,7 +235,7 @@ int main(int argc, char **args)
     
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause, &cuda_buffer[i], &cuda_resource[i], &cuda_pbo_storage_buffer_size[i], &pbo[i], &texture[i]));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause));
     }
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);

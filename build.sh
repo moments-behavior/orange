@@ -38,12 +38,12 @@ g++ -Ofast -ffast-math -std=c++17 \
     -lpthread \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
     -lGLEW -lGLU -lGL \
+    -I/home/red/src/darknet/include/darknet \
+    -L/home/red/src/darknet/build_release -ldarknet \
     -I$HOME/Build/nvidia/FFmpeg/build/include/ \
     -L$HOME/Build/nvidia/FFmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     -I/usr/local/include/opencv4 \
-    -I/home/red/src/darknet/include \
-    -L/home/red/src/darknet/build_release -ldarknet \
     -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d \
     `pkg-config --static --libs glfw3`
 
-sudo ./targets/orange;
+sudo LD_LIBRARY_PATH=/usr/local/cuda/lib64:/home/red/Build/nvidia/FFmpeg/build/lib:/home/red/Build/aruco-3.1.12/install/lib:/home/red/src/darknet/build_release:$LD_LIBRARY_PATH ./targets/orange;

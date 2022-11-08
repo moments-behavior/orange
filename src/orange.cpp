@@ -14,7 +14,9 @@
 #include "IconsForkAwesome.h"
 #include "implot.h"
 #include <imfilebrowser.h>
-#include<unistd.h>
+#include <unistd.h>
+#include "buffer_utils.h"
+#include "detection.h"
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const std::string current_date_time() {
@@ -231,17 +233,29 @@ int main(int argc, char **args)
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     
 
+    // allocate display buffer
+    int size_pic = 3208 * 2200 * 4 * sizeof(unsigned char);
+    PictureBuffer display_buffer_cpu[4];
+    for(int j=0; j<num_cameras; j++){
+        display_buffer_cpu[j].frame = (unsigned char*)malloc(size_pic);
+        clear_buffer_with_constant_image(display_buffer_cpu[j].frame, 3208, 2200);
+        display_buffer_cpu[j].frame_number = 0;
+        display_buffer_cpu[j].available_to_write = true;
+    }
     
+
+
     
     for(int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause));
+        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause, &display_buffer_cpu[i]));
     }
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
     file_dialog.SetTitle("My files");
     std::string input_folder;
 
+    std::thread t_detection = std::thread(&yolo_detection, display_buffer_cpu, num_cameras, key_num_ptr);
 
 
     while (!glfwWindowShouldClose(window))
@@ -480,6 +494,7 @@ int main(int argc, char **args)
     for (auto& t : camera_threads)
             t.join();
     
+    if (t_detection.joinable()) t_detection.join();
 
     for(int i = 0; i < num_cameras; i++)
     {

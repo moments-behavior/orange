@@ -12,11 +12,14 @@
 #include <mutex>         // std::mutex, std::unique_lock
 #include <cmath>
 #include <fstream>
-
+#include "buffer_utils.h"
+#define OPENCV 1
 
 
 #include <opencv2/opencv.hpp>            
 #include "yolo_v2_class.hpp"    
+#include <opencv2/sfm.hpp>
+
 
 template<typename T>
 class send_one_replaceable_object_t {
@@ -65,7 +68,7 @@ struct detection_data_t {
 };
 
 
-
+void yolo_detection(PictureBuffer* display_buffer_cpu, int num_cameras, int* key_num_ptr);
 
 
 #endif

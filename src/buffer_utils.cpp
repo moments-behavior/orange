@@ -14,7 +14,7 @@ void GetImage(CUdeviceptr dpSrc, uint8_t* pDst, int nWidth, int nHeight)
     cuMemcpy2D(&m);
 }
 
-void clear_buffer_with_constant_image(unsigned char* image_pt, int width, int height) {
+void clear_buffer_with_constant_image_rgba(unsigned char* image_pt, int width, int height) {
     int counter = 0;
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
@@ -26,6 +26,20 @@ void clear_buffer_with_constant_image(unsigned char* image_pt, int width, int he
         }
     }
 }
+
+
+void clear_buffer_with_constant_image(unsigned char* image_pt, int width, int height) {
+    int counter = 0;
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            *(image_pt + counter) = 45;
+            *(image_pt + counter + 1) = 85;
+            *(image_pt + counter + 2) = 255;
+            counter += 3;
+        }
+    }
+}
+
 
 void print_one_display_buffer(unsigned char* image_pt, int width, int height, int channels) {
     int counter = 0;

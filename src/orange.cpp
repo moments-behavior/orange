@@ -109,7 +109,7 @@ int main(int argc, char **args)
 
     PTPParams* ptp_params = new PTPParams{0, 0};
     int select_camera[] = {0, 1, 2, 3}; 
-    int encode_gpu[] = {1, 1, 1, 1};
+    int encode_gpu[] = {0, 0, 1, 1};
 
 
     int buffer_size {500};
@@ -207,34 +207,46 @@ int main(int argc, char **args)
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 
     GLuint texture[num_cameras];
-    GLuint pbo[num_cameras];
-    cudaGraphicsResource_t cuda_resource[num_cameras] {0};
-    unsigned char* cuda_buffer[num_cameras];
-    size_t cuda_pbo_storage_buffer_size[num_cameras];
+    // GLuint pbo[num_cameras];
+    // cudaGraphicsResource_t cuda_resource[num_cameras] {0};
+    // unsigned char* cuda_buffer[num_cameras];
+    // size_t cuda_pbo_storage_buffer_size[num_cameras];
     unsigned char *display_buffer[num_cameras];
 
-    cudaStream_t streams[num_cameras];
+    // cudaStream_t streams[num_cameras];
 
-    for(int i = 0; i < num_cameras; i++)
-    {
-        cudaStreamCreate(&streams[i]);
-        int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
+    // for(int i = 0; i < num_cameras; i++)
+    // {
+    //     cudaStreamCreate(&streams[i]);
+    //     int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
 
-        create_texture(&texture[i]);
-        create_pbo(&pbo[i], cameras_params[i].width, cameras_params[i].height);
-        bind_pbo(&pbo[i]);
+    //     create_texture(&texture[i]);
+    //     create_pbo(&pbo[i], cameras_params[i].width, cameras_params[i].height);
+    //     bind_pbo(&pbo[i]);
 
-        register_pbo_to_cuda(&pbo[i], &cuda_resource[i]);
-        unbind_texture();
-        unbind_pbo();
-        cudaMalloc((void **)&display_buffer[i], size_pic);
+    //     register_pbo_to_cuda(&pbo[i], &cuda_resource[i]);
+    //     unbind_texture();
+    //     unbind_pbo();
+    //     cudaMalloc((void **)&display_buffer[i], size_pic);
+    // }
+
+    for(int j=0; j<num_cameras; j++){
+        glGenTextures(1, &texture[j]);
+        glBindTexture(GL_TEXTURE_2D, texture[j]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3208, 2200, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        // Setup filtering parameters for display
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
     }
-
+    
+    
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
     
-
     // allocate display buffer
-    int size_pic = 3208 * 2200 * 4 * sizeof(unsigned char);
+    int output_channels = 3;
+    int size_pic = 3208 * 2200 * output_channels * sizeof(unsigned char);
     PictureBuffer display_buffer_cpu[4];
     for(int j=0; j<num_cameras; j++){
         display_buffer_cpu[j].frame = (unsigned char*)malloc(size_pic);
@@ -243,8 +255,6 @@ int main(int argc, char **args)
         display_buffer_cpu[j].available_to_write = true;
     }
     
-
-
     
     for(int i = 0; i < num_cameras; i++)
     {
@@ -257,26 +267,36 @@ int main(int argc, char **args)
 
     std::thread t_detection = std::thread(&yolo_detection, display_buffer_cpu, num_cameras, key_num_ptr);
 
+    // unsigned int microsecond = 1000000;
+    // usleep(10 * microsecond);//sleeps for 3 second
 
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
 
-        for (int i = 0; i < num_cameras; i++) {
-            // Transfer to PBO then OpenGL texture
-            // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-            map_cuda_resource(&cuda_resource[i]);
-            cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
-            cudaMemcpy2DAsync(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice, streams[i]);
-            unmap_cuda_resource(&cuda_resource[i]);
-            // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
-            bind_pbo(&pbo[i]);
-            bind_texture(&texture[i]);
-            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+        // for (int i = 0; i < num_cameras; i++) {
+        //     // Transfer to PBO then OpenGL texture
+        //     // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
+        //     map_cuda_resource(&cuda_resource[i]);
+        //     cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
+        //     cudaMemcpy2DAsync(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice, streams[i]);
+        //     unmap_cuda_resource(&cuda_resource[i]);
+        //     // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
+        //     bind_pbo(&pbo[i]);
+        //     bind_texture(&texture[i]);
+        //     upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+        //     unbind_texture();
+        //     unbind_pbo();
+        // }
+        // cudaDeviceSynchronize();
+
+        for(int j=0; j<num_cameras; j++){
+            // if the current frame is ready, upload for display, otherwise wait for the frame to get ready 
+            bind_texture(&texture[j]);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 3208, 2200, GL_RGB, GL_UNSIGNED_BYTE, display_buffer_cpu[j].frame);
             unbind_texture();
-            unbind_pbo();
         }
-        cudaDeviceSynchronize();
+
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -494,7 +514,7 @@ int main(int argc, char **args)
     for (auto& t : camera_threads)
             t.join();
     
-    if (t_detection.joinable()) t_detection.join();
+    // if (t_detection.joinable()) t_detection.join();
 
     for(int i = 0; i < num_cameras; i++)
     {

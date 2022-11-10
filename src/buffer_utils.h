@@ -1,6 +1,7 @@
 #pragma once
 #include <cuda.h>
 #include "NvCodecUtils.h"
+#include <opencv2/opencv.hpp>            
 
 struct PictureBuffer{
     unsigned char* frame;

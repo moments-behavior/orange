@@ -1,7 +1,8 @@
 #!/bin/bash
 mkdir -p targets;
 rm -f targets/orange;
-nvcc -c src/cuda_line_reorder.cu -arch=sm_80 -o targets/cuda_line_reorder.o
+nvcc -c src/cuda_line_reorder.cu -arch=sm_75 -o targets/cuda_line_reorder.o
+nvcc -c src/rgba_color_conversion.cu -arch=sm_75 -o targets/rgba_color_conversion.o
 
 
 DIR_IMGUI="third_party/imgui"

@@ -48,6 +48,7 @@ __global__ void GSPRINT4521_ConvertKernel(unsigned char* dest, const unsigned ch
     }
 }
 
+
 void GSPRINT4521_Convert(unsigned char* dest, const unsigned char* src, int width, int height, int strideS, int strideD, int leftShift)
 {
     dim3 threadPerBlock(1, 1);  // 1 thread per line    
@@ -57,3 +58,5 @@ void GSPRINT4521_Convert(unsigned char* dest, const unsigned char* src, int widt
     cudaError_t err = cudaDeviceSynchronize();
     if(err != cudaSuccess) printf("GSPRINT4521_ConvertKernel failed: %s\n", cudaGetErrorString(err));
 }
+
+

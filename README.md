@@ -18,6 +18,9 @@ git submodule update --init
 3. Install CMake
 4. Install CUDA 11.6
 5. Install Emergent camera SDK 2.36.01
+6. Download Video Codec SDK 11.1.5
+7. Copy `nvcuvid.lib` and `nvencodeapi.lib` to `nvcodec\lib`.
+8. Run `cmake` to configure the project. An easy way is to use the [CMake Tools extension for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools).
 
 ## Build instructions 
 1. Install Emergent camera SDK

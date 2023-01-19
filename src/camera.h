@@ -75,4 +75,5 @@ void update_height_value(Emergent::CEmergentCamera* camera, int height_val, Came
 void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, CameraParams* camera_params);
 void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, CameraParams* camera_params);
 void update_focus_value(Emergent::CEmergentCamera* camera, int focus_value, CameraParams* camera_params);
+int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
 #endif

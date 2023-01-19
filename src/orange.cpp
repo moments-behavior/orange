@@ -25,23 +25,22 @@ int main(int argc, char **args)
 
 
     // bool select_cameras = false; 
- 
-    // // **************** camera resources ***************************************** 
-    // GigEVisionDeviceInfo device_info[max_cameras];
+    int max_cameras = 16;
+    GigEVisionDeviceInfo device_info[max_cameras];
     // GigEVisionDeviceInfo ordered_device_info[max_cameras];
 
     // int num_cameras = 4;
 
-    // int cam_count;
-    // cam_count = order_for_test_rig(max_cameras, device_info, ordered_device_info);
+    int cam_count;
+    cam_count = scan_cameras(max_cameras, device_info);
+    
+    
     // if (cam_count < num_cameras) 
     // {
     //     printf("Missing cameras...Exit\n");
     //     return 0;
     // }
 
-
-    // // set_ip_persistent_with_open_close_camera(device_info, num_cameras);
 
     // // esc to exit 
     // int key_num;
@@ -176,25 +175,24 @@ int main(int argc, char **args)
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-            // bool selected[cam_count] = {};
+            bool selected[cam_count] = {};
 
-            // if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
-            // {
-            //     for (int i = 0; i < num_cameras; i++)
-            //     {
-            //         char label[32];
-            //         sprintf(label, "Camera %d", cameras_params[i].camera_id);
-            //         ImGui::TableNextRow();
-            //         ImGui::TableNextColumn();
-            //         ImGui::Selectable(label, &selected[i], ImGuiSelectableFlags_SpanAllColumns);
-            //         ImGui::TableNextColumn();
-            //         ImGui::Text(ordered_device_info[select_camera[i]].serialNumber);
-            //         ImGui::TableNextColumn();
-            //         ImGui::Text(ordered_device_info[select_camera[i]].currentIp);
-            //     }
-            //     ImGui::EndTable();
-            // }
-
+            if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+            {
+                for (int i = 0; i < cam_count; i++)
+                {
+                    char label[32];
+                    // sprintf(label, "Camera %d", cameras_params[i].camera_id);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Selectable(label, &selected[i], ImGuiSelectableFlags_SpanAllColumns);
+                    ImGui::TableNextColumn();
+                    ImGui::Text(device_info[i].serialNumber);
+                    ImGui::TableNextColumn();
+                    ImGui::Text(device_info[i].currentIp);
+                }
+                ImGui::EndTable();
+            }
 
             ImGui::Separator();
             ImGui::Spacing();

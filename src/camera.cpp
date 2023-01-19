@@ -309,174 +309,6 @@ void close_camera(Emergent::CEmergentCamera* camera)
 
 
 
-// order for rig room 
-int order_4_ceiling_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
-{
-    int cameras_found = 0;
-    unsigned int listcam_buf_size = max_cameras;
-    unsigned int count;
-
-    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
-
-    if (count == 0)
-    {
-        printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
-        return 0;
-    }
-    else
-    {
-        for (unsigned int i = 0; i < count; i++)
-        {
-            if (strcmp(device_info[i].serialNumber, "710018") == 0)
-            {
-                ordered_device_info[0] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710041") == 0)
-            {
-                ordered_device_info[1] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710039") == 0)
-            {
-                ordered_device_info[2] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710040") == 0)
-            {
-                ordered_device_info[3] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710037") == 0)
-            {
-                ordered_device_info[4] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710042") == 0)
-            {
-                ordered_device_info[5] = device_info[i];
-            }
-        }
-
-        printf("Found %d cameras. \n", count);
-        for (unsigned int i = 0; i < count; i++)
-        {
-            quick_print_camera(device_info, i);
-        }
-        return count;
-    }
-}
-
-
-
-// order for rig room 
-int check_cameras(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
-{
-    int cameras_found = 0;
-    unsigned int listcam_buf_size = max_cameras;
-    unsigned int count;
-
-    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
-
-    if (count == 0)
-    {
-        printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
-        return 0;
-    }
-    else
-    {
-        for (unsigned int i = 0; i < count; i++)
-        {
-            if (strcmp(device_info[i].serialNumber, "710018") == 0)
-            {
-                ordered_device_info[0] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710041") == 0)
-            {
-                ordered_device_info[1] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710038") == 0)
-            {
-                ordered_device_info[2] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710039") == 0)
-            {
-                ordered_device_info[3] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710032") == 0)
-            {
-                ordered_device_info[4] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710037") == 0)
-            {
-                ordered_device_info[5] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "710040") == 0)
-            {
-                ordered_device_info[6] = device_info[i];
-            }
-        }
-
-        printf("Found %d cameras. \n", count);
-        for (unsigned int i = 0; i < count; i++)
-        {
-            quick_print_camera(device_info, i);
-        }
-        return count;
-    }
-}
-
-
-// order for rig room 
-int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
-{
-    int cameras_found = 0;
-    unsigned int listcam_buf_size = max_cameras;
-    unsigned int count;
-
-    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
-
-    if (count == 0)
-    {
-        printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
-        return 0;
-    }
-    else
-    {
-        for (unsigned int i = 0; i < count; i++)
-        {
-           
-            if (strcmp(device_info[i].serialNumber, "2002490") == 0)
-            {
-                ordered_device_info[0] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "2002496") == 0)
-            {
-                ordered_device_info[1] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "2002488") == 0)
-            {
-                ordered_device_info[2] = device_info[i];
-            }
-            else if (strcmp(device_info[i].serialNumber, "2002489") == 0)
-            {
-                ordered_device_info[3] = device_info[i];
-            }
-        
-            // center one
-            else if (strcmp(device_info[i].serialNumber, "2002494") == 0)
-            {
-                ordered_device_info[4] = device_info[i];
-            }
-
-        }
-
-        printf("Found %d cameras. \n", count);
-        for (unsigned int i = 0; i < count; i++)
-        {
-            quick_print_camera(device_info, i);
-        }
-        return count;
-    }
-}
-
-
-
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params)
 {
 
@@ -567,145 +399,61 @@ void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CE
     check_camera_errors(Emergent::EVT_IPConfig(camera, true, new_ip, subnet_mask, default_gateway));
 }
 
-
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
 {
     std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
 }
 
 
-void set_temporary_camera_ip(GigEVisionDeviceInfo* device_info, int num_camera)
+int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {
-    // set fixed ip for each camera, clockwise from experimenter view 
-    for(int cam_id = 0; cam_id < num_camera; cam_id++) 
+    int cameras_found = 0;
+    unsigned int listcam_buf_size = max_cameras;
+    unsigned int count;
+
+    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
+
+    if (count == 0)
     {
-        // centers
-        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0) 
+        printf("Enumerate Cameras: \tNo cameras found. Exiting program.\n");
+        return 0;
+    }
+    else
+    {
+        for (unsigned int i = 0; i < count; i++)
         {
-            change_camera_ip(&device_info[cam_id], "192.168.1.9");
+           
+            if (strcmp(device_info[i].serialNumber, "2002490") == 0)
+            {
+                ordered_device_info[0] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "2002496") == 0)
+            {
+                ordered_device_info[1] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "2002488") == 0)
+            {
+                ordered_device_info[2] = device_info[i];
+            }
+            else if (strcmp(device_info[i].serialNumber, "2002489") == 0)
+            {
+                ordered_device_info[3] = device_info[i];
+            }
+        
+            // center one
+            else if (strcmp(device_info[i].serialNumber, "2002494") == 0)
+            {
+                ordered_device_info[4] = device_info[i];
+            }
+
         }
 
-        // far 
-        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0) 
+        printf("Found %d cameras. \n", count);
+        for (unsigned int i = 0; i < count; i++)
         {
-            change_camera_ip(&device_info[cam_id], "192.168.1.19");
+            quick_print_camera(device_info, i);
         }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710038") == 0) 
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.1.18");
-        }
-
-        // rob's camera
-        if(strcmp(device_info[cam_id].serialNumber, "710042") == 0) 
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.1.100");
-        }
-
-
-
-        // change to 1 tempararily for testing
-
-        // right
-        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0) 
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.1.29");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710039") == 0) 
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.1.28");
-        }
-
-
-        // left
-        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0) 
-        {
-            change_camera_ip(&device_info[cam_id], "192.168.1.39");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710040") == 0) 
-        {
-            printf("was here?");
-            change_camera_ip(&device_info[cam_id], "192.168.1.38");
-        }
-
+        return count;
     }
 }
 
-
-void set_rigroom_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, int num_camera)
-{
-    // set fixed ip for each camera, clockwise from experimenter view 
-    for(int cam_id = 0; cam_id < num_camera; cam_id++) 
-    {
-        // centers
-        if(strcmp(device_info[cam_id].serialNumber, "710018") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.9");
-        }
-
-        // far 
-        if(strcmp(device_info[cam_id].serialNumber, "710041") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.19");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710038") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.1.18");
-        }
-
-
-        // right
-        if(strcmp(device_info[cam_id].serialNumber, "710032") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id],"192.168.2.29");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710039") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.28");
-        }
-
-
-        // left
-        if(strcmp(device_info[cam_id].serialNumber, "710037") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.39");
-        }
-
-        if(strcmp(device_info[cam_id].serialNumber, "710040") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.2.38");
-        }
-
-
-        // galvo-mirror camera
-        if(strcmp(device_info[cam_id].serialNumber, "710031") == 0) 
-        {
-            change_camera_ip_persistent(&device_info[cam_id], &camera[cam_id], "192.168.3.31");
-        }
-
-    }
-}
-
-
-void set_ip_persistent_with_open_close_camera(GigEVisionDeviceInfo* device_info, int num_camera)
-{
-    Emergent::CEmergentCamera camera[num_camera];
-
-    // open camera
-    for(int cam_id = 0; cam_id < num_camera; cam_id++)
-    {
-        check_camera_errors(EVT_CameraOpen(&camera[cam_id], &device_info[cam_id]));      
-    }
-
-    set_rigroom_camera_ip_persistent(device_info, camera, num_camera);
-    
-    for(int cam_id = 0; cam_id < num_camera; cam_id++)
-    {
-        close_camera(&camera[cam_id]);      
-    }
-
-}

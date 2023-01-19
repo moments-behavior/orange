@@ -405,6 +405,23 @@ void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx)
 }
 
 
+int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info)
+{
+    int cameras_found = 0;
+    unsigned int listcam_buf_size = max_cameras;
+    unsigned int count;
+
+    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
+    if (count == 0)
+    {
+        printf("Enumerate Cameras: \tNo cameras found.\n");
+        return 0;
+    } else {
+        return count;
+    }
+}
+
+
 int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {
     int cameras_found = 0;

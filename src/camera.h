@@ -7,7 +7,6 @@
 #include <EvtParamAttribute.h>
 #include <unistd.h>
 
-
 struct CameraParams{
     unsigned int width;
     unsigned int height;
@@ -19,6 +18,7 @@ struct CameraParams{
     string color_temp;
     int gpu_id;
     int camera_id;
+    string camera_name;
     int num_cameras;
     bool gpu_direct;
     bool need_reorder;
@@ -48,6 +48,11 @@ struct CameraParams{
     unsigned int focus_inc;
 }; 
 
+struct CameraEmergent{
+    Emergent::CEmergentCamera camera;
+    Emergent::CEmergentFrame evt_frame[100];
+    Emergent::CEmergentFrame frame_recv;
+};
 
 struct PTPParams{
     unsigned long long ptp_global_time; 

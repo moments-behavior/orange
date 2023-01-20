@@ -8,6 +8,7 @@
 #include "implot.h"
 #include <imfilebrowser.h>
 #include "project.h"
+#include "gui.h"
 
 int main(int argc, char **args) 
 {
@@ -21,29 +22,31 @@ int main(int argc, char **args)
         .glsl_version = (char *)malloc(100)};
 
     render_initialize_target(window);
-
-
-    // bool select_cameras = false; 
+    
     int max_cameras = 16;
     GigEVisionDeviceInfo device_info[max_cameras];
-    // GigEVisionDeviceInfo ordered_device_info[max_cameras];
-
-    // int num_cameras = 4;
-
     int cam_count;
     cam_count = scan_cameras(max_cameras, device_info);
     
+
+    ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
+    file_dialog.SetTitle("My files");
+    std::string input_folder = file_dialog.GetPwd();
     
-    // if (cam_count < num_cameras) 
-    // {
-    //     printf("Missing cameras...Exit\n");
-    //     return 0;
-    // }
+    bool check[cam_count] = {};
+    bool streaming = false;
+
+    CameraParams* cameras_params;
 
 
-    // // esc to exit 
+    CameraEmergent* ecams;
+    std::vector<thread> camera_threads;
+    GL_Texture* tex;
+    u32 num_cameras = 0;
+
     int key_num;
     int* key_num_ptr = &key_num;  
+
     // bool* record_video = new bool(false);
     // bool* capture_pause = new bool(false);
 
@@ -60,94 +63,18 @@ int main(int argc, char **args)
     //     std::cout << "Recorded video saves to : " << folder_name << std::endl;
 
 
-    // int select_camera[] = {0, 1, 2, 3}; 
-    // int encode_gpu[] = {1, 1, 1, 1};
-
-
     // int buffer_size {500};
     // PTPParams* ptp_params = new PTPParams{0, 0};
 
 
-    // for(int i = 0; i < num_cameras; i++)
-    // {
-    //     int camera_id = select_camera[i];
-    //     int gpu_id = encode_gpu[i];
-    //     init_25G_camera_params(&cameras_params[i], camera_id, num_cameras, 2000, 3000, gpu_id);   
-    // }
-
-
-    // // init camera resources 
-    // Emergent::CEmergentCamera camera[num_cameras];
-    // Emergent::CEmergentFrame evt_frame[num_cameras][buffer_size]; 
-    // Emergent::CEmergentFrame frame_recv[num_cameras];
-
     // string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
     // const char *encoder_str = encoder_setup.c_str();
-    // std::vector<thread> camera_threads;
-
-    // for(int i = 0; i < num_cameras; i++)
-    // {
-    //     open_camera_with_params(&camera[i], &ordered_device_info[select_camera[i]], &cameras_params[i]); 
-    //     // open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
-
-    //     // sync 
-    //     ptp_camera_sync(&camera[i]);
-    //     EVT_CameraOpenStream(&camera[i]);
-    //     allocate_frame_buffer(&camera[i], evt_frame[i], &cameras_params[i], buffer_size);
-    //     set_frame_buffer(&frame_recv[i], &cameras_params[i]);
-    // }
-
-
-    // GLuint texture[num_cameras];
-    // GLuint pbo[num_cameras];
-    // cudaGraphicsResource_t cuda_resource[num_cameras] {0};
-    // unsigned char* cuda_buffer[num_cameras];
-    // size_t cuda_pbo_storage_buffer_size[num_cameras];
-    // unsigned char *display_buffer[num_cameras];
-    // cudaStream_t streams[num_cameras];
-
-    // for(int i = 0; i < num_cameras; i++)
-    // {
-    //     cudaStreamCreate(&streams[i]);
-    //     int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
-
-    //     create_texture(&texture[i]);
-    //     create_pbo(&pbo[i], cameras_params[i].width, cameras_params[i].height);
-    //     bind_pbo(&pbo[i]);
-
-    //     register_pbo_to_cuda(&pbo[i], &cuda_resource[i]);
-    //     unbind_texture();
-    //     unbind_pbo();
-    //     cudaMalloc((void **)&display_buffer[i], size_pic);
-    // }
-
-    
     
     // for(int i = 0; i < num_cameras; i++)
     // {
     //     camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &camera[i], &frame_recv[i], &cameras_params[i], encoder_str, key_num_ptr, ptp_params, folder_name, display_buffer[i], record_video, capture_pause, &cuda_buffer[i], &cuda_resource[i], &cuda_pbo_storage_buffer_size[i], &pbo[i], &texture[i]));
     // }
 
-    ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
-    file_dialog.SetTitle("My files");
-    std::string input_folder = file_dialog.GetPwd();
-    
-    bool check[cam_count] = {};
-    bool streaming = false;
-
-    CameraParams* cameras_params;
-
-    // init camera resources 
-    // Emergent::CEmergentCamera camera[num_cameras];
-    // Emergent::CEmergentFrame evt_frame[num_cameras][buffer_size]; 
-    // Emergent::CEmergentFrame frame_recv[num_cameras];
-
-    // string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
-    // const char *encoder_str = encoder_setup.c_str();
-    CameraEmergent* ecams;
-    std::vector<thread> camera_threads;
-    GL_Texture* tex;
-    u32 num_cameras = 0;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -173,11 +100,10 @@ int main(int argc, char **args)
         } 
 
 
-        if (ImGui::Begin("Orange Streaming",  NULL, ImGuiWindowFlags_MenuBar))
+        if (ImGui::Begin("Orange Streaming"))
         {
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
 
             if (ImGui::Button("Save to")){
                 file_dialog.Open();
@@ -206,7 +132,6 @@ int main(int argc, char **args)
             for (int i = 0; i < cam_count; i++){
                 if(check[i]) { num_cameras++;}
             }
-            std::cout << num_cameras << std::endl;
 
             if (ImGui::Button("Streaming")){
                 // start streaming selected cameras 
@@ -218,15 +143,11 @@ int main(int argc, char **args)
                     init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0);   
                 }
 
-                std::cout << "here?" << std::endl;
 
                 ecams = new CameraEmergent[num_cameras];
-                std::cout << "here?" << std::endl;
                 for(int i = 0; i < num_cameras; i++)
                 {
                     open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]); 
-                    // open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
-
                     // sync 
                     // ptp_camera_sync(&camera[i]);
                     EVT_CameraOpenStream(&ecams[i].camera);
@@ -263,118 +184,26 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
-        //     //if (ImGui::TreeNode("Camera Property"))
-        //     {
-        //         static int selected_camera = 0;
-        //         static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY, slider_focus;
+            if (streaming){
+                set_camera_properties(ecams, cameras_params, num_cameras);
+            }
 
-        //         for (int n = 0; n < num_cameras; n++)
-        //         {
-        //             char buf[32];
-        //             sprintf(buf, "Camera %d", select_camera[n]);
-        //             if (ImGui::Selectable(buf, selected_camera == n))
-        //                 selected_camera = n;
-        //                 slider_gain = cameras_params[selected_camera].gain;
-        //                 slider_focus = cameras_params[selected_camera].focus;
-        //                 slider_width = cameras_params[selected_camera].width;
-        //                 slider_height = cameras_params[selected_camera].height;
-        //                 slider_exposure = cameras_params[selected_camera].exposure;
-        //                 slider_frame_rate = cameras_params[selected_camera].frame_rate; 
-        //         }
+            ImGui::Separator();
+            ImGui::Spacing();
             
+            // if (*record_video)
+            //     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.5f, 0, 0, 1.0f });
+            // else
+            //     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0, 0.5f, 0, 1.0f });
 
-        //         // if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[0].width_max, "%d"))
-        //         // {
-        //         //     slider_width = (slider_width / 16) * 16; // round to even number
-
-        //         //     *capture_pause = true;
-        //         //     update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
-        //         //     // set_frame_buffer(&frame_recv[selected_camera], &cameras_params[selected_camera]);
-        //         //     // for(int frame_count=0;frame_count<buffer_size;frame_count++)
-        //         //     // {
-        //         //     //     set_frame_buffer(&evt_frame[selected_camera][frame_count], &cameras_params[selected_camera]);
-        //         //     // }
-        //         //     *capture_pause = false;
-                    
-        //         // }
-
-        //         // if(ImGui::SliderInt("Height", &slider_height, cameras_params[selected_camera].height_min, cameras_params[0].height_max, "%d"))
-        //         // {
-        //         //     slider_height = (slider_height / 16) * 16; // round to even number
-        //         //     update_height_value(&camera[selected_camera], slider_height, &cameras_params[selected_camera]);
-        //         // }
-
-
-        //         if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[selected_camera].offsetx_max, "%d"))
-        //         {
-        //             // round to 16 
-        //             OffsetX = (OffsetX / 16) * 16; // round to even number
-        //             // update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
-        //             EVT_CameraSetUInt32Param(camera, "OffsetX", OffsetX);
-
-        //         }
-
-
-        //         if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[selected_camera].offsety_max, "%d"))
-        //         {
-        //             // round to 16 
-        //             OffsetY = (OffsetY / 16) * 16; // round to even number
-        //             // update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
-        //             EVT_CameraSetUInt32Param(camera, "OffsetY", OffsetY);
-
-        //         }
-
-
-        //         if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[selected_camera].gain_max, "%d"))
-        //         {
-        //             update_gain_value(&camera[selected_camera], slider_gain, &cameras_params[selected_camera]);
-        //         }
-
-
-        //         if(ImGui::SliderInt("Focus", &slider_focus, cameras_params[selected_camera].focus_min, cameras_params[selected_camera].focus_max, "%d"))
-        //         {
-        //             update_focus_value(&camera[selected_camera], slider_focus, &cameras_params[selected_camera]);
-        //         }
-
-
-        //         if(ImGui::SliderInt("Exposure", &slider_exposure, cameras_params[selected_camera].exposure_min, cameras_params[selected_camera].exposure_max, "%d"))
-        //         {
-        //             update_exposure_value(&camera[selected_camera], slider_exposure, &cameras_params[selected_camera]);
-        //         }
-
-
-        //         if(ImGui::SliderInt("FrameRate", &slider_frame_rate, cameras_params[selected_camera].frame_rate_min, cameras_params[selected_camera].frame_rate_max, "%d"))
-        //         {
-        //             update_frame_rate_value(&camera[selected_camera], slider_frame_rate, &cameras_params[selected_camera]);
-        //         }
-        //         //ImGui::TreePop();
-
-        //     }
-
-        //     ImGui::Separator();
-        //     ImGui::Spacing();
-            
-        //     // if (ImGui::Button("Streaming")){}
-        //     // ImGui::SameLine();
-
-        //     if (*record_video)
-        //         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.5f, 0, 0, 1.0f });
-        //     else
-        //         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0, 0.5f, 0, 1.0f });
-
-        //     if (ImGui::Button(*record_video ? ICON_FK_PAUSE : ICON_FK_PLAY)){
-        //         (*record_video) = !(*record_video);
-        //     }
-        //     ImGui::PopStyleColor(1);
-
-
-            ImGui::End();        
-
+            // if (ImGui::Button(*record_video ? ICON_FK_PAUSE : ICON_FK_PLAY)){
+            //     (*record_video) = !(*record_video);
+            // }
+            // ImGui::PopStyleColor(1);
         }
-
+        ImGui::End();        
         file_dialog.Display();
 
-        
         if (file_dialog.HasSelected())
         {
             input_folder = file_dialog.GetSelected().string();
@@ -384,7 +213,7 @@ int main(int argc, char **args)
 
         if (streaming) {
             for (int i = 0; i < num_cameras; i++) {
-                string window_name = cameras_params[i].camera_name; // "Cam" + std::to_string(cameras_params[i].camera_id);            
+                string window_name = cameras_params[i].camera_name; // "Cam" + std::to_string(cameras_params[i].camera_id);
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

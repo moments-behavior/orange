@@ -244,7 +244,7 @@ int main(int argc, char **args)
     for(int i = 0; i < num_cameras; i++)
     {
         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);
-        EVT_CameraOpenStream(&ecams[i].camera);
+        EVT_CameraCloseStream(&ecams[i].camera);
         close_camera(&ecams[i].camera);
     }
 

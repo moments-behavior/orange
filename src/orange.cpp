@@ -7,8 +7,7 @@
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
 #include <imfilebrowser.h>
-#include "gx_helper.h"
-
+#include "project.h"
 
 int main(int argc, char **args) 
 {
@@ -43,8 +42,8 @@ int main(int argc, char **args)
 
 
     // // esc to exit 
-    // int key_num;
-    // int* key_num_ptr = &key_num;  
+    int key_num;
+    int* key_num_ptr = &key_num;  
     // bool* record_video = new bool(false);
     // bool* capture_pause = new bool(false);
 
@@ -61,13 +60,12 @@ int main(int argc, char **args)
     //     std::cout << "Recorded video saves to : " << folder_name << std::endl;
 
 
-    // PTPParams* ptp_params = new PTPParams{0, 0};
     // int select_camera[] = {0, 1, 2, 3}; 
     // int encode_gpu[] = {1, 1, 1, 1};
 
 
     // int buffer_size {500};
-    // CameraParams cameras_params[num_cameras];
+    // PTPParams* ptp_params = new PTPParams{0, 0};
 
 
     // for(int i = 0; i < num_cameras; i++)
@@ -132,60 +130,70 @@ int main(int argc, char **args)
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
     file_dialog.SetTitle("My files");
-    std::string input_folder;
+    std::string input_folder = file_dialog.GetPwd();
+    
+    bool check[cam_count] = {};
+    bool streaming = false;
 
+    CameraParams* cameras_params;
 
+    // init camera resources 
+    // Emergent::CEmergentCamera camera[num_cameras];
+    // Emergent::CEmergentFrame evt_frame[num_cameras][buffer_size]; 
+    // Emergent::CEmergentFrame frame_recv[num_cameras];
+
+    // string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
+    // const char *encoder_str = encoder_setup.c_str();
+    CameraEmergent* ecams;
+    std::vector<thread> camera_threads;
+    GL_Texture* tex;
+    u32 num_cameras = 0;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
 
-        // if(select_camera) {
+        if(streaming) {
 
-        //     for (int i = 0; i < num_cameras; i++) {
-        //         // Transfer to PBO then OpenGL texture
-        //         // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-        //         map_cuda_resource(&cuda_resource[i]);
-        //         cuda_pointer_from_resource(&cuda_buffer[i], &cuda_pbo_storage_buffer_size[i], &cuda_resource[i]);
-        //         cudaMemcpy2DAsync(cuda_buffer[i], cameras_params[i].width*4, display_buffer[i], cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice, streams[i]);
-        //         unmap_cuda_resource(&cuda_resource[i]);
-        //         // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
-        //         bind_pbo(&pbo[i]);
-        //         bind_texture(&texture[i]);
-        //         upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
-        //         unbind_texture();
-        //         unbind_pbo();
-        //     }
-        //     cudaDeviceSynchronize();
-        // }
+            for (int i = 0; i < num_cameras; i++) {
+                // Transfer to PBO then OpenGL texture
+                // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
+                map_cuda_resource(&tex[i].cuda_resource);
+                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width*4, tex[i].display_buffer, cameras_params[i].width*4, cameras_params[i].width*4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
+                unmap_cuda_resource(&tex[i].cuda_resource);
+                // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
+                bind_pbo(&tex[i].pbo);
+                bind_texture(&tex[i].texture);
+                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                unbind_texture();
+                unbind_pbo();
+            }
+            cudaDeviceSynchronize();
+        } 
 
 
         if (ImGui::Begin("Orange Streaming",  NULL, ImGuiWindowFlags_MenuBar))
         {
 
-            if (ImGui::BeginMenuBar())
-            {
-                if (ImGui::BeginMenu("File"))
-                {
-                    if (ImGui::MenuItem("Open")) { file_dialog.Open(); };
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMenuBar();
-            }
-
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-            bool selected[cam_count] = {};
 
+            if (ImGui::Button("Save to")){
+                file_dialog.Open();
+            }
+            ImGui::SameLine();
+            ImGui::Text(input_folder.c_str());
+               
             if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
                 for (int i = 0; i < cam_count; i++)
                 {
                     char label[32];
-                    // sprintf(label, "Camera %d", cameras_params[i].camera_id);
+                    sprintf(label, "##checkbox%d", i);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::Selectable(label, &selected[i], ImGuiSelectableFlags_SpanAllColumns);
+                    ImGui::Checkbox(label, &check[i]);
                     ImGui::TableNextColumn();
                     ImGui::Text(device_info[i].serialNumber);
                     ImGui::TableNextColumn();
@@ -193,6 +201,64 @@ int main(int argc, char **args)
                 }
                 ImGui::EndTable();
             }
+
+            num_cameras = 0;
+            for (int i = 0; i < cam_count; i++){
+                if(check[i]) { num_cameras++;}
+            }
+            std::cout << num_cameras << std::endl;
+
+            if (ImGui::Button("Streaming")){
+                // start streaming selected cameras 
+                cameras_params = new CameraParams[num_cameras];
+
+                for(int i = 0; i < num_cameras; i++)
+                {
+                    cameras_params[i].camera_name.append(device_info[i].serialNumber);
+                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0);   
+                }
+
+                std::cout << "here?" << std::endl;
+
+                ecams = new CameraEmergent[num_cameras];
+                std::cout << "here?" << std::endl;
+                for(int i = 0; i < num_cameras; i++)
+                {
+                    open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]); 
+                    // open_camera_with_params(&camera[i], &device_info[i], camera_params[i]); 
+
+                    // sync 
+                    // ptp_camera_sync(&camera[i]);
+                    EVT_CameraOpenStream(&ecams[i].camera);
+                    allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
+                    set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
+                }
+
+                tex = new GL_Texture[num_cameras];
+                for(int i = 0; i < num_cameras; i++)
+                {
+                    cudaStreamCreate(&tex[i].streams);
+                    int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
+
+                    create_texture(&tex[i].texture);
+                    create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                    bind_pbo(&tex[i].pbo);
+
+                    register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
+                    unbind_texture();
+                    unbind_pbo();
+                    cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                }
+
+    
+                for(int i = 0; i < num_cameras; i++)
+                {
+                    camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], key_num_ptr, tex[i].display_buffer));
+                }
+                streaming = true;
+
+            }
+
 
             ImGui::Separator();
             ImGui::Spacing();
@@ -316,20 +382,20 @@ int main(int argc, char **args)
             file_dialog.ClearSelected();
         }
 
-        // if (select_camera) {
-        //     for (int i = 0; i < num_cameras; i++) {
-        //         string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);            
-        //         ImGui::Begin(window_name.c_str());
-        //         ImVec2 avail_size = ImGui::GetContentRegionAvail();
+        if (streaming) {
+            for (int i = 0; i < num_cameras; i++) {
+                string window_name = cameras_params[i].camera_name; // "Cam" + std::to_string(cameras_params[i].camera_id);            
+                ImGui::Begin(window_name.c_str());
+                ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-        //         //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
-        //         if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
-        //             ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
-        //             ImPlot::EndPlot();
-        //         }
-        //         ImGui::End();        
-        //     }
-        // }
+                //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+                if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
+                    ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)tex[i].texture, ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+                    ImPlot::EndPlot();
+                }
+                ImGui::End();        
+            }
+        }
 
        render_a_frame(window);
     }
@@ -338,20 +404,20 @@ int main(int argc, char **args)
     gx_cleanup(window);
  
     // exit 
-    // key_num = 27;
+    key_num = 27;
 
 
-    // // wait for threads to join
-    // for (auto& t : camera_threads)
-    //         t.join();
+    // wait for threads to join
+    for (auto& t : camera_threads)
+            t.join();
     
 
-    // for(int i = 0; i < num_cameras; i++)
-    // {
-    //     destroy_frame_buffer(&camera[i], evt_frame[i], buffer_size);
-    //     EVT_CameraOpenStream(&camera[i]);
-    //     close_camera(&camera[i]);
-    // }
+    for(int i = 0; i < num_cameras; i++)
+    {
+        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);
+        EVT_CameraOpenStream(&ecams[i].camera);
+        close_camera(&ecams[i].camera);
+    }
 
     // std::cout << folder_name << std::endl;
     cudaDeviceReset();

@@ -16,8 +16,7 @@ const std::string current_date_time() {
     return buf;
 }
 
-void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure)
-{
+void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure) {
     camera_params->width = 1280;
     camera_params->height = 1280;
     camera_params->frame_rate = 100;
@@ -34,8 +33,7 @@ void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int nu
 
 
 
-void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id)
-{
+void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id) {
     camera_params->width = 3208;
     camera_params->height = 2200;
     camera_params->frame_rate = 25;
@@ -52,7 +50,7 @@ void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_
 }
 
 
-struct GL_Texture{
+struct GL_Texture {
     GLuint texture;
     GLuint pbo;
     cudaGraphicsResource_t cuda_resource;

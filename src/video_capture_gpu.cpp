@@ -438,17 +438,15 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
 
 
 
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams* camera_params, int* key_num_ptr, unsigned char* display_buffer)
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera_Control *camera_control, unsigned char *display_buffer)
 {
-    int camera_return{0};
 
-    unsigned short id_prev = 0, dropped_frames = 0;
-    unsigned int frames_recd = 0;
+    Camera_State camera_state; 
 
     ck(cudaSetDevice(camera_params->gpu_id));
 
-    // modularize these parts: 1. debayer; 2. encoding; 
-    // gpu: upload raw images and color debayer
+
+
     int output_channels = 4;
     unsigned char *d_orig;
     int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
@@ -508,7 +506,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams* camera_params, int* k
     std::chrono::steady_clock::time_point steady_start, steady_end;
     std::thread t_stream;
     t_stream = std::thread([&](){
-        while(*key_num_ptr != 27){
+        while(camera_control->streaming){
             steady_end = std::chrono::steady_clock::now();
             float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
             if (time_sec >= 0.03){
@@ -529,10 +527,12 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams* camera_params, int* k
     StopWatch w;
     w.Start();
     int frame_count = 0;
-    while (*key_num_ptr != 27)
+
+
+    
+    while (camera_control->streaming)
     {
         camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
-        // printf("get frame\n");
         if (!camera_return)
         {
             //Counting dropped frames through frame_id as redundant check.
@@ -547,13 +547,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams* camera_params, int* k
                         // line reorder using gpu 
                         GSPRINT4521_Convert(d_orig, (const unsigned char*)ecam->frame_recv.imagePtr, 
                                 camera_params->width , camera_params->height, camera_params->width, camera_params->width, 0); // only for  8 bit 
-                    
-                        // cudaError_t cu_result = cudaMemcpy(d_orig, frame_recv->imagePtr, size_pic, cudaMemcpyDeviceToDevice);
-                        // if (cu_result != cudaSuccess)
-                        // {
-                            // std::cout << "Cuda Error" << std::endl;
-                        // }
-                    }else{
+                    } else {
                         EVT_FrameConvert(&ecam->frame_recv, &FrameConvert, 0, 0, ecam->camera.linesReorderHandle);
                         // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
                         cudaError_t cu_result = cudaMemcpy(d_orig, FrameConvert.imagePtr, size_pic, cudaMemcpyHostToDevice);
@@ -565,14 +559,12 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams* camera_params, int* k
                 }
                 else{
                      if (camera_params->gpu_direct){
-                        // upload to gpu, consider doing this in a different thread, write encoder as a callback function?
                         cudaError_t cu_result = cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyDeviceToDevice);
                         if (cu_result != cudaSuccess)
                         {
                             std::cout << "Cuda Error" << std::endl;
                         }
                     }else{
-                        // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
                         cudaError_t cu_result = cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyHostToDevice);
                         if (cu_result != cudaSuccess)
                         {

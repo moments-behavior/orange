@@ -27,28 +27,21 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     int cam_count;
     cam_count = scan_cameras(max_cameras, device_info);
-    
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
     file_dialog.SetTitle("My files");
     std::string input_folder = file_dialog.GetPwd();
     
     bool check[cam_count] = {};
-    bool streaming = false;
-
     CameraParams* cameras_params;
-
-
     CameraEmergent* ecams;
     std::vector<thread> camera_threads;
     GL_Texture* tex;
     u32 num_cameras = 0;
 
-    int key_num;
-    int* key_num_ptr = &key_num;  
-
-    // bool* record_video = new bool(false);
-    // bool* capture_pause = new bool(false);
+    Camera_Control *camera_control = new Camera_Control;
+    camera_control->streaming = false;
+    camera_control->record_video = false;
 
     // string folder_string = current_date_time();
     // string folder_name = "/home/red/Videos/" + folder_string;
@@ -80,7 +73,7 @@ int main(int argc, char **args)
     {
         create_new_frame();
 
-        if(streaming) {
+        if(camera_control->streaming) {
 
             for (int i = 0; i < num_cameras; i++) {
                 // Transfer to PBO then OpenGL texture
@@ -174,9 +167,9 @@ int main(int argc, char **args)
     
                 for(int i = 0; i < num_cameras; i++)
                 {
-                    camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], key_num_ptr, tex[i].display_buffer));
+                    camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer));
                 }
-                streaming = true;
+                camera_control->streaming = true;
 
             }
 
@@ -184,22 +177,23 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (streaming){
+            if (camera_control->streaming){
                 set_camera_properties(ecams, cameras_params, num_cameras);
             }
 
             ImGui::Separator();
             ImGui::Spacing();
             
-            // if (*record_video)
-            //     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.5f, 0, 0, 1.0f });
-            // else
-            //     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0, 0.5f, 0, 1.0f });
 
-            // if (ImGui::Button(*record_video ? ICON_FK_PAUSE : ICON_FK_PLAY)){
-            //     (*record_video) = !(*record_video);
-            // }
-            // ImGui::PopStyleColor(1);
+            if (camera_control->record_video)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.5f, 0, 0, 1.0f });
+            else
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0, 0.5f, 0, 1.0f });
+
+            if (ImGui::Button(camera_control->record_video ? ICON_FK_PAUSE : ICON_FK_PLAY)){
+                (camera_control->record_video) = !(camera_control->record_video);
+            }
+            ImGui::PopStyleColor(1);
         }
         ImGui::End();        
         file_dialog.Display();
@@ -211,7 +205,7 @@ int main(int argc, char **args)
             file_dialog.ClearSelected();
         }
 
-        if (streaming) {
+        if (camera_control->streaming) {
             for (int i = 0; i < num_cameras; i++) {
                 string window_name = cameras_params[i].camera_name; // "Cam" + std::to_string(cameras_params[i].camera_id);
                 ImGui::Begin(window_name.c_str());
@@ -231,16 +225,11 @@ int main(int argc, char **args)
 
     // Cleanup
     gx_cleanup(window);
- 
-    // exit 
-    key_num = 27;
-
-
-    // wait for threads to join
+    
+    camera_control->streaming = false;
     for (auto& t : camera_threads)
             t.join();
     
-
     for(int i = 0; i < num_cameras; i++)
     {
         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);

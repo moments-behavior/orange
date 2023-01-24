@@ -383,7 +383,7 @@ void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergent
 		check_camera_errors(EVT_ReleaseFrameBuffer(camera, &evt_frame[frame_count]));
 	}
 
-	//Host side tear down for stream.
+	// Host side tear down for stream.
     // EVT_CameraCloseStream(camera);
 }
 

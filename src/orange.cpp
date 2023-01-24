@@ -126,8 +126,7 @@ int main(int argc, char **args)
                 if(check[i]) { num_cameras++;}
             }
 
-            if (ImGui::Button("Streaming")){
-                // start streaming selected cameras 
+            if (ImGui::Button(camera_control->streaming ? "Stop streaming" : "Start streaming")){
                 cameras_params = new CameraParams[num_cameras];
 
                 for(int i = 0; i < num_cameras; i++)

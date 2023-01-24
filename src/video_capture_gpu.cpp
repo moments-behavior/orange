@@ -436,203 +436,177 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     // printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }
 
-
-
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera_Control *camera_control, unsigned char *display_buffer)
+static inline void upload_frame_to_gpu(CameraParams *camera_params, unsigned char *d_orig, CameraEmergent *ecam, int size_pic)
 {
+    if (camera_params->need_reorder)
+    {
+        if (camera_params->gpu_direct)
+        {
+            // line reorder using gpu
+            GSPRINT4521_Convert(d_orig, (const unsigned char *)ecam->frame_recv.imagePtr,
+                                camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0); // only for  8 bit
+        }
+        else
+        {
+            EVT_FrameConvert(&ecam->frame_recv, &ecam->frame_reorder, 0, 0, ecam->camera.linesReorderHandle);
+            // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
+            ck(cudaMemcpy(d_orig, &ecam->frame_reorder.imagePtr, size_pic, cudaMemcpyHostToDevice));
 
-    Camera_State camera_state; 
+        }
+    }
+    else
+    {
+        if (camera_params->gpu_direct)
+        {
+            ck(cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyDeviceToDevice));
+        }
+        else
+        {
+            ck(cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyHostToDevice));
+        }
+    }
+}
 
-    ck(cudaSetDevice(camera_params->gpu_id));
-
-
-
+static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params, int size_pic)
+{
     int output_channels = 4;
-    unsigned char *d_orig;
-    int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
-    cudaMalloc((void **)&d_orig, size_pic);
-    unsigned char *d_debayer;
-    cudaMalloc((void **)&d_debayer, size_pic * output_channels);
-
-   
-    ck(cuInit(0));
-    CUdevice cuDevice = 0;
-    ck(cuDeviceGet(&cuDevice, camera_params->gpu_id));
-    char szDeviceName[80];
-    ck(cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice));
-    std::cout << "GPU in use: " << szDeviceName << std::endl;
-    CUcontext cuContext = NULL;
-    ck(cuCtxCreate(&cuContext, 0, cuDevice));
-
-    // debayer
-    NppiSize size;
-    size.width = camera_params->width;
-    size.height = camera_params->height;
-    Npp8u nAlpha = 255;
-
-    NppiRect roi;
-    roi.x = 0;
-    roi.y = 0;
-    roi.width = camera_params->width;
-    roi.height = camera_params->height;
-
-    NppiBayerGridPosition grid;
-    
-    if(camera_params->need_reorder)
+    cudaMalloc((void **)&debayer->d_debayer, size_pic * output_channels);
+    debayer->size.width = camera_params->width;
+    debayer->size.height = camera_params->height;
+    debayer->nAlpha = 255;
+    debayer->roi.x = 0;
+    debayer->roi.y = 0;
+    debayer->roi.width = camera_params->width;
+    debayer->roi.height = camera_params->height;
+    if (camera_params->need_reorder)
     {
-        grid = NPPI_BAYER_GRBG;
+        debayer->grid = NPPI_BAYER_GRBG;
     }
-    else{
-        grid = NPPI_BAYER_RGGB;
-    }
-    
-    Emergent::CEmergentFrame FrameConvert;
-    //Five params used for memory allocation for converted frames. Worst case covers all models so no recompilation required.
-    FrameConvert.size_x = 5120;
-    FrameConvert.size_y = 4096;
-    FrameConvert.pixel_type = GVSP_PIX_BAYGB8;
-    FrameConvert.convertColor = EVT_COLOR_CONVERT_NONE;
-    FrameConvert.convertBitDepth = EVT_CONVERT_NONE;
-    EVT_AllocateFrameBuffer(&ecam->camera, &FrameConvert, EVT_FRAME_BUFFER_DEFAULT);
-    
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
-    
-    //*********************************************************************************************
-    // streaming thread
-    cudaStream_t stream1;
-    cudaError_t cu_result;
-    cu_result = cudaStreamCreate(&stream1);
-
-    std::chrono::steady_clock::time_point steady_start, steady_end;
-    std::thread t_stream;
-    t_stream = std::thread([&](){
-        while(camera_control->streaming){
-            steady_end = std::chrono::steady_clock::now();
-            float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
-            if (time_sec >= 0.03){
-                // cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
-                cu_result = cudaMemcpy2DAsync(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice, stream1);
-                if (cu_result != cudaSuccess)
-                {
-                    std::cout << "Cuda Error" << std::endl;
-                }
-                steady_start = steady_end;
-            }
-            else{
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }
-        }
-    });    
-
-    StopWatch w;
-    w.Start();
-    int frame_count = 0;
-
-
-    
-    while (camera_control->streaming)
+    else
     {
-        camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
-        if (!camera_return)
-        {
-            //Counting dropped frames through frame_id as redundant check.
-            if (((ecam->frame_recv.frame_id) != id_prev + 1) && (frame_count != 0))
-                dropped_frames++;
-            else
-            {
+        debayer->grid = NPPI_BAYER_RGGB;
+    }
+}
 
-                frames_recd++;
-                if(camera_params->need_reorder){
-                    if (camera_params->gpu_direct){
-                        // line reorder using gpu 
-                        GSPRINT4521_Convert(d_orig, (const unsigned char*)ecam->frame_recv.imagePtr, 
-                                camera_params->width , camera_params->height, camera_params->width, camera_params->width, 0); // only for  8 bit 
-                    } else {
-                        EVT_FrameConvert(&ecam->frame_recv, &FrameConvert, 0, 0, ecam->camera.linesReorderHandle);
-                        // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
-                        cudaError_t cu_result = cudaMemcpy(d_orig, FrameConvert.imagePtr, size_pic, cudaMemcpyHostToDevice);
-                        if (cu_result != cudaSuccess)
-                        {
-                            std::cout << "Cuda Error" << std::endl;
-                        }
-                    }
-                }
-                else{
-                     if (camera_params->gpu_direct){
-                        cudaError_t cu_result = cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyDeviceToDevice);
-                        if (cu_result != cudaSuccess)
-                        {
-                            std::cout << "Cuda Error" << std::endl;
-                        }
-                    }else{
-                        cudaError_t cu_result = cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyHostToDevice);
-                        if (cu_result != cudaSuccess)
-                        {
-                            std::cout << "Cuda Error" << std::endl;
-                        }
-                    }
-                }
+static inline void debayer_frame_gpu(CameraParams *camera_params, unsigned char *d_orig, Debayer *debayer)
+{
+    const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
+                                                         camera_params->width * sizeof(unsigned char),
+                                                         debayer->size,
+                                                         debayer->roi,
+                                                         debayer->d_debayer,
+                                                         camera_params->width * sizeof(uchar4),
+                                                         debayer->grid,
+                                                         NPPI_INTER_UNDEFINED,
+                                                         debayer->nAlpha);
+    if (npp_result != 0)
+    {
+        std::cout << "\nNPP error %d \n"
+                  << npp_result << std::endl;
+    }
+}
 
-                const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
-                                                                     camera_params->width * sizeof(unsigned char),
-                                                                     size,
-                                                                     roi,
-                                                                     d_debayer,
-                                                                     camera_params->width * sizeof(uchar4),
-                                                                     grid,
-                                                                     NPPI_INTER_UNDEFINED,
-                                                                     nAlpha);
-                if (npp_result != 0)
-                {
-                    std::cout << "\nNPP error %d \n" << npp_result << std::endl;
-                }
-
-            }
-        }
+static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, int size_pic, unsigned char *d_orig)
+{
+    camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
+    if (!camera_state->camera_return)
+    {
+        // Counting dropped frames through frame_id as redundant check.
+        if (((ecam->frame_recv.frame_id) != camera_state->id_prev + 1) && (camera_state->frame_count != 0))
+            camera_state->dropped_frames++;
         else
         {
-            dropped_frames++;
-            std::cout << "EVT_CameraGetFrame Error" << camera_return << std::endl;
+            camera_state->frames_recd++;
+            upload_frame_to_gpu(camera_params, d_orig, ecam, size_pic);
+            debayer_frame_gpu(camera_params, d_orig, debayer);
         }
 
-        //In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
+        // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
         if (ecam->frame_recv.frame_id == 65535)
-            id_prev = 0;
+            camera_state->id_prev = 0;
         else
-            id_prev = ecam->frame_recv.frame_id;
+            camera_state->id_prev = ecam->frame_recv.frame_id;
 
-        if (camera_return)
-            break; //No requeue reqd
-
-        camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); //Re-queue.
-        if (camera_return)
+        camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
+        if (camera_state->camera_return)
             std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
 
-        if (frame_count % 100 == 99)
+        if (camera_state->frame_count % 100 == 99)
         {
             printf(".");
             fflush(stdout);
         }
-        if (frame_count % 10000 == 9999)
+        if (camera_state->frame_count % 10000 == 9999)
             printf("\n");
 
-        if (dropped_frames >= 100)
-            break;
-        
-        frame_count++; 
+        camera_state->frame_count++;
     }
+    else
+    {
+        camera_state->dropped_frames++;
+        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
+    }
+}
 
+static inline void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff)
+{
+    printf("\n");
+    printf("Camera id: \t%d\n", camera_params->camera_id);
+    printf("Frame count: \t%d\n", camera_state->frame_count);
+    printf("Frame received: \t%d\n", camera_state->frames_recd);
+    printf("Dropped Frames: \t%d\n", camera_state->dropped_frames);
+    printf("Calculated Frame Rate: \t%f\n", camera_state->frames_recd / time_diff);
+}
+
+static inline void copy_to_display_buffer(CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, Debayer *debayer, cudaStream_t stream1)
+{
+    std::chrono::steady_clock::time_point steady_start, steady_end;
+    while (camera_control->streaming)
+    {
+        steady_end = std::chrono::steady_clock::now();
+        float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
+        if (time_sec >= 0.03)
+        {
+            // cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
+            ck(cudaMemcpy2DAsync(display_buffer, camera_params->width * 4, debayer->d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice, stream1));
+            steady_start = steady_end;
+        }
+        else
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+}
+
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer)
+{
+    ck(cudaSetDevice(camera_params->gpu_id));
+    CameraState camera_state; 
+
+    unsigned char *d_orig;
+    int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
+    cudaMalloc((void **)&d_orig, size_pic);
+
+    // debayer
+    Debayer debayer;
+    initialize_gpu_debayer(&debayer, camera_params, size_pic);
+
+    // streaming thread
+    cudaStream_t stream1;
+    ck(cudaStreamCreate(&stream1));
+    std::thread t_stream = std::thread(&copy_to_display_buffer, camera_params, camera_control, display_buffer, &debayer, stream1);
+
+    StopWatch w;
+    w.Start();
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));    
+    while (camera_control->streaming)
+    {
+        get_one_frame(&camera_state, ecam, camera_params, &debayer, size_pic, d_orig);
+    }
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
     double time_diff = w.Stop();
 
-    //Report stats
-    printf("\n");
-    printf("Camera id: \t%d\n", camera_params->camera_id);
-    printf("Frame count: \t%d\n", frame_count);
-    printf("Frame received: \t%d\n", frames_recd);
-    printf("Dropped Frames: \t%d\n", dropped_frames);
-    printf("Calculated Frame Rate: \t%f\n", frames_recd / time_diff);
-
+    report_statistics(camera_params, &camera_state, time_diff);
     if (t_stream.joinable()) t_stream.join();
     cudaStreamDestroy(stream1);
 }

@@ -39,7 +39,7 @@ int main(int argc, char **args)
     GL_Texture* tex;
     u32 num_cameras = 0;
 
-    Camera_Control *camera_control = new Camera_Control;
+    CameraControl *camera_control = new CameraControl;
     camera_control->streaming = false;
     camera_control->record_video = false;
 
@@ -145,6 +145,9 @@ int main(int argc, char **args)
                     // ptp_camera_sync(&camera[i]);
                     EVT_CameraOpenStream(&ecams[i].camera);
                     allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
+                    if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct) {
+                        allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+                    }
                     set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                 }
 

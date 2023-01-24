@@ -367,6 +367,14 @@ void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergen
     }
 }
 
+void allocate_frame_reorder_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_reorder, CameraParams* camera_params)
+{
+    set_frame_buffer(frame_reorder, camera_params);
+    frame_reorder->convertColor = EVT_COLOR_CONVERT_NONE;
+    frame_reorder->convertBitDepth = EVT_CONVERT_NONE;
+    EVT_AllocateFrameBuffer(camera, frame_reorder, EVT_FRAME_BUFFER_DEFAULT);
+}
+
 
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size)
 {

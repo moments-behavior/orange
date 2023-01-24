@@ -52,6 +52,7 @@ struct CameraEmergent{
     Emergent::CEmergentCamera camera;
     Emergent::CEmergentFrame evt_frame[100];
     Emergent::CEmergentFrame frame_recv;
+    Emergent::CEmergentFrame frame_reorder;
 };
 
 struct PTPParams{
@@ -81,4 +82,5 @@ void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, C
 void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, CameraParams* camera_params);
 void update_focus_value(Emergent::CEmergentCamera* camera, int focus_value, CameraParams* camera_params);
 int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
+void allocate_frame_reorder_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_reorder, CameraParams* camera_params);
 #endif

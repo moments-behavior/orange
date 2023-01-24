@@ -436,21 +436,21 @@ void aquire_frames_gpu_encode(Emergent::CEmergentCamera *camera, Emergent::CEmer
     // printf("Frame Rate Meas3: \t%f\n", ((float)(1000000000) * (float)(frame_count)) / ((float)(frame_ts_delta_sum)));
 }
 
-static inline void upload_frame_to_gpu(CameraParams *camera_params, unsigned char *d_orig, CameraEmergent *ecam, int size_pic)
+static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *frame_original, CameraEmergent *ecam)
 {
     if (camera_params->need_reorder)
     {
         if (camera_params->gpu_direct)
         {
             // line reorder using gpu
-            GSPRINT4521_Convert(d_orig, (const unsigned char *)ecam->frame_recv.imagePtr,
+            GSPRINT4521_Convert(frame_original->d_orig, (const unsigned char *)ecam->frame_recv.imagePtr,
                                 camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0); // only for  8 bit
         }
         else
         {
             EVT_FrameConvert(&ecam->frame_recv, &ecam->frame_reorder, 0, 0, ecam->camera.linesReorderHandle);
             // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
-            ck(cudaMemcpy(d_orig, &ecam->frame_reorder.imagePtr, size_pic, cudaMemcpyHostToDevice));
+            ck(cudaMemcpy(frame_original->d_orig, &ecam->frame_reorder.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
 
         }
     }
@@ -458,19 +458,20 @@ static inline void upload_frame_to_gpu(CameraParams *camera_params, unsigned cha
     {
         if (camera_params->gpu_direct)
         {
-            ck(cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyDeviceToDevice));
+            ck(cudaMemcpy(frame_original->d_orig, ecam->frame_recv.imagePtr, frame_original->size_pic, cudaMemcpyDeviceToDevice));
         }
         else
         {
-            ck(cudaMemcpy(d_orig, ecam->frame_recv.imagePtr, size_pic, cudaMemcpyHostToDevice));
+            ck(cudaMemcpy(frame_original->d_orig, ecam->frame_recv.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
         }
     }
 }
 
-static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params, int size_pic)
+static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params)
 {
     int output_channels = 4;
-    cudaMalloc((void **)&debayer->d_debayer, size_pic * output_channels);
+    int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char) * output_channels;
+    cudaMalloc((void **)&debayer->d_debayer, size_pic);
     debayer->size.width = camera_params->width;
     debayer->size.height = camera_params->height;
     debayer->nAlpha = 255;
@@ -488,9 +489,9 @@ static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera
     }
 }
 
-static inline void debayer_frame_gpu(CameraParams *camera_params, unsigned char *d_orig, Debayer *debayer)
+static inline void debayer_frame_gpu(CameraParams *camera_params, FrameGPU *frame_original, Debayer *debayer)
 {
-    const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(d_orig,
+    const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(frame_original->d_orig,
                                                          camera_params->width * sizeof(unsigned char),
                                                          debayer->size,
                                                          debayer->roi,
@@ -506,7 +507,7 @@ static inline void debayer_frame_gpu(CameraParams *camera_params, unsigned char 
     }
 }
 
-static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, int size_pic, unsigned char *d_orig)
+static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     if (!camera_state->camera_return)
@@ -517,8 +518,8 @@ static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam
         else
         {
             camera_state->frames_recd++;
-            upload_frame_to_gpu(camera_params, d_orig, ecam, size_pic);
-            debayer_frame_gpu(camera_params, d_orig, debayer);
+            upload_frame_to_gpu(camera_params, frame_original, ecam);
+            debayer_frame_gpu(camera_params, frame_original, debayer);
         }
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
@@ -567,7 +568,7 @@ static inline void copy_to_display_buffer(CameraParams *camera_params, CameraCon
         float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
         if (time_sec >= 0.03)
         {
-            // cudaError_t cu_result = cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice);
+            // ck(cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice));
             ck(cudaMemcpy2DAsync(display_buffer, camera_params->width * 4, debayer->d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice, stream1));
             steady_start = steady_end;
         }
@@ -578,20 +579,21 @@ static inline void copy_to_display_buffer(CameraParams *camera_params, CameraCon
     }
 }
 
+static inline void innitalize_gpu_frame(FrameGPU* frame_original, CameraParams* camera_params) {
+    frame_original->size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
+    cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic);
+}
+
 void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer)
 {
     ck(cudaSetDevice(camera_params->gpu_id));
+    
     CameraState camera_state; 
-
-    unsigned char *d_orig;
-    int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
-    cudaMalloc((void **)&d_orig, size_pic);
-
-    // debayer
+    FrameGPU frame_original;
+    innitalize_gpu_frame(&frame_original, camera_params);
     Debayer debayer;
-    initialize_gpu_debayer(&debayer, camera_params, size_pic);
+    initialize_gpu_debayer(&debayer, camera_params);
 
-    // streaming thread
     cudaStream_t stream1;
     ck(cudaStreamCreate(&stream1));
     std::thread t_stream = std::thread(&copy_to_display_buffer, camera_params, camera_control, display_buffer, &debayer, stream1);
@@ -601,7 +603,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));    
     while (camera_control->streaming)
     {
-        get_one_frame(&camera_state, ecam, camera_params, &debayer, size_pic, d_orig);
+        get_one_frame(&camera_state, ecam, camera_params, &debayer, &frame_original);
     }
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
     double time_diff = w.Stop();
@@ -609,4 +611,6 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     report_statistics(camera_params, &camera_state, time_diff);
     if (t_stream.joinable()) t_stream.join();
     cudaStreamDestroy(stream1);
+    cudaFree(frame_original.d_orig);
+    cudaFree(debayer.d_debayer);
 }

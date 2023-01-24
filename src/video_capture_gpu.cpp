@@ -331,4 +331,5 @@ void aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params,
     cudaStreamDestroy(stream1);
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
+    delete writer;
 }

@@ -43,7 +43,7 @@ int main(int argc, char **args)
     CameraControl *camera_control = new CameraControl;
 
     // int buffer_size {500};
-    // PTPParams* ptp_params = new PTPParams{0, 0};
+    PTPParams* ptp_params = new PTPParams{0, 0};
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -205,7 +205,12 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu_encode, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name));
+                        ptp_camera_sync(&ecams[i].camera);
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        camera_threads.push_back(std::thread(&sync_aquire_frames_gpu_encode, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->streaming = true;                    
                 }

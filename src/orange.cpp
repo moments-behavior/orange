@@ -29,8 +29,9 @@ int main(int argc, char **args)
     cam_count = scan_cameras(max_cameras, device_info);
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
-    file_dialog.SetTitle("My files");
+    file_dialog.SetPwd("/home/jinyao/exp");
     std::string input_folder = file_dialog.GetPwd();
+    file_dialog.SetTitle("My files");
 
     bool check[cam_count] = {};
     CameraParams *cameras_params;

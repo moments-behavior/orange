@@ -9,14 +9,18 @@
 #include "thread.h"
 #include "camera.h"
 #include <iostream>
+#include "FFmpegWriter.h"
+#include <fstream>
 
-struct CameraControl {
+struct CameraControl
+{
     bool streaming = false;
     bool record_video = false;
     bool pause_recording = false;
 };
 
-struct CameraState {
+struct CameraState
+{
     int camera_return = 0;
     unsigned short id_prev = 0;
     unsigned short dropped_frames = 0;
@@ -24,31 +28,39 @@ struct CameraState {
     int frame_count = 0;
 };
 
-struct Debayer {
+struct Debayer
+{
     unsigned char *d_debayer;
     NppiSize size;
     Npp8u nAlpha;
     NppiRect roi;
-    NppiBayerGridPosition grid; 
+    NppiBayerGridPosition grid;
 };
 
-
-struct FrameGPU {
+struct FrameGPU
+{
     unsigned char *d_orig;
     int size_pic;
 };
 
+struct Writer
+{
+    string video_file;
+    string metadata_file;
+    FFmpegWriter *video;
+    ofstream* metadata;
+};
 
-struct EncoderContext {
+struct EncoderContext
+{
     NV_ENC_BUFFER_FORMAT eFormat;
     NvEncoderInitParam encodeCLIOptions;
     CUcontext cuContext;
     int num_frame_encode;
-    string video_file;
-    string metadata_file;
     std::vector<std::vector<uint8_t>> vPacket;
+    NvEncoderCuda *pEnc;
 };
 
 void aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name);
 void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_state, unsigned char *display_buffer);
-#endif 
+#endif

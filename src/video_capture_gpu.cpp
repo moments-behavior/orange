@@ -1,7 +1,4 @@
 #include "video_capture_gpu.h"
-#include "FFmpegWriter.h"
-#include <iostream>
-#include <fstream>
 #include "cuda_line_reorder.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
@@ -19,7 +16,6 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
     pEnc->CreateEncoder(&initializeParams);
 }
 
-
 static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *frame_original, CameraEmergent *ecam)
 {
     if (camera_params->need_reorder)
@@ -35,7 +31,6 @@ static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *fr
             EVT_FrameConvert(&ecam->frame_recv, &ecam->frame_reorder, 0, 0, ecam->camera.linesReorderHandle);
             // upload to gpu, can consider do this in a different thread, write encoder as a callback function?
             ck(cudaMemcpy(frame_original->d_orig, &ecam->frame_reorder.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
-
         }
     }
     else
@@ -91,22 +86,22 @@ static inline void debayer_frame_gpu(CameraParams *camera_params, FrameGPU *fram
     }
 }
 
-static inline void encode_frame(NvEncoderCuda *pEnc, FFmpegWriter *writer, Debayer *debayer, EncoderContext *encoder)
+static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, Debayer *debayer)
 {
     // encoding
-    const NvEncInputFrame *encoderInputFrame = pEnc->GetNextInputFrame();
+    const NvEncInputFrame *encoderInputFrame = encoder->pEnc->GetNextInputFrame();
     NvEncoderCuda::CopyToDeviceFrame(encoder->cuContext,
                                      debayer->d_debayer,
                                      0,
                                      (CUdeviceptr)encoderInputFrame->inputPtr,
                                      (int)encoderInputFrame->pitch,
-                                     pEnc->GetEncodeWidth(),
-                                     pEnc->GetEncodeHeight(),
+                                     encoder->pEnc->GetEncodeWidth(),
+                                     encoder->pEnc->GetEncodeHeight(),
                                      CU_MEMORYTYPE_DEVICE,
                                      encoderInputFrame->bufferFormat,
                                      encoderInputFrame->chromaOffsets,
                                      encoderInputFrame->numChromaPlanes);
-    pEnc->EncodeFrame(encoder->vPacket);
+    encoder->pEnc->EncodeFrame(encoder->vPacket);
     for (std::vector<uint8_t> &packet : encoder->vPacket)
     {
         // For each encoded packet
@@ -156,7 +151,12 @@ static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam
     }
 }
 
-static inline void get_one_frame_encode(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, NvEncoderCuda *pEnc, EncoderContext *encoder, FFmpegWriter *writer, ofstream *frame_metadata)
+static inline void write_meatadata(ofstream *metadata, CameraEmergent *ecam)
+{
+    *metadata << ecam->frame_recv.frame_id << "," << ecam->frame_recv.timestamp << endl;
+}
+
+static inline void get_one_frame_encode(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     if (!camera_state->camera_return)
@@ -166,14 +166,13 @@ static inline void get_one_frame_encode(CameraState *camera_state, CameraControl
             camera_state->dropped_frames++;
         else
         {
-            if (!camera_control->pause_recording) {
-                *frame_metadata << ecam->frame_recv.frame_id << "," << ecam->frame_recv.timestamp << endl;                
-            }
             camera_state->frames_recd++;
             upload_frame_to_gpu(camera_params, frame_original, ecam);
             debayer_frame_gpu(camera_params, frame_original, debayer);
-            if (!camera_control->pause_recording) {
-                encode_frame(pEnc, writer, debayer, encoder);
+            if (!camera_control->pause_recording)
+            {
+                encode_frame(encoder, writer->video, debayer);
+                write_meatadata(writer->metadata, ecam);
             }
         }
 
@@ -234,7 +233,8 @@ static inline void copy_to_display_buffer(CameraParams *camera_params, CameraCon
     }
 }
 
-static inline void initalize_gpu_frame(FrameGPU* frame_original, CameraParams* camera_params) {
+static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *camera_params)
+{
     frame_original->size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
     cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic);
 }
@@ -243,8 +243,8 @@ static inline void initalize_gpu_frame(FrameGPU* frame_original, CameraParams* c
 void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer)
 {
     ck(cudaSetDevice(camera_params->gpu_id));
-    
-    CameraState camera_state; 
+
+    CameraState camera_state;
     FrameGPU frame_original;
     initalize_gpu_frame(&frame_original, camera_params);
     Debayer debayer;
@@ -256,7 +256,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
 
     StopWatch w;
     w.Start();
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));    
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
     while (camera_control->streaming)
     {
         get_one_frame(&camera_state, ecam, camera_params, &debayer, &frame_original);
@@ -265,13 +265,14 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     double time_diff = w.Stop();
 
     report_statistics(camera_params, &camera_state, time_diff);
-    if (t_stream.joinable()) t_stream.join();
+    if (t_stream.joinable())
+        t_stream.join();
     cudaStreamDestroy(stream1);
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
 }
 
-static inline void initialize_encoder(EncoderContext *encoder, string encoder_str, CameraParams *camera_params, string folder_name)
+static inline void initialize_encoder(EncoderContext *encoder, string encoder_str, CameraParams *camera_params)
 {
     encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
     encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str.c_str());
@@ -279,19 +280,40 @@ static inline void initialize_encoder(EncoderContext *encoder, string encoder_st
     ck(cuDeviceGet(&cuDevice, camera_params->gpu_id));
     encoder->cuContext = NULL;
     ck(cuCtxCreate(&encoder->cuContext, 0, cuDevice));
-    encoder->video_file = folder_name + "/Cam" + camera_params->camera_name + ".mp4";
-    encoder->metadata_file = folder_name + "/Cam" + camera_params->camera_name + "_meta.csv";
+    encoder->pEnc = new NvEncoderCuda(encoder->cuContext, camera_params->width, camera_params->height, encoder->eFormat);
+    InitializeEncoder(encoder->pEnc, encoder->encodeCLIOptions, encoder->eFormat);
 }
 
 static inline void open_metadata_file(ofstream *frame_metadata, string metadata_file)
 {
     frame_metadata->open(metadata_file.c_str());
-    if (!frame_metadata)
+
+    if (!(*frame_metadata))
     {
         std::cout << "File did not open!";
         return;
     }
     *frame_metadata << "frame_id,timestamp\n";
+}
+
+static inline void initialize_writer(Writer *writer, CameraParams *camera_params, string folder_name)
+{
+    writer->video_file = folder_name + "/Cam" + camera_params->camera_name + ".mp4";
+    writer->metadata_file = folder_name + "/Cam" + camera_params->camera_name + "_meta.csv";
+    writer->video = new FFmpegWriter(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str());
+    writer->metadata = new ofstream();
+    open_metadata_file(writer->metadata, writer->metadata_file);
+}
+
+void static inline close_writer(EncoderContext *encoder, Writer *writer)
+{
+    encoder->pEnc->EndEncode(encoder->vPacket);
+    for (std::vector<uint8_t> &packet : encoder->vPacket)
+    {
+        writer->video->Write(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+    }
+    encoder->pEnc->DestroyEncoder();
+    (*writer->metadata).close();
 }
 
 void aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name)
@@ -310,40 +332,31 @@ void aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params,
 
     // encoding
     EncoderContext encoder;
-    initialize_encoder(&encoder, encoder_setup, camera_params, folder_name);
+    initialize_encoder(&encoder, encoder_setup, camera_params);
 
-    NvEncoderCuda *pEnc = new NvEncoderCuda(encoder.cuContext, camera_params->width, camera_params->height, encoder.eFormat);
-    InitializeEncoder(pEnc, encoder.encodeCLIOptions, encoder.eFormat);
-
-    FFmpegWriter *writer = new FFmpegWriter(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, encoder.video_file.c_str());
-    ofstream frame_metadata;
-    open_metadata_file(&frame_metadata, encoder.metadata_file);
+    Writer writer;
+    initialize_writer(&writer, camera_params, folder_name);
 
     StopWatch w;
     w.Start();
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
     while (camera_control->streaming)
     {
-        get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, pEnc, &encoder, writer, &frame_metadata);
+        get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer);
     }
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
 
-    pEnc->EndEncode(encoder.vPacket);
-    for (std::vector<uint8_t> &packet : encoder.vPacket)
-    {
-        writer->Write(packet.data(), (int)packet.size(), encoder.num_frame_encode++);
-    }
-    pEnc->DestroyEncoder();
-    frame_metadata.close();
-
+    close_writer(&encoder, &writer);
     double time_diff = w.Stop();
     report_statistics(camera_params, &camera_state, time_diff);
 
+    // cleanup
     if (t_stream.joinable())
         t_stream.join();
     cudaStreamDestroy(stream1);
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
-    delete writer;
-    delete pEnc;
+    delete writer.video;
+    delete writer.metadata;
+    delete encoder.pEnc;
 }

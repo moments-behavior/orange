@@ -24,9 +24,11 @@ int main(int argc, char **args)
     render_initialize_target(window);
 
     int max_cameras = 16;
-    GigEVisionDeviceInfo device_info[max_cameras];
     int cam_count;
-    cam_count = scan_cameras(max_cameras, device_info);
+    GigEVisionDeviceInfo unsorted_device_info[max_cameras];
+    cam_count = scan_cameras(max_cameras, unsorted_device_info);
+    GigEVisionDeviceInfo device_info[max_cameras];
+    sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
     file_dialog.SetPwd("/home/jinyao/exp");

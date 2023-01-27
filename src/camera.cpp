@@ -429,6 +429,38 @@ int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info)
     }
 }
 
+template <typename T>
+std::vector<size_t> sort_indexes(const std::vector<T> &v)
+{
+    // initialize original index locations
+    std::vector<size_t> idx(v.size());
+    std::iota(idx.begin(), idx.end(), 0);
+
+    // sort indexes based on comparing values in v
+    // using std::stable_sort instead of std::sort
+    // to avoid unnecessary index re-orderings
+    // when v contains elements of equal values
+    stable_sort(idx.begin(), idx.end(),
+                [&v](size_t i1, size_t i2)
+                { return v[i1] < v[i2]; });
+
+    return idx;
+}
+
+void sort_cameras_ip(GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *sorted_device_info, int cam_count) 
+{
+    std::vector<std::string> camera_ips;
+    for (int i = 0; i < cam_count; i++) {
+        camera_ips.push_back(std::string(device_info[i].currentIp));
+    }
+    
+    int j = 0;
+    for (auto i: sort_indexes(camera_ips)) {
+        sorted_device_info[j] = device_info[i];
+        j++;    
+    }
+}
+
 
 int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {

@@ -36,7 +36,7 @@ void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int nu
 void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id) {
     camera_params->width = 3208;
     camera_params->height = 2200;
-    camera_params->frame_rate = 25;
+    camera_params->frame_rate = 5;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
     camera_params->pixel_format = "BayerRG8";

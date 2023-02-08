@@ -3,7 +3,6 @@
 
 #include <unistd.h>
 #include <iostream>
-#include "gx_helper.h"
 #include "camera.h"
 
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
@@ -49,15 +48,5 @@ void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_
     camera_params->camera_id = camera_id;
 }
 
-
-struct GL_Texture {
-    GLuint texture;
-    GLuint pbo;
-    cudaGraphicsResource_t cuda_resource;
-    unsigned char* cuda_buffer;
-    size_t cuda_pbo_storage_buffer_size;
-    unsigned char *display_buffer;
-    cudaStream_t streams;
-};
 
 #endif

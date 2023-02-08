@@ -14,6 +14,17 @@
 #include "imgui_impl_opengl3.h"
 #include "types.h"
 
+struct GL_Texture {
+    GLuint texture;
+    GLuint pbo;
+    cudaGraphicsResource_t cuda_resource;
+    unsigned char* cuda_buffer;
+    size_t cuda_pbo_storage_buffer_size;
+    unsigned char *display_buffer;
+    cudaStream_t streams;
+};
+
+
 typedef struct gx_context
 {
     u32 swap_interval;

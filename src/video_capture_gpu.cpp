@@ -459,3 +459,88 @@ void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_pa
     delete writer.metadata;
     delete encoder.pEnc;
 }
+
+
+static inline void get_one_frame_encode(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer)
+{
+    camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
+
+    if (!camera_state->camera_return)
+    {
+        // Counting dropped frames through frame_id as redundant check.
+        if (((ecam->frame_recv.frame_id) != camera_state->id_prev + 1) && (camera_state->frame_count != 0))
+            camera_state->dropped_frames++;
+        else
+        {
+            camera_state->frames_recd++;
+            upload_frame_to_gpu(camera_params, frame_original, ecam);
+            debayer_frame_gpu(camera_params, frame_original, debayer);
+            if (!camera_control->pause_recording)
+            {
+                encode_frame(encoder, writer->video, debayer);
+                write_meatadata(writer->metadata, ecam);
+            }
+        }
+
+        // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
+        if (ecam->frame_recv.frame_id == 65535)
+            camera_state->id_prev = 0;
+        else
+            camera_state->id_prev = ecam->frame_recv.frame_id;
+
+        camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
+        if (camera_state->camera_return)
+            std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
+
+        if (camera_state->frame_count % 100 == 99)
+        {
+            printf(".");
+            fflush(stdout);
+        }
+        if (camera_state->frame_count % 10000 == 9999)
+            printf("\n");
+
+        camera_state->frame_count++;
+    }
+    else
+    {
+        camera_state->dropped_frames++;
+        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
+    }
+}
+
+void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, string encoder_setup, string folder_name)
+{
+    ck(cudaSetDevice(camera_params->gpu_id));
+
+    CameraState camera_state;
+    FrameGPU frame_original;
+    initalize_gpu_frame(&frame_original, camera_params);
+    Debayer debayer;
+    initialize_gpu_debayer(&debayer, camera_params);
+
+    // encoding
+    EncoderContext encoder;
+    initialize_encoder(&encoder, encoder_setup, camera_params);
+
+    Writer writer;
+    initialize_writer(&writer, camera_params, folder_name);
+
+    StopWatch w;
+    w.Start();
+    while (camera_control->streaming)
+    {
+        get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer);
+    }
+
+    close_writer(&encoder, &writer);
+    double time_diff = w.Stop();
+    report_statistics(camera_params, &camera_state, time_diff);
+
+    // cleanup
+    cudaFree(frame_original.d_orig);
+    cudaFree(debayer.d_debayer);
+    delete writer.video;
+    delete writer.metadata;
+    delete encoder.pEnc;
+}

@@ -16,10 +16,10 @@ const std::string current_date_time() {
     return buf;
 }
 
-void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure) {
+void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int frame_rate) {
     camera_params->width = 1280;
     camera_params->height = 1280;
-    camera_params->frame_rate = 100;
+    camera_params->frame_rate = frame_rate;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
     camera_params->pixel_format = "BayerRG8";
@@ -33,10 +33,10 @@ void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int nu
 
 
 
-void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id) {
+void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) {
     camera_params->width = 3208;
     camera_params->height = 2200;
-    camera_params->frame_rate = 5;
+    camera_params->frame_rate = frame_rate;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
     camera_params->pixel_format = "BayerRG8";

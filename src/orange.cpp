@@ -47,6 +47,9 @@ int main(int argc, char **args)
     // int buffer_size {500};
     PTPParams* ptp_params = new PTPParams{0, 0};
 
+    char* multicastIp = "239.255.255.250";
+    unsigned short multicastPort = 60646;
+
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
@@ -110,15 +113,19 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     cameras_params[i].camera_name.append(device_info[i].serialNumber);
-                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0);
+                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 100);
                 }
 
                 ecams = new CameraEmergent[num_cameras];
                 for (int i = 0; i < num_cameras; i++)
                 {
                     open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
-                    // sync
-                    // ptp_camera_sync(&camera[i]);
+
+                    // try mcast 
+                    ecams[i].camera.multicastAddress = multicastIp; 
+                    ecams[i].camera.portMulticast = multicastPort;
+                    ecams[i].camera.multicastMasterSubscribe = true; 
+
                     EVT_CameraOpenStream(&ecams[i].camera);
                     allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
                     if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)

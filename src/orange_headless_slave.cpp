@@ -22,7 +22,7 @@ int main(int argc, char **args)
 
     char *multicastIp = "239.255.255.250";
     unsigned short multicastPort = 60646;
-    char *ifaceIp = "192.168.1.21";
+    char *ifaceIp = "192.168.1.20";
 
     ecams[0].camera.ifaceAddress = ifaceIp;
     ecams[0].camera.multicastAddress = multicastIp;
@@ -44,7 +44,7 @@ int main(int argc, char **args)
     set_frame_buffer(&ecams[0].frame_recv, &cameras_params[0]);
 
     string folder_string = current_date_time();
-    string folder_name = "/home/jinyao/Videos/" + folder_string;
+    string folder_name = "/home/user/Videos/" + folder_string;
 
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)

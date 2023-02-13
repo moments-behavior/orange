@@ -12,15 +12,16 @@ int main(int argc, char **args)
 
     CameraControl *camera_control = new CameraControl;
     
-    int num_cameras = 4;
+    int num_cameras = 2;
     cameras_params = new CameraParams[num_cameras];
     ecams = new CameraEmergent[num_cameras];
 
     for (int i = 0; i < num_cameras; i++)
     {
-        init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, i, 100);
+        init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, i, 10);
         string multicast_ip = "239.255.255." + std::to_string(i);
         string iface_address = "192.168.1." + std::to_string(2*i + 20);
+        std::cout << "Ip: " << multicast_ip << ", iface_ip: " << iface_address << std::endl;
         ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
         ecams[i].camera.ifaceAddress = iface_address.c_str();
         ecams[i].camera.portMulticast = 60646 + i;    

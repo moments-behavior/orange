@@ -12,21 +12,19 @@ int main(int argc, char **args)
 
     CameraControl *camera_control = new CameraControl;
     
-    int num_cameras = 1;
+    int num_cameras = 4;
     cameras_params = new CameraParams[num_cameras];
-    for (int i = 0; i < num_cameras; i++)
-    {
-        init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 100);
-    }
     ecams = new CameraEmergent[num_cameras];
 
-    char *multicastIp = "239.255.255.250";
-    unsigned short multicastPort = 60646;
-    char *ifaceIp = "192.168.1.20";
-
-    ecams[0].camera.ifaceAddress = ifaceIp;
-    ecams[0].camera.multicastAddress = multicastIp;
-    ecams[0].camera.portMulticast = multicastPort;
+    for (int i = 0; i < num_cameras; i++)
+    {
+        init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, i, 100);
+        string multicast_ip = "239.255.255." + std::to_string(i);
+        string iface_address = "192.168.1." + std::to_string(2*i + 20);
+        ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
+        ecams[i].camera.ifaceAddress = iface_address.c_str();
+        ecams[i].camera.portMulticast = 60646 + i;    
+    }
     
     int ReturnVal = 0;
     ReturnVal = EVT_CameraOpenStream(&ecams[0].camera);

@@ -47,9 +47,6 @@ int main(int argc, char **args)
     // int buffer_size {500};
     PTPParams* ptp_params = new PTPParams{0, 0};
 
-    char* multicastIp = "239.255.255.250";
-    unsigned short multicastPort = 60646;
-
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
@@ -113,7 +110,7 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     cameras_params[i].camera_name.append(device_info[i].serialNumber);
-                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 100);
+                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 5);
                 }
 
                 ecams = new CameraEmergent[num_cameras];
@@ -121,9 +118,10 @@ int main(int argc, char **args)
                 {
                     open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
 
-                    // try mcast 
-                    ecams[i].camera.multicastAddress = multicastIp; 
-                    ecams[i].camera.portMulticast = multicastPort;
+                    string multicast_ip = "239.255.255." + std::to_string(i);
+                    ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
+                    printf(ecams[i].camera.multicastAddress);
+                    ecams[i].camera.portMulticast = 60646 + i;
                     ecams[i].camera.multicastMasterSubscribe = true; 
 
                     EVT_CameraOpenStream(&ecams[i].camera);

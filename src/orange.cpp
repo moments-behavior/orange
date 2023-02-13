@@ -110,7 +110,7 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     cameras_params[i].camera_name.append(device_info[i].serialNumber);
-                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 5);
+                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 10);
                 }
 
                 ecams = new CameraEmergent[num_cameras];
@@ -120,7 +120,7 @@ int main(int argc, char **args)
 
                     string multicast_ip = "239.255.255." + std::to_string(i);
                     ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
-                    printf(ecams[i].camera.multicastAddress);
+                    std::cout << ecams[i].camera.multicastAddress << std::endl;
                     ecams[i].camera.portMulticast = 60646 + i;
                     ecams[i].camera.multicastMasterSubscribe = true; 
 

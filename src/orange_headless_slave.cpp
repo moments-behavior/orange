@@ -19,29 +19,31 @@ int main(int argc, char **args)
     for (int i = 0; i < num_cameras; i++)
     {
         init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, i, 10);
+        
         string multicast_ip = "239.255.255." + std::to_string(i);
         string iface_address = "192.168.1." + std::to_string(2*i + 20);
         std::cout << "Ip: " << multicast_ip << ", iface_ip: " << iface_address << std::endl;
         ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
         ecams[i].camera.ifaceAddress = iface_address.c_str();
         ecams[i].camera.portMulticast = 60646 + i;    
+    
+        int ReturnVal = 0;
+        ReturnVal = EVT_CameraOpenStream(&ecams[i].camera);
+        if(ReturnVal != 0)
+        {
+            std::cout << "Camera" << i << "EVT_CameraOpenStream: Error" << std::endl;
+            return ReturnVal;
+        }
+    
+        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
+        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
+        {
+            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+        }
+        set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
     }
     
-    int ReturnVal = 0;
-    ReturnVal = EVT_CameraOpenStream(&ecams[0].camera);
-    if(ReturnVal != 0)
-    {
-        printf("EVT_CameraOpenStream: Error\n");
-        return ReturnVal;
-    }
-
-    allocate_frame_buffer(&ecams[0].camera, ecams[0].evt_frame, &cameras_params[0], 100);
-    if (cameras_params[0].need_reorder && cameras_params[0].gpu_direct)
-    {
-        allocate_frame_reorder_buffer(&ecams[0].camera, &ecams[0].frame_reorder, &cameras_params[0]);
-    }
-    set_frame_buffer(&ecams[0].frame_recv, &cameras_params[0]);
-
+     
     string folder_string = current_date_time();
     string folder_name = "/home/user/Videos/" + folder_string;
 

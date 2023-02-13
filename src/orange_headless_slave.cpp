@@ -4,7 +4,7 @@
 #include <thread>
 #include "project.h"
 
-int main(int argc, char **args)
+int main(int argc, char *argv[])
 {
     CameraParams *cameras_params;
     CameraEmergent *ecams;
@@ -12,7 +12,9 @@ int main(int argc, char **args)
 
     CameraControl *camera_control = new CameraControl;
     
-    int num_cameras = 2;
+    int num_cameras = atoi(argv[1]);
+    std::cout << "number of cameras: " << num_cameras << std::endl;
+    
     cameras_params = new CameraParams[num_cameras];
     ecams = new CameraEmergent[num_cameras];
 

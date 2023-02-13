@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     
     int num_cameras = atoi(argv[1]);
     std::cout << "number of cameras: " << num_cameras << std::endl;
-    
+
     cameras_params = new CameraParams[num_cameras];
     ecams = new CameraEmergent[num_cameras];
 
@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
         string multicast_ip = "239.255.255." + std::to_string(i);
         string iface_address = "192.168.1." + std::to_string(2*i + 20);
         std::cout << "Ip: " << multicast_ip << ", iface_ip: " << iface_address << std::endl;
+        cameras_params[i].camera_name.append(multicast_ip);
         ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
         ecams[i].camera.ifaceAddress = iface_address.c_str();
         ecams[i].camera.portMulticast = 60646 + i;    

@@ -538,7 +538,7 @@ void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams 
     w.Start();
     while (camera_control->streaming)
     {
-        get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
+        get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer);
     }
 
     close_writer(&encoder, &writer);
@@ -554,6 +554,49 @@ void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams 
 }
 
 
+static inline void sync_get_one_frame(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state)
+{
+    camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
+    PTP_timestamp_checking(ptp_state, ecam, camera_state);
+
+    if (!camera_state->camera_return)
+    {
+        // Counting dropped frames through frame_id as redundant check.
+        if (((ecam->frame_recv.frame_id) != camera_state->id_prev + 1) && (camera_state->frame_count != 0))
+            camera_state->dropped_frames++;
+        else
+        {
+            camera_state->frames_recd++;
+        }
+
+        // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
+        if (ecam->frame_recv.frame_id == 65535)
+            camera_state->id_prev = 0;
+        else
+            camera_state->id_prev = ecam->frame_recv.frame_id;
+
+        camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
+        if (camera_state->camera_return)
+            std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
+
+        if (camera_state->frame_count % 100 == 99)
+        {
+            printf(".");
+            fflush(stdout);
+        }
+        if (camera_state->frame_count % 10000 == 9999)
+            printf("\n");
+
+        camera_state->frame_count++;
+    }
+    else
+    {
+        camera_state->dropped_frames++;
+        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
+    }
+}
+
+
 void syc_aquisition(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, PTPParams* ptp_params)
 {
     CameraState camera_state;
@@ -561,13 +604,16 @@ void syc_aquisition(CameraEmergent *ecam, CameraParams *camera_params, CameraCon
     show_ptp_offset(&ptp_state, ecam);
     start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
 
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
-    printf("Press Enter to stop streaming. The slave will not be able to receive packets.\n");
-    
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));    
+    grab_frames_after_countdown(&ptp_state, ecam);
+
+    StopWatch w;
+    w.Start();
     while (camera_control->streaming)
     {
-        PTP_timestamp_checking(&ptp_state, ecam, &camera_state);
-        
+        sync_get_one_frame(&camera_state, camera_control, ecam, camera_params, &ptp_state);
     }
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
+    double time_diff = w.Stop();
+    report_statistics(camera_params, &camera_state, time_diff);
 }

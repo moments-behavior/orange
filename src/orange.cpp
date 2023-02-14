@@ -128,14 +128,12 @@ int main(int argc, char **args)
                     ecams[i].camera.multicastMasterSubscribe = true; 
 
                     EVT_CameraOpenStream(&ecams[i].camera);
-                    if (subscribe){
-                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
-                        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
-                        {
-                            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
-                        }
-                        set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
+                    allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
+                    if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
+                    {
+                        allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
                     }
+                    set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                 }
 
                 if (subscribe)

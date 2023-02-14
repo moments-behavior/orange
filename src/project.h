@@ -29,14 +29,33 @@ void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int nu
     camera_params->num_cameras = num_cameras;
     camera_params->gpu_direct = false;
     camera_params->need_reorder = false;
+    camera_params->color = true;
 }
 
 
+void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) {
+    // camera_params->width = 9344;
+    // camera_params->height = 7000;
+    camera_params->width = 640;
+    camera_params->height = 640;
+    camera_params->frame_rate = frame_rate;
+    camera_params->gain = gain;
+    camera_params->exposure = exposure;
+    camera_params->pixel_format = "Mono8";
+    camera_params->gpu_id = gpu_id;
+    camera_params->num_cameras = num_cameras;
+    camera_params->gpu_direct = false;
+    camera_params->need_reorder = false;
+    camera_params->focus = 320;
+    camera_params->camera_id = camera_id;
+    camera_params->color = false;
+}
 
-void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id) {
+
+void init_7MP_camera_params_color(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) {
     camera_params->width = 3208;
     camera_params->height = 2200;
-    camera_params->frame_rate = 5;
+    camera_params->frame_rate = frame_rate;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
     camera_params->pixel_format = "BayerRG8";
@@ -47,6 +66,7 @@ void init_25G_camera_params(CameraParams* camera_params, int camera_id, int num_
     camera_params->need_reorder = false;
     camera_params->focus = 320;
     camera_params->camera_id = camera_id;
+    camera_params->color = true;
 }
 
 
@@ -58,6 +78,7 @@ struct GL_Texture {
     size_t cuda_pbo_storage_buffer_size;
     unsigned char *display_buffer;
     cudaStream_t streams;
+    int num_channels;
 };
 
 #endif

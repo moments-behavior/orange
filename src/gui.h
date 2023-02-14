@@ -45,20 +45,20 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
         // }
 
 
-        // if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[selected_camera].offsetx_max, "%d"))
-        // {
-        //     // round to 16 
-        //     OffsetX = (OffsetX / 16) * 16; // round to even number
-        //     update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
-        // }
+        if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[selected_camera].offsetx_max, "%d"))
+        {
+            // round to 16 
+            OffsetX = (OffsetX / 16) * 16; // round to even number
+            update_offsetX_value(&ecams[selected_camera].camera, OffsetX, &cameras_params[selected_camera]);
+        }
 
 
-        // if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[selected_camera].offsety_max, "%d"))
-        // {
-        //     // round to 16 
-        //     OffsetY = (OffsetY / 16) * 16; // round to even number
-        //     update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
-        // }
+        if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[selected_camera].offsety_max, "%d"))
+        {
+            // round to 16 
+            OffsetY = (OffsetY / 16) * 16; // round to even number
+            update_offsetY_value(&ecams[selected_camera].camera, OffsetY, &cameras_params[selected_camera]);
+        }
 
 
         if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[selected_camera].gain_max, "%d"))

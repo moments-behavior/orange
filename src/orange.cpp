@@ -60,12 +60,12 @@ int main(int argc, char **args)
                 // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
                 map_cuda_resource(&tex[i].cuda_resource);
                 cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * 4, tex[i].display_buffer, cameras_params[i].width * 4, cameras_params[i].width * 4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
+                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * tex[i].num_channels, tex[i].display_buffer, cameras_params[i].width * tex[i].num_channels, cameras_params[i].width * tex[i].num_channels, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
                 unmap_cuda_resource(&tex[i].cuda_resource);
                 // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
                 bind_pbo(&tex[i].pbo);
                 bind_texture(&tex[i].texture);
-                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height, tex[i].num_channels); // Needs no arguments because texture and PBO are bound
                 unbind_texture();
                 unbind_pbo();
             }
@@ -110,7 +110,11 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     cameras_params[i].camera_name.append(device_info[i].serialNumber);
-                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0);
+                    if (strcmp(device_info[i].modelName, "HB-65000GM")==0) {
+                        init_65MP_camera_params_mono(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 10);
+                    } else if (strcmp(device_info[i].modelName, "HB-7000SC")==0) {
+                        init_7MP_camera_params_color(&cameras_params[i], i, num_cameras, 2000, 3000, 0, 10);
+                    }
                 }
 
                 ecams = new CameraEmergent[num_cameras];
@@ -132,10 +136,16 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     cudaStreamCreate(&tex[i].streams);
-                    int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
+                    int num_channels;
+                    if (cameras_params[i].color) {
+                        tex->num_channels = 4;
+                    } else {
+                        tex->num_channels = 1; 
+                    }
+                    int size_pic = cameras_params[i].width * cameras_params[i].height * tex->num_channels * sizeof(unsigned char);
 
                     create_texture(&tex[i].texture);
-                    create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                    create_pbo(&tex[i].pbo, cameras_params[i].width * tex->num_channels, cameras_params[i].height);
                     bind_pbo(&tex[i].pbo);
 
                     register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);

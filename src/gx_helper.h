@@ -118,6 +118,10 @@ static void create_texture(GLuint *texture)
     glGenTextures(1, texture);
     glBindTexture(GL_TEXTURE_2D, *texture);
 
+    // reading green and blue channel from red channel
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED);
+    
     // Setup filtering parameters for display
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -133,11 +137,11 @@ static void unbind_texture()
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-static void create_pbo(GLuint *pbo, int image_width, int img_height)
+static void create_pbo(GLuint *pbo, int image_pitch, int image_height)
 {
     glGenBuffers(1, pbo);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *pbo);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, image_width * img_height * 4 * sizeof(unsigned char), 0, GL_STREAM_DRAW);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, image_pitch * image_height * sizeof(unsigned char), 0, GL_STREAM_DRAW);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
@@ -171,14 +175,17 @@ static void unmap_cuda_resource(cudaGraphicsResource_t *cuda_resource)
     cudaGraphicsUnmapResources(1, cuda_resource);
 }
 
-static void upload_image_pbo_to_texture(int image_width, int image_height)
+static void upload_image_pbo_to_texture(int image_width, int image_height, int num_channels)
 {
     // Assume PBO is bound before this, therefore the last
     // argument is an offset into the PBO, not a pointer to a
     // buffer stored in CPU memory
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    if(num_channels == 4) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    } else if (num_channels == 1) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, image_width, image_height, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
+    }
 }
-
 
 void render_initialize_target(gx_context *window)
 {

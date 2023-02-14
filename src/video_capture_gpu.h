@@ -30,7 +30,6 @@ struct CameraState
 
 struct Debayer
 {
-    unsigned char *d_debayer;
     NppiSize size;
     Npp8u nAlpha;
     NppiRect roi;
@@ -39,8 +38,10 @@ struct Debayer
 
 struct FrameGPU
 {
-    unsigned char *d_orig;
-    int size_pic;
+    unsigned char *frame;
+    int pitch;
+    int width;
+    int height;
 };
 
 struct Writer

@@ -33,8 +33,10 @@
 
 # Build artifacts
 /targets/*
+/targets2/*
 /external/targets_nvenc
 .vscode
+.vscode/
 
 # Editor files
 *#*
@@ -54,4 +56,3 @@
 imgui.ini
 
 
-.vscode/

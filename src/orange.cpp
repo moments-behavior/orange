@@ -46,30 +46,33 @@ int main(int argc, char **args)
 
     // int buffer_size {500};
     PTPParams* ptp_params = new PTPParams{0, 0};
+    bool subscribe = false;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
 
-        if (camera_control->streaming)
+        if (subscribe)
         {
-
-            for (int i = 0; i < num_cameras; i++)
+            if (camera_control->streaming)
             {
-                // Transfer to PBO then OpenGL texture
-                // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-                map_cuda_resource(&tex[i].cuda_resource);
-                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * 4, tex[i].display_buffer, cameras_params[i].width * 4, cameras_params[i].width * 4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
-                unmap_cuda_resource(&tex[i].cuda_resource);
-                // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
-                bind_pbo(&tex[i].pbo);
-                bind_texture(&tex[i].texture);
-                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
-                unbind_texture();
-                unbind_pbo();
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    // Transfer to PBO then OpenGL texture
+                    // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
+                    map_cuda_resource(&tex[i].cuda_resource);
+                    cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                    cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * 4, tex[i].display_buffer, cameras_params[i].width * 4, cameras_params[i].width * 4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
+                    unmap_cuda_resource(&tex[i].cuda_resource);
+                    // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
+                    bind_pbo(&tex[i].pbo);
+                    bind_texture(&tex[i].texture);
+                    upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                    unbind_texture();
+                    unbind_pbo();
+                }
+                cudaDeviceSynchronize();
             }
-            cudaDeviceSynchronize();
         }
 
         if (ImGui::Begin("Orange Streaming"))
@@ -125,35 +128,48 @@ int main(int argc, char **args)
                     ecams[i].camera.multicastMasterSubscribe = true; 
 
                     EVT_CameraOpenStream(&ecams[i].camera);
-                    allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
-                    if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
-                    {
-                        allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+                    if (subscribe){
+                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
+                        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
+                        {
+                            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+                        }
+                        set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                     }
-                    set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                 }
 
-                tex = new GL_Texture[num_cameras];
+                if (subscribe)
+                {
+                    tex = new GL_Texture[num_cameras];
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cudaStreamCreate(&tex[i].streams);
+                        int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
+
+                        create_texture(&tex[i].texture);
+                        create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                        bind_pbo(&tex[i].pbo);
+
+                        register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
+                        unbind_texture();
+                        unbind_pbo();
+                        cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                    }
+                }
+                
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    cudaStreamCreate(&tex[i].streams);
-                    int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
-
-                    create_texture(&tex[i].texture);
-                    create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                    bind_pbo(&tex[i].pbo);
-
-                    register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                    unbind_texture();
-                    unbind_pbo();
-                    cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                    ptp_camera_sync(&ecams[i].camera);
                 }
 
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer));
+                    // camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer));
+                    camera_threads.push_back(std::thread(&syc_aquisition, &ecams[i], &cameras_params[i], camera_control, ptp_params));
                 }
                 camera_control->streaming = true;
+
+
             }
 
             ImGui::Separator();
@@ -234,21 +250,24 @@ int main(int argc, char **args)
             file_dialog.ClearSelected();
         }
 
-        if (camera_control->streaming)
+        if (subscribe)
         {
-            for (int i = 0; i < num_cameras; i++)
+            if (camera_control->streaming)
             {
-                string window_name = cameras_params[i].camera_name;
-                ImGui::Begin(window_name.c_str());
-                ImVec2 avail_size = ImGui::GetContentRegionAvail();
-
-                // ImGui::Image((void*)(intptr_t)texture[i], avail_size);
-                if (ImPlot::BeginPlot("##no_plot_name", avail_size))
+                for (int i = 0; i < num_cameras; i++)
                 {
-                    ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
-                    ImPlot::EndPlot();
+                    string window_name = cameras_params[i].camera_name;
+                    ImGui::Begin(window_name.c_str());
+                    ImVec2 avail_size = ImGui::GetContentRegionAvail();
+
+                    // ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+                    if (ImPlot::BeginPlot("##no_plot_name", avail_size))
+                    {
+                        ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+                        ImPlot::EndPlot();
+                    }
+                    ImGui::End();
                 }
-                ImGui::End();
             }
         }
 

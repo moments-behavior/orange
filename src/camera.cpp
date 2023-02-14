@@ -151,16 +151,16 @@ void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, C
 {
     //Set ROI OffsetX. Now that Width changed we need to check new OffsetX limits
     EVT_CameraGetUInt32ParamMax(camera, "OffsetX",   &camera_params->offsetx_max);
-    printf("OffsetX Max: \t\t%d\n", camera_params->offsetx_max);
+    // printf("OffsetX Max: \t\t%d\n", camera_params->offsetx_max);
     EVT_CameraGetUInt32ParamMin(camera, "OffsetX",   &camera_params->offsetx_min);
-    printf("OffsetX Min: \t\t%d\n", camera_params->offsetx_min);
+    // printf("OffsetX Min: \t\t%d\n", camera_params->offsetx_min);
     EVT_CameraGetUInt32ParamInc(camera, "OffsetX",   &camera_params->offsetx_inc);
-    printf("OffsetX Inc: \t\t%d\n", camera_params->offsetx_inc);
+    // printf("OffsetX Inc: \t\t%d\n", camera_params->offsetx_inc);
 
     if(OFFSET_X_VAL >= camera_params->offsetx_min && OFFSET_X_VAL <= camera_params->offsetx_max)
     {
         EVT_CameraSetUInt32Param(camera, "OffsetX", OFFSET_X_VAL);
-        printf("OffsetX Set: \t\t%d\n", OFFSET_X_VAL);
+        // printf("OffsetX Set: \t\t%d\n", OFFSET_X_VAL);
     }
 }
 
@@ -170,16 +170,16 @@ void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, C
 {
     //Set ROI OffsetX. Now that Width changed we need to check new OffsetX limits
     EVT_CameraGetUInt32ParamMax(camera, "OffsetY",   &camera_params->offsety_max);
-    printf("OffsetY Max: \t\t%d\n", camera_params->offsety_max);
+    // printf("OffsetY Max: \t\t%d\n", camera_params->offsety_max);
     EVT_CameraGetUInt32ParamMin(camera, "OffsetY",   &camera_params->offsety_min);
-    printf("OffsetY Min: \t\t%d\n", camera_params->offsety_min);
+    // printf("OffsetY Min: \t\t%d\n", camera_params->offsety_min);
     EVT_CameraGetUInt32ParamInc(camera, "OffsetY",   &camera_params->offsety_inc);
-    printf("OffsetY Inc: \t\t%d\n", camera_params->offsety_inc);
+    // printf("OffsetY Inc: \t\t%d\n", camera_params->offsety_inc);
 
     if(OFFSET_Y_VAL >= camera_params->offsety_min && OFFSET_Y_VAL <= camera_params->offsety_max)
     {
         EVT_CameraSetUInt32Param(camera, "OffsetY", OFFSET_Y_VAL);
-        printf("OffsetX Set: \t\t%d\n", OFFSET_Y_VAL);
+        // printf("OffsetX Set: \t\t%d\n", OFFSET_Y_VAL);
     }
 }
 
@@ -200,7 +200,7 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     unsigned int width_max, height_max;
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width" , &width_max));
-    printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
+    // printf("Resolution: \t\t%d x %d\n", width_max, height_max); 
 
 
     update_width_value(camera, camera_params->width, camera_params);
@@ -212,7 +212,7 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
 
     const char* pixel_format = camera_params->pixel_format.c_str();
     check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
-    printf("PixelFormat: \t\t%s\n", pixel_format);
+    // printf("PixelFormat: \t\t%s\n", pixel_format);
 
     const char* color_temp = camera_params->color_temp.c_str();
     //check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));

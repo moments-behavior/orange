@@ -13,5 +13,5 @@ g++ -Ofast -ffast-math -std=c++17 \
     -lm \
     -lpthread \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
-    -I$HOME/nvidia/ffmpeg/build/include/ \
-    -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec
+    -I$HOME/nvidia/FFmpeg/build/include/ \
+    -L$HOME/nvidia/FFmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec

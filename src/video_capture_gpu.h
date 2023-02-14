@@ -86,8 +86,8 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-
+void syc_aquisition(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, PTPParams* ptp_params);
 void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams* ptp_params);
 void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_state, unsigned char *display_buffer);
-void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, string encoder_setup, string folder_name);
+void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, string encoder_setup, string folder_name, PTPParams* ptp_params);
 #endif

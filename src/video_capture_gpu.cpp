@@ -358,7 +358,17 @@ static inline void show_ptp_offset(PTPState* ptp_state, CameraEmergent *ecam)
         ptp_state->ptp_offset_prev = ptp_state->ptp_offset;
     }
     printf("Offset Average: %d\n", ptp_state->ptp_offset_sum / 5);
+}
 
+static inline void sync_multiple_process(PTPParams* ptp_params, CameraParams* camera_params)
+{
+    uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
+    printf("%lu\n", ptp_counter);
+    while(ptp_params->ptp_counter != camera_params->num_cameras)
+    {
+        printf(".");
+        fflush(stdout);
+    }
 }
 
 static inline void start_ptp_sync(PTPState* ptp_state, PTPParams* ptp_params, CameraParams* camera_params, CameraEmergent* ecam, unsigned int delay_in_second)
@@ -369,13 +379,8 @@ static inline void start_ptp_sync(PTPState* ptp_state, PTPParams* ptp_params, Ca
         ptp_state->ptp_time = get_current_PTP_time(&ecam->camera);
         ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_state->ptp_time;
     }
-    uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
-    printf("%lu\n", ptp_counter);
-    while(ptp_params->ptp_counter != camera_params->num_cameras)
-    {
-        printf(".");
-        fflush(stdout);
-    }
+
+    sync_multiple_process(ptp_params, camera_params);
 
     unsigned long long ptp_time_plus_delta_to_start = ptp_params->ptp_global_time;
     ptp_state->ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
@@ -509,7 +514,7 @@ static inline void get_one_frame_encode(CameraState *camera_state, CameraControl
     }
 }
 
-void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, string encoder_setup, string folder_name)
+void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, string encoder_setup, string folder_name, PTPParams* ptp_params)
 {
     ck(cudaSetDevice(camera_params->gpu_id));
 
@@ -526,11 +531,14 @@ void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams 
     Writer writer;
     initialize_writer(&writer, camera_params, folder_name);
 
+    PTPState ptp_state;
+    sync_multiple_process(ptp_params, camera_params);
+
     StopWatch w;
     w.Start();
     while (camera_control->streaming)
     {
-        get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer);
+        get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
     }
 
     close_writer(&encoder, &writer);
@@ -543,4 +551,23 @@ void headless_slave_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams 
     delete writer.video;
     delete writer.metadata;
     delete encoder.pEnc;
+}
+
+
+void syc_aquisition(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, PTPParams* ptp_params)
+{
+    CameraState camera_state;
+    PTPState ptp_state;
+    show_ptp_offset(&ptp_state, ecam);
+    start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
+
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
+    printf("Press Enter to stop streaming. The slave will not be able to receive packets.\n");
+    
+    while (camera_control->streaming)
+    {
+        PTP_timestamp_checking(&ptp_state, ecam, &camera_state);
+        
+    }
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
 }

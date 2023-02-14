@@ -11,7 +11,8 @@ int main(int argc, char *argv[])
     std::vector<thread> camera_threads;
 
     CameraControl *camera_control = new CameraControl;
-    
+    PTPParams* ptp_params = new PTPParams{0, 0};
+
     int num_cameras = atoi(argv[1]);
     std::cout << "number of cameras: " << num_cameras << std::endl;
 
@@ -23,7 +24,9 @@ int main(int argc, char *argv[])
         init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, i, 10);
         
         string multicast_ip = "239.255.255." + std::to_string(i);
-        string iface_address = "192.168.1." + std::to_string(2*i + 20);
+        // string iface_address = "192.168.1." + std::to_string(2*i + 20);
+        string iface_address = "192.168.1.21";
+
         std::cout << "Ip: " << multicast_ip << ", iface_ip: " << iface_address << std::endl;
         cameras_params[i].camera_name.append(multicast_ip);
         ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
@@ -48,7 +51,7 @@ int main(int argc, char *argv[])
     
      
     string folder_string = current_date_time();
-    string folder_name = "/home/user/Videos/" + folder_string;
+    string folder_name = "/home/jinyao/Videos/" + folder_string;
 
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -68,7 +71,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&headless_slave_aquire_frames_gpu_encode, &ecams[i], &cameras_params[i], camera_control, encoder_setup, folder_name));
+        camera_threads.push_back(std::thread(&headless_slave_aquire_frames_gpu_encode, &ecams[i], &cameras_params[i], camera_control, encoder_setup, folder_name, ptp_params));
     }
 
     getchar();

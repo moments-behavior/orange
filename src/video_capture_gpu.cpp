@@ -127,52 +127,6 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, D
     }
 }
 
-static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original)
-{
-    camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
-    if (!camera_state->camera_return)
-    {
-        // Counting dropped frames through frame_id as redundant check.
-        if (((ecam->frame_recv.frame_id) != camera_state->id_prev + 1) && (camera_state->frame_count != 0))
-            camera_state->dropped_frames++;
-        else
-        {
-            camera_state->frames_recd++;
-            upload_frame_to_gpu(camera_params, frame_original, ecam);
-            if (camera_params->color){
-                debayer_frame_gpu(camera_params, frame_original, debayer);
-            } else {
-                duplicate_channel_gpu(camera_params, frame_original, debayer);
-            }
-        }
-
-        // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
-        if (ecam->frame_recv.frame_id == 65535)
-            camera_state->id_prev = 0;
-        else
-            camera_state->id_prev = ecam->frame_recv.frame_id;
-
-        camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
-        if (camera_state->camera_return)
-            std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
-
-        if (camera_state->frame_count % 100 == 99)
-        {
-            printf(".");
-            fflush(stdout);
-        }
-        if (camera_state->frame_count % 10000 == 9999)
-            printf("\n");
-
-        camera_state->frame_count++;
-    }
-    else
-    {
-        camera_state->dropped_frames++;
-        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
-    }
-}
-
 static inline void write_meatadata(ofstream *metadata, CameraEmergent *ecam)
 {
     unsigned int offsetx; 
@@ -206,10 +160,13 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
     ptp_state->frame_ts_prev = ptp_state->frame_ts;
 }
 
-static inline void sync_get_one_frame_encode(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer, PTPState *ptp_state)
+
+static inline void get_one_frame(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer, PTPState *ptp_state)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
-    PTP_timestamp_checking(ptp_state, ecam, camera_state);
+    if (camera_control->sync_camera) {
+        PTP_timestamp_checking(ptp_state, ecam, camera_state);
+    }
 
     if (!camera_state->camera_return)
     {
@@ -220,8 +177,12 @@ static inline void sync_get_one_frame_encode(CameraState *camera_state, CameraCo
         {
             camera_state->frames_recd++;
             upload_frame_to_gpu(camera_params, frame_original, ecam);
-            debayer_frame_gpu(camera_params, frame_original, debayer);
-            if (!camera_control->pause_recording)
+            if (camera_params->color){
+                debayer_frame_gpu(camera_params, frame_original, debayer);
+            } else {
+                duplicate_channel_gpu(camera_params, frame_original, debayer);
+            }
+            if (camera_control->record_video)
             {
                 encode_frame(encoder, writer->video, debayer);
                 write_meatadata(writer->metadata, ecam);
@@ -289,46 +250,6 @@ static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *c
 {
     frame_original->size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
     cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic);
-}
-
-// gpu pipeline, raw bayer images as input
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer)
-{
-    ck(cudaSetDevice(camera_params->gpu_id));
-
-    CameraState camera_state;
-    FrameGPU frame_original;
-    initalize_gpu_frame(&frame_original, camera_params);
-    Debayer debayer;
-    initialize_gpu_debayer(&debayer, camera_params);
-
-    cudaStream_t stream1;
-    ck(cudaStreamCreate(&stream1));
-    std::thread t_stream = std::thread(&copy_to_display_buffer, camera_params, camera_control, display_buffer, &debayer, stream1);
-
-    StopWatch w;
-    w.Start();
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
-    
-    // set roi 
-    int OFFSET_X_VAL = 2848;
-    int OFFSET_Y_VAL = 1300;
-    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
-    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
-
-    while (camera_control->streaming)
-    {
-        get_one_frame(&camera_state, ecam, camera_params, &debayer, &frame_original);
-    }
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
-    double time_diff = w.Stop();
-
-    report_statistics(camera_params, &camera_state, time_diff);
-    if (t_stream.joinable())
-        t_stream.join();
-    cudaStreamDestroy(stream1);
-    cudaFree(frame_original.d_orig);
-    cudaFree(debayer.d_debayer);
 }
 
 static inline void initialize_encoder(EncoderContext *encoder, string encoder_str, CameraParams *camera_params)
@@ -441,7 +362,8 @@ static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmerge
     printf("\n");
 }
 
-void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams *ptp_params)
+
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams *ptp_params)
 {
     ck(cudaSetDevice(camera_params->gpu_id));
 
@@ -457,46 +379,54 @@ void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_pa
 
     // encoding
     EncoderContext encoder;
-    initialize_encoder(&encoder, encoder_setup, camera_params);
-
     Writer writer;
-    initialize_writer(&writer, camera_params, folder_name);
-
     PTPState ptp_state;
-    show_ptp_offset(&ptp_state, ecam);
-    start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
 
+    if (camera_control->record_video) {
+        initialize_encoder(&encoder, encoder_setup, camera_params);
+        initialize_writer(&writer, camera_params, folder_name);
+    }
+
+    if (camera_control->sync_camera) {
+        show_ptp_offset(&ptp_state, ecam);
+        start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
+    }
+    
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
-    grab_frames_after_countdown(&ptp_state, ecam);
+    if (camera_control->sync_camera) {
+        grab_frames_after_countdown(&ptp_state, ecam);
+    }
 
     StopWatch w;
     w.Start();
 
-    int offset = 0;
-    int phase = 1;
+    // int OFFSET_X_VAL = 2848;
+    // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
+    // int offset = 0;
+    // int phase = 1;
     while (camera_control->streaming)
     {
         // set roi
-        // int OFFSET_X_VAL = 3296 + (camera_state->frame_count % 500) * 16;
-        // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
-        int OFFSET_Y_VAL = 1300 + offset * 4;
-        EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
+        // int OFFSET_Y_VAL = 1300 + offset * 4;
+        // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
 
-        sync_get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
-        if (offset == 200) {
-            phase = -1;
-        }
-        if (offset == 0) {
-            phase = 1;
-        }
-        if (phase == -1) {
-            offset--;
-        } else { offset++; }
+        get_one_frame(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
+        // if (offset == 200) {
+        //     phase = -1;
+        // }
+        // if (offset == 0) {
+        //     phase = 1;
+        // }
+        // if (phase == -1) {
+        //     offset--;
+        // } else { offset++; }
 
     }
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
 
-    close_writer(&encoder, &writer);
+    if (camera_control->record_video) {
+        close_writer(&encoder, &writer);
+    }
     double time_diff = w.Stop();
     report_statistics(camera_params, &camera_state, time_diff);
 

@@ -47,6 +47,8 @@ int main(int argc, char **args)
 
     // int buffer_size {500};
     PTPParams* ptp_params = new PTPParams{0, 0};
+    string encoder_setup;
+    string folder_name;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -160,7 +162,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
                     }
 
                 } else {
@@ -207,7 +209,7 @@ int main(int argc, char **args)
                 if (camera_control->record_video)
                 {
                     string folder_string = current_date_time();
-                    string folder_name = file_dialog.GetSelected().string() + "/" + folder_string;
+                    folder_name = file_dialog.GetSelected().string() + "/" + folder_string;
 
                     if (mkdir(folder_name.c_str(), 0777) == -1)
                     {
@@ -218,7 +220,7 @@ int main(int argc, char **args)
                     {
                         std::cout << "Recorded video saves to : " << folder_name << std::endl;
                     }
-                    string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
+                    encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
                     
                     for (int i = 0; i < num_cameras; i++)
                     {               
@@ -247,16 +249,38 @@ int main(int argc, char **args)
                         cudaMalloc((void **)&tex[i].display_buffer, size_pic);
                     }
 
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        ptp_camera_sync(&ecams[i].camera);
+                    if (num_cameras > 1){
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            ptp_camera_sync(&ecams[i].camera);
+                        }
+                        camera_control->sync_camera = true;
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&sync_aquire_frames_gpu_encode, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->streaming = true;                    
+                } else {
+                    camera_control->streaming = false;
+                    camera_control->sync_camera = false;
+
+                    for (auto &t : camera_threads)
+                        t.join();
+                    
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        camera_threads.pop_back();
+                    }
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);
+                        EVT_CameraCloseStream(&ecams[i].camera);
+                        gx_delete_buffer(&tex[i].pbo);
+                        cudaFree(tex[i].display_buffer);  
+                    }
+                    delete[] tex;                     
                 }
             }
             ImGui::PopStyleColor(1);
@@ -310,19 +334,6 @@ int main(int argc, char **args)
 
     // Cleanup
     gx_cleanup(window);
-
-    camera_control->streaming = false;
-    for (auto &t : camera_threads)
-        t.join();
-
-    for (int i = 0; i < num_cameras; i++)
-    {
-        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);
-        EVT_CameraCloseStream(&ecams[i].camera);
-        close_camera(&ecams[i].camera);
-    }
-
-    // std::cout << folder_name << std::endl;
     cudaDeviceReset();
     return 0;
 }

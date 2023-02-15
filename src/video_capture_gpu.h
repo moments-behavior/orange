@@ -17,7 +17,7 @@ struct CameraControl
     bool open = false;
     bool streaming = false;
     bool record_video = false;
-    bool pause_recording = false;
+    bool sync_camera = false;
 };
 
 struct CameraState
@@ -87,7 +87,5 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-
-void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams* ptp_params);
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_state, unsigned char *display_buffer);
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams* ptp_params);
 #endif

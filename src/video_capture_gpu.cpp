@@ -51,6 +51,8 @@ static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera
     int output_channels = 4;
     int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char) * output_channels;
     cudaMalloc((void **)&debayer->d_debayer, size_pic);
+    cudaMemset(debayer->d_debayer, 0xFF, size_pic);
+    
     debayer->size.width = camera_params->width;
     debayer->size.height = camera_params->height;
     debayer->nAlpha = 255;
@@ -65,6 +67,22 @@ static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera
     else
     {
         debayer->grid = NPPI_BAYER_RGGB;
+    }
+}
+
+static inline void duplicate_channel_gpu(CameraParams *camera_params, FrameGPU *frame_original, Debayer *debayer)
+{
+    const NppStatus npp_result = nppiDup_8u_C1AC4R(
+        frame_original->d_orig,
+        camera_params->width * sizeof(unsigned char),
+        debayer->d_debayer,
+        camera_params->width * sizeof(uchar4),
+        debayer->size);
+
+    if (npp_result != 0)
+    {
+        std::cout << "\nNPP error %d \n"
+                  << npp_result << std::endl;
     }
 }
 
@@ -121,7 +139,11 @@ static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam
         {
             camera_state->frames_recd++;
             upload_frame_to_gpu(camera_params, frame_original, ecam);
-            debayer_frame_gpu(camera_params, frame_original, debayer);
+            if (camera_params->color){
+                debayer_frame_gpu(camera_params, frame_original, debayer);
+            } else {
+                duplicate_channel_gpu(camera_params, frame_original, debayer);
+            }
         }
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
@@ -153,10 +175,14 @@ static inline void get_one_frame(CameraState *camera_state, CameraEmergent *ecam
 
 static inline void write_meatadata(ofstream *metadata, CameraEmergent *ecam)
 {
-    *metadata << ecam->frame_recv.frame_id << "," << ecam->frame_recv.timestamp << endl;
+    unsigned int offsetx; 
+    unsigned int offsety; 
+    EVT_CameraGetUInt32Param(&ecam->camera, "OffsetX", &offsetx);
+    EVT_CameraGetUInt32Param(&ecam->camera, "OffsetY", &offsety);
+    *metadata << ecam->frame_recv.frame_id << "," << ecam->frame_recv.timestamp << "," << offsetx << "," << offsety << endl;
 }
 
-static inline void PTP_timestamp_checking(PTPState* ptp_state, CameraEmergent* ecam, CameraState* camera_state)
+static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
 {
 
     EVT_CameraExecuteCommand(&ecam->camera, "GevTimestampControlLatch");
@@ -182,6 +208,12 @@ static inline void PTP_timestamp_checking(PTPState* ptp_state, CameraEmergent* e
 
 static inline void sync_get_one_frame_encode(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer, PTPState *ptp_state)
 {
+    // set roi 
+    int OFFSET_X_VAL = (camera_state->frame_count * 16) % 8704;
+    int OFFSET_Y_VAL = (camera_state->frame_count *4) % 6360;
+    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
+    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
+
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     PTP_timestamp_checking(ptp_state, ecam, camera_state);
 
@@ -319,7 +351,7 @@ static inline void open_metadata_file(ofstream *frame_metadata, string metadata_
         std::cout << "File did not open!";
         return;
     }
-    *frame_metadata << "frame_id,timestamp\n";
+    *frame_metadata << "frame_id,timestamp,offsetx,offsety\n";
 }
 
 static inline void initialize_writer(Writer *writer, CameraParams *camera_params, string folder_name)
@@ -342,10 +374,9 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
     (*writer->metadata).close();
 }
 
-
-static inline void show_ptp_offset(PTPState* ptp_state, CameraEmergent *ecam) 
+static inline void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam)
 {
-    //Show raw offsets.
+    // Show raw offsets.
     for (unsigned int i = 0; i < 5;)
     {
         EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset", &ptp_state->ptp_offset);
@@ -353,32 +384,31 @@ static inline void show_ptp_offset(PTPState* ptp_state, CameraEmergent *ecam)
         {
             ptp_state->ptp_offset_sum += ptp_state->ptp_offset;
             i++;
-            //printf("Offset %d: %d\n", i, ptp_offset);
+            // printf("Offset %d: %d\n", i, ptp_offset);
         }
         ptp_state->ptp_offset_prev = ptp_state->ptp_offset;
     }
     printf("Offset Average: %d\n", ptp_state->ptp_offset_sum / 5);
-
 }
 
-static inline void start_ptp_sync(PTPState* ptp_state, PTPParams* ptp_params, CameraParams* camera_params, CameraEmergent* ecam, unsigned int delay_in_second)
+static inline void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, CameraParams *camera_params, CameraEmergent *ecam, unsigned int delay_in_second)
 {
 
-    if(ptp_params->ptp_counter == camera_params->num_cameras -1)
+    if (ptp_params->ptp_counter == camera_params->num_cameras - 1)
     {
         ptp_state->ptp_time = get_current_PTP_time(&ecam->camera);
         ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_state->ptp_time;
     }
     uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
     printf("%lu\n", ptp_counter);
-    while(ptp_params->ptp_counter != camera_params->num_cameras)
+    while (ptp_params->ptp_counter != camera_params->num_cameras)
     {
         printf(".");
         fflush(stdout);
     }
 
     unsigned long long ptp_time_plus_delta_to_start = ptp_params->ptp_global_time;
-    ptp_state->ptp_time_plus_delta_to_start_low  = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
+    ptp_state->ptp_time_plus_delta_to_start_low = (unsigned int)(ptp_time_plus_delta_to_start & 0xFFFFFFFF);
     ptp_state->ptp_time_plus_delta_to_start_high = (unsigned int)(ptp_time_plus_delta_to_start >> 32);
     EVT_CameraSetUInt32Param(&ecam->camera, "PtpAcquisitionGateTimeHigh", ptp_state->ptp_time_plus_delta_to_start_high);
     EVT_CameraSetUInt32Param(&ecam->camera, "PtpAcquisitionGateTimeLow", ptp_state->ptp_time_plus_delta_to_start_low);
@@ -387,12 +417,13 @@ static inline void start_ptp_sync(PTPState* ptp_state, PTPParams* ptp_params, Ca
     printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
 }
 
-static inline void grab_frames_after_countdown(PTPState* ptp_state, CameraEmergent* ecam)
+static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam)
 {
     printf("Grabbing Frames after countdown...\n");
     ptp_state->ptp_time_countdown = 0;
-    //Countdown code
-    do {
+    // Countdown code
+    do
+    {
         EVT_CameraExecuteCommand(&ecam->camera, "GevTimestampControlLatch");
         EVT_CameraGetUInt32Param(&ecam->camera, "GevTimestampValueHigh", &ptp_state->ptp_time_high);
         EVT_CameraGetUInt32Param(&ecam->camera, "GevTimestampValueLow", &ptp_state->ptp_time_low);
@@ -401,15 +432,15 @@ static inline void grab_frames_after_countdown(PTPState* ptp_state, CameraEmerge
         if (ptp_state->ptp_time > ptp_state->ptp_time_countdown)
         {
             printf("%llu\n", (ptp_state->ptp_time_plus_delta_to_start - ptp_state->ptp_time) / 1000000000);
-            ptp_state->ptp_time_countdown = ptp_state->ptp_time + 1000000000; //1s
+            ptp_state->ptp_time_countdown = ptp_state->ptp_time + 1000000000; // 1s
         }
 
     } while (ptp_state->ptp_time <= ptp_state->ptp_time_plus_delta_to_start);
-    //Countdown done.
+    // Countdown done.
     printf("\n");
 }
 
-void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams* ptp_params)
+void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams *ptp_params)
 {
     ck(cudaSetDevice(camera_params->gpu_id));
 

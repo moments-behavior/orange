@@ -36,6 +36,7 @@ int main(int argc, char **args)
     file_dialog.SetTitle("My files");
 
     bool check[cam_count] = {};
+
     CameraParams *cameras_params;
     CameraEmergent *ecams;
     std::vector<thread> camera_threads;
@@ -51,26 +52,7 @@ int main(int argc, char **args)
     {
         create_new_frame();
 
-        if (camera_control->streaming)
-        {
 
-            for (int i = 0; i < num_cameras; i++)
-            {
-                // Transfer to PBO then OpenGL texture
-                // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-                map_cuda_resource(&tex[i].cuda_resource);
-                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * 4, tex[i].display_buffer, cameras_params[i].width * 4, cameras_params[i].width * 4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
-                unmap_cuda_resource(&tex[i].cuda_resource);
-                // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
-                bind_pbo(&tex[i].pbo);
-                bind_texture(&tex[i].texture);
-                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
-                unbind_texture();
-                unbind_pbo();
-            }
-            cudaDeviceSynchronize();
-        }
 
         if (ImGui::Begin("Orange Streaming"))
         {
@@ -106,11 +88,23 @@ int main(int argc, char **args)
             if (ImGui::Button(camera_control->streaming ? "Stop streaming" : "Start streaming"))
             {
                 cameras_params = new CameraParams[num_cameras];
+                std::vector<int> selected_cameras;
 
+                for (int i = 0; i < cam_count; i++)
+                {
+                    if (check[i]) {
+                        selected_cameras.push_back(i);
+                    }
+                }
+                
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    cameras_params[i].camera_name.append(device_info[i].serialNumber);
-                    init_25G_camera_params(&cameras_params[i], i, num_cameras, 2000, 3000, 0);
+                    cameras_params[i].camera_name.append(device_info[selected_cameras[i]].serialNumber);
+                    if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
+                        init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 8000, 0, 100); 
+                    } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
+                        init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, 0, 10);
+                    }
                 }
 
                 ecams = new CameraEmergent[num_cameras];
@@ -231,6 +225,22 @@ int main(int argc, char **args)
 
         if (camera_control->streaming)
         {
+            for (int i = 0; i < num_cameras; i++)
+            {
+                // Transfer to PBO then OpenGL texture
+                // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
+                map_cuda_resource(&tex[i].cuda_resource);
+                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * 4, tex[i].display_buffer, cameras_params[i].width * 4, cameras_params[i].width * 4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
+                unmap_cuda_resource(&tex[i].cuda_resource);
+                // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
+                bind_pbo(&tex[i].pbo);
+                bind_texture(&tex[i].texture);
+                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                unbind_texture();
+                unbind_pbo();
+            }
+            
             for (int i = 0; i < num_cameras; i++)
             {
                 string window_name = cameras_params[i].camera_name;

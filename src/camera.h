@@ -50,6 +50,7 @@ struct CameraParams{
     unsigned int focus_max; 
     unsigned int focus_min;
     unsigned int focus_inc;
+    bool color;
 }; 
 
 struct CameraEmergent{
@@ -65,7 +66,6 @@ struct PTPParams{
 };
 
 
-CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras, bool gpu_direct);
 void configure_factory_defaults(Emergent::CEmergentCamera* camera);
 void close_camera(Emergent::CEmergentCamera* camera);
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams* camera_params);

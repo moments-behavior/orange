@@ -102,7 +102,7 @@ int main(int argc, char **args)
                         {
                             cameras_params[i].camera_name.append(device_info[selected_cameras[i]].serialNumber);
                             if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
-                                init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 458); 
+                                init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 200); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, 1, 10);
                             }
@@ -220,7 +220,6 @@ int main(int argc, char **args)
                     {
                         std::cout << "Recorded video saves to : " << folder_name << std::endl;
                     }
-                    encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
                     
                     for (int i = 0; i < num_cameras; i++)
                     {               
@@ -259,6 +258,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
+                        encoder_setup = "-preset p1 -fps " + to_string(cameras_params[i].frame_rate);
                         camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->streaming = true;                    

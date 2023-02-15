@@ -38,7 +38,7 @@ void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, in
 {
     // camera_params->width = 9344;
     // camera_params->height = 7000;
-    camera_params->width = 1024;
+    camera_params->width = 512;
     camera_params->height = 512;
     camera_params->frame_rate = frame_rate;
     camera_params->gain = gain;

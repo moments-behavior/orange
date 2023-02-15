@@ -3,25 +3,6 @@
 #include <iostream>
 
 
-// important camera tuning parameters
-CameraParams create_camera_params(unsigned int width, unsigned int height, unsigned int frame_rate, unsigned int gain, unsigned int exposure, string pixel_format, string color_temp, int camera_id, int gpu_id, int num_cameras, bool gpu_direct)
-{
-    CameraParams camera_params = {};
-    camera_params.width = width;
-    camera_params.height = height;
-    camera_params.frame_rate = frame_rate;
-    camera_params.gain = gain;
-    camera_params.exposure = exposure;
-    camera_params.pixel_format = pixel_format;
-    camera_params.color_temp = color_temp;
-    camera_params.camera_id = camera_id;
-    camera_params.gpu_id = gpu_id;
-    camera_params.num_cameras = num_cameras;
-    camera_params.gpu_direct = gpu_direct;
-    return camera_params;
-}
-
-
 //A function to reset to factory defaults for running eSDK examples 
 // TODO: many thing doesn't work with this emergent native code 
 void configure_factory_defaults(Emergent::CEmergentCamera* camera)
@@ -214,16 +195,17 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
     printf("PixelFormat: \t\t%s\n", pixel_format);
 
-    const char* color_temp = camera_params->color_temp.c_str();
+    if (camera_params->color) {
+        const char* color_temp = camera_params->color_temp.c_str();
+        check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp));
+    }
+
     //check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
     update_gain_value(camera, camera_params->gain, camera_params);
 
 
     //check_camera_errors(EVT_CameraSetUInt32Param(camera, "Exposure", camera_params->exposure));
     update_exposure_value(camera, camera_params->exposure, camera_params);
-
-
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp));
 
     // unsigned int frame_rate_max;
     // check_camera_errors(EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &frame_rate_max));
@@ -311,7 +293,6 @@ void close_camera(Emergent::CEmergentCamera* camera)
 
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params)
 {
-
     //Three params used for memory allocation. Worst case covers all models so no recompilation required.   
     evt_frame->size_x = camera_params->width;
     evt_frame->size_y = camera_params->height;

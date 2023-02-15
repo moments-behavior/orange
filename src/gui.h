@@ -23,42 +23,33 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
         }
     
 
-        // if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[selected_camera].width_max, "%d"))
-        // {
-        //     slider_width = (slider_width / 16) * 16; // round to even number
+        if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[selected_camera].width_max, "%d"))
+        {
+            slider_width = (slider_width / 16) * 16; // round to even number
+            update_width_value(&ecams[selected_camera].camera, slider_width, &cameras_params[selected_camera]);
+        }
 
-        //     *capture_pause = true;
-        //     update_width_value(&camera[selected_camera], slider_width, &cameras_params[selected_camera]);
-        //     // set_frame_buffer(&frame_recv[selected_camera], &cameras_params[selected_camera]);
-        //     // for(int frame_count=0;frame_count<buffer_size;frame_count++)
-        //     // {
-        //     //     set_frame_buffer(&evt_frame[selected_camera][frame_count], &cameras_params[selected_camera]);
-        //     // }
-        //     *capture_pause = false;
-            
-        // }
-
-        // if(ImGui::SliderInt("Height", &slider_height, cameras_params[selected_camera].height_min, cameras_params[selected_camera].height_max, "%d"))
-        // {
-        //     slider_height = (slider_height / 16) * 16; // round to even number
-        //     update_height_value(&camera[selected_camera], slider_height, &cameras_params[selected_camera]);
-        // }
+        if(ImGui::SliderInt("Height", &slider_height, cameras_params[selected_camera].height_min, cameras_params[selected_camera].height_max, "%d"))
+        {
+            slider_height = (slider_height / 16) * 16; // round to even number
+            update_height_value(&ecams[selected_camera].camera, slider_height, &cameras_params[selected_camera]);
+        }
 
 
-        // if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[selected_camera].offsetx_max, "%d"))
-        // {
-        //     // round to 16 
-        //     OffsetX = (OffsetX / 16) * 16; // round to even number
-        //     update_offsetX_value(&camera[selected_camera], OffsetX, &cameras_params[selected_camera]);
-        // }
+        if(ImGui::SliderInt("OffsetX", &OffsetX, cameras_params[selected_camera].offsetx_min, cameras_params[selected_camera].offsetx_max, "%d"))
+        {
+            // round to 16 
+            OffsetX = (OffsetX / 16) * 16; // round to even number
+            update_offsetX_value(&ecams[selected_camera].camera, OffsetX, &cameras_params[selected_camera]);
+        }
 
 
-        // if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[selected_camera].offsety_max, "%d"))
-        // {
-        //     // round to 16 
-        //     OffsetY = (OffsetY / 16) * 16; // round to even number
-        //     update_offsetY_value(&camera[selected_camera], OffsetY, &cameras_params[selected_camera]);
-        // }
+        if(ImGui::SliderInt("OffsetY", &OffsetY, cameras_params[selected_camera].offsety_min, cameras_params[selected_camera].offsety_max, "%d"))
+        {
+            // round to 16 
+            OffsetY = (OffsetY / 16) * 16; // round to even number
+            update_offsetY_value(&ecams[selected_camera].camera, OffsetY, &cameras_params[selected_camera]);
+        }
 
 
         if(ImGui::SliderInt("Gain", &slider_gain, cameras_params[selected_camera].gain_min, cameras_params[selected_camera].gain_max, "%d"))

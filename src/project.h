@@ -38,8 +38,8 @@ void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, in
 {
     // camera_params->width = 9344;
     // camera_params->height = 7000;
-    camera_params->width = 640;
-    camera_params->height = 640;
+    camera_params->width = 1024;
+    camera_params->height = 512;
     camera_params->frame_rate = frame_rate;
     camera_params->gain = gain;
     camera_params->exposure = exposure;
@@ -71,7 +71,6 @@ void init_7MP_camera_params_color(CameraParams* camera_params, int camera_id, in
     camera_params->camera_id = camera_id;
     camera_params->color = true;
 }
-
 
 struct GL_Texture {
     GLuint texture;

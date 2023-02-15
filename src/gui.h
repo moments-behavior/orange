@@ -3,6 +3,7 @@
 #include "gx_helper.h"
 #include "camera.h"
 
+
 static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, int num_cameras)
 {
     if (ImGui::TreeNode("Camera Property"))

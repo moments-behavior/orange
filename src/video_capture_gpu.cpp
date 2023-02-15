@@ -208,12 +208,6 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
 
 static inline void sync_get_one_frame_encode(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer, PTPState *ptp_state)
 {
-    // set roi 
-    int OFFSET_X_VAL = (camera_state->frame_count * 16) % 8704;
-    int OFFSET_Y_VAL = (camera_state->frame_count *4) % 6360;
-    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
-    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
-
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     PTP_timestamp_checking(ptp_state, ecam, camera_state);
 
@@ -315,6 +309,13 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     StopWatch w;
     w.Start();
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
+    
+    // set roi 
+    int OFFSET_X_VAL = 2848;
+    int OFFSET_Y_VAL = 1300;
+    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
+    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
+
     while (camera_control->streaming)
     {
         get_one_frame(&camera_state, ecam, camera_params, &debayer, &frame_original);
@@ -470,9 +471,28 @@ void sync_aquire_frames_gpu_encode(CameraEmergent *ecam, CameraParams *camera_pa
 
     StopWatch w;
     w.Start();
+
+    int offset = 0;
+    int phase = 1;
     while (camera_control->streaming)
     {
+        // set roi
+        // int OFFSET_X_VAL = 3296 + (camera_state->frame_count % 500) * 16;
+        // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
+        int OFFSET_Y_VAL = 1300 + offset * 4;
+        EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
+
         sync_get_one_frame_encode(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
+        if (offset == 200) {
+            phase = -1;
+        }
+        if (offset == 0) {
+            phase = 1;
+        }
+        if (phase == -1) {
+            offset--;
+        } else { offset++; }
+
     }
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
 

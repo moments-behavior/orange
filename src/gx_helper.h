@@ -112,6 +112,11 @@ void gx_imgui_init(gx_context *context)
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 }
 
+void gx_delete_buffer(GLuint *texture) 
+{
+	glDeleteBuffers(1, texture);
+}
+
 static void create_texture(GLuint *texture)
 {
     // Create a OpenGL texture identifier
@@ -156,9 +161,9 @@ static void register_pbo_to_cuda(GLuint *pbo, cudaGraphicsResource_t *cuda_resou
     cudaGraphicsGLRegisterBuffer(cuda_resource, *pbo, cudaGraphicsRegisterFlagsNone);
 }
 
-static void map_cuda_resource(cudaGraphicsResource_t *cuda_resource)
+static void map_cuda_resource(cudaGraphicsResource_t *cuda_resource , cudaStream_t stream)
 {
-    cudaGraphicsMapResources(1, cuda_resource);
+    cudaGraphicsMapResources(1, cuda_resource, stream);
 }
 
 static void cuda_pointer_from_resource(unsigned char **cuda_buffer_p, size_t *size_p, cudaGraphicsResource_t *cuda_resource)

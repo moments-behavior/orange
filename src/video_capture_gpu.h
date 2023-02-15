@@ -14,6 +14,7 @@
 
 struct CameraControl
 {
+    bool open = false;
     bool streaming = false;
     bool record_video = false;
     bool pause_recording = false;

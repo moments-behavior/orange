@@ -38,8 +38,8 @@ g++ -Ofast -ffast-math -std=c++17 \
     -lpthread \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode \
     -lGLEW -lGLU -lGL \
-    -I$HOME/Build/nvidia/FFmpeg/build/include/ \
-    -L$HOME/Build/nvidia/FFmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I$HOME/nvidia/ffmpeg/build/include/ \
+    -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     `pkg-config --static --libs glfw3`
 
 sudo ./targets/orange;

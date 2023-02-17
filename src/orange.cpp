@@ -102,9 +102,9 @@ int main(int argc, char **args)
                         {
                             cameras_params[i].camera_name.append(device_info[selected_cameras[i]].serialNumber);
                             if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
-                                init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 200); //458 
+                                init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, 1, 10);
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, 1, 30);
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -112,7 +112,7 @@ int main(int argc, char **args)
                         {
                             open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
                             // mcast
-                            string multicast_ip = "239.255.255." + std::to_string(i);
+                            string multicast_ip = "239.255.255.255"; // + std::to_string(i);
                             ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
                             std::cout << ecams[i].camera.multicastAddress << std::endl;
                             ecams[i].camera.portMulticast = 60646 + i;

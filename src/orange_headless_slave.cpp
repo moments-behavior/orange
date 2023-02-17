@@ -22,9 +22,10 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_cameras; i++)
     {
-        init_65MP_camera_params_mono(&cameras_params[i], i, num_cameras, 2000, 1000, 1, 400); //458 
-        
-        string multicast_ip = "239.255.255." + std::to_string(i);
+        // init_65MP_camera_params_mono(&cameras_params[i], i, num_cameras, 2000, 1000, 1, 400); //458 
+        init_7MP_camera_params_color(&cameras_params[i], i, num_cameras, 2000, 1000, 1, 30); 
+
+        string multicast_ip = "239.255.255.255"; //+ std::to_string(i);
         // string iface_address = "192.168.1." + std::to_string(2*i + 20);
         string iface_address = "192.168.1.20";
 

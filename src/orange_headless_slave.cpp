@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_cameras; i++)
     {
-        init_65MP_camera_params_mono(&cameras_params[i], i, num_cameras, 2000, 1000, 0, 200); //458 
+        init_65MP_camera_params_mono(&cameras_params[i], i, num_cameras, 2000, 1000, 1, 400); //458 
         
         string multicast_ip = "239.255.255." + std::to_string(i);
         // string iface_address = "192.168.1." + std::to_string(2*i + 20);
@@ -70,6 +70,8 @@ int main(int argc, char *argv[])
     camera_control->record_video = true; 
     camera_control->subscribe = true;
     camera_control->stream = false;
+    camera_control->m_slave = true;
+    camera_control->sync_camera = false;
 
     for (int i = 0; i < num_cameras; i++)
     {

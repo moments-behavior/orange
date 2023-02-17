@@ -14,6 +14,7 @@
 #include "imgui_impl_opengl3.h"
 #include "types.h"
 
+
 typedef struct gx_context
 {
     u32 swap_interval;

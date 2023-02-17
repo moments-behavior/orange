@@ -111,6 +111,12 @@ int main(int argc, char **args)
                         for (int i = 0; i < num_cameras; i++)
                         {
                             open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+                            // mcast
+                            string multicast_ip = "239.255.255." + std::to_string(i);
+                            ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
+                            std::cout << ecams[i].camera.multicastAddress << std::endl;
+                            ecams[i].camera.portMulticast = 60646 + i;
+                            ecams[i].camera.multicastMasterSubscribe = true; 
                         }
                     }
 
@@ -128,10 +134,10 @@ int main(int argc, char **args)
                 set_camera_properties(ecams, cameras_params, num_cameras);
             }
 
-            if (ImGui::Button(camera_control->streaming ? "Stop streaming" : "Start streaming"))
+            if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))
             {
-                (camera_control->streaming) = !(camera_control->streaming);
-                if (camera_control->streaming)
+                (camera_control->subscribe) = !(camera_control->subscribe);
+                if (camera_control->subscribe)
                 {                
                     for (int i = 0; i < num_cameras; i++)
                     {               
@@ -261,9 +267,9 @@ int main(int argc, char **args)
                         encoder_setup = "-preset p1 -fps " + to_string(cameras_params[i].frame_rate);
                         camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
                     }
-                    camera_control->streaming = true;                    
+                    camera_control->subscribe = true;                    
                 } else {
-                    camera_control->streaming = false;
+                    camera_control->subscribe = false;
                     camera_control->sync_camera = false;
 
                     for (auto &t : camera_threads)
@@ -295,7 +301,7 @@ int main(int argc, char **args)
             file_dialog.ClearSelected();
         }
 
-        if (camera_control->streaming)
+        if (camera_control->subscribe)
         {
             for (int i = 0; i < num_cameras; i++)
             {

@@ -4,6 +4,17 @@
 #include "camera.h"
 
 
+struct GL_Texture {
+    GLuint texture;
+    GLuint pbo;
+    cudaGraphicsResource_t cuda_resource;
+    unsigned char* cuda_buffer;
+    size_t cuda_pbo_storage_buffer_size;
+    unsigned char *display_buffer;
+    cudaStream_t streams;
+    int num_channels;
+};
+
 static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, int num_cameras)
 {
     if (ImGui::TreeNode("Camera Property"))

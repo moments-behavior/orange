@@ -229,7 +229,7 @@ static inline void report_statistics(CameraParams *camera_params, CameraState *c
 static inline void copy_to_display_buffer(CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, Debayer *debayer, cudaStream_t stream1)
 {
     std::chrono::steady_clock::time_point steady_start, steady_end;
-    while (camera_control->streaming)
+    while (camera_control->subscribe)
     {
         steady_end = std::chrono::steady_clock::now();
         float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
@@ -374,8 +374,11 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     initialize_gpu_debayer(&debayer, camera_params);
 
     cudaStream_t stream1;
-    ck(cudaStreamCreate(&stream1));
-    std::thread t_stream = std::thread(&copy_to_display_buffer, camera_params, camera_control, display_buffer, &debayer, stream1);
+    std::thread t_stream;
+    if (camera_control->stream) {
+        ck(cudaStreamCreate(&stream1));
+        t_stream = std::thread(&copy_to_display_buffer, camera_params, camera_control, display_buffer, &debayer, stream1);
+    }
 
     // encoding
     EncoderContext encoder;
@@ -400,27 +403,27 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     StopWatch w;
     w.Start();
 
-    int OFFSET_X_VAL = 2848;
-    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
-    int offset = 0;
-    int phase = 1;
+    // int OFFSET_X_VAL = 2848;
+    // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
+    // int offset = 0;
+    // int phase = 1;
 
-    while (camera_control->streaming)
+    while (camera_control->subscribe)
     {
-        int OFFSET_Y_VAL = 1300 + offset * 4;
-        EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
+        // int OFFSET_Y_VAL = 1300 + offset * 4;
+        // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
 
         get_one_frame(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
 
-        if (offset == 200) {
-            phase = -1;
-        }
-        if (offset == 0) {
-            phase = 1;
-        }
-        if (phase == -1) {
-            offset--;
-        } else { offset++; }
+        // if (offset == 200) {
+        //     phase = -1;
+        // }
+        // if (offset == 0) {
+        //     phase = 1;
+        // }
+        // if (phase == -1) {
+        //     offset--;
+        // } else { offset++; }
     }
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
 
@@ -430,8 +433,10 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     double time_diff = w.Stop();
     report_statistics(camera_params, &camera_state, time_diff);
 
-    if (t_stream.joinable())
-        t_stream.join();
+    if (camera_control->stream) {
+        if (t_stream.joinable())
+            t_stream.join();
+    }
     cudaStreamDestroy(stream1);
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);

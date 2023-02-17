@@ -25,7 +25,7 @@ DIR_IMPLOT="third_party/implot"
 g++ -Ofast -ffast-math -std=c++17 \
     targets/cuda_line_reorder.o \
     -o targets/*.o \
-    -o targets/orange -I ./src/ src/*.cpp \
+    -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
     -I$DIR_IMPLOT \
@@ -36,7 +36,7 @@ g++ -Ofast -ffast-math -std=c++17 \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
     -lm \
     -lpthread \
-    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode \
+    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode \
     -lGLEW -lGLU -lGL \
     -I$HOME/nvidia/ffmpeg/build/include/ \
     -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \

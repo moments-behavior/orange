@@ -406,27 +406,27 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     StopWatch w;
     w.Start();
 
-    int OFFSET_X_VAL = 2848;
-    EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
-    int offset = 0;
-    int phase = 1;
+    // int OFFSET_X_VAL = 2848;
+    // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
+    // int offset = 0;
+    // int phase = 1;
 
     while (camera_control->subscribe)
     {
-        int OFFSET_Y_VAL = 1300 + offset * 4;
-        EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
+        // int OFFSET_Y_VAL = 1300 + offset * 4;
+        // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
 
         get_one_frame(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
 
-        if (offset == 200) {
-            phase = -1;
-        }
-        if (offset == 0) {
-            phase = 1;
-        }
-        if (phase == -1) {
-            offset--;
-        } else { offset++; }
+        // if (offset == 200) {
+        //     phase = -1;
+        // }
+        // if (offset == 0) {
+        //     phase = 1;
+        // }
+        // if (phase == -1) {
+        //     offset--;
+        // } else { offset++; }
     }
 
     if (!camera_control->m_slave) {

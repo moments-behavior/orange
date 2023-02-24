@@ -31,7 +31,7 @@ int main(int argc, char **args)
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
-    file_dialog.SetPwd("/home/jinyao/exp");
+    file_dialog.SetPwd("/home/user/exp");
     std::string input_folder = file_dialog.GetPwd();
     file_dialog.SetTitle("My files");
 
@@ -104,7 +104,8 @@ int main(int argc, char **args)
                             if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
                                 init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, 1, 30);
+                                int gpu_id = i % 4;
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 60);
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -112,11 +113,11 @@ int main(int argc, char **args)
                         {
                             open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
                             // mcast
-                            string multicast_ip = "239.255.255.255"; // + std::to_string(i);
-                            ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
-                            std::cout << ecams[i].camera.multicastAddress << std::endl;
-                            ecams[i].camera.portMulticast = 60646 + i;
-                            ecams[i].camera.multicastMasterSubscribe = true; 
+                            // string multicast_ip = "239.255.255.255"; // + std::to_string(i);
+                            // ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
+                            // std::cout << ecams[i].camera.multicastAddress << std::endl;
+                            // ecams[i].camera.portMulticast = 60646 + i;
+                            // ecams[i].camera.multicastMasterSubscribe = true; 
                         }
                     }
 
@@ -238,21 +239,25 @@ int main(int argc, char **args)
                         set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                     }
 
-                    tex = new GL_Texture[num_cameras];
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        cudaStreamCreate(&tex[i].streams);
-                        int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
+                    camera_control->stream = false;
 
-                        create_texture(&tex[i].texture);
-                        create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                        bind_pbo(&tex[i].pbo);
+                    if (!camera_control->stream) {
+                        tex = new GL_Texture[num_cameras];
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            cudaStreamCreate(&tex[i].streams);
+                            int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
 
-                        register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                        unbind_texture();
-                        unbind_pbo();
-                        cudaMalloc((void **)&tex[i].display_buffer, size_pic);
-                    }
+                            create_texture(&tex[i].texture);
+                            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                            bind_pbo(&tex[i].pbo);
+
+                            register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
+                            unbind_texture();
+                            unbind_pbo();
+                            cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                        }
+                    } 
 
                     if (num_cameras > 1){
                         for (int i = 0; i < num_cameras; i++)
@@ -270,6 +275,7 @@ int main(int argc, char **args)
                     camera_control->subscribe = true;                    
                 } else {
                     camera_control->subscribe = false;
+                    camera_control->stream = true;
                     camera_control->sync_camera = false;
 
                     for (auto &t : camera_threads)
@@ -301,7 +307,7 @@ int main(int argc, char **args)
             file_dialog.ClearSelected();
         }
 
-        if (camera_control->subscribe)
+        if (camera_control->subscribe && camera_control->stream)
         {
             for (int i = 0; i < num_cameras; i++)
             {
@@ -321,7 +327,7 @@ int main(int argc, char **args)
             
             for (int i = 0; i < num_cameras; i++)
             {
-                string window_name = cameras_params[i].camera_name;
+                string window_name = std::to_string(cameras_params[i].camera_id);
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

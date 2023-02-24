@@ -278,8 +278,8 @@ static inline void open_metadata_file(ofstream *frame_metadata, string metadata_
 
 static inline void initialize_writer(Writer *writer, CameraParams *camera_params, string folder_name)
 {
-    writer->video_file = folder_name + "/Cam" + camera_params->camera_name + ".mp4";
-    writer->metadata_file = folder_name + "/Cam" + camera_params->camera_name + "_meta.csv";
+    writer->video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
+    writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
     writer->video = new FFmpegWriter(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str());
     writer->metadata = new ofstream();
     open_metadata_file(writer->metadata, writer->metadata_file);

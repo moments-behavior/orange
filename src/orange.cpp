@@ -31,7 +31,7 @@ int main(int argc, char **args)
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
-    file_dialog.SetPwd("/home/user/exp");
+    file_dialog.SetPwd("/home/jinyao/exp");
     std::string input_folder = file_dialog.GetPwd();
     file_dialog.SetTitle("My files");
 
@@ -105,7 +105,7 @@ int main(int argc, char **args)
                                 init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 int gpu_id = i % 4;
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 20);
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 20); // 2000, 3000
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -139,7 +139,8 @@ int main(int argc, char **args)
             {
                 (camera_control->subscribe) = !(camera_control->subscribe);
                 if (camera_control->subscribe)
-                {                
+                {   
+                    camera_control->stream = true;     
                     for (int i = 0; i < num_cameras; i++)
                     {               
                         EVT_CameraOpenStream(&ecams[i].camera);
@@ -238,10 +239,10 @@ int main(int argc, char **args)
                         }
                         set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                     }
+                    
+                    // camera_control->stream = false;
 
-                    camera_control->stream = false;
-
-                    if (!camera_control->stream) {
+                    if (camera_control->stream) {
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
@@ -275,7 +276,6 @@ int main(int argc, char **args)
                     camera_control->subscribe = true;                    
                 } else {
                     camera_control->subscribe = false;
-                    camera_control->stream = true;
                     camera_control->sync_camera = false;
 
                     for (auto &t : camera_threads)
@@ -289,10 +289,14 @@ int main(int argc, char **args)
                     {
                         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);
                         EVT_CameraCloseStream(&ecams[i].camera);
-                        gx_delete_buffer(&tex[i].pbo);
-                        cudaFree(tex[i].display_buffer);  
+                        if (camera_control->stream) {
+                            gx_delete_buffer(&tex[i].pbo);
+                            cudaFree(tex[i].display_buffer);  
+                        }
                     }
-                    delete[] tex;                     
+                    if (camera_control->stream) {
+                        delete[] tex;                     
+                    }
                 }
             }
             ImGui::PopStyleColor(1);

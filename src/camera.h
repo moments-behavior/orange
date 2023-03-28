@@ -87,5 +87,6 @@ void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, C
 void update_focus_value(Emergent::CEmergentCamera* camera, int focus_value, CameraParams* camera_params);
 int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
 void allocate_frame_reorder_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_reorder, CameraParams* camera_params);
+void camera_open_stream(Emergent::CEmergentCamera* camera);
 void sort_cameras_ip(GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *sorted_device_info, int cam_count);
 #endif

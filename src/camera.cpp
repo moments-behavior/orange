@@ -214,7 +214,7 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     //check_camera_errors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params->frame_rate));
     //printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
     update_frame_rate_value(camera, camera_params->frame_rate, camera_params);
-    // update_focus_value(camera, camera_params->focus, camera_params);
+    update_focus_value(camera, camera_params->focus, camera_params);
 }
 
 // **********************************************sync***************************************************** 
@@ -439,7 +439,6 @@ void sort_cameras_ip(GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *so
         j++;    
     }
 }
-
 
 int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *ordered_device_info)
 {

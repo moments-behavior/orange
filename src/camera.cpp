@@ -214,9 +214,7 @@ void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDevice
     //check_camera_errors(EVT_CameraSetUInt32Param(camera, "FrameRate", camera_params->frame_rate));
     //printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
     update_frame_rate_value(camera, camera_params->frame_rate, camera_params);
-    update_focus_value(camera, camera_params->focus, camera_params);
-
-
+    // update_focus_value(camera, camera_params->focus, camera_params);
 }
 
 // **********************************************sync***************************************************** 
@@ -333,13 +331,13 @@ void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_
 
 }
 
+void camera_open_stream(Emergent::CEmergentCamera* camera)
+{
+    check_camera_errors(EVT_CameraOpenStream(camera));
+}
 
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params, int buffer_size)
-{
-
-    // open stream is important to acclocate frame buffer successfully
-    // check_camera_errors(EVT_CameraOpenStream(camera));
-    
+{    
     for(int frame_count=0;frame_count<buffer_size;frame_count++)
     {
         set_frame_buffer(&evt_frame[frame_count], camera_params);

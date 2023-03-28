@@ -31,7 +31,7 @@ int main(int argc, char **args)
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
-    file_dialog.SetPwd("/home/jinyao/exp");
+    file_dialog.SetPwd("/home/user/exp");
     std::string input_folder = file_dialog.GetPwd();
     file_dialog.SetTitle("My files");
 
@@ -47,8 +47,8 @@ int main(int argc, char **args)
 
     // int buffer_size {500};
     PTPParams* ptp_params = new PTPParams{0, 0};
-    string encoder_setup;
-    string folder_name;
+    std::string encoder_setup;
+    std::string folder_name;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -104,8 +104,8 @@ int main(int argc, char **args)
                             if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
                                 init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
-                                int gpu_id = i % 4;
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 20); // 2000, 3000
+                                int gpu_id = 0;
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -143,7 +143,7 @@ int main(int argc, char **args)
                     camera_control->stream = true;     
                     for (int i = 0; i < num_cameras; i++)
                     {               
-                        EVT_CameraOpenStream(&ecams[i].camera);
+                        camera_open_stream(&ecams[i].camera);
                         allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
                         if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
                         {
@@ -260,13 +260,13 @@ int main(int argc, char **args)
                         }
                     } 
 
-                    if (num_cameras > 1){
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_camera_sync(&ecams[i].camera);
-                        }
-                        camera_control->sync_camera = true;
-                    }
+                    // if (num_cameras > 1){
+                    //     for (int i = 0; i < num_cameras; i++)
+                    //     {
+                    //         ptp_camera_sync(&ecams[i].camera);
+                    //     }
+                    //     camera_control->sync_camera = true;
+                    // }
 
                     for (int i = 0; i < num_cameras; i++)
                     {

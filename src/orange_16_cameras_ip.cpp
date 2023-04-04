@@ -17,7 +17,6 @@ int main(int argc, char *argv[])
     int num_cameras = atoi(argv[1]);
 
     for (unsigned int i = 0; i < count; i++) {
-
         change_camera_ip_persistent(device_info[i], , const char* new_ip)
     }
 }

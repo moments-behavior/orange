@@ -14,7 +14,13 @@ int main(int argc, char *argv[])
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
     std::cout << "available no of cameras: " << cam_count << std::endl;
     int num_cameras = atoi(argv[1]);
+    int frame_rate = atoi(argv[2]);
+    int frame_buffer_size = atoi(argv[3]);
+
     std::cout << "number of cameras: " << num_cameras << std::endl;
+    std::cout << "frame_rate: " << frame_rate << std::endl;
+    std::cout << "frame_buffer_size: " << frame_buffer_size << std::endl;
+
 
     CameraParams *cameras_params;
     CameraEmergent *ecams;
@@ -25,10 +31,11 @@ int main(int argc, char *argv[])
     cameras_params = new CameraParams[num_cameras];
     ecams = new CameraEmergent[num_cameras];
 
+
     for (int i = 0; i < num_cameras; i++)
     {
         int gpu_id = i%8;
-        init_7MP_camera_params_color(&cameras_params[i], i, num_cameras, 2000, 1500, gpu_id, 30); 
+        init_7MP_camera_params_color(&cameras_params[i], i, num_cameras, 2000, 1500, gpu_id, frame_rate); 
         open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
 
         int ReturnVal = 0;  
@@ -38,7 +45,7 @@ int main(int argc, char *argv[])
             std::cout << "Camera" << i << ": EVT_CameraOpenStream: Error" << std::endl;
             return ReturnVal;
         }
-        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 50);
+        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], frame_buffer_size);
         if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
         {
             allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);

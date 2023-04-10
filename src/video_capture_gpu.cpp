@@ -176,17 +176,17 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
         else
         {
             camera_state->frames_recd++;
-            upload_frame_to_gpu(camera_params, frame_original, ecam);
-            if (camera_params->color){
-                debayer_frame_gpu(camera_params, frame_original, debayer);
-            } else {
-                duplicate_channel_gpu(camera_params, frame_original, debayer);
-            }
-            if (camera_control->record_video)
-            {
-                encode_frame(encoder, writer->video, debayer);
-                write_meatadata(writer->metadata, ecam);
-            }
+            // upload_frame_to_gpu(camera_params, frame_original, ecam);
+            // if (camera_params->color){
+            //     debayer_frame_gpu(camera_params, frame_original, debayer);
+            // } else {
+            //     duplicate_channel_gpu(camera_params, frame_original, debayer);
+            // }
+            // if (camera_control->record_video)
+            // {
+            //     encode_frame(encoder, writer->video, debayer);
+            //     write_meatadata(writer->metadata, ecam);
+            // }
         }
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.

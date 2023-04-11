@@ -36,7 +36,7 @@ g++ -Ofast -ffast-math -std=c++17 \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
     -lm \
     -lpthread \
-    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode \
+    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc \
     -lGLEW -lGLU -lGL \
     -I$HOME/nvidia/ffmpeg/build/include/ \
     -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \

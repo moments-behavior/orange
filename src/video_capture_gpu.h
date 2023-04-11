@@ -11,6 +11,7 @@
 #include <iostream>
 #include "FFmpegWriter.h"
 #include <fstream>
+#include <npp.h>
 
 struct CameraControl
 {

@@ -16,7 +16,7 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
     pEnc->CreateEncoder(&initializeParams);
 }
 
-static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *frame_original, CameraEmergent *ecam)
+static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *frame_original, CameraEmergent *ecam, cudaStream_t stream2)
 {
     if (camera_params->need_reorder)
     {
@@ -41,13 +41,16 @@ static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *fr
         }
         else
         {
-            ck(cudaMemcpy(frame_original->d_orig, ecam->frame_recv.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
+            // ck(cudaMemcpy2D(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            ck(cudaMemcpy2DAsync(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice, stream2));
+            // ck(cudaMemcpy(frame_original->d_orig, ecam->frame_recv.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
         }
     }
 }
 
-static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params)
+static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params, cudaStream_t stream2)
 {
+    nppSetStream(stream2);
     int output_channels = 4;
     int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char) * output_channels;
     cudaMalloc((void **)&debayer->d_debayer, size_pic);
@@ -161,7 +164,7 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
 }
 
 
-static inline void get_one_frame(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer, PTPState *ptp_state)
+static inline void get_one_frame(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, Debayer *debayer, FrameGPU *frame_original, EncoderContext *encoder, Writer *writer, PTPState *ptp_state, cudaStream_t stream2)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     if (camera_control->sync_camera) {
@@ -176,17 +179,17 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
         else
         {
             camera_state->frames_recd++;
-            // upload_frame_to_gpu(camera_params, frame_original, ecam);
-            // if (camera_params->color){
-            //     debayer_frame_gpu(camera_params, frame_original, debayer);
-            // } else {
-            //     duplicate_channel_gpu(camera_params, frame_original, debayer);
-            // }
-            // if (camera_control->record_video)
-            // {
-            //     encode_frame(encoder, writer->video, debayer);
-            //     write_meatadata(writer->metadata, ecam);
-            // }
+            upload_frame_to_gpu(camera_params, frame_original, ecam, stream2);
+            if (camera_params->color){
+                debayer_frame_gpu(camera_params, frame_original, debayer);
+            } else {
+                duplicate_channel_gpu(camera_params, frame_original, debayer);
+            }
+            if (camera_control->record_video)
+            {
+                encode_frame(encoder, writer->video, debayer);
+                write_meatadata(writer->metadata, ecam);
+            }
         }
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
@@ -252,7 +255,7 @@ static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *c
     cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic);
 }
 
-static inline void initialize_encoder(EncoderContext *encoder, string encoder_str, CameraParams *camera_params)
+static inline void initialize_encoder(EncoderContext *encoder, string encoder_str, CameraParams *camera_params, cudaStream_t stream2)
 {
     encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
     encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str.c_str());
@@ -367,11 +370,12 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
 {
     ck(cudaSetDevice(camera_params->gpu_id));
 
+    cudaStream_t stream2;
     CameraState camera_state;
     FrameGPU frame_original;
     initalize_gpu_frame(&frame_original, camera_params);
     Debayer debayer;
-    initialize_gpu_debayer(&debayer, camera_params);
+    initialize_gpu_debayer(&debayer, camera_params, stream2);
 
     cudaStream_t stream1;
     std::thread t_stream;
@@ -386,7 +390,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     PTPState ptp_state;
 
     if (camera_control->record_video) {
-        initialize_encoder(&encoder, encoder_setup, camera_params);
+        initialize_encoder(&encoder, encoder_setup, camera_params, stream2);
         initialize_writer(&writer, camera_params, folder_name);
     }
 
@@ -416,7 +420,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
 
-        get_one_frame(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state);
+        get_one_frame(&camera_state, camera_control, ecam, camera_params, &debayer, &frame_original, &encoder, &writer, &ptp_state, stream2);
 
         // if (offset == 200) {
         //     phase = -1;

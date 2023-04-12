@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
         camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, nullptr, encoder_setup, folder_name, ptp_params));
     }
 
-    getchar();
+    // getchar();
     camera_control->subscribe = false;
     for (auto &t : camera_threads)
         t.join();

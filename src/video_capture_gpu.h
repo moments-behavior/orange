@@ -44,6 +44,7 @@ struct Debayer
 struct FrameGPU
 {
     unsigned char *d_orig;
+    unsigned char *d_orig_host;
     int size_pic;
 };
 

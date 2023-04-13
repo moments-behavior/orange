@@ -41,7 +41,9 @@ static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *fr
         }
         else
         {
-            ck(cudaMemcpy2D(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            // memcpy(frame_original->d_orig_host, ecam->frame_recv.imagePtr, frame_original->size_pic); 
+            ck(cudaMemcpy2D(frame_original->d_orig_host, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToHost));
+            ck(cudaMemcpy2D(frame_original->d_orig, camera_params->width, frame_original->d_orig_host, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
             // ck(cudaMemcpy2DAsync(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
             // ck(cudaMemcpy(frame_original->d_orig, ecam->frame_recv.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
         }
@@ -178,6 +180,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
         else
         {
             camera_state->frames_recd++;
+            // copy to pinned memory first
             upload_frame_to_gpu(camera_params, frame_original, ecam);
             // if (camera_params->color){
             //     debayer_frame_gpu(camera_params, frame_original, debayer);
@@ -251,7 +254,8 @@ static inline void copy_to_display_buffer(CameraParams *camera_params, CameraCon
 static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *camera_params)
 {
     frame_original->size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
-    cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic);
+    ck(cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic));
+    ck(cudaMallocHost((void **)&frame_original->d_orig_host, frame_original->size_pic));
 }
 
 static inline void initialize_encoder(EncoderContext *encoder, string encoder_str, CameraParams *camera_params)

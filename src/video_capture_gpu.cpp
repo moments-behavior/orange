@@ -16,6 +16,17 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
     pEnc->CreateEncoder(&initializeParams);
 }
 
+void naiveMemcpy(void* pDest, const void* pSource, std::size_t sizeBytes)
+{
+  char* p_dest = (char*)pDest;
+  const char* p_source = (const char*)pSource;
+  for (std::size_t i = 0; i < sizeBytes; ++i)
+  {
+    *p_dest++ = *p_source++;
+  }
+}
+
+
 static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *frame_original, CameraEmergent *ecam)
 {
     if (camera_params->need_reorder)
@@ -41,8 +52,8 @@ static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *fr
         }
         else
         {
-            // memcpy(frame_original->d_orig_host, ecam->frame_recv.imagePtr, frame_original->size_pic); 
-            ck(cudaMemcpy2D(frame_original->d_orig_host, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToHost));
+            naiveMemcpy(frame_original->d_orig_host, ecam->frame_recv.imagePtr, frame_original->size_pic); 
+            // ck(cudaMemcpy2D(frame_original->d_orig_host, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToHost));
             ck(cudaMemcpy2D(frame_original->d_orig, camera_params->width, frame_original->d_orig_host, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
             // ck(cudaMemcpy2DAsync(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
             // ck(cudaMemcpy(frame_original->d_orig, ecam->frame_recv.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
@@ -367,7 +378,6 @@ static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmerge
     // Countdown done.
     printf("\n");
 }
-
 
 void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams *ptp_params)
 {

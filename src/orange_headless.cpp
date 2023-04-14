@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     camera_control->sync_camera = true;
     string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
     string folder_string = current_date_time();
-    string folder_name = "/home/user/Videos/" + folder_string;
+    string folder_name = "/home/jinyao/Videos/" + folder_string;
 
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)

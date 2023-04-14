@@ -3,7 +3,7 @@ mkdir -p targets2;
 rm -f targets/orange_headless;
 nvcc -c src/cuda_line_reorder.cu -arch=sm_80 -o targets2/cuda_line_reorder.o
 
-g++ -Ofast -ffast-math -std=c++17 \
+g++ -std=c++17 -march=native -mtune=native -O3 \
     targets2/cuda_line_reorder.o \
     -o targets2/*.o \
     -o targets2/orange_headless -I ./src/ src/orange_headless.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp \

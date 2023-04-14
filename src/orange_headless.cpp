@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_cameras; i++)
     {
-        int gpu_id = i%8;
+        int gpu_id = i%4;
         init_7MP_camera_params_color(&cameras_params[i], i, num_cameras, 2000, 1500, gpu_id, frame_rate); 
         open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
 

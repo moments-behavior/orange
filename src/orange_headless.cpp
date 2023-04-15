@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
         set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
     }
 
-    camera_control->record_video = false; 
+    camera_control->record_video = true; 
     camera_control->subscribe = true;
     camera_control->stream = false;
     camera_control->m_slave = false;

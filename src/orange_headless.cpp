@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     camera_control->subscribe = true;
     camera_control->stream = false;
     camera_control->m_slave = false;
-    camera_control->sync_camera = true;
+    camera_control->sync_camera = false;
     string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
     string folder_string = current_date_time();
     string folder_name = "/home/jinyao/Videos/" + folder_string;
@@ -73,11 +73,13 @@ int main(int argc, char *argv[])
         std::cout << "Recorded video saves to : " << folder_name << std::endl;
     }
 
+    
+    if (camera_control->sync_camera) {
     for (int i = 0; i < num_cameras; i++)
-    {
-        ptp_camera_sync(&ecams[i].camera);
+        {
+            ptp_camera_sync(&ecams[i].camera);
+        }
     }
-
 
     for (int i = 0; i < num_cameras; i++)
     {

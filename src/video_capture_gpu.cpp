@@ -396,7 +396,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
 
     if (camera_control->sync_camera) {
         show_ptp_offset(&ptp_state, ecam);
-        start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
+        start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 10);
     }
     
     if (!camera_control->m_slave) {

@@ -1,5 +1,5 @@
 # orange :orange: 
-A light weight C++ library for emergent camera
+A GUI-based C/C++ library for emergent camera
 
 ![gui](images/gui.png)
 

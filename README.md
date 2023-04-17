@@ -9,7 +9,7 @@ A GUI-based C/C++ library for emergent cameras
 1. Multiple cameras streaming 
 2. PTP synchronization 
 3. GPU accelerated encoding (h264, h265)
-3. Support 7MP, 65MP, 100G Emergent cameras
+3. Support 7MP, 65MP, 100G, mono or color Emergent cameras
 
 ## Benchmark
 Encoding performance using GPU A6000 with 7MP Emergent camera

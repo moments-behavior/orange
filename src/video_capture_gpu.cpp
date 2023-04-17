@@ -63,13 +63,13 @@ static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera
     debayer->roi.y = 0;
     debayer->roi.width = camera_params->width;
     debayer->roi.height = camera_params->height;
-    if (camera_params->need_reorder)
-    {
+    if (camera_params->need_reorder) {
+        // 100G camera 
         debayer->grid = NPPI_BAYER_GRBG;
-    }
-    else
-    {
+    } else if (camera_params->pixel_format.compare("BayerRG8")==0) {
         debayer->grid = NPPI_BAYER_RGGB;
+    } else {
+        debayer->grid = NPPI_BAYER_GBRG;
     }
 }
 
@@ -281,11 +281,20 @@ static inline void open_metadata_file(ofstream *frame_metadata, string metadata_
     *frame_metadata << "frame_id,timestamp,offsetx,offsety\n";
 }
 
-static inline void initialize_writer(Writer *writer, CameraParams *camera_params, string folder_name)
+static inline void initialize_writer(Writer *writer, CameraParams *camera_params, string folder_name, string encoder_str)
 {
     writer->video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
     writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
-    writer->video = new FFmpegWriter(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str());
+
+    if (encoder_str.find("h264") != std::string::npos) {
+        std::cout << "h264 encoding" << '\n';
+        writer->video = new FFmpegWriter(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str());
+    } else if (encoder_str.find("hevc") != std::string::npos){
+        std::cout << "hevc encoding" << '\n';
+        writer->video = new FFmpegWriter(AV_CODEC_ID_HEVC, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str());
+    } else {
+        std::cout << "codec not supported" << '\n';
+    }
     writer->metadata = new ofstream();
     open_metadata_file(writer->metadata, writer->metadata_file);
 }
@@ -391,7 +400,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
 
     if (camera_control->record_video) {
         initialize_encoder(&encoder, encoder_setup, camera_params);
-        initialize_writer(&writer, camera_params, folder_name);
+        initialize_writer(&writer, camera_params, folder_name, encoder_setup);
     }
 
     if (camera_control->sync_camera) {

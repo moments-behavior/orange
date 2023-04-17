@@ -53,6 +53,25 @@ void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, in
 }
 
 
+void init_65MP_camera_params_color(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
+{
+    camera_params->width = 8192; // 9344;
+    camera_params->height = 7000; // 7000;
+    camera_params->frame_rate = frame_rate;
+    camera_params->gain = gain;
+    camera_params->exposure = exposure;
+    camera_params->pixel_format = "BayerGB8";
+    camera_params->gpu_id = gpu_id;
+    camera_params->num_cameras = num_cameras;
+    camera_params->gpu_direct = false;
+    camera_params->need_reorder = false;
+    camera_params->focus = 4419;
+    camera_params->camera_id = camera_id;
+    camera_params->color = true;
+    camera_params->color_temp = "CT_3000K";
+}
+
+
 void init_7MP_camera_params_color(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
 {
     camera_params->width = 3208;

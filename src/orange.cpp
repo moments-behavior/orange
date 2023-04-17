@@ -48,6 +48,9 @@ int main(int argc, char **args)
     // int buffer_size {500};
     PTPParams* ptp_params = new PTPParams{0, 0};
     std::string encoder_setup;
+    std::string encoder_basic_setup = "-codec h264 -preset p1 -fps ";
+    std::string encoder_codec = "h264"; 
+    std::string encoder_preset = "p1";
     std::string folder_name;
 
     while (!glfwWindowShouldClose(window->render_target))
@@ -102,10 +105,14 @@ int main(int argc, char **args)
                         {
                             cameras_params[i].camera_name.append(device_info[selected_cameras[i]].serialNumber);
                             if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
-                                init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, 1, 400); //458 
+                                int gpu_id = 0;
+                                init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 int gpu_id = 0;
                                 init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
+                            } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
+                                int gpu_id = 0;
+                                init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -202,6 +209,27 @@ int main(int argc, char **args)
             ImGui::SameLine();
             ImGui::Text(input_folder.c_str());
 
+            {
+                const char* items[] = { "h264", "hevc"};
+                static int item_current = 0;
+                ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
+                encoder_codec = items[item_current];
+            }
+
+            {
+                const char* items[] = { "p1", "p3", "p5", "p7"};
+                static int item_current = 0;
+                ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
+                encoder_preset = items[item_current];
+            }
+
+            if (ImGui::Button("Update Encoding Params"))
+            {
+                encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
+                std::cout << encoder_basic_setup << std::endl;
+            }
+
+
             if (camera_control->record_video)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.5f, 0, 0, 1.0f});
@@ -270,7 +298,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        encoder_setup = "-preset p1 -fps " + to_string(cameras_params[i].frame_rate);
+                        encoder_setup = encoder_basic_setup + to_string(cameras_params[i].frame_rate);
                         camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->subscribe = true;                    

@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     camera_control->stream = false;
     camera_control->m_slave = false;
     camera_control->sync_camera = true;
-    string encoder_setup = "-preset p1 -fps " + to_string(cameras_params[0].frame_rate);
+    string encoder_setup = "-codec h264 -preset p1 -fps " + to_string(cameras_params[0].frame_rate);
     string folder_string = current_date_time();
     string folder_name = "/home/jinyao/Videos/" + folder_string;
 

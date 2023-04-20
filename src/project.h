@@ -85,7 +85,7 @@ void init_7MP_camera_params_color(CameraParams* camera_params, int camera_id, in
     camera_params->num_cameras = num_cameras;
     camera_params->gpu_direct = false;
     camera_params->need_reorder = false;
-    camera_params->focus = 320;
+    camera_params->focus = 345;
     camera_params->camera_id = camera_id;
     camera_params->color = true;
 }

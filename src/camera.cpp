@@ -228,6 +228,16 @@ void ptp_camera_sync(Emergent::CEmergentCamera* camera)
     check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"));
 }
 
+
+void ptp_sync_off(Emergent::CEmergentCamera* camera)
+{
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "AcquisitionMode", "Continuous"));
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"));
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"));
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+}
+
 // use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds  
 unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera)
 {

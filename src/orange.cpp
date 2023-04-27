@@ -429,25 +429,14 @@ int main(int argc, char **args)
 
             if (camera_control->calibration) {
                 
-                if (ImGui::Button("Get new frame")) {
-                    display_buffer_cpu->available_to_write=true;
-                }
-
-                std::string no_frames_str = "Number of Frames: " + std::to_string(imagePoints.size());
-                ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), no_frames_str.c_str());
-
                 if (ImGui::Button("Detect")) 
                 {
                     display_buffer_cpu->available_to_write=false;
 
                     int winSize = 11;  // Half of search window for cornerSubPix
-                    float grid_width = calib_setting.squareSize * (calib_setting.boardSize.width - 1);
-                    Mat cameraMatrix, distCoeffs;
-                    Size imageSize;
-                    clock_t prevTimestamp = 0;
-
                     // local the frame and process frame 
                     cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[0].frame).reshape(3, 2200);
+                    std::cout << view.size << std::endl;
 
                     //! [find_pattern]
                     vector<Point2f> pointBuf;
@@ -471,7 +460,6 @@ int main(int argc, char **args)
                     }
 
                     std::cout << "\n after finding corner?:" << found << std::endl;
-
                     //! [find_pattern]
                     //! [pattern_found]
                     if (found)                // If done with success,
@@ -482,12 +470,37 @@ int main(int argc, char **args)
                                 Mat viewGray;
                                 cvtColor(view, viewGray, COLOR_BGR2GRAY);
                                 cornerSubPix( viewGray, pointBuf, Size(winSize,winSize),
-                                    Size(-1,-1), TermCriteria( TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001 ));
+                                    Size(-1,-1), TermCriteria(TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001));
                             }
                             imagePoints.push_back(pointBuf);                                
                             // Draw the corners.
                             drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
                             bitwise_not(view, view);
+                    }
+                }
+
+                if (ImGui::Button("Get new frame")) {
+                    display_buffer_cpu->available_to_write=true;
+                }
+
+                int no_frames = imagePoints.size();
+                std::string no_frames_str = "Number of Frames: " + std::to_string(no_frames);
+                if(no_frames < 25)
+                {
+                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), no_frames_str.c_str());
+                } else {
+                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), no_frames_str.c_str());
+                }
+                
+                if(ImGui::Button("Run calibration"))
+                {
+                    float grid_width = calib_setting.squareSize * (calib_setting.boardSize.width - 1);
+                    Mat cameraMatrix, distCoeffs;
+                    Size imageSize = cv::Size(2200, 3200);
+                    cout << "imageSize" << imageSize << endl;
+
+                    if(runCalibrationAndSave(calib_setting, imageSize, cameraMatrix, distCoeffs, imagePoints, grid_width, false)) {
+                        printf("Calibrated");
                     }
                 }
 

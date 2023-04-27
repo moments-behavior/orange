@@ -2,6 +2,7 @@
 mkdir -p targets;
 rm -f targets/orange;
 nvcc -c src/cuda_line_reorder.cu -arch=sm_80 -o targets/cuda_line_reorder.o
+nvcc -c src/color_conversion_gpu.cu -arch=sm_80 -o targets/color_conversion_gpu.o
 
 
 DIR_IMGUI="third_party/imgui"
@@ -23,9 +24,9 @@ DIR_IMPLOT="third_party/implot"
 
 
 g++ -Ofast -ffast-math -std=c++17 \
-    targets/cuda_line_reorder.o \
+    targets/color_conversion_gpu.o \
     -o targets/*.o \
-    -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp \
+    -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp src/buffer_utils.cpp \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
     -I$DIR_IMPLOT \
@@ -41,7 +42,7 @@ g++ -Ofast -ffast-math -std=c++17 \
     -I$HOME/nvidia/ffmpeg/build/include/ \
     -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     -I/usr/local/include/opencv4 \
-    -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d -lopencv_dnn \
+    -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d -lopencv_dnn -lopencv_features2d \
     `pkg-config --static --libs glfw3`
 
 sudo ./targets/orange;

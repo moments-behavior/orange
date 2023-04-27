@@ -9,6 +9,7 @@
 #include <imfilebrowser.h>
 #include "project.h"
 #include "gui.h"
+#include "camera_calibration.h"
 
 int main(int argc, char **args)
 {
@@ -52,6 +53,35 @@ int main(int argc, char **args)
     std::string encoder_codec = "h264"; 
     std::string encoder_preset = "p1";
     std::string folder_name;
+
+    // for camera calibration
+    
+    // allocate display buffer on cpu, make this dynamic later
+    int output_channels = 3;
+    int size_pic = 3208 * 2200 * output_channels * sizeof(unsigned char);
+    PictureBuffer display_buffer_cpu[4];
+    for(int j=0; j<4; j++){
+        display_buffer_cpu[j].frame = (unsigned char*)malloc(size_pic);
+        clear_buffer_with_constant_image(display_buffer_cpu[j].frame, 3208, 2200);
+        display_buffer_cpu[j].frame_number = 0;
+        display_buffer_cpu[j].available_to_write = true;
+    }
+
+    GLuint texture[4];
+
+    for(int j=0; j<4; j++){
+        glGenTextures(1, &texture[j]);
+        glBindTexture(GL_TEXTURE_2D, texture[j]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3208, 2200, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        // Setup filtering parameters for display
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+    }
+    Settings calib_setting;
+    vector<vector<Point2f> > imagePoints;
+
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -177,7 +207,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &display_buffer_cpu[i]));
                     }
 
                 } else {
@@ -295,11 +325,10 @@ int main(int argc, char **args)
                     //     }
                     //     camera_control->sync_camera = true;
                     // }
-
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &display_buffer_cpu[i]));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -330,8 +359,8 @@ int main(int argc, char **args)
             ImGui::PopStyleColor(1);
         }
         ImGui::End();
-        file_dialog.Display();
 
+        file_dialog.Display();
         if (file_dialog.HasSelected())
         {
             input_folder = file_dialog.GetSelected().string();
@@ -372,6 +401,118 @@ int main(int argc, char **args)
                 ImGui::End();
             }
         }
+
+
+        if (ImGui::Begin("Calibration"))
+        {
+            if (ImGui::Button("Load config file")){
+                const string inputSettingsFile = "/home/user/src/orange/default.xml";
+                FileStorage fs(inputSettingsFile, FileStorage::READ);
+                if (!fs.isOpened())
+                {
+                    std::cout << "Could not open the configuration file: \"" << inputSettingsFile << "\"" << std::endl;
+                    return -1;
+                } 
+                fs["Settings"] >> calib_setting;
+                fs.release();
+
+                if (!calib_setting.goodInput)
+                {
+                    cout << "Invalid input detected. Application stopping. " << endl;
+                    return -1;
+                } else {
+                    std::cout << "Calibration configuration file loaded: \"" << inputSettingsFile << "\"" << std::endl;
+                }
+                camera_control->copy_to_cpu = true;
+                camera_control->calibration = true;
+            }
+
+            if (camera_control->calibration) {
+                
+                if (ImGui::Button("Get new frame")) {
+                    display_buffer_cpu->available_to_write=true;
+                }
+
+                std::string no_frames_str = "Number of Frames: " + std::to_string(imagePoints.size());
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), no_frames_str.c_str());
+
+                if (ImGui::Button("Detect")) 
+                {
+                    display_buffer_cpu->available_to_write=false;
+
+                    int winSize = 11;  // Half of search window for cornerSubPix
+                    float grid_width = calib_setting.squareSize * (calib_setting.boardSize.width - 1);
+                    Mat cameraMatrix, distCoeffs;
+                    Size imageSize;
+                    clock_t prevTimestamp = 0;
+
+                    // local the frame and process frame 
+                    cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[0].frame).reshape(3, 2200);
+
+                    //! [find_pattern]
+                    vector<Point2f> pointBuf;
+                    bool found;
+                    int chessBoardFlags = CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE | CALIB_CB_FAST_CHECK;
+
+                    switch(calib_setting.calibrationPattern) // Find feature points on the input format
+                    {
+                        case Settings::CHESSBOARD:
+                            found = findChessboardCorners(view, calib_setting.boardSize, pointBuf);
+                            break;
+                        case Settings::CIRCLES_GRID:
+                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf );
+                            break;
+                        case Settings::ASYMMETRIC_CIRCLES_GRID:
+                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf, CALIB_CB_ASYMMETRIC_GRID);
+                            break;
+                        default:
+                            found = false;
+                            break;
+                    }
+
+                    std::cout << "\n after finding corner?:" << found << std::endl;
+
+                    //! [find_pattern]
+                    //! [pattern_found]
+                    if (found)                // If done with success,
+                    {
+                        // improve the found corners' coordinate accuracy for chessboard
+                            if(calib_setting.calibrationPattern == Settings::CHESSBOARD)
+                            {
+                                Mat viewGray;
+                                cvtColor(view, viewGray, COLOR_BGR2GRAY);
+                                cornerSubPix( viewGray, pointBuf, Size(winSize,winSize),
+                                    Size(-1,-1), TermCriteria( TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001 ));
+                            }
+                            imagePoints.push_back(pointBuf);                                
+                            // Draw the corners.
+                            drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
+                            bitwise_not(view, view);
+                    }
+                }
+
+                for(int j=0; j<num_cameras; j++){
+                    // if the current frame is ready, upload for display, otherwise wait for the frame to get ready 
+                    bind_texture(&texture[j]);
+                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 3208, 2200, GL_RGB, GL_UNSIGNED_BYTE, display_buffer_cpu[j].frame);
+                    unbind_texture();
+                }
+
+                for (int i = 0; i < num_cameras; i++) {
+                    string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);            
+                    ImGui::Begin(window_name.c_str());
+                    ImVec2 avail_size = ImGui::GetContentRegionAvail();
+
+                    //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+                    if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
+                        ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+                        ImPlot::EndPlot();
+                    }
+                    ImGui::End();            
+                }
+            }
+        }
+        ImGui::End();
 
         render_a_frame(window);
     }

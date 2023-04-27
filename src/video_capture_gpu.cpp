@@ -1,5 +1,5 @@
 #include "video_capture_gpu.h"
-#include "cuda_line_reorder.h"
+
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -230,8 +230,12 @@ static inline void report_statistics(CameraParams *camera_params, CameraState *c
     printf("Calculated Frame Rate: \t%f\n", camera_state->frames_recd / time_diff);
 }
 
-static inline void copy_to_display_buffer(CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, Debayer *debayer, cudaStream_t stream1)
+static inline void copy_to_display_buffer(CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, PictureBuffer* display_buffer_cpu, Debayer *debayer, cudaStream_t stream1)
 {
+
+    unsigned char *d_rgb;
+    cudaMalloc((void **)&d_rgb, 3208 * 2200 * 3);
+
     std::chrono::steady_clock::time_point steady_start, steady_end;
     while (camera_control->subscribe)
     {
@@ -239,6 +243,15 @@ static inline void copy_to_display_buffer(CameraParams *camera_params, CameraCon
         float time_sec = std::chrono::duration<double>(steady_end - steady_start).count();
         if (time_sec >= 0.03)
         {
+            if (camera_control->copy_to_cpu && display_buffer_cpu->available_to_write) {
+                rgba2bgr_convert(d_rgb, debayer->d_debayer, 3208, 2200, stream1);
+                cudaError_t cu_result = cudaMemcpy2DAsync(display_buffer_cpu->frame, camera_params->width*3, d_rgb, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost, stream1);
+                if (cu_result != cudaSuccess)
+                {
+                    std::cout << "Cuda Error" << std::endl;
+                }
+            } 
+
             // ck(cudaMemcpy2D(display_buffer, camera_params->width*4, d_debayer, camera_params->width*4, camera_params->width*4, camera_params->height, cudaMemcpyDeviceToDevice));
             ck(cudaMemcpy2DAsync(display_buffer, camera_params->width * 4, debayer->d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice, stream1));
             steady_start = steady_end;
@@ -376,7 +389,7 @@ static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmerge
     printf("\n");
 }
 
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams *ptp_params)
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams *ptp_params, PictureBuffer* display_buffer_cpu)
 {
     ck(cudaSetDevice(camera_params->gpu_id));
 
@@ -390,7 +403,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     std::thread t_stream;
     if (camera_control->stream) {
         ck(cudaStreamCreate(&stream1));
-        t_stream = std::thread(&copy_to_display_buffer, camera_params, camera_control, display_buffer, &debayer, stream1);
+        t_stream = std::thread(&copy_to_display_buffer, camera_params, camera_control, display_buffer, display_buffer_cpu, &debayer, stream1);
     }
 
     // encoding

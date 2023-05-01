@@ -406,7 +406,7 @@ int main(int argc, char **args)
         if (ImGui::Begin("Calibration"))
         {
             if (ImGui::Button("Load config file")){
-                const string inputSettingsFile = "/home/user/src/orange/default.xml";
+                const string inputSettingsFile = "/home/user/src/orange/circle.xml";
                 FileStorage fs(inputSettingsFile, FileStorage::READ);
                 if (!fs.isOpened())
                 {
@@ -453,6 +453,7 @@ int main(int argc, char **args)
                             break;
                         case Settings::ASYMMETRIC_CIRCLES_GRID:
                             found = findCirclesGrid(view, calib_setting.boardSize, pointBuf, CALIB_CB_ASYMMETRIC_GRID);
+                            std::cout << "here?" << std::endl;
                             break;
                         default:
                             found = false;

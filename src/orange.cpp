@@ -80,7 +80,9 @@ int main(int argc, char **args)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
     }
     Settings calib_setting;
-    vector<vector<Point2f> > imagePoints;
+    vector<vector<Point2f>> imagePoints;
+    vector<Mat> camera_matrices;
+    vector<Mat> dist_coeffs;
 
 
     while (!glfwWindowShouldClose(window->render_target))
@@ -431,57 +433,67 @@ int main(int argc, char **args)
                 
                 if (ImGui::Button("Detect")) 
                 {
-                    display_buffer_cpu->available_to_write=false;
 
-                    int winSize = 11;  // Half of search window for cornerSubPix
-                    // local the frame and process frame 
-                    cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[0].frame).reshape(3, 2200);
-                    std::cout << view.size << std::endl;
+                    for(int i=0; i < num_cameras; i++){
+                        display_buffer_cpu[i].available_to_write = false;
+                    }
+                    
+                    for(int i=0; i < num_cameras; i++) {
 
-                    //! [find_pattern]
-                    vector<Point2f> pointBuf;
-                    bool found;
-                    int chessBoardFlags = CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE | CALIB_CB_FAST_CHECK;
+                        int winSize = 11;  // Half of search window for cornerSubPix
+                        // local the frame and process frame 
+                        cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[i].frame).reshape(3, 2200);
 
-                    switch(calib_setting.calibrationPattern) // Find feature points on the input format
-                    {
-                        case Settings::CHESSBOARD:
-                            found = findChessboardCorners(view, calib_setting.boardSize, pointBuf);
-                            break;
-                        case Settings::CIRCLES_GRID:
-                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf );
-                            break;
-                        case Settings::ASYMMETRIC_CIRCLES_GRID:
-                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf, CALIB_CB_ASYMMETRIC_GRID);
-                            std::cout << "here?" << std::endl;
-                            break;
-                        default:
-                            found = false;
-                            break;
+                        //! [find_pattern]
+                        vector<Point2f> pointBuf;
+                        bool found;
+                        int chessBoardFlags = CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE | CALIB_CB_FAST_CHECK;
+
+                        switch(calib_setting.calibrationPattern) // Find feature points on the input format
+                        {
+                            case Settings::CHESSBOARD:
+                                found = findChessboardCorners(view, calib_setting.boardSize, pointBuf);
+                                break;
+                            case Settings::CIRCLES_GRID:
+                                found = findCirclesGrid(view, calib_setting.boardSize, pointBuf );
+                                break;
+                            case Settings::ASYMMETRIC_CIRCLES_GRID:
+                                found = findCirclesGrid(view, calib_setting.boardSize, pointBuf, CALIB_CB_ASYMMETRIC_GRID);
+                                std::cout << "here?" << std::endl;
+                                break;
+                            default:
+                                found = false;
+                                break;
+                        }
+
+                        std::cout << "\n after finding corner?:" << found << std::endl;
+                        //! [find_pattern]
+                        //! [pattern_found]
+                        if (found)                // If done with success,
+                        {
+                            // improve the found corners' coordinate accuracy for chessboard
+                                if(calib_setting.calibrationPattern == Settings::CHESSBOARD)
+                                {
+                                    Mat viewGray;
+                                    cvtColor(view, viewGray, COLOR_BGR2GRAY);
+                                    cornerSubPix( viewGray, pointBuf, Size(winSize,winSize),
+                                        Size(-1,-1), TermCriteria(TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001));
+                                }
+                                if (i==0){
+                                    imagePoints.push_back(pointBuf);                                
+                                }
+                                // Draw the corners.
+                                drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
+                                bitwise_not(view, view);
+                        }
                     }
 
-                    std::cout << "\n after finding corner?:" << found << std::endl;
-                    //! [find_pattern]
-                    //! [pattern_found]
-                    if (found)                // If done with success,
-                    {
-                        // improve the found corners' coordinate accuracy for chessboard
-                            if(calib_setting.calibrationPattern == Settings::CHESSBOARD)
-                            {
-                                Mat viewGray;
-                                cvtColor(view, viewGray, COLOR_BGR2GRAY);
-                                cornerSubPix( viewGray, pointBuf, Size(winSize,winSize),
-                                    Size(-1,-1), TermCriteria(TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001));
-                            }
-                            imagePoints.push_back(pointBuf);                                
-                            // Draw the corners.
-                            drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
-                            bitwise_not(view, view);
-                    }
                 }
 
                 if (ImGui::Button("Get new frame")) {
-                    display_buffer_cpu->available_to_write=true;
+                    for(int i=0; i < num_cameras; i++){
+                        display_buffer_cpu[i].available_to_write = true;
+                    }
                 }
 
                 int no_frames = imagePoints.size();
@@ -496,13 +508,79 @@ int main(int argc, char **args)
                 if(ImGui::Button("Run calibration"))
                 {
                     float grid_width = calib_setting.squareSize * (calib_setting.boardSize.width - 1);
-                    Mat cameraMatrix, distCoeffs;
                     Size imageSize = cv::Size(2200, 3200);
                     cout << "imageSize" << imageSize << endl;
 
-                    if(runCalibrationAndSave(calib_setting, imageSize, cameraMatrix, distCoeffs, imagePoints, grid_width, false)) {
-                        printf("Calibrated");
+                    for(int i=0; i < num_cameras; i++){
+                        if(runCalibrationAndSave(calib_setting, imageSize, camera_matrices[i], dist_coeffs[i], imagePoints, grid_width, false)) {
+                            printf("Calibrated");
+                        }                                        
+                    } 
+                }
+
+                if(ImGui::Button("Estimate camera pose")){
+                    
+                    // detect 
+                    for(int i=0; i < num_cameras; i++){
+                        display_buffer_cpu[i].available_to_write = false;
                     }
+                    
+                    for(int i=0; i < num_cameras; i++) {
+
+                        int winSize = 11;  // Half of search window for cornerSubPix
+                        // local the frame and process frame 
+                        cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[i].frame).reshape(3, 2200);
+
+                        //! [find_pattern]
+                        vector<Point2f> pointBuf;
+                        bool found;
+                        int chessBoardFlags = CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE | CALIB_CB_FAST_CHECK;
+
+                        switch(calib_setting.calibrationPattern) // Find feature points on the input format
+                        {
+                            case Settings::CHESSBOARD:
+                                found = findChessboardCorners(view, calib_setting.boardSize, pointBuf);
+                                break;
+                            case Settings::CIRCLES_GRID:
+                                found = findCirclesGrid(view, calib_setting.boardSize, pointBuf );
+                                break;
+                            case Settings::ASYMMETRIC_CIRCLES_GRID:
+                                found = findCirclesGrid(view, calib_setting.boardSize, pointBuf, CALIB_CB_ASYMMETRIC_GRID);
+                                std::cout << "here?" << std::endl;
+                                break;
+                            default:
+                                found = false;
+                                break;
+                        }
+
+                        std::cout << "\n after finding corner?:" << found << std::endl;
+                        //! [find_pattern]
+                        //! [pattern_found]
+                        if (found)                // If done with success,
+                        {
+                            // improve the found corners' coordinate accuracy for chessboard
+                                if(calib_setting.calibrationPattern == Settings::CHESSBOARD)
+                                {
+                                    Mat viewGray;
+                                    cvtColor(view, viewGray, COLOR_BGR2GRAY);
+                                    cornerSubPix( viewGray, pointBuf, Size(winSize,winSize),
+                                        Size(-1,-1), TermCriteria(TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001));
+                                }
+                                if (i==0){
+                                    imagePoints.push_back(pointBuf);                                
+                                }
+                                // Draw the corners.
+                                drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
+                                bitwise_not(view, view);
+                        }
+                    }
+
+                    std::vector<cv::Point3f> obj_points;
+                    obj_points.push_back(Point3f(0.44,0.30,0.46));
+
+                    // estimatePose(obj_points, pointBuf)
+
+
                 }
 
                 for(int j=0; j<num_cameras; j++){

@@ -459,4 +459,19 @@ bool runCalibrationAndSave(Settings& s, Size imageSize, Mat& cameraMatrix, Mat& 
 }
 //! [run_and_save]
 
+
+// Estimate the pose given a list of 2D/3D correspondences and the method to use
+bool estimatePose(const std::vector<cv::Point3f> &list_points3d, const std::vector<cv::Point2f> &list_points2d, Mat& cameraMatrix, Mat& distCoeffs, int flags)
+{
+    cv::Mat rvec = cv::Mat::zeros(3, 1, CV_64FC1);
+    cv::Mat tvec = cv::Mat::zeros(3, 1, CV_64FC1);
+
+    bool useExtrinsicGuess = false;
+
+    // Pose estimation
+    bool correspondence = cv::solvePnP( list_points3d, list_points2d, cameraMatrix, distCoeffs, rvec, tvec,
+                                        useExtrinsicGuess, flags);
+    return correspondence;
+}
+
 #endif

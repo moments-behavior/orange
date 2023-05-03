@@ -81,8 +81,8 @@ int main(int argc, char **args)
     }
     Settings calib_setting;
     vector<vector<Point2f>> imagePoints;
-    vector<Mat> camera_matrices;
-    vector<Mat> dist_coeffs;
+    Mat camera_matrices;
+    Mat dist_coeffs;
 
 
     while (!glfwWindowShouldClose(window->render_target))
@@ -482,6 +482,7 @@ int main(int argc, char **args)
                                 if (i==0){
                                     imagePoints.push_back(pointBuf);                                
                                 }
+                                std::cout << pointBuf << std::endl;
                                 // Draw the corners.
                                 drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
                                 bitwise_not(view, view);
@@ -511,11 +512,11 @@ int main(int argc, char **args)
                     Size imageSize = cv::Size(2200, 3200);
                     cout << "imageSize" << imageSize << endl;
 
-                    for(int i=0; i < num_cameras; i++){
-                        if(runCalibrationAndSave(calib_setting, imageSize, camera_matrices[i], dist_coeffs[i], imagePoints, grid_width, false)) {
+                    // for(int i=0; i < num_cameras; i++){
+                        if(runCalibrationAndSave(calib_setting, imageSize, camera_matrices, dist_coeffs, imagePoints, grid_width, false)) {
                             printf("Calibrated");
                         }                                        
-                    } 
+                    // } 
                 }
 
                 if(ImGui::Button("Estimate camera pose")){
@@ -525,8 +526,9 @@ int main(int argc, char **args)
                         display_buffer_cpu[i].available_to_write = false;
                     }
                     
-                    for(int i=0; i < num_cameras; i++) {
-
+                    // for(int i=0; i < num_cameras; i++) 
+                    {
+                        int i = 0;
                         int winSize = 11;  // Half of search window for cornerSubPix
                         // local the frame and process frame 
                         cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[i].frame).reshape(3, 2200);
@@ -563,7 +565,7 @@ int main(int argc, char **args)
                                 {
                                     Mat viewGray;
                                     cvtColor(view, viewGray, COLOR_BGR2GRAY);
-                                    cornerSubPix( viewGray, pointBuf, Size(winSize,winSize),
+                                    cornerSubPix(viewGray, pointBuf, Size(winSize,winSize),
                                         Size(-1,-1), TermCriteria(TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001));
                                 }
                                 if (i==0){
@@ -572,14 +574,15 @@ int main(int argc, char **args)
                                 // Draw the corners.
                                 drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
                                 bitwise_not(view, view);
+
+                                // estimate extrinsics 
+                                if(estimatePose(calib_setting, pointBuf, camera_matrices, dist_coeffs, SOLVEPNP_ITERATIVE)){
+                                    std::cout << "Extrinsics estimated successfully." << std::endl;
+                                }
                         }
                     }
 
-                    std::vector<cv::Point3f> obj_points;
-                    obj_points.push_back(Point3f(0.44,0.30,0.46));
-
-                    // estimatePose(obj_points, pointBuf)
-
+                    
 
                 }
 

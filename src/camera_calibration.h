@@ -272,7 +272,11 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
 
     vector<vector<Point3f> > objectPoints(1);
     calcBoardCornerPositions(s.boardSize, s.squareSize, objectPoints[0], s.calibrationPattern);
+    std::cout << objectPoints[0] << std::endl;
+
     objectPoints[0][s.boardSize.width - 1].x = objectPoints[0][0].x + grid_width;
+    std::cout << objectPoints[0] << std::endl;
+
     newObjPoints = objectPoints[0];
 
     objectPoints.resize(imagePoints.size(),objectPoints[0]);
@@ -461,15 +465,19 @@ bool runCalibrationAndSave(Settings& s, Size imageSize, Mat& cameraMatrix, Mat& 
 
 
 // Estimate the pose given a list of 2D/3D correspondences and the method to use
-bool estimatePose(const std::vector<cv::Point3f> &list_points3d, const std::vector<cv::Point2f> &list_points2d, Mat& cameraMatrix, Mat& distCoeffs, int flags)
+bool estimatePose(Settings& s, const std::vector<cv::Point2f> &list_points2d, Mat& cameraMatrix, Mat& distCoeffs, int flags)
 {
+    vector<Point3f> list_points3d;
+    calcBoardCornerPositions(s.boardSize, s.squareSize, list_points3d, s.calibrationPattern);
+    std::cout << list_points3d << std::endl;
+
     cv::Mat rvec = cv::Mat::zeros(3, 1, CV_64FC1);
     cv::Mat tvec = cv::Mat::zeros(3, 1, CV_64FC1);
 
     bool useExtrinsicGuess = false;
 
     // Pose estimation
-    bool correspondence = cv::solvePnP( list_points3d, list_points2d, cameraMatrix, distCoeffs, rvec, tvec,
+    bool correspondence = cv::solvePnP(list_points3d, list_points2d, cameraMatrix, distCoeffs, rvec, tvec,
                                         useExtrinsicGuess, flags);
     return correspondence;
 }

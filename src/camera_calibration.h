@@ -55,6 +55,7 @@ public:
         node["Square_Size"]  >> squareSize;
         node["Calibrate_NrOfFrameToUse"] >> nrFrames;
         node["Calibrate_FixAspectRatio"] >> aspectRatio;
+        node["Calibrate_UseIntrinsicGuess"] >> intrinsicGuess;
         node["Write_DetectedFeaturePoints"] >> writePoints;
         node["Write_extrinsicParameters"] >> writeExtrinsics;
         node["Write_gridPoints"] >> writeGrid;
@@ -96,6 +97,7 @@ public:
         if(calibFixPrincipalPoint) flag |= CALIB_FIX_PRINCIPAL_POINT;
         if(calibZeroTangentDist)   flag |= CALIB_ZERO_TANGENT_DIST;
         if(aspectRatio)            flag |= CALIB_FIX_ASPECT_RATIO;
+        if(intrinsicGuess)         flag |= CALIB_USE_INTRINSIC_GUESS;
         if(fixK1)                  flag |= CALIB_FIX_K1;
         if(fixK2)                  flag |= CALIB_FIX_K2;
         if(fixK3)                  flag |= CALIB_FIX_K3;
@@ -155,6 +157,7 @@ public:
     float squareSize;            // The size of a square in your defined unit (point, millimeter,etc).
     int nrFrames;                // The number of frames to use from the input for calibration
     float aspectRatio;           // The aspect ratio
+    float intrinsicGuess;
     int delay;                   // In case of a video input
     bool writePoints;            // Write detected feature points
     bool writeExtrinsics;        // Write extrinsic parameters
@@ -298,7 +301,7 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
             iFixedPoint = s.boardSize.width - 1;
         rms = calibrateCameraRO(objectPoints, imagePoints, imageSize, iFixedPoint,
                                 cameraMatrix, distCoeffs, rvecs, tvecs, newObjPoints,
-                                s.flag | CALIB_USE_LU);
+                                s.flag);
     }
 
     if (release_object) {
@@ -327,7 +330,7 @@ static void saveCameraParams( string outputFileName, Settings& s, Size& imageSiz
                               const vector<float>& reprojErrs, const vector<vector<Point2f> >& imagePoints,
                               double totalAvgErr, const vector<Point3f>& newObjPoints )
 {
-    FileStorage fs(outputFileName, FileStorage::WRITE );
+    FileStorage fs(outputFileName, FileStorage::WRITE);
 
     time_t tm;
     time( &tm );

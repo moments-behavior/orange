@@ -515,10 +515,16 @@ int main(int argc, char **args)
                 
                 if(ImGui::Button("Run calibration"))
                 {
-                    for(int i=0; i < num_cameras; i++){       
+                    for(int i=0; i < num_cameras; i++){
+
                         Mat cameraMatrix = Mat::eye(3, 3, CV_64F);
-                        if( !calib_setting.useFisheye && calib_setting.flag & CALIB_FIX_ASPECT_RATIO )
-                            cameraMatrix.at<double>(0,0) = calib_setting.aspectRatio;
+                        // initialization 
+                        if (!calib_setting.intrinsicGuess) {
+                            if( !calib_setting.useFisheye && calib_setting.flag & CALIB_FIX_ASPECT_RATIO )
+                                cameraMatrix.at<double>(0,0) = calib_setting.aspectRatio;
+                        } else {
+                            cameraMatrix = (Mat_<double>(3,3) << 2800, 0, 1100, 0, 2800, 1600, 0, 0, 1);
+                        }
                         camera_matrices.push_back(cameraMatrix);
 
                         if (calib_setting.useFisheye) {

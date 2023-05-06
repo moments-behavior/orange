@@ -39,7 +39,6 @@ public:
                   << "Write_DetectedFeaturePoints" << writePoints
                   << "Write_extrinsicParameters"   << writeExtrinsics
                   << "Write_gridPoints" << writeGrid
-                  << "Write_outputFileName"  << outputFileName
 
                   << "Show_UndistortedImage" << showUndistorted
 
@@ -59,7 +58,6 @@ public:
         node["Write_DetectedFeaturePoints"] >> writePoints;
         node["Write_extrinsicParameters"] >> writeExtrinsics;
         node["Write_gridPoints"] >> writeGrid;
-        node["Write_outputFileName"] >> outputFileName;
         node["Calibrate_AssumeZeroTangentialDistortion"] >> calibZeroTangentDist;
         node["Calibrate_FixPrincipalPointAtTheCenter"] >> calibFixPrincipalPoint;
         node["Calibrate_UseFisheyeModel"] >> useFisheye;
@@ -164,7 +162,6 @@ public:
     bool calibZeroTangentDist;   // Assume zero tangential distortion
     bool calibFixPrincipalPoint; // Fix the principal point at the center
     bool flipVertical;           // Flip the captured images around the horizontal axis
-    string outputFileName;       // The name of the file where to write
     bool showUndistorted;        // Show undistorted images after calibration
     string input;                // The input ->
     bool useFisheye;             // use fisheye camera model for calibration
@@ -259,16 +256,16 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
                             vector<float>& reprojErrs,  double& totalAvgErr, vector<Point3f>& newObjPoints,
                             float grid_width, bool release_object)
 {
-    //! [fixed_aspect]
-    cameraMatrix = Mat::eye(3, 3, CV_64F);
-    if( !s.useFisheye && s.flag & CALIB_FIX_ASPECT_RATIO )
-        cameraMatrix.at<double>(0,0) = s.aspectRatio;
-    //! [fixed_aspect]
-    if (s.useFisheye) {
-        distCoeffs = Mat::zeros(4, 1, CV_64F);
-    } else {
-        distCoeffs = Mat::zeros(8, 1, CV_64F);
-    }
+    // //! [fixed_aspect]
+    // cameraMatrix = Mat::eye(3, 3, CV_64F);
+    // if( !s.useFisheye && s.flag & CALIB_FIX_ASPECT_RATIO )
+    //     cameraMatrix.at<double>(0,0) = s.aspectRatio;
+    // //! [fixed_aspect]
+    // if (s.useFisheye) {
+    //     distCoeffs = Mat::zeros(4, 1, CV_64F);
+    // } else {
+    //     distCoeffs = Mat::zeros(8, 1, CV_64F);
+    // }
 
     vector<vector<Point3f> > objectPoints(1);
     calcBoardCornerPositions(s.boardSize, s.squareSize, objectPoints[0], s.calibrationPattern);
@@ -325,12 +322,12 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
 }
 
 // Print camera parameters to the output file
-static void saveCameraParams( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat& distCoeffs,
+static void saveCameraParams( string outputFileName, Settings& s, Size& imageSize, Mat& cameraMatrix, Mat& distCoeffs,
                               const vector<Mat>& rvecs, const vector<Mat>& tvecs,
                               const vector<float>& reprojErrs, const vector<vector<Point2f> >& imagePoints,
                               double totalAvgErr, const vector<Point3f>& newObjPoints )
 {
-    FileStorage fs( s.outputFileName, FileStorage::WRITE );
+    FileStorage fs(outputFileName, FileStorage::WRITE );
 
     time_t tm;
     time( &tm );
@@ -443,7 +440,7 @@ static void saveCameraParams( Settings& s, Size& imageSize, Mat& cameraMatrix, M
 }
 
 //! [run_and_save]
-bool runCalibrationAndSave(Settings& s, Size imageSize, Mat& cameraMatrix, Mat& distCoeffs,
+bool runCalibrationAndSave(String outputFileName, Settings& s, Size imageSize, Mat& cameraMatrix, Mat& distCoeffs,
                            vector<vector<Point2f> > imagePoints, float grid_width, bool release_object)
 {
     vector<Mat> rvecs, tvecs;
@@ -457,7 +454,7 @@ bool runCalibrationAndSave(Settings& s, Size imageSize, Mat& cameraMatrix, Mat& 
          << ". avg re projection error = " << totalAvgErr << endl;
 
     if (ok)
-        saveCameraParams(s, imageSize, cameraMatrix, distCoeffs, rvecs, tvecs, reprojErrs, imagePoints,
+        saveCameraParams(outputFileName, s, imageSize, cameraMatrix, distCoeffs, rvecs, tvecs, reprojErrs, imagePoints,
                          totalAvgErr, newObjPoints);
     return ok;
 }
@@ -465,7 +462,7 @@ bool runCalibrationAndSave(Settings& s, Size imageSize, Mat& cameraMatrix, Mat& 
 
 
 // Estimate the pose given a list of 2D/3D correspondences and the method to use
-bool estimatePose(Settings& s, const std::vector<cv::Point2f> &list_points2d, Mat& cameraMatrix, Mat& distCoeffs, int flags)
+bool estimatePose(String output_file_name, Settings& s, const std::vector<cv::Point2f> &list_points2d, Mat& cameraMatrix, Mat& distCoeffs, int flags)
 {
     vector<Point3f> list_points3d;
     calcBoardCornerPositions(s.boardSize, s.squareSize, list_points3d, s.calibrationPattern);
@@ -479,6 +476,16 @@ bool estimatePose(Settings& s, const std::vector<cv::Point2f> &list_points2d, Ma
     // Pose estimation
     bool correspondence = cv::solvePnP(list_points3d, list_points2d, cameraMatrix, distCoeffs, rvec, tvec,
                                         useExtrinsicGuess, flags);
+
+    if (correspondence) {
+
+        FileStorage fs(output_file_name, FileStorage::WRITE);
+        CV_Assert(rvec.type() == tvec.type());
+        fs << "camera_matrix" << cameraMatrix;
+        fs << "distortion_coefficients" << distCoeffs;
+        fs << "rotation_vector" << rvec;
+        fs << "translation_vector" << tvec;
+    }
     return correspondence;
 }
 

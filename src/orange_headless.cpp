@@ -13,6 +13,13 @@ int main(int argc, char *argv[])
     GigEVisionDeviceInfo device_info[max_cameras];
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
     std::cout << "available no of cameras: " << cam_count << std::endl;
+    
+    if (argc < 4)
+    {
+        std::cout << "Missing arguments. sudo ./orange_headless num_cameras frame_rate frame_buffer_size" << std::endl; 
+        return 1;
+    }
+    
     int num_cameras = atoi(argv[1]);
     int frame_rate = atoi(argv[2]);
     int frame_buffer_size = atoi(argv[3]);

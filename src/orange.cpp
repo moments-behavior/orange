@@ -79,10 +79,11 @@ int main(int argc, char **args)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
     }
+
     Settings calib_setting;
-    vector<vector<Point2f>> imagePoints;
-    Mat camera_matrices;
-    Mat dist_coeffs;
+    vector<vector<vector<Point2f>>> imagePoints;
+    vector<Mat> camera_matrices;
+    vector<Mat> dist_coeffs;
 
 
     while (!glfwWindowShouldClose(window->render_target))
@@ -427,13 +428,18 @@ int main(int argc, char **args)
                 }
                 camera_control->copy_to_cpu = true;
                 camera_control->calibration = true;
+
+                for(int i=0; i < num_cameras; i++) {
+                    vector<vector<Point2f>> image_points_per_cam;
+                    imagePoints.push_back(image_points_per_cam);
+                }
             }
 
+            
             if (camera_control->calibration) {
                 
                 if (ImGui::Button("Detect")) 
                 {
-
                     for(int i=0; i < num_cameras; i++){
                         display_buffer_cpu[i].available_to_write = false;
                     }
@@ -479,9 +485,8 @@ int main(int argc, char **args)
                                     cornerSubPix( viewGray, pointBuf, Size(winSize,winSize),
                                         Size(-1,-1), TermCriteria(TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001));
                                 }
-                                if (i==0){
-                                    imagePoints.push_back(pointBuf);                                
-                                }
+                                
+                                imagePoints[i].push_back(pointBuf);                                
                                 std::cout << pointBuf << std::endl;
                                 // Draw the corners.
                                 drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
@@ -497,26 +502,44 @@ int main(int argc, char **args)
                     }
                 }
 
-                int no_frames = imagePoints.size();
-                std::string no_frames_str = "Number of Frames: " + std::to_string(no_frames);
-                if(no_frames < 25)
-                {
-                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), no_frames_str.c_str());
-                } else {
-                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), no_frames_str.c_str());
+                for(int i=0; i < num_cameras; i++) {
+                    int no_frames = imagePoints[i].size();
+                    std::string no_frames_str = "Number of Frames: " + std::to_string(no_frames);
+                    if(no_frames < 25)
+                    {
+                        ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), no_frames_str.c_str());
+                    } else {
+                        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), no_frames_str.c_str());
+                    }
                 }
                 
                 if(ImGui::Button("Run calibration"))
                 {
+                    for(int i=0; i < num_cameras; i++){       
+                        Mat cameraMatrix = Mat::eye(3, 3, CV_64F);
+                        if( !calib_setting.useFisheye && calib_setting.flag & CALIB_FIX_ASPECT_RATIO )
+                            cameraMatrix.at<double>(0,0) = calib_setting.aspectRatio;
+                        camera_matrices.push_back(cameraMatrix);
+
+                        if (calib_setting.useFisheye) {
+                            Mat distCoeffs = Mat::zeros(4, 1, CV_64F);
+                            dist_coeffs.push_back(distCoeffs);
+                        } else {
+                            Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
+                            dist_coeffs.push_back(distCoeffs);
+                        }
+                    }
+
                     float grid_width = calib_setting.squareSize * (calib_setting.boardSize.width - 1);
                     Size imageSize = cv::Size(2200, 3200);
                     cout << "imageSize" << imageSize << endl;
 
-                    // for(int i=0; i < num_cameras; i++){
-                        if(runCalibrationAndSave(calib_setting, imageSize, camera_matrices, dist_coeffs, imagePoints, grid_width, false)) {
+                    for(int i=0; i < num_cameras; i++){
+                        string cam_calib_out = "Cam" + std::to_string(cameras_params[i].camera_id) + ".xml"; 
+                        if(runCalibrationAndSave(cam_calib_out, calib_setting, imageSize, camera_matrices[i], dist_coeffs[i], imagePoints[i], grid_width, false)) {
                             printf("Calibrated");
                         }                                        
-                    // } 
+                    } 
                 }
 
                 if(ImGui::Button("Estimate camera pose")){
@@ -526,9 +549,8 @@ int main(int argc, char **args)
                         display_buffer_cpu[i].available_to_write = false;
                     }
                     
-                    // for(int i=0; i < num_cameras; i++) 
+                    for(int i=0; i < num_cameras; i++) 
                     {
-                        int i = 0;
                         int winSize = 11;  // Half of search window for cornerSubPix
                         // local the frame and process frame 
                         cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[i].frame).reshape(3, 2200);
@@ -568,22 +590,18 @@ int main(int argc, char **args)
                                     cornerSubPix(viewGray, pointBuf, Size(winSize,winSize),
                                         Size(-1,-1), TermCriteria(TermCriteria::EPS+TermCriteria::COUNT, 30, 0.0001));
                                 }
-                                if (i==0){
-                                    imagePoints.push_back(pointBuf);                                
-                                }
+                                imagePoints[i].push_back(pointBuf);                                
                                 // Draw the corners.
                                 drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
                                 bitwise_not(view, view);
-
+                                
+                                string cam_calib_estrinsics = "Cam" + std::to_string(cameras_params[i].camera_id) + "_extrinsics.xml"; 
                                 // estimate extrinsics 
-                                if(estimatePose(calib_setting, pointBuf, camera_matrices, dist_coeffs, SOLVEPNP_ITERATIVE)){
+                                if(estimatePose(cam_calib_estrinsics, calib_setting, pointBuf, camera_matrices[i], dist_coeffs[i], SOLVEPNP_ITERATIVE)){
                                     std::cout << "Extrinsics estimated successfully." << std::endl;
                                 }
                         }
                     }
-
-                    
-
                 }
 
                 for(int j=0; j<num_cameras; j++){
@@ -608,8 +626,8 @@ int main(int argc, char **args)
             }
         }
         ImGui::End();
-
         render_a_frame(window);
+
     }
 
     // Cleanup

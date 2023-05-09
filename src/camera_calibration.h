@@ -492,4 +492,19 @@ bool estimatePose(String output_file_name, Settings& s, const std::vector<cv::Po
     return correspondence;
 }
 
+
+void loadIntrinsics(String input_file_name, Mat& cameraMatrix, Mat& distCoeffs)
+{
+    FileStorage fs;
+    fs.open(input_file_name, FileStorage::READ);
+    if (!fs.isOpened())
+    {
+        cerr << "Failed to open file: " << input_file_name << endl;
+        return;
+    }
+    fs["camera_matrix"] >> cameraMatrix;
+    fs["distortion_coefficients"] >> distCoeffs;
+    return;
+}
+
 #endif

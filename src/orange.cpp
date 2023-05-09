@@ -59,17 +59,17 @@ int main(int argc, char **args)
     // allocate display buffer on cpu, make this dynamic later
     int output_channels = 3;
     int size_pic = 3208 * 2200 * output_channels * sizeof(unsigned char);
-    PictureBuffer display_buffer_cpu[4];
-    for(int j=0; j<4; j++){
+    PictureBuffer display_buffer_cpu[8];
+    for(int j=0; j<8; j++){
         display_buffer_cpu[j].frame = (unsigned char*)malloc(size_pic);
         clear_buffer_with_constant_image(display_buffer_cpu[j].frame, 3208, 2200);
         display_buffer_cpu[j].frame_number = 0;
         display_buffer_cpu[j].available_to_write = true;
     }
 
-    GLuint texture[4];
+    GLuint texture[8];
 
-    for(int j=0; j<4; j++){
+    for(int j=0; j<8; j++){
         glGenTextures(1, &texture[j]);
         glBindTexture(GL_TEXTURE_2D, texture[j]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3208, 2200, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -84,7 +84,8 @@ int main(int argc, char **args)
     vector<vector<vector<Point2f>>> imagePoints;
     vector<Mat> camera_matrices;
     vector<Mat> dist_coeffs;
-
+    vector<int> image_save_index;
+    bool* selected_images_to_save;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -143,6 +144,7 @@ int main(int argc, char **args)
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 int gpu_id = 0;
                                 init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
+                                // init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 30); // 2000, 3000
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
                                 int gpu_id = 0;
                                 init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
@@ -433,10 +435,91 @@ int main(int argc, char **args)
                     vector<vector<Point2f>> image_points_per_cam;
                     imagePoints.push_back(image_points_per_cam);
                 }
+
+
+                for(int i=0; i < num_cameras; i++){
+
+                    Mat cameraMatrix = Mat::eye(3, 3, CV_64F);
+                    // initialization 
+                    if (!calib_setting.intrinsicGuess) {
+                        if( !calib_setting.useFisheye && calib_setting.flag & CALIB_FIX_ASPECT_RATIO )
+                            cameraMatrix.at<double>(0,0) = calib_setting.aspectRatio;
+                    } else {
+                        cameraMatrix = (Mat_<double>(3,3) << 2800, 0, 1100, 0, 2800, 1600, 0, 0, 1);
+                    }
+                    camera_matrices.push_back(cameraMatrix);
+
+                    if (calib_setting.useFisheye) {
+                        Mat distCoeffs = Mat::zeros(4, 1, CV_64F);
+                        dist_coeffs.push_back(distCoeffs);
+                    } else {
+                        Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
+                        dist_coeffs.push_back(distCoeffs);
+                    }
+                }
+
+                for(int i=0; i < num_cameras; i++){
+                    image_save_index.push_back(0);
+                }
+                selected_images_to_save = new bool[num_cameras];
+                for(int i=0; i < num_cameras; i++){
+                    selected_images_to_save[i] = false;
+                }
             }
 
             
             if (camera_control->calibration) {
+
+                if (ImGui::Button("Save images all")) 
+                {
+                    for(int i=0; i < num_cameras; i++){
+                        display_buffer_cpu[i].available_to_write = false;
+                    }
+                    
+                    for(int i=0; i < num_cameras; i++) {
+                        cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[i].frame).reshape(3, 2200);
+                        string image_name = "/home/user/Calibration/8ceiling_cam_matlab/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tiff"; 
+                        cv::imwrite(image_name, view);
+                        image_save_index[i]++;
+                    }
+
+                    for(int i=0; i < num_cameras; i++){
+                        display_buffer_cpu[i].available_to_write = true;
+                    }
+                }
+               
+               
+                for(int i=0; i < num_cameras; i++) {
+                    ImGui::InputInt("Saving image index: ", &image_save_index[i]);
+                }
+
+                for(int i=0; i < num_cameras; i++) {
+                    char label[32];
+                    sprintf(label, "Cam%d", i);
+                    ImGui::Checkbox(label, &selected_images_to_save[i]);
+                    ImGui::SameLine();
+                }
+
+                if (ImGui::Button("Save selected")) 
+                {
+                    for(int i=0; i < num_cameras; i++){
+                        display_buffer_cpu[i].available_to_write = false;
+                    }
+                    
+                    for(int i=0; i < num_cameras; i++) {
+                        if (selected_images_to_save[i]) {
+                            cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer_cpu[i].frame).reshape(3, 2200);
+                            string image_name = "/home/user/Calibration/16cam_matlab/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tiff"; 
+                            cv::imwrite(image_name, view);
+                            image_save_index[i]++;
+                        }
+                    }
+
+                    for(int i=0; i < num_cameras; i++){
+                        display_buffer_cpu[i].available_to_write = true;
+                    }
+                }
+
                 
                 if (ImGui::Button("Detect")) 
                 {
@@ -515,27 +598,6 @@ int main(int argc, char **args)
                 
                 if(ImGui::Button("Run calibration"))
                 {
-                    for(int i=0; i < num_cameras; i++){
-
-                        Mat cameraMatrix = Mat::eye(3, 3, CV_64F);
-                        // initialization 
-                        if (!calib_setting.intrinsicGuess) {
-                            if( !calib_setting.useFisheye && calib_setting.flag & CALIB_FIX_ASPECT_RATIO )
-                                cameraMatrix.at<double>(0,0) = calib_setting.aspectRatio;
-                        } else {
-                            cameraMatrix = (Mat_<double>(3,3) << 2800, 0, 1100, 0, 2800, 1600, 0, 0, 1);
-                        }
-                        camera_matrices.push_back(cameraMatrix);
-
-                        if (calib_setting.useFisheye) {
-                            Mat distCoeffs = Mat::zeros(4, 1, CV_64F);
-                            dist_coeffs.push_back(distCoeffs);
-                        } else {
-                            Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
-                            dist_coeffs.push_back(distCoeffs);
-                        }
-                    }
-
                     float grid_width = calib_setting.squareSize * (calib_setting.boardSize.width - 1);
                     Size imageSize = cv::Size(2200, 3200);
                     cout << "imageSize" << imageSize << endl;
@@ -546,6 +608,13 @@ int main(int argc, char **args)
                             printf("Calibrated");
                         }                                        
                     } 
+                }
+
+                if(ImGui::Button("Load intrinsics")){
+                    for(int i=0; i < num_cameras; i++){
+                        string input_intrinsic_files = "Cam" + std::to_string(cameras_params[i].camera_id) + ".xml"; 
+                        loadIntrinsics(input_intrinsic_files, camera_matrices[i], dist_coeffs[i]);
+                    }
                 }
 
                 if(ImGui::Button("Estimate camera pose")){
@@ -627,6 +696,7 @@ int main(int argc, char **args)
                         ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)texture[i], ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
                         ImPlot::EndPlot();
                     }
+
                     ImGui::End();            
                 }
             }

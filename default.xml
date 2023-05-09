@@ -28,6 +28,7 @@
   <!-- Consider only fy as a free parameter, the ratio fx/fy stays the same as in the input cameraMatrix. 
 	   Use or not setting. 0 - False Non-Zero - True-->
   <Calibrate_FixAspectRatio> 1 </Calibrate_FixAspectRatio>
+  <Calibrate_UseIntrinsicGuess> 1 </Calibrate_UseIntrinsicGuess>
   <!-- If true (non-zero) tangential distortion coefficients  are set to zeros and stay zero.-->
   <Calibrate_AssumeZeroTangentialDistortion>1</Calibrate_AssumeZeroTangentialDistortion>
   <!-- If true (non-zero) the principal point is not changed during the global optimization.-->

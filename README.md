@@ -40,5 +40,12 @@ sudo apt-get install libglm-dev
 git submodule init
 git submodule update
 ```
+
+5. If you are building the project the first time, uncomment line 11 ~ line 21 for building `ImGui` and `Implot` obejct files. Run
+```
+./build.sh
+```
+You can comment out line 11 ~ line 21 to reducing building time afterwards. 
+
 ## Contribute to the project 
 If you wish to contribute to the project, please make changes to your local branch, and create a pull request before pushing.  

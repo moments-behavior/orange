@@ -26,6 +26,7 @@ Run `build.sh` in local folder
 ```
 ./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64
 ```
+The project build file `build.sh` assume you install FFmepg at `$HOME/nvidia/ffmpeg/build/include/` and `$HOME/nvidia/ffmpeg/build/lib/`, if you install it as different locations, please change the `build.sh` accordingly. 
 
 3. Install OpenGL and GLEW, GLM
 ```

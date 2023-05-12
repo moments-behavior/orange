@@ -34,3 +34,11 @@ sudo apt-get install libglfw3-dev
 sudo apt-get install libglew-dev
 sudo apt-get install libglm-dev
 ```
+
+4. orange depends on github repos like `Dear Imgui`, `Implot` etc. Once cloned the repo, use the following command to pull submodules
+```
+git submodule init
+git submodule update
+```
+## Contribute to the project 
+If you wish to contribute to the project, please make changes to your local branch, and create a pull request before pushing.  

@@ -20,8 +20,9 @@ Run `build.sh` in local folder
 
 
 ## Build instructions 
-1. Install Emergent camera SDK
-2. Install FFmpeg as shared library
+1. Install CUDA 11.7 fowllow instructions from Nvidia Cuda install instructions.
+2. Install Emergent camera SDK
+3. Install FFmpeg 4.4 as shared library
 ```
 ./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64
 ```

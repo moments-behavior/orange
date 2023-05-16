@@ -13,31 +13,29 @@
 
 struct CPURender
 {
-    u32 image_width;
-    u32 image_height;
-    u32 output_channels;
     GLuint *image_texture;
     PictureBuffer* display_buffer;
 };
 
 void allocate_cpu_render_resources(CPURender* cpu_buffers, u32 image_width, u32 image_height, u32 num_cams)
 {
-    cpu_buffers->display_buffer = (PictureBuffer *)malloc(num_cams * sizeof(PictureBuffer *));
-
-    u32 size_pic = cpu_buffers->image_height * cpu_buffers->image_width * cpu_buffers->output_channels * sizeof(unsigned char);
+    cpu_buffers->display_buffer = (PictureBuffer *)malloc(num_cams * sizeof(PictureBuffer));
+    u32 size_pic = image_height * image_width * 3 * sizeof(unsigned char);
+    
     for (u32 j = 0; j < num_cams; j++)
     {
         cpu_buffers->display_buffer[j].frame = (unsigned char*)malloc(size_pic);
-        clear_buffer_with_constant_image(cpu_buffers->display_buffer[j].frame, cpu_buffers->image_width, cpu_buffers->image_height);
+        clear_buffer_with_constant_image(cpu_buffers->display_buffer[j].frame, image_width, image_height);
         cpu_buffers->display_buffer[j].frame_number = 0;
         cpu_buffers->display_buffer[j].available_to_write = true;
     }
 
+    cpu_buffers->image_texture = (GLuint *)malloc(num_cams * sizeof(GLuint));
     for (u32 j = 0; j < num_cams; j++)
     {
         glGenTextures(1, &cpu_buffers->image_texture[j]);
         glBindTexture(GL_TEXTURE_2D, cpu_buffers->image_texture[j]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, cpu_buffers->image_width, cpu_buffers->image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
         // Setup filtering parameters for display
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -55,7 +53,6 @@ struct CameraCalibResults{
 struct CalibData
 {
     bool* selected_images_to_save;
-    Settings calib_setting;
     vector<vector<vector<Point2f>>> imagePoints;
     vector<int> image_save_index;
 };
@@ -67,7 +64,7 @@ void calibration_window(CPURender* cpu_buffers, Settings* calib_setting, CameraC
         if (ImGui::Button("Load config file")) {
             
             // allocate cpu display buffer
-            allocate_cpu_render_resources(cpu_buffers, cameras_params->width, cameras_params->height, num_cameras);
+            allocate_cpu_render_resources(cpu_buffers, cameras_params[0].width, cameras_params[0].height, num_cameras);
 
             const std::string inputSettingsFile = "/home/user/src/orange/circle.xml";
             FileStorage fs(inputSettingsFile, FileStorage::READ);

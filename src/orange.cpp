@@ -56,6 +56,7 @@ int main(int argc, char **args)
     CPURender cpu_buffers;
     CameraCalibResults calib_results;
     CalibData calib_data;
+    Settings calib_setting;
 
     bool show_calibration_window = false;
     bool show_arucomarker_window = false;
@@ -388,7 +389,7 @@ int main(int argc, char **args)
 
 
         if (show_calibration_window) {
-            // calibration_window();
+            calibration_window(&cpu_buffers, &calib_setting, camera_control, cameras_params, num_cameras, &calib_results, &calib_data);
         }
 
         render_a_frame(window);

@@ -413,7 +413,7 @@ int main(int argc, char **args)
                 }
 
                 for (int i = 0; i < num_cameras; i++) {
-                    string window_name = "CamC" + std::to_string(cameras_params[i].camera_id);            
+                    string window_name = "CCam" + std::to_string(cameras_params[i].camera_id);            
                     ImGui::Begin(window_name.c_str());
                     ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

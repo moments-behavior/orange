@@ -53,13 +53,14 @@ int main(int argc, char **args)
     std::string encoder_preset = "p1";
     std::string folder_name;
 
-    CPURender cpu_buffers;
+    CPURender *cpu_buffers;
     CameraCalibResults calib_results;
     CalibData calib_data;
     Settings calib_setting;
 
     bool show_calibration_window = false;
     bool show_arucomarker_window = false;
+    bool show_cpu_buffer = false;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -184,9 +185,11 @@ int main(int argc, char **args)
                         cudaMalloc((void **)&tex[i].display_buffer, size_pic);
                     }
 
+                    cpu_buffers = new CPURender[num_cameras];
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers.display_buffer[i]));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
                     }
 
                 } else {
@@ -307,7 +310,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers.display_buffer[i]));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -382,10 +385,49 @@ int main(int argc, char **args)
         }
 
         if (ImGui::Begin("Realtime Tools")) {
+            
+            if (ImGui::Button("Allocate cpu buffers")) {
+                for (int i = 0; i < num_cameras; i++) {
+                    allocate_cpu_render_resources(&cpu_buffers[i], cameras_params[i].width, cameras_params[i].height);
+                }
+                show_cpu_buffer = true;
+
+            }
+
+            if (ImGui::Button("Copy to CPU")) {
+                camera_control->copy_to_cpu = true;
+            }
+
             ImGui::Checkbox("Calibration", &show_calibration_window);      
             ImGui::Checkbox("Aruco Marker", &show_arucomarker_window);
         }
         ImGui::End();
+
+
+        if (show_cpu_buffer) {
+            if (ImGui::Begin("CPU buffers")) {
+                for(int i=0; i < num_cameras; i++){
+                    bind_texture(&cpu_buffers[i].image_texture);
+                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cameras_params[i].width, cameras_params[i].height, GL_RGB, GL_UNSIGNED_BYTE, cpu_buffers[i].display_buffer.frame);
+                    unbind_texture();
+                }
+
+                for (int i = 0; i < num_cameras; i++) {
+                    string window_name = "CamC" + std::to_string(cameras_params[i].camera_id);            
+                    ImGui::Begin(window_name.c_str());
+                    ImVec2 avail_size = ImGui::GetContentRegionAvail();
+
+                    //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+                    if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
+                        ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)cpu_buffers[i].image_texture, ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+                        ImPlot::EndPlot();
+                    }
+
+                    ImGui::End();            
+                }
+            }
+            ImGui::End();            
+        }
 
 
         if (show_calibration_window) {

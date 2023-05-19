@@ -246,6 +246,7 @@ static inline void copy_to_display_buffer(CameraParams *camera_params, CameraCon
             if (camera_control->copy_to_cpu && display_buffer_cpu->available_to_write) {
                 rgba2bgr_convert(d_rgb, debayer->d_debayer, 3208, 2200, stream1);
                 cudaError_t cu_result = cudaMemcpy2DAsync(display_buffer_cpu->frame, camera_params->width*3, d_rgb, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost, stream1);
+
                 if (cu_result != cudaSuccess)
                 {
                     std::cout << "Cuda Error" << std::endl;

@@ -11,6 +11,7 @@
 #include "types.h"
 #include "gui.h"
 #include "aruco.h"
+#include <opencv2/sfm.hpp>
 
 struct CPURender
 {
@@ -40,97 +41,129 @@ void allocate_cpu_render_resources(CPURender *cpu_buffers, u32 image_width, u32 
 
 struct CameraCalibResults
 {
-    Mat camera_matrix;
-    Mat dist_coeff;
-    Mat tc_ext;
-    Mat rc_ext;
+    cv::Mat k;
+    cv::Mat dist_coeffs;
+    cv::Mat r;
+    cv::Mat rvec;
+    cv::Mat tvec;
+    cv::Mat projection_mat;
 };
-
 
 struct CalibData
 {
     vector<vector<vector<Point2f>>> imagePoints;
 };
 
-void aruco_detection(PictureBuffer* display_buffer) 
+struct ArucoMarker2d 
+{
+    int id; 
+    std::vector<int> detected_cameras;
+    std::vector<std::vector<cv::Point2f>> detected_points;
+};
+
+struct ArucoMarker3d
+{
+    int id;
+    std::vector<cv::Point3f> corners;
+};
+
+
+void load_camera_calibration_results(CameraCalibResults* calib_results, CameraParams *cameras_params) 
+{
+    std::string calibration_file = "/home/user/Calibration/world/calibration_aruco/Cam" + std::to_string(cameras_params->camera_id) + ".yaml";
+    cv::FileStorage fs(calibration_file, cv::FileStorage::READ);
+    if (!fs.isOpened())
+    {
+        std::cout << "Could not open the calibration file: \"" << calibration_file << "\"" << std::endl;
+    }
+    fs["camera_matrix"] >> calib_results->k;
+    fs["distortion_coefficients"] >> calib_results->dist_coeffs;
+    fs["tc_ext"] >> calib_results->tvec;
+    fs["rc_ext"] >> calib_results->r;
+    fs.release();
+    cv::Rodrigues(calib_results->r, calib_results->rvec);
+    cv::sfm::projectionFromKRt(calib_results->k, calib_results->r, calib_results->tvec, calib_results->projection_mat);
+}
+
+void print_calibration_results(CameraCalibResults* calib_results) {
+    std::cout << "k = " << std::endl << cv::format(calib_results->k, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
+    std::cout << "dist_coeffs  = " << std::endl << cv::format(calib_results->dist_coeffs, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
+    std::cout << "r = " << std::endl << cv::format(calib_results->r, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
+    std::cout << "tvec = " << std::endl << cv::format(calib_results->tvec, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
+    std::cout << "rvec = " << std::endl << cv::format(calib_results->rvec, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
+    std::cout << "projection_mat = " << std::endl << cv::format(calib_results->projection_mat, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
+}
+
+cv::Point3f triangulate_points(std::vector<cv::Point2f> image_points, vector<CameraCalibResults*> calib_results)
+{
+    std::vector<cv::Mat> sfm_points2d;
+    std::vector<cv::Mat> projection_matrices;
+    cv::Mat output3d;
+    for (int i=0; i<calib_results.size(); i++)
+    {
+        cv::Mat point = (cv::Mat_<float>(2, 1) << image_points[i].x, image_points[i].y);
+        cv::Mat pointUndistort;
+        std::cout << calib_results[i]->k << std::endl;
+        cv::undistortPoints(point, pointUndistort, calib_results[i]->k, calib_results[i]->dist_coeffs, cv::noArray(), calib_results[i]->k);
+        sfm_points2d.push_back(pointUndistort.reshape(1, 2));
+        projection_matrices.push_back(calib_results[i]->projection_mat);
+        
+    }
+
+    cv::sfm::triangulatePoints(sfm_points2d, projection_matrices, output3d);
+    output3d.convertTo(output3d, CV_32F);
+    cv::Point3f pts3d = cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
+    return pts3d;
+}
+
+
+void aruco_detection(PictureBuffer* display_buffer, CameraParams *cameras_params, ArucoMarker2d* aruco_marker_2d) 
 {    
-    cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, display_buffer->frame).reshape(3, 2200);
+    cv::Mat view = cv::Mat(cameras_params->width * cameras_params->height * 3, 1, CV_8U, display_buffer->frame).reshape(3, cameras_params->height);
     aruco::MarkerDetector MDetector;
     // detect 
     std::vector<aruco::Marker> markers = MDetector.detect(view);
     for (size_t i = 0; i < markers.size(); i++) {
         std::cout << markers[i] << std::endl;
         markers[i].draw(view);
+
+        if (markers[i].id == 0) {
+            // id 0 is ramp
+            std::vector<cv::Point2f> corners;
+            for (size_t j = 0; j < 4; j++) {
+                corners.push_back(markers[i][j]);
+            }
+            aruco_marker_2d->detected_points.push_back(corners);
+            aruco_marker_2d->detected_cameras.push_back(cameras_params->camera_id);
+        }
     } 
 }
 
-void load_camera_calibration_results(CameraCalibResults* calib_results, CameraParams *cameras_params) {
-    std::string calibration_file = "/home/user/Calibration/world/calibration_aruco/Cam" + std::to_string(cameras_params->camera_id) + ".yaml";
-    FileStorage fs(calibration_file, FileStorage::READ);
-    if (!fs.isOpened())
-    {
-        std::cout << "Could not open the calibration file: \"" << calibration_file << "\"" << std::endl;
+void find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d, CameraCalibResults* calib_results)
+{
+    int num_detected_cams = aruco_marker_2d->detected_cameras.size();
+    if (num_detected_cams > 2) {
+        // triangulate
+        vector<CameraCalibResults*> calib_results_all; 
+        for (size_t i = 0; i < num_detected_cams; i++) {
+            calib_results_all.push_back(calib_results + i);
+        }
+ 
+        for (size_t i = 0; i < 4; i++) {
+            std::vector<cv::Point2f> image_points_all;
+            for (size_t j = 0; j < num_detected_cams; j++) {
+                image_points_all.push_back(aruco_marker_2d->detected_points[j][i]);
+            }
+            cv::Point3f output3d = triangulate_points(image_points_all, calib_results_all);
+            aruco_maker_3d->corners.push_back(output3d);
+        }
     }
-    fs["camera_matrix"] >> calib_results->camera_matrix;
-    fs["distortion_coefficients"] >> calib_results->dist_coeff;
-    fs["tc_ext"] >> calib_results->tc_ext;
-    fs["rc_ext"] >> calib_results->rc_ext;
-    fs.release();
+
+    // print marker corners
+    for (size_t i = 0; i < 4; i++) {
+        std::cout << aruco_maker_3d->corners[i] << ", " << std::endl;
+    }
 }
-
-void print_camera_calibration(CameraCalibResults* calib_results, CameraParams *cameras_params) {
-    std::cout << "Cam" << std::to_string(cameras_params->camera_id) << std::endl;
-    std::cout << "camera_matrix:  " << std::endl << " "  << calib_results->camera_matrix << std::endl << std::endl;
-    std::cout << "dist_coeff:  " << std::endl << " "  << calib_results->dist_coeff << std::endl << std::endl;
-    std::cout << "tc_ext:  " << std::endl << " "  << calib_results->tc_ext << std::endl << std::endl;
-    std::cout << "rc_ext:  " << std::endl << " "  << calib_results->rc_ext << std::endl << std::endl;
-}
-
-
-// static void reprojection(std::vector<CameraParams> camera_params, int num_cams)
-// {
-   
-
-//     if (num_views_labeled >= 2){
-        
-//         std::vector<cv::Mat> sfmPoints2d;
-//         std::vector<cv::Mat> projection_matrices;
-//         cv::Mat output;
-
-//         for (u32 view_idx = 0; view_idx < num_cams; view_idx++)
-//         {
-//             if(keypoints->keypoints2d[view_idx][node].is_labeled)
-//             {
-//                 cv::Mat point = (cv::Mat_<float>(2, 1) << keypoints->keypoints2d[view_idx][node].position.x, (float)2200 - keypoints->keypoints2d[view_idx][node].position.y);
-//                 cv::Mat pointUndistort;
-//                 cv::undistortPoints(point, pointUndistort, camera_params[view_idx].k, camera_params[view_idx].dist_coeffs, cv::noArray(), camera_params[view_idx].k);
-                
-//                 sfmPoints2d.push_back(pointUndistort.reshape(1, 2));
-//                 projection_matrices.push_back(camera_params[view_idx].projection_mat);
-//             }
-//         }
-
-//         cv::sfm::triangulatePoints(sfmPoints2d, projection_matrices, output);
-//         output.convertTo(output, CV_32F);
-
-//         keypoints->keypoints3d[node].x = output.at<float>(0);
-//         keypoints->keypoints3d[node].y = output.at<float>(1);
-//         keypoints->keypoints3d[node].z = output.at<float>(2);
-
-//         for (u32 view_idx = 0; view_idx < num_cams; view_idx++)
-//         {
-//             cv::Mat imagePts;
-//             cv::projectPoints(output, camera_params[view_idx].rvec, camera_params[view_idx].tvec, camera_params[view_idx].k, camera_params[view_idx].dist_coeffs, imagePts);
-//             double x = imagePts.at<float>(0, 0);
-//             double y = float(2200) - imagePts.at<float>(0, 1);
-//             keypoints->keypoints2d[view_idx][node].position.x = x;
-//             keypoints->keypoints2d[view_idx][node].position.y = y;
-//             keypoints->keypoints2d[view_idx][node].is_labeled = true;
-//         }
-//     }
-
-// }
-
 
 
 // void calibration_window(CPURender *cpu_buffers[], Settings *calib_setting, CameraControl *camera_control, CameraParams *cameras_params, u32 num_cameras, CameraCalibResults *calib_results, CalibData *calib_data)

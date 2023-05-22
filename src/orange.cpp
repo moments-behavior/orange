@@ -58,11 +58,14 @@ int main(int argc, char **args)
     CalibData calib_data;
     Settings calib_setting;
 
-    vector<int> image_save_index;
+    std::vector<int> image_save_index;
     bool *selected_images_to_save;
 
     bool show_calibration_window = false;
     bool show_cpu_buffer = false;
+
+    ArucoMarker2d marker2d_all_cams;
+    ArucoMarker3d marker3d;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -418,8 +421,12 @@ int main(int argc, char **args)
 
 
                 for (int i = 0; i < num_cameras; i++) {
-                    aruco_detection(&cpu_buffers[i].display_buffer); 
-                }
+                    aruco_detection(&cpu_buffers[i].display_buffer, cameras_params, &marker2d_all_cams); 
+                }                
+            }
+
+            if (ImGui::Button("Find Marker 3d")) {
+                find_marker3d(&marker2d_all_cams, &marker3d, calib_results);
             }
 
             ImGui::Checkbox("Calibration", &show_calibration_window);      
@@ -513,8 +520,8 @@ int main(int argc, char **args)
             if (ImGui::Button("Load camera calibration")) {
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    load_camera_calibration_results(calib_results, cameras_params);
-                    print_camera_calibration(calib_results, cameras_params);
+                    load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
+                    print_calibration_results(&calib_results[i]);
                 }
             }
 

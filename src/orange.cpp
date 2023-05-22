@@ -9,7 +9,7 @@
 #include <imfilebrowser.h>
 #include "project.h"
 #include "gui.h"
-#include "calibration_gui.h"
+#include "realtime_gui.h"
 
 int main(int argc, char **args)
 {
@@ -54,12 +54,14 @@ int main(int argc, char **args)
     std::string folder_name;
 
     CPURender *cpu_buffers;
-    CameraCalibResults calib_results;
+    CameraCalibResults* calib_results;
     CalibData calib_data;
     Settings calib_setting;
 
+    vector<int> image_save_index;
+    bool *selected_images_to_save;
+
     bool show_calibration_window = false;
-    bool show_arucomarker_window = false;
     bool show_cpu_buffer = false;
 
     while (!glfwWindowShouldClose(window->render_target))
@@ -186,6 +188,7 @@ int main(int argc, char **args)
                     }
 
                     cpu_buffers = new CPURender[num_cameras];
+                    calib_results = new CameraCalibResults[num_cameras];
 
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -391,15 +394,35 @@ int main(int argc, char **args)
                     allocate_cpu_render_resources(&cpu_buffers[i], cameras_params[i].width, cameras_params[i].height);
                 }
                 show_cpu_buffer = true;
+                camera_control->copy_to_cpu = true;
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    image_save_index.push_back(0);
+                }
+
+                selected_images_to_save = new bool[num_cameras];
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    selected_images_to_save[i] = false;
+                }
 
             }
 
-            if (ImGui::Button("Copy to CPU")) {
-                camera_control->copy_to_cpu = true;
+            if (ImGui::Button("Detect Aruco Marker")) {
+                
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    cpu_buffers[i].display_buffer.available_to_write = false;
+                }
+
+
+                for (int i = 0; i < num_cameras; i++) {
+                    aruco_detection(&cpu_buffers[i].display_buffer); 
+                }
             }
 
             ImGui::Checkbox("Calibration", &show_calibration_window);      
-            ImGui::Checkbox("Aruco Marker", &show_arucomarker_window);
         }
         ImGui::End();
 
@@ -426,13 +449,82 @@ int main(int argc, char **args)
                     ImGui::End();            
                 }
             }
+
+
+            if (ImGui::Button("Save images all"))
+            {
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    cpu_buffers[i].display_buffer.available_to_write = false;
+                }
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
+                    string image_name = "/home/user/Calibration/lower8/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                    cv::imwrite(image_name, view);
+                    image_save_index[i]++;
+                }
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    cpu_buffers[i].display_buffer.available_to_write = true;
+                }
+            }
+
+            for (int i = 0; i < num_cameras; i++)
+            {
+                ImGui::InputInt("Saving image index: ", &image_save_index[i]);
+            }
+
+            for (int i = 0; i < num_cameras; i++)
+            {
+                char label[32];
+                sprintf(label, "Cam%d", i);
+                ImGui::Checkbox(label, &selected_images_to_save[i]);
+                ImGui::SameLine();
+            }
+
+            if (ImGui::Button("Save selected"))
+            {
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    cpu_buffers[i].display_buffer.available_to_write = false;
+                }
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    if (selected_images_to_save[i])
+                    {
+                        cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
+                        string image_name = "/home/user/Calibration/lower8/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                        cv::imwrite(image_name, view);
+                        image_save_index[i]++;
+                    }
+                }
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    cpu_buffers[i].display_buffer.available_to_write = true;
+                }
+            }
+
+            if (ImGui::Button("Load camera calibration")) {
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    load_camera_calibration_results(calib_results, cameras_params);
+                    print_camera_calibration(calib_results, cameras_params);
+                }
+            }
+
             ImGui::End();            
         }
 
 
-        if (show_calibration_window) {
-            calibration_window(&cpu_buffers, &calib_setting, camera_control, cameras_params, num_cameras, &calib_results, &calib_data);
-        }
+        // if (show_calibration_window) {
+        //     calibration_window(&cpu_buffers, &calib_setting, camera_control, cameras_params, num_cameras, &calib_results, &calib_data);
+        // }
 
         render_a_frame(window);
 

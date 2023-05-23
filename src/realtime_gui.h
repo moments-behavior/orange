@@ -65,6 +65,8 @@ struct ArucoMarker3d
 {
     int id;
     std::vector<cv::Point3f> corners;
+    cv::Point3f t_vec;
+    cv::Point3f r_vec;  
 };
 
 
@@ -139,6 +141,19 @@ void aruco_detection(PictureBuffer* display_buffer, CameraParams *cameras_params
     } 
 }
 
+
+void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
+{
+    aruco_maker_3d->t_vec = aruco_maker_3d->corners[0] + aruco_maker_3d->corners[1] + aruco_maker_3d->corners[2] + aruco_maker_3d->corners[3];
+    aruco_maker_3d->t_vec = aruco_maker_3d->t_vec / 4.0;
+        
+    cv::Point3f corner1to4 = aruco_maker_3d->corners[3] - aruco_maker_3d->corners[0];
+    cv::Point3f corner1to2 = aruco_maker_3d->corners[1] - aruco_maker_3d->corners[0];
+    aruco_maker_3d->r_vec = corner1to4.cross(corner1to2);
+    aruco_maker_3d->r_vec =  aruco_maker_3d->r_vec / cv::norm(aruco_maker_3d->r_vec);
+    
+}
+
 void find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d, CameraCalibResults* calib_results)
 {
     int num_detected_cams = aruco_marker_2d->detected_cameras.size();
@@ -159,10 +174,12 @@ void find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
         }
     }
 
-    // print marker corners
-    for (size_t i = 0; i < 4; i++) {
-        std::cout << aruco_maker_3d->corners[i] << ", " << std::endl;
-    }
+    // // print marker corners
+    // for (size_t i = 0; i < 4; i++) {
+    //     std::cout << aruco_maker_3d->corners[i] << ", " << std::endl;
+    // }
+
+    marker3d_to_pose(aruco_maker_3d);
 }
 
 

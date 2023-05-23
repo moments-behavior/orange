@@ -427,6 +427,8 @@ int main(int argc, char **args)
 
             if (ImGui::Button("Find Marker 3d")) {
                 find_marker3d(&marker2d_all_cams, &marker3d, calib_results);
+                std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
+                std::cout << "Marker rvec: " << marker3d.r_vec << std::endl;
             }
 
             ImGui::Checkbox("Calibration", &show_calibration_window);      
@@ -521,7 +523,7 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
-                    print_calibration_results(&calib_results[i]);
+                    // print_calibration_results(&calib_results[i]);
                 }
             }
 

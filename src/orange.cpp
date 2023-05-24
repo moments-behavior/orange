@@ -55,13 +55,13 @@ int main(int argc, char **args)
 
     CPURender *cpu_buffers;
     CameraCalibResults* calib_results;
-    CalibData calib_data;
+    vector<vector<vector<Point2f>>> calib_data;
+
     Settings calib_setting;
 
     std::vector<int> image_save_index;
     bool *selected_images_to_save;
 
-    bool show_calibration_window = false;
     bool show_cpu_buffer = false;
 
     ArucoMarker2d marker2d_all_cams;
@@ -390,7 +390,8 @@ int main(int argc, char **args)
             }
         }
 
-        if (ImGui::Begin("Realtime Tools")) {
+        if (ImGui::Begin("Realtime Tools")) 
+        {
             
             if (ImGui::Button("Allocate cpu buffers")) {
                 for (int i = 0; i < num_cameras; i++) {
@@ -431,13 +432,49 @@ int main(int argc, char **args)
                 std::cout << "Marker rvec: " << marker3d.r_vec << std::endl;
             }
 
-            ImGui::Checkbox("Calibration", &show_calibration_window);      
-        }
-        ImGui::End();
 
+            if (ImGui::Button("Load Calibration Configure File")) {
+                std::string input_settings_file = "/home/user/src/orange/circle.xml";
+                load_calibration_config_file(input_settings_file, &calib_setting);
+            }
 
-        if (show_cpu_buffer) {
-            if (ImGui::Begin("CPU buffers")) {
+            if (ImGui::Button("Innitialize Calibration Params")) {
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    vector<vector<Point2f>> image_points_per_cam;
+                    calib_data.push_back(image_points_per_cam);
+                }
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+
+                    Mat cameraMatrix = Mat::eye(3, 3, CV_64F);
+                    // initialization
+                    if (!calib_setting.intrinsicGuess)
+                    {
+                        if (!calib_setting.useFisheye && calib_setting.flag & CALIB_FIX_ASPECT_RATIO)
+                            cameraMatrix.at<double>(0, 0) = calib_setting.aspectRatio;
+                    }
+                    else
+                    {
+                        cameraMatrix = (Mat_<double>(3, 3) << 2800, 0, 1100, 0, 2800, 1600, 0, 0, 1);
+                    }
+                    calib_results[i].k = cameraMatrix;
+
+                    if (calib_setting.useFisheye)
+                    {
+                        Mat distCoeffs = Mat::zeros(4, 1, CV_64F);
+                        calib_results[i].dist_coeffs = distCoeffs;
+                    }
+                    else
+                    {
+                        Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
+                        calib_results[i].dist_coeffs.push_back(distCoeffs);
+                    }
+                }
+            }
+
+            if (show_cpu_buffer) {
                 for(int i=0; i < num_cameras; i++){
                     bind_texture(&cpu_buffers[i].image_texture);
                     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cameras_params[i].width, cameras_params[i].height, GL_RGB, GL_UNSIGNED_BYTE, cpu_buffers[i].display_buffer.frame);
@@ -454,81 +491,81 @@ int main(int argc, char **args)
                         ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)cpu_buffers[i].image_texture, ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
                         ImPlot::EndPlot();
                     }
-
                     ImGui::End();            
                 }
-            }
+                
 
 
-            if (ImGui::Button("Save images all"))
-            {
-
-                for (int i = 0; i < num_cameras; i++)
+                if (ImGui::Button("Save images all"))
                 {
-                    cpu_buffers[i].display_buffer.available_to_write = false;
-                }
 
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
-                    string image_name = "/home/user/Calibration/lower8/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
-                    cv::imwrite(image_name, view);
-                    image_save_index[i]++;
-                }
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
 
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    cpu_buffers[i].display_buffer.available_to_write = true;
-                }
-            }
-
-            for (int i = 0; i < num_cameras; i++)
-            {
-                ImGui::InputInt("Saving image index: ", &image_save_index[i]);
-            }
-
-            for (int i = 0; i < num_cameras; i++)
-            {
-                char label[32];
-                sprintf(label, "Cam%d", i);
-                ImGui::Checkbox(label, &selected_images_to_save[i]);
-                ImGui::SameLine();
-            }
-
-            if (ImGui::Button("Save selected"))
-            {
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    cpu_buffers[i].display_buffer.available_to_write = false;
-                }
-
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    if (selected_images_to_save[i])
+                    for (int i = 0; i < num_cameras; i++)
                     {
                         cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
                         string image_name = "/home/user/Calibration/lower8/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
                         cv::imwrite(image_name, view);
                         image_save_index[i]++;
                     }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = true;
+                    }
                 }
 
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    cpu_buffers[i].display_buffer.available_to_write = true;
+                    ImGui::InputInt("Saving image index: ", &image_save_index[i]);
                 }
-            }
 
-            if (ImGui::Button("Load camera calibration")) {
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
-                    // print_calibration_results(&calib_results[i]);
+                    char label[32];
+                    sprintf(label, "Cam%d", i);
+                    ImGui::Checkbox(label, &selected_images_to_save[i]);
+                    ImGui::SameLine();
+                }
+
+                if (ImGui::Button("Save selected"))
+                {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        if (selected_images_to_save[i])
+                        {
+                            cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
+                            string image_name = "/home/user/Calibration/lower8/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                            cv::imwrite(image_name, view);
+                            image_save_index[i]++;
+                        }
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = true;
+                    }
+                }
+
+                if (ImGui::Button("Load camera calibration")) {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
+                        // print_calibration_results(&calib_results[i]);
+                    }
                 }
             }
-
-            ImGui::End();            
+                     
         }
+        ImGui::End();   
 
 
         // if (show_calibration_window) {

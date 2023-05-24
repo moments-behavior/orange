@@ -25,7 +25,6 @@ struct CameraControl
     bool sync_camera = false;
     bool m_slave = false;
     bool copy_to_cpu = false;
-    bool calibration = false;
 };
 
 struct CameraState

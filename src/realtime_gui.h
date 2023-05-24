@@ -49,11 +49,6 @@ struct CameraCalibResults
     cv::Mat projection_mat;
 };
 
-struct CalibData
-{
-    vector<vector<vector<Point2f>>> imagePoints;
-};
-
 struct ArucoMarker2d 
 {
     int id; 
@@ -183,68 +178,32 @@ void find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
 }
 
 
+void load_calibration_config_file(std::string inputSettingsFile, Settings *calib_setting)
+{
+    FileStorage fs(inputSettingsFile, FileStorage::READ);
+    if (!fs.isOpened())
+    {
+        std::cout << "Could not open the configuration file: \"" << inputSettingsFile << "\"" << std::endl;
+    }
+    fs["Settings"] >> *calib_setting;
+    fs.release();
+
+    if (!calib_setting->goodInput)
+    {
+        cout << "Invalid input detected. Application stopping. " << endl;
+    }
+    else
+    {
+        std::cout << "Calibration configuration file loaded: \"" << inputSettingsFile << "\"" << std::endl;
+    }
+}
+
+
 // void calibration_window(CPURender *cpu_buffers[], Settings *calib_setting, CameraControl *camera_control, CameraParams *cameras_params, u32 num_cameras, CameraCalibResults *calib_results, CalibData *calib_data)
 // {
 //     if (ImGui::Begin("Calibration"))
 //     {
-//         if (ImGui::Button("Load config file"))
-//         {
-
-//             const std::string inputSettingsFile = "/home/user/src/orange/circle.xml";
-//             FileStorage fs(inputSettingsFile, FileStorage::READ);
-//             if (!fs.isOpened())
-//             {
-//                 std::cout << "Could not open the configuration file: \"" << inputSettingsFile << "\"" << std::endl;
-//             }
-//             fs["Settings"] >> *calib_setting;
-//             fs.release();
-
-//             if (!calib_setting->goodInput)
-//             {
-//                 cout << "Invalid input detected. Application stopping. " << endl;
-//             }
-//             else
-//             {
-//                 std::cout << "Calibration configuration file loaded: \"" << inputSettingsFile << "\"" << std::endl;
-//             }
-
-//             camera_control->calibration = true;
-
-//             for (int i = 0; i < num_cameras; i++)
-//             {
-//                 vector<vector<Point2f>> image_points_per_cam;
-//                 calib_data->imagePoints.push_back(image_points_per_cam);
-//             }
-
-//             for (int i = 0; i < num_cameras; i++)
-//             {
-
-//                 Mat cameraMatrix = Mat::eye(3, 3, CV_64F);
-//                 // initialization
-//                 if (!calib_setting->intrinsicGuess)
-//                 {
-//                     if (!calib_setting->useFisheye && calib_setting->flag & CALIB_FIX_ASPECT_RATIO)
-//                         cameraMatrix.at<double>(0, 0) = calib_setting->aspectRatio;
-//                 }
-//                 else
-//                 {
-//                     cameraMatrix = (Mat_<double>(3, 3) << 2800, 0, 1100, 0, 2800, 1600, 0, 0, 1);
-//                 }
-//                 calib_results->camera_matrices.push_back(cameraMatrix);
-
-//                 if (calib_setting->useFisheye)
-//                 {
-//                     Mat distCoeffs = Mat::zeros(4, 1, CV_64F);
-//                     calib_results->dist_coeffs.push_back(distCoeffs);
-//                 }
-//                 else
-//                 {
-//                     Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
-//                     calib_results->dist_coeffs.push_back(distCoeffs);
-//                 }
-//             }
-//         }
-
+//        
 //         if (camera_control->calibration)
 //         {
 //             if (ImGui::Button("Detect"))

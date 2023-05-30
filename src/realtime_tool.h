@@ -12,6 +12,11 @@
 #include "gui.h"
 #include "aruco.h"
 #include <opencv2/sfm.hpp>
+#include "opencv2/core/core_c.h"
+#include "opencv2/core/core.hpp"
+#include <math.h>
+
+#define PI 3.14159265
 
 struct CPURender
 {
@@ -61,7 +66,9 @@ struct ArucoMarker3d
     int id;
     std::vector<cv::Point3f> corners;
     cv::Point3f t_vec;
-    cv::Point3f r_vec;  
+    cv::Point3f normal; 
+    f32 angle_x_axis;
+    cv::Point2f grab_point;
 };
 
 
@@ -100,7 +107,6 @@ cv::Point3f triangulate_points(std::vector<cv::Point2f> image_points, vector<Cam
     {
         cv::Mat point = (cv::Mat_<float>(2, 1) << image_points[i].x, image_points[i].y);
         cv::Mat pointUndistort;
-        std::cout << calib_results[i]->k << std::endl;
         cv::undistortPoints(point, pointUndistort, calib_results[i]->k, calib_results[i]->dist_coeffs, cv::noArray(), calib_results[i]->k);
         sfm_points2d.push_back(pointUndistort.reshape(1, 2));
         projection_matrices.push_back(calib_results[i]->projection_mat);
@@ -121,7 +127,7 @@ void aruco_detection(PictureBuffer* display_buffer, CameraParams *cameras_params
     // detect 
     std::vector<aruco::Marker> markers = MDetector.detect(view);
     for (size_t i = 0; i < markers.size(); i++) {
-        std::cout << markers[i] << std::endl;
+        // std::cout << markers[i] << std::endl;
         markers[i].draw(view);
 
         if (markers[i].id == 0) {
@@ -144,15 +150,27 @@ void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
         
     cv::Point3f corner1to4 = aruco_maker_3d->corners[3] - aruco_maker_3d->corners[0];
     cv::Point3f corner1to2 = aruco_maker_3d->corners[1] - aruco_maker_3d->corners[0];
-    aruco_maker_3d->r_vec = corner1to4.cross(corner1to2);
-    aruco_maker_3d->r_vec =  aruco_maker_3d->r_vec / cv::norm(aruco_maker_3d->r_vec);
-    
+    aruco_maker_3d->normal = corner1to4.cross(corner1to2);
+    aruco_maker_3d->normal =  aruco_maker_3d->normal / cv::norm(aruco_maker_3d->normal);
+
+    aruco_maker_3d->angle_x_axis = atan2(corner1to4.y, corner1to4.x);
+    f32 result = aruco_maker_3d->angle_x_axis * 180 / PI;
+    printf("The marker (x=%f, y=%f) is %f degrees from world x-axis. \n", corner1to4.x, corner1to4.y, result);    
+
+    cv::Point2f corner4to1; 
+    corner4to1.x = - corner1to4.x;
+    corner4to1.y = - corner1to4.y;
+    corner4to1 = corner4to1 / cv::norm(corner4to1);
+
+    aruco_maker_3d->grab_point.x = aruco_maker_3d->t_vec.x + 73.036f * corner4to1.x;
+    aruco_maker_3d->grab_point.y = aruco_maker_3d->t_vec.y + 73.036f * corner4to1.y;
+    printf("The grabbing point (x=%f, y=%f) is %f degrees from world x-axis. \n", aruco_maker_3d->grab_point.x, aruco_maker_3d->grab_point.y, result);    
 }
 
-void find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d, CameraCalibResults* calib_results)
+bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d, CameraCalibResults* calib_results)
 {
     int num_detected_cams = aruco_marker_2d->detected_cameras.size();
-    if (num_detected_cams > 2) {
+    if (num_detected_cams >= 2) {
         // triangulate
         vector<CameraCalibResults*> calib_results_all; 
         for (size_t i = 0; i < num_detected_cams; i++) {
@@ -167,14 +185,81 @@ void find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
             cv::Point3f output3d = triangulate_points(image_points_all, calib_results_all);
             aruco_maker_3d->corners.push_back(output3d);
         }
+    } else {
+        return false;
     }
 
-    // // print marker corners
-    // for (size_t i = 0; i < 4; i++) {
-    //     std::cout << aruco_maker_3d->corners[i] << ", " << std::endl;
-    // }
+    // print marker corners
+    for (size_t i = 0; i < 4; i++) {
+        std::cout << aruco_maker_3d->corners[i] << ", " << std::endl;
+    }
 
     marker3d_to_pose(aruco_maker_3d);
+    return true;
+}
+
+
+// https://stackoverflow.com/questions/21206870/opencv-rigid-transformation-between-two-3d-point-clouds
+// eigen has a better implementation: http://eigen.tuxfamily.org/dox/group__Geometry__Module.html#gab3f5a82a24490b936f8694cf8fef8e60
+cv::Vec3d CalculateMean(const cv::Mat_<cv::Vec3d> &points)
+{
+    cv::Mat_<cv::Vec3d> result;
+    cv::reduce(points, result, 0, CV_REDUCE_AVG);
+    return result(0, 0);
+}
+
+cv::Mat_<double> FindRigidTransform(const cv::Mat_<cv::Vec3d> &points1, const cv::Mat_<cv::Vec3d> points2)
+{
+    /* Calculate centroids. */
+    cv::Vec3d t1 = -CalculateMean(points1);
+    cv::Vec3d t2 = -CalculateMean(points2);
+
+    cv::Mat_<double> T1 = cv::Mat_<double>::eye(4, 4);
+    T1(0, 3) = t1[0];
+    T1(1, 3) = t1[1];
+    T1(2, 3) = t1[2];
+
+    cv::Mat_<double> T2 = cv::Mat_<double>::eye(4, 4);
+    T2(0, 3) = -t2[0];
+    T2(1, 3) = -t2[1];
+    T2(2, 3) = -t2[2];
+
+    /* Calculate covariance matrix for input points. Also calculate RMS deviation from centroid
+     * which is used for scale calculation.
+     */
+    cv::Mat_<double> C(3, 3, 0.0);
+    double p1Rms = 0, p2Rms = 0;
+    for (int ptIdx = 0; ptIdx < points1.rows; ptIdx++) {
+        cv::Vec3d p1 = points1(ptIdx, 0) + t1;
+        cv::Vec3d p2 = points2(ptIdx, 0) + t2;
+        p1Rms += p1.dot(p1);
+        p2Rms += p2.dot(p2);
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                C(i, j) += p2[i] * p1[j];
+            }
+        }
+    }
+
+    cv::Mat_<double> u, s, vh;
+    cv::SVD::compute(C, s, u, vh);
+
+    cv::Mat_<double> R = u * vh;
+
+    if (cv::determinant(R) < 0) {
+        R -= u.col(2) * (vh.row(2) * 2.0);
+    }
+
+    double scale = sqrt(p2Rms / p1Rms);
+    R *= scale;
+
+    cv::Mat_<double> M = cv::Mat_<double>::eye(4, 4);
+    R.copyTo(M.colRange(0, 3).rowRange(0, 3));
+
+    cv::Mat_<double> result = T2 * M * T1;
+    result /= result(3, 3);
+
+    return result.rowRange(0, 3);
 }
 
 
@@ -196,6 +281,60 @@ void load_calibration_config_file(std::string inputSettingsFile, Settings *calib
     {
         std::cout << "Calibration configuration file loaded: \"" << inputSettingsFile << "\"" << std::endl;
     }
+}
+
+
+
+void world_coordinates_projection_points(CameraCalibResults* cvp, double* axis_x_values, double* axis_y_values, float scale)
+{
+    std::vector<cv::Point3f> world_coordinates;
+    world_coordinates.push_back(cv::Point3f(0.0f, 0.0f, 0.0f));
+    world_coordinates.push_back(cv::Point3f(scale * 1.0f, 0.0f, 0.0f));
+    world_coordinates.push_back(cv::Point3f(0.0f, scale * 1.0f, 0.0f));
+    world_coordinates.push_back(cv::Point3f(0.0f, 0.0f, scale * 1.0f));
+
+    std::vector<cv::Point2f> img_pts;
+    cv::projectPoints(world_coordinates, cvp->rvec, cvp->tvec, cvp->k, cvp->dist_coeffs, img_pts);
+    
+    for (int i = 0; i < 4; i++){
+        axis_x_values[i] = img_pts.at(i).x;
+        axis_y_values[i] = 2200 - img_pts.at(i).y;
+    }
+}
+
+static void gui_plot_world_coordinates(CameraCalibResults* cvp, int cam_id)
+{
+    double axis_x_values[4]; double axis_y_values[4]; 
+    world_coordinates_projection_points(cvp, axis_x_values, axis_y_values, 50);
+    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, ImVec4(1.0, 1.0, 1.0,1.0));
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 1.0,1.0), 3.0);
+    std::string name = "World Origin";
+    
+    float one_axis_x[2];
+    float one_axis_y[2];
+
+    std::vector<triple_f> node_colors = {
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}};
+                
+    for (u32 edge=0; edge < 3; edge++)
+    {
+        double xs[2] {axis_x_values[0], axis_x_values[edge+1]};
+        double ys[2] {axis_y_values[0], axis_y_values[edge+1]};
+        
+        ImVec4 my_color; 
+        my_color.w = 1.0f; 
+        my_color.x = node_colors[edge+1].x;
+        my_color.y = node_colors[edge+1].y;
+        my_color.z = node_colors[edge+1].z;
+
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
+        ImPlot::SetNextLineStyle(my_color, 3.0);
+        ImPlot::PlotLine("##line", xs, ys, 2, ImPlotLineFlags_Segments);
+    }
+    
 }
 
 #endif

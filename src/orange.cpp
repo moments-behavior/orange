@@ -66,6 +66,7 @@ int main(int argc, char **args)
 
     ArucoMarker2d marker2d_all_cams;
     ArucoMarker3d marker3d;
+    bool have_calibration_results = false;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -305,13 +306,14 @@ int main(int argc, char **args)
                         }
                     } 
 
-                    // if (num_cameras > 1){
-                    //     for (int i = 0; i < num_cameras; i++)
-                    //     {
-                    //         ptp_camera_sync(&ecams[i].camera);
-                    //     }
-                    //     camera_control->sync_camera = true;
-                    // }
+                    if (num_cameras > 1){
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            ptp_camera_sync(&ecams[i].camera);
+                        }
+                        camera_control->sync_camera = true;
+                    }
+                    
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + to_string(cameras_params[i].frame_rate);
@@ -426,12 +428,19 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
+                        have_calibration_results = true;
                         // print_calibration_results(&calib_results[i]);
                     }
                 }
 
                 if (ImGui::Button("Detect Aruco Marker")) {
-                    
+
+                    if (!marker2d_all_cams.detected_cameras.empty()) {
+                        marker2d_all_cams.detected_cameras.clear();
+                        marker2d_all_cams.detected_points.clear();
+                        marker3d.corners.clear();
+                    }
+
                     for (int i = 0; i < num_cameras; i++)
                     {
                         cpu_buffers[i].display_buffer.available_to_write = false;
@@ -440,13 +449,12 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++) {
                         aruco_detection(&cpu_buffers[i].display_buffer, cameras_params, &marker2d_all_cams); 
-                    }                
-                }
+                    } 
 
-                if (ImGui::Button("Find Marker 3d")) {
-                    find_marker3d(&marker2d_all_cams, &marker3d, calib_results);
-                    std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
-                    std::cout << "Marker rvec: " << marker3d.r_vec << std::endl;
+                    if(find_marker3d(&marker2d_all_cams, &marker3d, calib_results)) {
+                        std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
+                        std::cout << "Marker normal: " << marker3d.normal << std::endl;
+                    }
                 }
 
                 ImGui::Separator();
@@ -736,6 +744,12 @@ int main(int argc, char **args)
                     //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
                     if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
                         ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)cpu_buffers[i].image_texture, ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+
+                        if (have_calibration_results)
+                        {
+                            gui_plot_world_coordinates(&calib_results[i], i);
+                        }
+
                         ImPlot::EndPlot();
                     }
                     ImGui::End();            

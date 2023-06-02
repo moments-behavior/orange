@@ -18,6 +18,23 @@
 
 #define PI 3.14159265
 
+static void draw_cv_contours(std::vector<cv::Rect> boxes, std::vector<std::string> labels, std::vector<int> class_ids)
+{
+    for (int i=0; i< boxes.size(); i++)
+    {
+        double x[5] = {(double)boxes[i].x, (double)boxes[i].x, (double)boxes[i].x + boxes[i].width, (double)boxes[i].x + boxes[i].width, (double)boxes[i].x};
+        double y[5] = {(double)2200 - boxes[i].y, (double)2200 - boxes[i].y - boxes[i].height, (double)2200 - boxes[i].y - boxes[i].height, (double)2200 - boxes[i].y, (double)2200 - boxes[i].y};
+        
+        if(class_ids[i] == 0){
+            ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0,1.0), 3.0);
+        } else{
+            ImPlot::SetNextLineStyle(ImVec4(0.5, 1.0, 1.0,1.0), 3.0);}
+
+        ImPlot::PlotLine(labels[i].c_str(), &x[0], &y[0], 5); 
+    }
+}
+
+
 struct CPURender
 {
     GLuint image_texture;
@@ -167,6 +184,7 @@ void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
     printf("The grabbing point (x=%f, y=%f) is %f degrees from world x-axis. \n", aruco_maker_3d->grab_point.x, aruco_maker_3d->grab_point.y, result);    
 }
 
+
 bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d, CameraCalibResults* calib_results)
 {
     int num_detected_cams = aruco_marker_2d->detected_cameras.size();
@@ -197,6 +215,50 @@ bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
     marker3d_to_pose(aruco_maker_3d);
     return true;
 }
+
+std::map<unsigned int, cv::Point3f> get_3d_coordinates(vector<vector<cv::Rect>> bounding_boxes, vector<vector<int>> obj_ids, CameraCalibResults* CamParam)
+{
+    // points 
+    std::map<unsigned int, vector<cv::Point2f>> mapOfObjects;
+    std::map<unsigned int, vector<CameraCalibResults*>> mapOfCameras;
+    
+    // reformat detection data as dictionary 
+    for (int cam_idx = 0; cam_idx < bounding_boxes.size(); cam_idx++){
+        for (int box_id = 0; box_id < bounding_boxes[cam_idx].size(); box_id++) {
+        // for (auto &i : bounding_boxes[cam_idx]) {
+            if(mapOfObjects.count(obj_ids[cam_idx][box_id]) > 0){
+                // calcualte center of mass from bounding box 
+                float c_x =  float(bounding_boxes[cam_idx][box_id].x) + float(bounding_boxes[cam_idx][box_id].width)/2.0;
+                float c_y =  float(bounding_boxes[cam_idx][box_id].y) + float(bounding_boxes[cam_idx][box_id].height)/2.0;
+                mapOfObjects[obj_ids[cam_idx][box_id]].push_back(cv::Point2f(c_x, c_y));
+                mapOfCameras[obj_ids[cam_idx][box_id]].push_back(CamParam + cam_idx);
+            }
+            else{
+                float c_x =  float(bounding_boxes[cam_idx][box_id].x) + float(bounding_boxes[cam_idx][box_id].width)/2.0;
+                float c_y =  float(bounding_boxes[cam_idx][box_id].y) + float(bounding_boxes[cam_idx][box_id].height)/2.0;
+                vector<cv::Point2f> points_per_obj; 
+                vector<CameraCalibResults*> camera_per_obj;
+                points_per_obj.push_back(cv::Point2f(c_x, c_y));
+                camera_per_obj.push_back(CamParam + cam_idx);
+                mapOfObjects.insert({obj_ids[cam_idx][box_id], points_per_obj});
+                mapOfCameras.insert({obj_ids[cam_idx][box_id], camera_per_obj});
+            }
+        }
+    }
+
+    // triangulation
+    std::map<unsigned int, cv::Point3f> mapOfPoints3D;
+    for ( auto it = mapOfObjects.begin(); it != mapOfObjects.end(); ++it)
+    {
+        if(it->second.size() >= 2){
+            // triangulate if there are 2 camera detection
+            cv::Point3f point3d = triangulate_points(it->second, mapOfCameras[it->first]);  
+            mapOfPoints3D.insert({it->first, point3d});
+        }
+    }
+    return mapOfPoints3D;
+}
+
 
 
 // https://stackoverflow.com/questions/21206870/opencv-rigid-transformation-between-two-3d-point-clouds

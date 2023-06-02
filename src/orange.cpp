@@ -10,6 +10,8 @@
 #include "project.h"
 #include "gui.h"
 #include "realtime_tool.h"
+#include "grimlock.h"
+#include "yolo_detection.h"
 
 int main(int argc, char **args)
 {
@@ -67,6 +69,21 @@ int main(int argc, char **args)
     ArucoMarker2d marker2d_all_cams;
     ArucoMarker3d marker3d;
     bool have_calibration_results = false;
+
+    char grimlock_ip[] = "192.168.20.32";
+    ControlState grimlock_state;
+    std::thread grimlock_thread;
+    TSQueue<int> grimlock_queue; 
+
+    yolo_param yolo_setting = yolo_param();
+    std::vector<std::vector<cv::Rect>> yolo_boxes;
+    std::vector<std::vector<std::string>> yolo_labels;
+    std::vector<std::vector<int>> yolo_classid;
+    cv::dnn::Net yolo_net;
+    std::map<unsigned int, cv::Point3f> yolo_obj_3d;
+    tuple_f grimlock_xy;
+
+    bool draw_yolo_detection = false;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -457,6 +474,50 @@ int main(int argc, char **args)
                     }
                 }
 
+                if (ImGui::Button("Load Yolo Models")) {
+                    std::string yolov5_onnx = "/home/user/dev/clips0/yolo_models/best.onnx";
+                    std::string yolov5_labelname = "/home/user/dev/clips0/yolo_models/label.names";
+                    read_yolo_labels(yolov5_labelname, &yolo_setting);
+
+                    yolo_net = cv::dnn::readNet(yolov5_onnx);
+                    yolo_net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+                    yolo_net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+                    std::cout << "model loaded" << std::endl;
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        std::vector<cv::Rect> yolo_box_per_cam;
+                        std::vector<std::string> yolo_label_per_cam;
+                        std::vector<int> yolo_classid_per_cam;
+                        yolo_boxes.push_back(yolo_box_per_cam);
+                        yolo_labels.push_back(yolo_label_per_cam);
+                        yolo_classid.push_back(yolo_classid_per_cam);
+                    }
+
+                }
+
+
+                if (ImGui::Button("Yolo Detect")) {
+                    
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+
+                    for (int i = 0; i < num_cameras; i++) {
+                        yolo_detection(yolo_net, &yolo_setting, &cpu_buffers[i].display_buffer, i, yolo_boxes, yolo_labels, yolo_classid);
+                    }
+
+                    yolo_obj_3d = get_3d_coordinates(yolo_boxes, yolo_classid, calib_results);
+                    for ( auto it = yolo_obj_3d.begin(); it != yolo_obj_3d.end(); ++it) {
+                            std::cout << "yolo_object: " << it->first << ", " << it->second << std::endl;
+                    }
+                    draw_yolo_detection = true;
+                    grimlock_xy.x = yolo_obj_3d[0].x + 161.958; // one-point fit of the base offset 
+                    grimlock_xy.y = yolo_obj_3d[0].y - 1156.594;
+                }
+
                 ImGui::Separator();
                 ImGui::Spacing();
 
@@ -559,6 +620,7 @@ int main(int argc, char **args)
                     {
                         cpu_buffers[i].display_buffer.available_to_write = true;
                     }
+                    draw_yolo_detection = false;
                 }
 
                 for (int i = 0; i < num_cameras; i++)
@@ -750,6 +812,10 @@ int main(int argc, char **args)
                             gui_plot_world_coordinates(&calib_results[i], i);
                         }
 
+                        if (draw_yolo_detection) {
+                            draw_cv_contours(yolo_boxes.at(i), yolo_labels.at(i), yolo_classid.at(i));
+                        }
+
                         ImPlot::EndPlot();
                     }
                     ImGui::End();            
@@ -759,8 +825,87 @@ int main(int argc, char **args)
         }
         ImGui::End();   
 
+
+        {
+            ImGui::Begin("Grimlock Experiment Control");
+
+            if (ImGui::Button(grimlock_state.activate ? "Deactivate Robot": "Activate Grimlock"))
+            {
+                grimlock_state.activate = !grimlock_state.activate;
+                if (grimlock_state.activate) {
+                    grimlock_thread = std::thread(&robot_process, grimlock_ip, &grimlock_state, &grimlock_queue, &grimlock_xy);
+                }
+                else {
+                    grimlock_thread.join();
+                }
+            }
+
+            ImGui::InputInt("Ball id", &grimlock_state.ball_idx);
+
+            if (ImGui::Button(grimlock_state.simple_task ? "Simple" : "Hard"))
+            {
+                grimlock_state.simple_task = !grimlock_state.simple_task;
+            }
+
+            if (ImGui::Button("Grab ball"))
+            {
+                grimlock_queue.push(GrabBall);
+            }
+
+            if (ImGui::Button("Place ball ramp"))
+            {
+                grimlock_queue.push(PlaceBallRamp);
+            }
+
+            if (ImGui::Button("Drop ball"))
+            {
+                grimlock_queue.push(DropBall);
+            }
+
+            if (ImGui::Button("Pick ball arena"))
+            {
+                grimlock_queue.push(PickBallArena);
+            }
+
+            if (ImGui::Button(grimlock_state.stop ? "Start Robot" : "Stop Robot"))
+            {
+                grimlock_state.stop = !grimlock_state.stop;
+                for (int row = 0; row < grimlock_queue.size(); row++) {
+                    grimlock_queue.pop();
+                }
+            }
+
+            if (ImGui::BeginTable("table1", 1))
+            {
+
+                ImGui::TableSetupColumn("Action Queue");
+                ImGui::TableHeadersRow();
+
+                for (int row = 0; row < grimlock_queue.size(); row++)
+                {
+                    ImGui::TableNextRow();
+                    for (int column = 0; column < 1; column++)
+                    {
+                        ImGui::TableSetColumnIndex(column);
+                        char buf[32];
+                        sprintf(buf, "%s", ActionPrimitivesStr[grimlock_queue.front()]);
+                        ImGui::TextUnformatted(buf);
+                    }
+                }
+                ImGui::EndTable();
+            }
+
+            ImGui::End();
+        }
+
         render_a_frame(window);
 
+    }
+
+
+    if (grimlock_state.activate) {
+        grimlock_state.activate = false;
+        grimlock_thread.join();
     }
 
     // Cleanup

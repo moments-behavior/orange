@@ -40,10 +40,10 @@ void printStatus(int Status) {
 }
 
 enum ActionPrimitives {   
-    GoHome, GoWorksurface, OpenGripper, CloseGripper, StopJ, StopL, GrabBall, PlaceBallRamp, DropBall, InitiateJogging, JogUp, StopJogging, GetPose, PoseTrans, PickBallArena
+    GoHome, GoWorksurface, OpenGripper, CloseGripper, StopJ, StopL, GrabBall, PlaceBallRamp, DropBall, InitiateJogging, JogUp, StopJogging, GetPose, PoseTrans, PickBallArena, PickRampArena
 };
 
-static const char *ActionPrimitivesStr[] = {"GoHome", "GoWorksurface", "OpenGripper", "CloseGripper", "StopJ", "StopL", "GrabBall", "PlaceBallRamp", "DropBall", "InitiateJogging", "JogUp", "StopJogging", "GetPose", "PoseTrans", "PickBallArena"};
+static const char *ActionPrimitivesStr[] = {"GoHome", "GoWorksurface", "OpenGripper", "CloseGripper", "StopJ", "StopL", "GrabBall", "PlaceBallRamp", "DropBall", "InitiateJogging", "JogUp", "StopJogging", "GetPose", "PoseTrans", "PickBallArena", "PickRampArena"};
 
 void moveJ_async(RTDEControlInterface* grimlock_control, ControlState* control_state, std::vector<double>& joint_psn, double speed, double acceleration)
 {
@@ -188,7 +188,7 @@ void gripper_open_sync(RobotiqGripper* gripper, ControlState* control_state, int
     printStatus(status);
 }
 
-void robot_process(const char* ip, ControlState* control_state, TSQueue<int>* queue, tuple_f* grimlock_xy) {
+void robot_process(const char* ip, ControlState* control_state, TSQueue<int>* queue, tuple_f* grimlock_xy, float* grimlock_rz) {
     
     RTDEControlInterface grimlock_control(ip);
     RTDEReceiveInterface grimlock_receive(ip);
@@ -258,28 +258,73 @@ void robot_process(const char* ip, ControlState* control_state, TSQueue<int>* qu
                     std::cout << actual_joint_q.at(i) << ' ';
                 std::cout << std::endl;
             } else if (action == PickBallArena) {
-                std::vector<double> arena_ball_tcp = {0.0, 0.0, 0.2913, -1.197, 2.905, 0.0};
-                arena_ball_tcp.at(0) = grimlock_xy->x / 1000.0f;
-                arena_ball_tcp.at(1) = grimlock_xy->y / 1000.0f;
-                for(int i=0; i < arena_ball_tcp.size(); i++)
-                    std::cout << arena_ball_tcp.at(i) << ' ';
-                std::cout << std::endl;
-                
+                std::vector<double> arena_tcp = {0.0, 0.0, 0.57148, -1.197, 2.905, 0.0};
+                arena_tcp.at(0) = grimlock_xy->x / 1000.0f;
+                arena_tcp.at(1) = grimlock_xy->y / 1000.0f;                
+
+
                 if (!control_state->stop) {
-                    moveL_async(&grimlock_control, control_state, arena_ball_tcp, 0.5, 0.5);
+                    moveL_async(&grimlock_control, control_state, arena_tcp, 0.5, 0.5);
                 }
+
+                arena_tcp.at(2) = 0.2913;
+                if (!control_state->stop) {
+                    moveL_async(&grimlock_control, control_state, arena_tcp, 0.5, 0.5);
+                }
+
                 // grabbing 
                 if (!control_state->stop) {
                     gripper_close_async(&gripper, control_state);
                 }
 
                 // move up 
-                std::vector<double> move_up; 
-                move_up = arena_ball_tcp;
-                move_up[2] = move_up[2] + 0.1;
+                arena_tcp[2] = arena_tcp[2] + 0.1;
                 
                 if (!control_state->stop) {
-                    moveL_async(&grimlock_control, control_state, move_up, 0.5, 0.5);
+                    moveL_async(&grimlock_control, control_state, arena_tcp, 0.5, 0.5);
+                }
+
+            } else if (action == PickRampArena) {
+                
+                if (!control_state->stop) {
+                    gripper_open_sync(&gripper, control_state, 140);
+                }
+
+                std::vector<double> prepare = {-0.57005, -0.45649, 0.57148, 0.0f, 3.1415, 0.0f};
+                if (!control_state->stop) {
+                    moveL_async(&grimlock_control, control_state, prepare, 0.5, 0.5);
+                }
+                // go to above picking location 
+                std::vector<double> arena_tcp = prepare;
+                arena_tcp.at(0) = grimlock_xy->x / 1000.0f;
+                arena_tcp.at(1) = grimlock_xy->y / 1000.0f;
+                if (!control_state->stop) {
+                    moveL_async(&grimlock_control, control_state, arena_tcp, 0.5, 0.5);
+                }
+                // rotate gripper 
+                std::vector<double> relative_p = {0.0, 0.0, 0.0, 0, 0, *grimlock_rz};
+                std::vector<double> new_pose;
+                new_pose = grimlock_control.poseTrans(arena_tcp, relative_p);
+                if (!control_state->stop) {
+                    moveL_async(&grimlock_control, control_state, new_pose, 0.5, 0.5);
+                }
+
+                // move down 
+                std::vector<double> actual_tcp_pose = grimlock_receive.getActualTCPPose();
+                actual_tcp_pose[2] = 0.329047;
+                if (!control_state->stop) {
+                    moveL_async(&grimlock_control, control_state, actual_tcp_pose, 0.5, 0.5);
+                }
+
+                // grabbing 
+                if (!control_state->stop) {
+                    gripper_close_async(&gripper, control_state);
+                }
+
+                // move up 
+                actual_tcp_pose[2] = 0.372962;
+                if (!control_state->stop) {
+                    moveL_async(&grimlock_control, control_state, actual_tcp_pose, 0.5, 0.5);
                 }
 
             } else if (action == GrabBall) {

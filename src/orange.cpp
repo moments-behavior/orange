@@ -82,6 +82,7 @@ int main(int argc, char **args)
     cv::dnn::Net yolo_net;
     std::map<unsigned int, cv::Point3f> yolo_obj_3d;
     tuple_f grimlock_xy;
+    float grimlock_rz;
 
     bool draw_yolo_detection = false;
 
@@ -472,6 +473,9 @@ int main(int argc, char **args)
                         std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
                         std::cout << "Marker normal: " << marker3d.normal << std::endl;
                     }
+                    grimlock_xy.x = marker3d.grab_point.x + 161.958;
+                    grimlock_xy.y = marker3d.grab_point.y - 1149.0;
+                    grimlock_rz = marker3d.angle_x_axis + 1.5708; 
                 }
 
                 if (ImGui::Button("Load Yolo Models")) {
@@ -515,7 +519,7 @@ int main(int argc, char **args)
                     }
                     draw_yolo_detection = true;
                     grimlock_xy.x = yolo_obj_3d[0].x + 161.958; // one-point fit of the base offset 
-                    grimlock_xy.y = yolo_obj_3d[0].y - 1156.594;
+                    grimlock_xy.y = yolo_obj_3d[0].y - 1149.0;
                 }
 
                 ImGui::Separator();
@@ -833,7 +837,7 @@ int main(int argc, char **args)
             {
                 grimlock_state.activate = !grimlock_state.activate;
                 if (grimlock_state.activate) {
-                    grimlock_thread = std::thread(&robot_process, grimlock_ip, &grimlock_state, &grimlock_queue, &grimlock_xy);
+                    grimlock_thread = std::thread(&robot_process, grimlock_ip, &grimlock_state, &grimlock_queue, &grimlock_xy, &grimlock_rz);
                 }
                 else {
                     grimlock_thread.join();
@@ -865,6 +869,12 @@ int main(int argc, char **args)
             if (ImGui::Button("Pick ball arena"))
             {
                 grimlock_queue.push(PickBallArena);
+            }
+
+
+            if (ImGui::Button("Pick ramp arena"))
+            {
+                grimlock_queue.push(PickRampArena);
             }
 
             if (ImGui::Button(grimlock_state.stop ? "Start Robot" : "Stop Robot"))

@@ -112,6 +112,13 @@ int main(int argc, char **args)
                 ImGui::EndTable();
             }
 
+            if (ImGui::Button("Select all")) {
+                for (int i = 0; i < cam_count; i++)
+                {
+                    check[i] = true;
+                }
+            }
+
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
                 (camera_control->open) = !(camera_control->open);
                 if (camera_control->open) 
@@ -649,8 +656,8 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        string cam_calib_out = "Cam" + std::to_string(cameras_params[i].camera_id) + ".xml";
-                        if (runCalibrationAndSave(cam_calib_out, calib_setting, imageSize, calib_results[i].k, calib_results[i].dist_coeffs, calib_data[i], grid_width, false))
+                        string cam_calib_out = "/home/user/Calibration/realtime_calib/Cam" + std::to_string(cameras_params[i].camera_id) + ".xml";
+                        if (runCalibrationAndSave(cam_calib_out, calib_setting, imageSize, calib_results[i].k, calib_results[i].dist_coeffs, calib_data[i], grid_width, calib_setting.release_object))
                         {
                             printf("Calibrated");
                         }
@@ -830,83 +837,83 @@ int main(int argc, char **args)
         ImGui::End();   
 
 
-        {
-            ImGui::Begin("Grimlock Experiment Control");
+        // {
+        //     ImGui::Begin("Grimlock Experiment Control");
 
-            if (ImGui::Button(grimlock_state.activate ? "Deactivate Robot": "Activate Grimlock"))
-            {
-                grimlock_state.activate = !grimlock_state.activate;
-                if (grimlock_state.activate) {
-                    grimlock_thread = std::thread(&robot_process, grimlock_ip, &grimlock_state, &grimlock_queue, &grimlock_xy, &grimlock_rz);
-                }
-                else {
-                    grimlock_thread.join();
-                }
-            }
+        //     if (ImGui::Button(grimlock_state.activate ? "Deactivate Robot": "Activate Grimlock"))
+        //     {
+        //         grimlock_state.activate = !grimlock_state.activate;
+        //         if (grimlock_state.activate) {
+        //             grimlock_thread = std::thread(&robot_process, grimlock_ip, &grimlock_state, &grimlock_queue, &grimlock_xy, &grimlock_rz);
+        //         }
+        //         else {
+        //             grimlock_thread.join();
+        //         }
+        //     }
 
-            ImGui::InputInt("Ball id", &grimlock_state.ball_idx);
+        //     ImGui::InputInt("Ball id", &grimlock_state.ball_idx);
 
-            if (ImGui::Button(grimlock_state.simple_task ? "Simple" : "Hard"))
-            {
-                grimlock_state.simple_task = !grimlock_state.simple_task;
-            }
+        //     if (ImGui::Button(grimlock_state.simple_task ? "Simple" : "Hard"))
+        //     {
+        //         grimlock_state.simple_task = !grimlock_state.simple_task;
+        //     }
 
-            if (ImGui::Button("Grab ball"))
-            {
-                grimlock_queue.push(GrabBall);
-            }
+        //     if (ImGui::Button("Grab ball"))
+        //     {
+        //         grimlock_queue.push(GrabBall);
+        //     }
 
-            if (ImGui::Button("Place ball ramp"))
-            {
-                grimlock_queue.push(PlaceBallRamp);
-            }
+        //     if (ImGui::Button("Place ball ramp"))
+        //     {
+        //         grimlock_queue.push(PlaceBallRamp);
+        //     }
 
-            if (ImGui::Button("Drop ball"))
-            {
-                grimlock_queue.push(DropBall);
-            }
+        //     if (ImGui::Button("Drop ball"))
+        //     {
+        //         grimlock_queue.push(DropBall);
+        //     }
 
-            if (ImGui::Button("Pick ball arena"))
-            {
-                grimlock_queue.push(PickBallArena);
-            }
+        //     if (ImGui::Button("Pick ball arena"))
+        //     {
+        //         grimlock_queue.push(PickBallArena);
+        //     }
 
 
-            if (ImGui::Button("Pick ramp arena"))
-            {
-                grimlock_queue.push(PickRampArena);
-            }
+        //     if (ImGui::Button("Pick ramp arena"))
+        //     {
+        //         grimlock_queue.push(PickRampArena);
+        //     }
 
-            if (ImGui::Button(grimlock_state.stop ? "Start Robot" : "Stop Robot"))
-            {
-                grimlock_state.stop = !grimlock_state.stop;
-                for (int row = 0; row < grimlock_queue.size(); row++) {
-                    grimlock_queue.pop();
-                }
-            }
+        //     if (ImGui::Button(grimlock_state.stop ? "Start Robot" : "Stop Robot"))
+        //     {
+        //         grimlock_state.stop = !grimlock_state.stop;
+        //         for (int row = 0; row < grimlock_queue.size(); row++) {
+        //             grimlock_queue.pop();
+        //         }
+        //     }
 
-            if (ImGui::BeginTable("table1", 1))
-            {
+        //     if (ImGui::BeginTable("table1", 1))
+        //     {
 
-                ImGui::TableSetupColumn("Action Queue");
-                ImGui::TableHeadersRow();
+        //         ImGui::TableSetupColumn("Action Queue");
+        //         ImGui::TableHeadersRow();
 
-                for (int row = 0; row < grimlock_queue.size(); row++)
-                {
-                    ImGui::TableNextRow();
-                    for (int column = 0; column < 1; column++)
-                    {
-                        ImGui::TableSetColumnIndex(column);
-                        char buf[32];
-                        sprintf(buf, "%s", ActionPrimitivesStr[grimlock_queue.front()]);
-                        ImGui::TextUnformatted(buf);
-                    }
-                }
-                ImGui::EndTable();
-            }
+        //         for (int row = 0; row < grimlock_queue.size(); row++)
+        //         {
+        //             ImGui::TableNextRow();
+        //             for (int column = 0; column < 1; column++)
+        //             {
+        //                 ImGui::TableSetColumnIndex(column);
+        //                 char buf[32];
+        //                 sprintf(buf, "%s", ActionPrimitivesStr[grimlock_queue.front()]);
+        //                 ImGui::TextUnformatted(buf);
+        //             }
+        //         }
+        //         ImGui::EndTable();
+        //     }
 
-            ImGui::End();
-        }
+        //     ImGui::End();
+        // }
 
         render_a_frame(window);
 

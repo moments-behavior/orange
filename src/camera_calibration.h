@@ -71,6 +71,7 @@ public:
         node["Fix_K3"] >> fixK3;
         node["Fix_K4"] >> fixK4;
         node["Fix_K5"] >> fixK5;
+        node["Release_Object"] >> release_object;
 
         validate();
     }
@@ -173,6 +174,7 @@ public:
     bool fixK3;                  // fix K3 distortion coefficient
     bool fixK4;                  // fix K4 distortion coefficient
     bool fixK5;                  // fix K5 distortion coefficient
+    bool release_object;
 
     int cameraID;
     vector<string> imageList;
@@ -269,6 +271,8 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
     // } else {
     //     distCoeffs = Mat::zeros(8, 1, CV_64F);
     // }
+
+    std::cout << "release object: " << release_object << std::endl;
 
     vector<vector<Point3f> > objectPoints(1);
     calcBoardCornerPositions(s.boardSize, s.squareSize, objectPoints[0], s.calibrationPattern);

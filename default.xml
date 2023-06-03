@@ -30,9 +30,9 @@
   <Calibrate_FixAspectRatio> 1 </Calibrate_FixAspectRatio>
   <Calibrate_UseIntrinsicGuess> 1 </Calibrate_UseIntrinsicGuess>
   <!-- If true (non-zero) tangential distortion coefficients  are set to zeros and stay zero.-->
-  <Calibrate_AssumeZeroTangentialDistortion>1</Calibrate_AssumeZeroTangentialDistortion>
+  <Calibrate_AssumeZeroTangentialDistortion>0</Calibrate_AssumeZeroTangentialDistortion>
   <!-- If true (non-zero) the principal point is not changed during the global optimization.-->
-  <Calibrate_FixPrincipalPointAtTheCenter> 1 </Calibrate_FixPrincipalPointAtTheCenter>
+  <Calibrate_FixPrincipalPointAtTheCenter> 0 </Calibrate_FixPrincipalPointAtTheCenter>
   
   <!-- The name of the output log file. -->
   <Write_outputFileName>"out_camera_data.xml"</Write_outputFileName>
@@ -56,5 +56,7 @@
   <Fix_K4>1</Fix_K4>
   <!-- If true (non-zero) distortion coefficient k5 will be equals to zero.-->
   <Fix_K5>1</Fix_K5>
+  <!-- If true (non-zero) release object is used for estimating intrinsics.-->
+  <Release_Object>1</Release_Object>
 </Settings>
 </opencv_storage>

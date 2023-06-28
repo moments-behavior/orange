@@ -12,6 +12,20 @@
 #include "realtime_tool.h"
 #include "grimlock.h"
 #include "yolo_detection.h"
+#include "fetch_generated.h"
+#define ENET_IMPLEMENTATION
+#include "enet.h"
+
+#define MAX_CLIENTS 32
+#include <random>
+
+// A nice way of printing out the system time
+std::string CurrentTimeStr()
+{
+    time_t now = time(NULL);
+    return std::string(ctime(&now));
+}
+#define CURRENT_TIME_STR CurrentTimeStr().c_str()
 
 int main(int argc, char **args)
 {
@@ -86,8 +100,66 @@ int main(int argc, char **args)
 
     bool draw_yolo_detection = false;
 
+    // network and protocal
+    if (enet_initialize() != 0)
+    {
+        printf("An error occurred while initializing ENet.\n");
+        return 1;
+    }
+
+    ENetAddress address;
+    enet_address_set_ip(&address, "127.0.0.1");
+    address.port = 6005;
+
+    ENetHost *server = enet_host_create(&address, MAX_CLIENTS, 2, 0, 0, 1024);
+    if (server == NULL)
+    {
+        fprintf(stderr,
+                "An error occurred while trying to create an ENet server host.\n");
+        exit(EXIT_FAILURE);
+    } else {
+        printf("Started a server...\n");
+    }
+
+    ENetEvent event;
+
+    flatbuffers::FlatBufferBuilder builder(1024);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> cube_dist(-0.7, 0.7);
+
+
     while (!glfwWindowShouldClose(window->render_target))
     {
+
+        while (enet_host_service(server, &event, 0) > 0) {
+            switch (event.type) {
+                case ENET_EVENT_TYPE_CONNECT:
+                    printf("\nA new client connected from %x:%u. %s\n", event.peer->host, event.peer->address.port, CURRENT_TIME_STR);
+                    /* Store any relevant client information here. */
+                    break;
+
+                case ENET_EVENT_TYPE_RECEIVE:
+                    printf("\nA packet of length %lu containing %s was received from %s on channel %u. %s.\n",
+                        event.packet->dataLength,
+                        event.packet->data,
+                        event.peer->data,
+                        event.channelID,
+                        CURRENT_TIME_STR);
+
+                    /* Clean up the packet now that we're done using it. */
+                    enet_packet_destroy(event.packet);
+                    break;
+                case ENET_EVENT_TYPE_DISCONNECT:
+                    printf("\n%s disconnected. %s\n", event.peer->data, CURRENT_TIME_STR);
+                    /* Reset the peer's client information. */
+                    event.peer->data = NULL;
+                    break;
+                case ENET_EVENT_TYPE_NONE:
+                    break;                    
+            }
+        }
+
         create_new_frame();
 
         if (ImGui::Begin("Orange Streaming"))
@@ -149,7 +221,7 @@ int main(int argc, char **args)
                                 init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 int gpu_id = 0;
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 60); 
                                 // init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 30); // 2000, 3000
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
                                 int gpu_id = 0;
@@ -753,7 +825,10 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
-                        string image_name = "/home/user/Calibration/lower8/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                        string image_name = "/home/user/Calibration/rob_calibration/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                        // string image_name = "/home/user/Calibration/realtime_calib/" + std::to_string(cameras_params[i].camera_id) + "-" + std::to_string(image_save_index[i]) + ".png";
+                        std::cout << image_name << std::endl;
+                        
                         cv::imwrite(image_name, view);
                         image_save_index[i]++;
                     }
@@ -790,7 +865,8 @@ int main(int argc, char **args)
                         if (selected_images_to_save[i])
                         {
                             cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
-                            string image_name = "/home/user/Calibration/lower8/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                            string image_name = "/home/user/Calibration/rob_calibration/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                            std::cout << image_name << std::endl;
                             cv::imwrite(image_name, view);
                             image_save_index[i]++;
                         }
@@ -836,6 +912,41 @@ int main(int argc, char **args)
         }
         ImGui::End();   
 
+        {
+            ImGui::Begin("Unity Rendering");
+
+            if (ImGui::Button("Send Ramp Location"))
+            {
+                
+                float x = cube_dist(gen);
+                float y = 0.1372;
+                float z = cube_dist(gen);
+
+                // build the buffer
+                auto position = FetchGame::Vec3(x, y, z);
+                float orientation = 0.1;
+                FetchGame::RampBuilder ramp_builder(builder);
+                ramp_builder.add_position(&position);
+                ramp_builder.add_orientation(orientation);
+                auto ramp = ramp_builder.Finish();
+                builder.Finish(ramp);
+                uint8_t *buf = builder.GetBufferPointer();
+                int size = builder.GetSize();
+
+
+                ENetPacket *packet = enet_packet_create(buf,
+                                                        size,
+                                                        ENET_PACKET_FLAG_RELIABLE);
+                /* Send the packet to the peer over channel id 0. */
+                /* One could also broadcast the packet by         */
+                enet_host_broadcast(server, 0, packet);
+                // enet_peer_send(peer, 0, packet);
+
+                // Receive some events
+                // enet_host_service(client, &event, 0);
+            }
+            ImGui::End();
+        }
 
         // {
         //     ImGui::Begin("Grimlock Experiment Control");

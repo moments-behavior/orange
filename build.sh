@@ -7,7 +7,7 @@ nvcc -c src/color_conversion_gpu.cu -arch=sm_80 -o targets/color_conversion_gpu.
 
 DIR_IMGUI="third_party/imgui"
 DIR_IMPLOT="third_party/implot"
-
+DIR_ENET="third_party/EnetCsharp"
 
 # g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui.o ./third_party/imgui/imgui.cpp
 # g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_demo.o ./third_party/imgui/imgui_demo.cpp
@@ -21,14 +21,13 @@ DIR_IMPLOT="third_party/implot"
 # g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_items.o $DIR_IMPLOT/implot_items.cpp
 # g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
 
-
-
 g++ -Ofast -ffast-math -std=c++17 \
     targets/color_conversion_gpu.o \
     -o targets/*.o \
     -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp src/buffer_utils.cpp \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
+    -I$DIR_ENET \
     -I$DIR_IMPLOT \
     -Ithird_party/imgui-filebrowser \
     -I./third_party/IconFontCppHeaders \

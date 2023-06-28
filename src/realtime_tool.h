@@ -91,7 +91,7 @@ struct ArucoMarker3d
 
 void load_camera_calibration_results(CameraCalibResults* calib_results, CameraParams *cameras_params) 
 {
-    std::string calibration_file = "/home/user/Calibration/world/calibration_aruco/Cam" + std::to_string(cameras_params->camera_id) + ".yaml";
+    std::string calibration_file = "/home/user/Calibration/4_edge_cams/Cam" + std::to_string(cameras_params->camera_id) + ".yaml";
     cv::FileStorage fs(calibration_file, cv::FileStorage::READ);
     if (!fs.isOpened())
     {

@@ -113,6 +113,12 @@ int main(int argc, char **args)
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
                                 int gpu_id = 0;
                                 init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
+                            } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SM")==0) {
+                                int gpu_id = 0;
+                                init_7MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
+                            } else {
+                                printf("Camera not supported...Exit");
+                                return 1;
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];

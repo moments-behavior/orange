@@ -23,7 +23,6 @@ DIR_IMPLOT="third_party/implot"
 
 
 g++ -Ofast -ffast-math -std=c++17 \
-    targets/cuda_line_reorder.o \
     -o targets/*.o \
     -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp \
     -I./third_party/imgui \

@@ -64,8 +64,8 @@ int main(int argc, char **args)
     // int buffer_size {500};
     PTPParams* ptp_params = new PTPParams{0, 0};
     std::string encoder_setup;
-    std::string encoder_basic_setup = "-codec h264 -preset p1 -fps ";
-    std::string encoder_codec = "h264"; 
+    std::string encoder_basic_setup = "-codec hevc -preset p1 -fps "; // h264
+    std::string encoder_codec = "hevc";  // h264
     std::string encoder_preset = "p1";
     std::string folder_name;
 
@@ -124,10 +124,6 @@ int main(int argc, char **args)
     ENetEvent event;
 
     flatbuffers::FlatBufferBuilder builder(1024);
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> cube_dist(-0.7, 0.7);
-
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -221,11 +217,11 @@ int main(int argc, char **args)
                                 init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 int gpu_id = 0;
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 60); 
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); 
                                 // init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 30); // 2000, 3000
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
                                 int gpu_id = 0;
-                                init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
+                                init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 18000, gpu_id, 30); 
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -325,7 +321,7 @@ int main(int argc, char **args)
             ImGui::Text(input_folder.c_str());
 
             {
-                const char* items[] = { "h264", "hevc"};
+                const char* items[] = { "hevc", "h264"};
                 static int item_current = 0;
                 ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
                 encoder_codec = items[item_current];
@@ -403,13 +399,13 @@ int main(int argc, char **args)
                         }
                     } 
 
-                    if (num_cameras > 1){
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_camera_sync(&ecams[i].camera);
-                        }
-                        camera_control->sync_camera = true;
-                    }
+                    // if (num_cameras > 1){
+                    //     for (int i = 0; i < num_cameras; i++)
+                    //     {
+                    //         ptp_camera_sync(&ecams[i].camera);
+                    //     }
+                    //     camera_control->sync_camera = true;
+                    // }
                     
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -918,16 +914,12 @@ int main(int argc, char **args)
             if (ImGui::Button("Send Ramp Location"))
             {
                 
-                float x = cube_dist(gen);
-                float y = 0.1372;
-                float z = cube_dist(gen);
-
                 // build the buffer
-                auto position = FetchGame::Vec3(x, y, z);
+                auto position = FetchGame::Vec3(marker3d.t_vec.x, marker3d.t_vec.y, marker3d.t_vec.z);
                 float orientation = 0.1;
                 FetchGame::RampBuilder ramp_builder(builder);
                 ramp_builder.add_position(&position);
-                ramp_builder.add_orientation(orientation);
+                ramp_builder.add_orientation(marker3d.angle_x_axis);
                 auto ramp = ramp_builder.Finish();
                 builder.Finish(ramp);
                 uint8_t *buf = builder.GetBufferPointer();

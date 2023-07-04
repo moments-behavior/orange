@@ -42,8 +42,8 @@ static inline void upload_frame_to_gpu(CameraParams *camera_params, FrameGPU *fr
         else
         {
             // ck(cudaMemcpy2D(frame_original->d_orig_host, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToHost));
-            ck(cudaMemcpy2D(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
-            // ck(cudaMemcpy2DAsync(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            // ck(cudaMemcpy2D(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            ck(cudaMemcpy2DAsync(frame_original->d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
             // ck(cudaMemcpy(frame_original->d_orig, ecam->frame_recv.imagePtr, frame_original->size_pic, cudaMemcpyHostToDevice));
         }
     }

@@ -172,7 +172,7 @@ void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
 
     aruco_maker_3d->angle_x_axis = atan2(corner1to4.y, corner1to4.x);
     f32 result = aruco_maker_3d->angle_x_axis * 180 / PI;
-    printf("The marker (x=%f, y=%f) is %f degrees from world x-axis. \n", corner1to4.x, corner1to4.y, result);    
+    printf("The marker is %f degrees from world x-axis. \n",  result);    
 
     cv::Point2f corner4to1; 
     corner4to1.x = - corner1to4.x;

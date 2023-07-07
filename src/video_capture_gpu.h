@@ -20,7 +20,6 @@ struct CameraControl
     bool stream = true;
     bool record_video = false;
     bool sync_camera = false;
-    bool m_slave = false;
 };
 
 struct CameraState

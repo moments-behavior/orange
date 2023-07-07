@@ -408,9 +408,7 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
         start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 5);
     }
     
-    if (!camera_control->m_slave) {
-        check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
-    }
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
 
     if (camera_control->sync_camera) {
         grab_frames_after_countdown(&ptp_state, ecam);
@@ -439,10 +437,8 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
         // } else { offset++; }
     }
 
-    if (!camera_control->m_slave) {
-        check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
-    }
-
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
+    
     if (camera_control->record_video) {
         close_writer(&encoder, &writer);
     }

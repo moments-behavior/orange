@@ -71,7 +71,6 @@ int main(int argc, char *argv[])
     camera_control->record_video = true; 
     camera_control->subscribe = true;
     camera_control->stream = false;
-    camera_control->m_slave = true;
     camera_control->sync_camera = false;
 
     for (int i = 0; i < num_cameras; i++)

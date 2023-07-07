@@ -9,6 +9,7 @@
 #include <imfilebrowser.h>
 #include "project.h"
 #include "gui.h"
+#include "utils.h"
 
 int main(int argc, char **args)
 {
@@ -31,7 +32,13 @@ int main(int argc, char **args)
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
-    file_dialog.SetPwd("/home/user/exp");
+
+    std::filesystem::path cwd = std::filesystem::current_path();
+    std::string delimiter = "/";
+    std::vector<std::string> tokenized_path = string_split (cwd, delimiter);
+    string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
+
+    file_dialog.SetPwd(start_folder_name);
     std::string input_folder = file_dialog.GetPwd();
     file_dialog.SetTitle("My files");
 

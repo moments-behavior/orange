@@ -394,7 +394,7 @@ static void gui_plot_world_coordinates(CameraCalibResults* cvp, int cam_id)
 
         ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
         ImPlot::SetNextLineStyle(my_color, 3.0);
-        ImPlot::PlotLine("##line", xs, ys, 2, ImPlotLineFlags_Segments);
+        ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
     }
     
 }

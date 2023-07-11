@@ -84,10 +84,10 @@ int main(int argc, char **args)
     ArucoMarker3d marker3d;
     bool have_calibration_results = false;
 
-    char grimlock_ip[] = "192.168.20.32";
-    ControlState grimlock_state;
-    std::thread grimlock_thread;
-    TSQueue<int> grimlock_queue; 
+    // char grimlock_ip[] = "192.168.20.32";
+    // ControlState grimlock_state;
+    // std::thread grimlock_thread;
+    // TSQueue<int> grimlock_queue; 
 
     yolo_param yolo_setting = yolo_param();
     std::vector<std::vector<cv::Rect>> yolo_boxes;
@@ -95,8 +95,9 @@ int main(int argc, char **args)
     std::vector<std::vector<int>> yolo_classid;
     cv::dnn::Net yolo_net;
     std::map<unsigned int, cv::Point3f> yolo_obj_3d;
-    tuple_f grimlock_xy;
-    float grimlock_rz;
+    triple_f ball_xyz;
+    triple_f ramp_xyz;
+    float ramp_rz;
 
     bool draw_yolo_detection = false;
 
@@ -548,9 +549,9 @@ int main(int argc, char **args)
                         std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
                         std::cout << "Marker normal: " << marker3d.normal << std::endl;
                     }
-                    grimlock_xy.x = marker3d.grab_point.x + 161.958;
-                    grimlock_xy.y = marker3d.grab_point.y - 1149.0;
-                    grimlock_rz = marker3d.angle_x_axis + 1.5708; 
+                    // ramp_xyz.x = marker3d.grab_point.x; // + 161.958;
+                    // ramp_xyz.y = marker3d.grab_point.y; // - 1149.0;
+                    // ramp_rz = marker3d.angle_x_axis; // + 1.5708; 
                 }
 
                 if (ImGui::Button("Load Yolo Models")) {
@@ -593,8 +594,9 @@ int main(int argc, char **args)
                             std::cout << "yolo_object: " << it->first << ", " << it->second << std::endl;
                     }
                     draw_yolo_detection = true;
-                    grimlock_xy.x = yolo_obj_3d[0].x + 161.958; // one-point fit of the base offset 
-                    grimlock_xy.y = yolo_obj_3d[0].y - 1149.0;
+                    ball_xyz.x = yolo_obj_3d[0].x; // + 2.9; // one-point fit of the base offset 
+                    ball_xyz.y = yolo_obj_3d[0].y; // - 1166.323;
+                    ball_xyz.z = yolo_obj_3d[0].z;
                 }
 
                 ImGui::Separator();
@@ -911,20 +913,25 @@ int main(int argc, char **args)
         {
             ImGui::Begin("Unity Rendering");
 
-            if (ImGui::Button("Send Ramp Location"))
+            if (ImGui::Button("Send Scene Info"))
             {
                 
                 // build the buffer
-                auto position = FetchGame::Vec3(marker3d.t_vec.x, marker3d.t_vec.y, marker3d.t_vec.z);
-                float orientation = 0.1;
-                FetchGame::RampBuilder ramp_builder(builder);
-                ramp_builder.add_position(&position);
-                ramp_builder.add_orientation(marker3d.angle_x_axis);
-                auto ramp = ramp_builder.Finish();
-                builder.Finish(ramp);
+                auto position_ramp = FetchGame::Vec3(marker3d.t_vec.x, marker3d.t_vec.y, marker3d.t_vec.z);
+                float orientation_ramp = marker3d.angle_x_axis;
+                auto ramp_fb = CreateRamp(builder, &position_ramp, orientation_ramp);
+
+
+                auto position_ball = FetchGame::Vec3(ball_xyz.x, ball_xyz.y, ball_xyz.z); 
+                auto ball_fb = CreateBall(builder, &position_ball);
+
+                FetchGame::SceneBuilder scene_builder(builder);
+                scene_builder.add_ramp(ramp_fb);
+                scene_builder.add_ball(ball_fb);
+                auto scene = scene_builder.Finish();
+                builder.Finish(scene);
                 uint8_t *buf = builder.GetBufferPointer();
                 int size = builder.GetSize();
-
 
                 ENetPacket *packet = enet_packet_create(buf,
                                                         size,
@@ -1023,10 +1030,10 @@ int main(int argc, char **args)
     }
 
 
-    if (grimlock_state.activate) {
-        grimlock_state.activate = false;
-        grimlock_thread.join();
-    }
+    // if (grimlock_state.activate) {
+    //     grimlock_state.activate = false;
+    //     grimlock_thread.join();
+    // }
 
     // Cleanup
     gx_cleanup(window);

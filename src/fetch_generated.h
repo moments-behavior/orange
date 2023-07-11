@@ -20,6 +20,12 @@ struct Vec3;
 struct Ramp;
 struct RampBuilder;
 
+struct Ball;
+struct BallBuilder;
+
+struct Scene;
+struct SceneBuilder;
+
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec3 FLATBUFFERS_FINAL_CLASS {
  private:
   float x_;
@@ -100,33 +106,127 @@ inline ::flatbuffers::Offset<Ramp> CreateRamp(
   return builder_.Finish();
 }
 
-inline const FetchGame::Ramp *GetRamp(const void *buf) {
-  return ::flatbuffers::GetRoot<FetchGame::Ramp>(buf);
+struct Ball FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef BallBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_POSITION = 4
+  };
+  const FetchGame::Vec3 *position() const {
+    return GetStruct<const FetchGame::Vec3 *>(VT_POSITION);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<FetchGame::Vec3>(verifier, VT_POSITION, 4) &&
+           verifier.EndTable();
+  }
+};
+
+struct BallBuilder {
+  typedef Ball Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_position(const FetchGame::Vec3 *position) {
+    fbb_.AddStruct(Ball::VT_POSITION, position);
+  }
+  explicit BallBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<Ball> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<Ball>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<Ball> CreateBall(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const FetchGame::Vec3 *position = nullptr) {
+  BallBuilder builder_(_fbb);
+  builder_.add_position(position);
+  return builder_.Finish();
 }
 
-inline const FetchGame::Ramp *GetSizePrefixedRamp(const void *buf) {
-  return ::flatbuffers::GetSizePrefixedRoot<FetchGame::Ramp>(buf);
+struct Scene FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SceneBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_RAMP = 4,
+    VT_BALL = 6
+  };
+  const FetchGame::Ramp *ramp() const {
+    return GetPointer<const FetchGame::Ramp *>(VT_RAMP);
+  }
+  const FetchGame::Ball *ball() const {
+    return GetPointer<const FetchGame::Ball *>(VT_BALL);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_RAMP) &&
+           verifier.VerifyTable(ramp()) &&
+           VerifyOffset(verifier, VT_BALL) &&
+           verifier.VerifyTable(ball()) &&
+           verifier.EndTable();
+  }
+};
+
+struct SceneBuilder {
+  typedef Scene Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_ramp(::flatbuffers::Offset<FetchGame::Ramp> ramp) {
+    fbb_.AddOffset(Scene::VT_RAMP, ramp);
+  }
+  void add_ball(::flatbuffers::Offset<FetchGame::Ball> ball) {
+    fbb_.AddOffset(Scene::VT_BALL, ball);
+  }
+  explicit SceneBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<Scene> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<Scene>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<Scene> CreateScene(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<FetchGame::Ramp> ramp = 0,
+    ::flatbuffers::Offset<FetchGame::Ball> ball = 0) {
+  SceneBuilder builder_(_fbb);
+  builder_.add_ball(ball);
+  builder_.add_ramp(ramp);
+  return builder_.Finish();
 }
 
-inline bool VerifyRampBuffer(
+inline const FetchGame::Scene *GetScene(const void *buf) {
+  return ::flatbuffers::GetRoot<FetchGame::Scene>(buf);
+}
+
+inline const FetchGame::Scene *GetSizePrefixedScene(const void *buf) {
+  return ::flatbuffers::GetSizePrefixedRoot<FetchGame::Scene>(buf);
+}
+
+inline bool VerifySceneBuffer(
     ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<FetchGame::Ramp>(nullptr);
+  return verifier.VerifyBuffer<FetchGame::Scene>(nullptr);
 }
 
-inline bool VerifySizePrefixedRampBuffer(
+inline bool VerifySizePrefixedSceneBuffer(
     ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<FetchGame::Ramp>(nullptr);
+  return verifier.VerifySizePrefixedBuffer<FetchGame::Scene>(nullptr);
 }
 
-inline void FinishRampBuffer(
+inline void FinishSceneBuffer(
     ::flatbuffers::FlatBufferBuilder &fbb,
-    ::flatbuffers::Offset<FetchGame::Ramp> root) {
+    ::flatbuffers::Offset<FetchGame::Scene> root) {
   fbb.Finish(root);
 }
 
-inline void FinishSizePrefixedRampBuffer(
+inline void FinishSizePrefixedSceneBuffer(
     ::flatbuffers::FlatBufferBuilder &fbb,
-    ::flatbuffers::Offset<FetchGame::Ramp> root) {
+    ::flatbuffers::Offset<FetchGame::Scene> root) {
   fbb.FinishSizePrefixed(root);
 }
 

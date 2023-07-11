@@ -179,17 +179,19 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
         else
         {
             camera_state->frames_recd++;
-            // copy to pinned memory first
-            upload_frame_to_gpu(camera_params, frame_original, ecam);
-            if (camera_params->color){
-                debayer_frame_gpu(camera_params, frame_original, debayer);
-            } else {
-                duplicate_channel_gpu(camera_params, frame_original, debayer);
-            }
-            if (camera_control->record_video)
-            {
-                encode_frame(encoder, writer->video, debayer);
-                write_meatadata(writer->metadata, ecam);
+            if(!camera_control->capture_only) {
+                // copy to pinned memory first
+                upload_frame_to_gpu(camera_params, frame_original, ecam);
+                if (camera_params->color){
+                    debayer_frame_gpu(camera_params, frame_original, debayer);
+                } else {
+                    duplicate_channel_gpu(camera_params, frame_original, debayer);
+                }
+                if (camera_control->record_video)
+                {
+                    encode_frame(encoder, writer->video, debayer);
+                    write_meatadata(writer->metadata, ecam);
+                }    
             }
         }
 

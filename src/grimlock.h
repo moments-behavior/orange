@@ -290,7 +290,7 @@ void robot_process(const char* ip, ControlState* control_state, TSQueue<int>* qu
                     gripper_open_sync(&gripper, control_state, 140);
                 }
 
-                std::vector<double> prepare = {-0.57005, -0.45649, 0.57148, 0.0f, 3.1415, 0.0f};
+                std::vector<double> prepare = {-0.57005, -0.45649, 0.57148, 0.0f, 3.1415f, 0.0f};
                 if (!control_state->stop) {
                     moveL_async(&grimlock_control, control_state, prepare, 0.5, 0.5);
                 }

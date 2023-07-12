@@ -947,93 +947,9 @@ int main(int argc, char **args)
             ImGui::End();
         }
 
-        // {
-        //     ImGui::Begin("Grimlock Experiment Control");
-
-        //     if (ImGui::Button(grimlock_state.activate ? "Deactivate Robot": "Activate Grimlock"))
-        //     {
-        //         grimlock_state.activate = !grimlock_state.activate;
-        //         if (grimlock_state.activate) {
-        //             grimlock_thread = std::thread(&robot_process, grimlock_ip, &grimlock_state, &grimlock_queue, &grimlock_xy, &grimlock_rz);
-        //         }
-        //         else {
-        //             grimlock_thread.join();
-        //         }
-        //     }
-
-        //     ImGui::InputInt("Ball id", &grimlock_state.ball_idx);
-
-        //     if (ImGui::Button(grimlock_state.simple_task ? "Simple" : "Hard"))
-        //     {
-        //         grimlock_state.simple_task = !grimlock_state.simple_task;
-        //     }
-
-        //     if (ImGui::Button("Grab ball"))
-        //     {
-        //         grimlock_queue.push(GrabBall);
-        //     }
-
-        //     if (ImGui::Button("Place ball ramp"))
-        //     {
-        //         grimlock_queue.push(PlaceBallRamp);
-        //     }
-
-        //     if (ImGui::Button("Drop ball"))
-        //     {
-        //         grimlock_queue.push(DropBall);
-        //     }
-
-        //     if (ImGui::Button("Pick ball arena"))
-        //     {
-        //         grimlock_queue.push(PickBallArena);
-        //     }
-
-
-        //     if (ImGui::Button("Pick ramp arena"))
-        //     {
-        //         grimlock_queue.push(PickRampArena);
-        //     }
-
-        //     if (ImGui::Button(grimlock_state.stop ? "Start Robot" : "Stop Robot"))
-        //     {
-        //         grimlock_state.stop = !grimlock_state.stop;
-        //         for (int row = 0; row < grimlock_queue.size(); row++) {
-        //             grimlock_queue.pop();
-        //         }
-        //     }
-
-        //     if (ImGui::BeginTable("table1", 1))
-        //     {
-
-        //         ImGui::TableSetupColumn("Action Queue");
-        //         ImGui::TableHeadersRow();
-
-        //         for (int row = 0; row < grimlock_queue.size(); row++)
-        //         {
-        //             ImGui::TableNextRow();
-        //             for (int column = 0; column < 1; column++)
-        //             {
-        //                 ImGui::TableSetColumnIndex(column);
-        //                 char buf[32];
-        //                 sprintf(buf, "%s", ActionPrimitivesStr[grimlock_queue.front()]);
-        //                 ImGui::TextUnformatted(buf);
-        //             }
-        //         }
-        //         ImGui::EndTable();
-        //     }
-
-        //     ImGui::End();
-        // }
-
         render_a_frame(window);
 
     }
-
-
-    // if (grimlock_state.activate) {
-    //     grimlock_state.activate = false;
-    //     grimlock_thread.join();
-    // }
 
     // Cleanup
     gx_cleanup(window);

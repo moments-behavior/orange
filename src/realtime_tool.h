@@ -85,7 +85,6 @@ struct ArucoMarker3d
     cv::Point3f t_vec;
     cv::Point3f normal; 
     f32 angle_x_axis;
-    cv::Point2f grab_point;
 };
 
 
@@ -174,14 +173,6 @@ void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
     f32 result = aruco_maker_3d->angle_x_axis * 180 / PI;
     printf("The marker is %f degrees from world x-axis. \n",  result);    
 
-    cv::Point2f corner4to1; 
-    corner4to1.x = - corner1to4.x;
-    corner4to1.y = - corner1to4.y;
-    corner4to1 = corner4to1 / cv::norm(corner4to1);
-
-    aruco_maker_3d->grab_point.x = aruco_maker_3d->t_vec.x + 74.5f * corner4to1.x;
-    aruco_maker_3d->grab_point.y = aruco_maker_3d->t_vec.y + 74.5f * corner4to1.y;
-    printf("The grabbing point (x=%f, y=%f) is %f degrees from world x-axis. \n", aruco_maker_3d->grab_point.x, aruco_maker_3d->grab_point.y, result);    
 }
 
 

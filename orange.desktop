@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Orange Streaming
+Exec=/home/user/src/orange/targets/orange
+Icon=/home/user/src/orange/images/orange_icon.png
+Terminal=false
+Type=Application

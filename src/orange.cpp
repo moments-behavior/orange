@@ -10,7 +10,6 @@
 #include "project.h"
 #include "gui.h"
 #include "realtime_tool.h"
-#include "grimlock.h"
 #include "yolo_detection.h"
 #include "fetch_generated.h"
 #define ENET_IMPLEMENTATION
@@ -84,20 +83,12 @@ int main(int argc, char **args)
     ArucoMarker3d marker3d;
     bool have_calibration_results = false;
 
-    // char grimlock_ip[] = "192.168.20.32";
-    // ControlState grimlock_state;
-    // std::thread grimlock_thread;
-    // TSQueue<int> grimlock_queue; 
-
     yolo_param yolo_setting = yolo_param();
     std::vector<std::vector<cv::Rect>> yolo_boxes;
     std::vector<std::vector<std::string>> yolo_labels;
     std::vector<std::vector<int>> yolo_classid;
     cv::dnn::Net yolo_net;
     std::map<unsigned int, cv::Point3f> yolo_obj_3d;
-    triple_f ball_xyz;
-    triple_f ramp_xyz;
-    float ramp_rz;
 
     bool draw_yolo_detection = false;
 
@@ -549,9 +540,6 @@ int main(int argc, char **args)
                         std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
                         std::cout << "Marker normal: " << marker3d.normal << std::endl;
                     }
-                    // ramp_xyz.x = marker3d.grab_point.x; // + 161.958;
-                    // ramp_xyz.y = marker3d.grab_point.y; // - 1149.0;
-                    // ramp_rz = marker3d.angle_x_axis; // + 1.5708; 
                 }
 
                 if (ImGui::Button("Load Yolo Models")) {
@@ -594,9 +582,6 @@ int main(int argc, char **args)
                             std::cout << "yolo_object: " << it->first << ", " << it->second << std::endl;
                     }
                     draw_yolo_detection = true;
-                    ball_xyz.x = yolo_obj_3d[0].x; // + 2.9; // one-point fit of the base offset 
-                    ball_xyz.y = yolo_obj_3d[0].y; // - 1166.323;
-                    ball_xyz.z = yolo_obj_3d[0].z;
                 }
 
                 ImGui::Separator();
@@ -922,7 +907,7 @@ int main(int argc, char **args)
                 auto ramp_fb = CreateRamp(builder, &position_ramp, orientation_ramp);
 
 
-                auto position_ball = FetchGame::Vec3(ball_xyz.x, ball_xyz.y, ball_xyz.z); 
+                auto position_ball = FetchGame::Vec3(yolo_obj_3d[0].x, yolo_obj_3d[0].y, yolo_obj_3d[0].z); 
                 auto ball_fb = CreateBall(builder, &position_ball);
 
                 FetchGame::SceneBuilder scene_builder(builder);

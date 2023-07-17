@@ -70,6 +70,7 @@ int main(int argc, char **args)
 
     CPURender *cpu_buffers;
     CameraCalibResults* calib_results;
+    vector<vector<vector<Point2f>>> calib_data;
 
     Settings calib_setting;
 
@@ -479,14 +480,11 @@ int main(int argc, char **args)
         if (ImGui::Begin("Realtime Tools")) 
         {
             
-            ImGui::Checkbox("Next", &show_cpu_buffer);
-
-
-            if (ImGui::Button("Start Realtime Thread")) {
-                // allocate cpu buffers
+            if (ImGui::Button("Allocate cpu buffers")) {
                 for (int i = 0; i < num_cameras; i++) {
-                    allocate_cpu_render_resources(&cpu_buffers[i], cameras_params[i].width, cameras_params[i].height, show_cpu_buffer);
+                    allocate_cpu_render_resources(&cpu_buffers[i], cameras_params[i].width, cameras_params[i].height);
                 }
+                show_cpu_buffer = true;
                 camera_control->copy_to_cpu = true;
 
                 for (int i = 0; i < num_cameras; i++)
@@ -500,17 +498,51 @@ int main(int argc, char **args)
                     selected_images_to_save[i] = false;
                 }
                 calib_results = new CameraCalibResults[num_cameras];
-                
+
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
-                    have_calibration_results = true;
-                    // print_calibration_results(&calib_results[i]);
+                    vector<vector<Point2f>> image_points_per_cam;
+                    calib_data.push_back(image_points_per_cam);
                 }
             }
+            ImGui::Separator();
+            ImGui::Spacing();
 
             if (show_cpu_buffer) {
                 
+                if (ImGui::Button("Load camera calibration")) {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
+                        have_calibration_results = true;
+                        // print_calibration_results(&calib_results[i]);
+                    }
+                }
+
+                if (ImGui::Button("Detect Aruco Marker")) {
+
+                    if (!marker2d_all_cams.detected_cameras.empty()) {
+                        marker2d_all_cams.detected_cameras.clear();
+                        marker2d_all_cams.detected_points.clear();
+                        marker3d.corners.clear();
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+
+                    for (int i = 0; i < num_cameras; i++) {
+                        aruco_detection(&cpu_buffers[i].display_buffer, cameras_params, &marker2d_all_cams); 
+                    } 
+
+                    if(find_marker3d(&marker2d_all_cams, &marker3d, calib_results)) {
+                        std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
+                        std::cout << "Marker normal: " << marker3d.normal << std::endl;
+                    }
+                }
+
                 if (ImGui::Button("Load Yolo Models")) {
                     std::string yolov5_onnx = "/home/user/dev/clips0/yolo_models/best.onnx";
                     std::string yolov5_labelname = "/home/user/dev/clips0/yolo_models/label.names";
@@ -530,6 +562,7 @@ int main(int argc, char **args)
                         yolo_labels.push_back(yolo_label_per_cam);
                         yolo_classid.push_back(yolo_classid_per_cam);
                     }
+
                 }
 
                 if (ImGui::Button("Yolo Detect")) {
@@ -554,6 +587,99 @@ int main(int argc, char **args)
                 ImGui::Separator();
                 ImGui::Spacing();
 
+                if (ImGui::Button("Load Calibration Configure File")) {
+                    std::string input_settings_file = "/home/user/src/orange/default.xml";
+                    load_calibration_config_file(input_settings_file, &calib_setting);
+                
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+
+                        Mat cameraMatrix = Mat::eye(3, 3, CV_64F);
+                        // initialization
+                        if (!calib_setting.intrinsicGuess)
+                        {
+                            if (!calib_setting.useFisheye && calib_setting.flag & CALIB_FIX_ASPECT_RATIO)
+                                cameraMatrix.at<double>(0, 0) = calib_setting.aspectRatio;
+                        }
+                        else
+                        {
+                            cameraMatrix = (Mat_<double>(3, 3) << 2800, 0, 1100, 0, 2800, 1600, 0, 0, 1);
+                        }
+                        calib_results[i].k = cameraMatrix;
+
+                        if (calib_setting.useFisheye)
+                        {
+                            Mat distCoeffs = Mat::zeros(4, 1, CV_64F);
+                            calib_results[i].dist_coeffs = distCoeffs;
+                        }
+                        else
+                        {
+                            Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
+                            calib_results[i].dist_coeffs.push_back(distCoeffs);
+                        }
+                    }
+                }
+
+                if (ImGui::Button("Detect"))
+                {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+
+                        int winSize = 11; // Half of search window for cornerSubPix
+                        // local the frame and process frame
+                        cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
+
+                        //! [find_pattern]
+                        vector<Point2f> pointBuf;
+                        bool found;
+                        int chessBoardFlags = CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE | CALIB_CB_FAST_CHECK;
+
+                        switch (calib_setting.calibrationPattern) // Find feature points on the input format
+                        {
+                        case Settings::CHESSBOARD:
+                            found = findChessboardCorners(view, calib_setting.boardSize, pointBuf);
+                            break;
+                        case Settings::CIRCLES_GRID:
+                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf);
+                            break;
+                        case Settings::ASYMMETRIC_CIRCLES_GRID:
+                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf, CALIB_CB_ASYMMETRIC_GRID);
+                            std::cout << "here?" << std::endl;
+                            break;
+                        default:
+                            found = false;
+                            break;
+                        }
+
+                        std::cout << "\n after finding corner?:" << found << std::endl;
+                        //! [find_pattern]
+                        //! [pattern_found]
+                        if (found) // If done with success,
+                        {
+                            // improve the found corners' coordinate accuracy for chessboard
+                            if (calib_setting.calibrationPattern == Settings::CHESSBOARD)
+                            {
+                                Mat viewGray;
+                                cvtColor(view, viewGray, COLOR_BGR2GRAY);
+                                cornerSubPix(viewGray, pointBuf, Size(winSize, winSize),
+                                                Size(-1, -1), TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 30, 0.0001));
+                            }
+
+                            calib_data[i].push_back(pointBuf);
+                            std::cout << pointBuf << std::endl;
+                            // Draw the corners.
+                            drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
+                            bitwise_not(view, view);
+                        }
+                    }
+                }
+
+
                 if (ImGui::Button("Get new frame"))
                 {
                     for (int i = 0; i < num_cameras; i++)
@@ -564,6 +690,113 @@ int main(int argc, char **args)
                     draw_aruco_detection = false;
                 }
 
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    int no_frames = calib_data[i].size();
+                    std::string no_frames_str = "Number of Frames: " + std::to_string(no_frames);
+                    if (no_frames < 25)
+                    {
+                        ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), no_frames_str.c_str());
+                    }
+                    else
+                    {
+                        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), no_frames_str.c_str());
+                    }
+                }
+
+                if (ImGui::Button("Run calibration"))
+                {
+                    float grid_width = calib_setting.squareSize * (calib_setting.boardSize.width - 1);
+                    Size imageSize = cv::Size(2200, 3200);
+                    cout << "imageSize" << imageSize << endl;
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        string cam_calib_out = "/home/user/Calibration/realtime_calib/Cam" + std::to_string(cameras_params[i].camera_id) + ".xml";
+                        if (runCalibrationAndSave(cam_calib_out, calib_setting, imageSize, calib_results[i].k, calib_results[i].dist_coeffs, calib_data[i], grid_width, calib_setting.release_object))
+                        {
+                            printf("Calibrated");
+                        }
+                    }
+                }
+
+                if (ImGui::Button("Load intrinsics"))
+                {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        string input_intrinsic_files = "Cam" + std::to_string(cameras_params[i].camera_id) + ".xml";
+                        loadIntrinsics(input_intrinsic_files, calib_results[i].k, calib_results[i].dist_coeffs);
+                    }
+                }
+
+                if (ImGui::Button("Estimate camera pose"))
+                {
+
+                    // detect
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        int winSize = 11; // Half of search window for cornerSubPix
+                        // local the frame and process frame
+                        cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
+
+                        //! [find_pattern]
+                        vector<Point2f> pointBuf;
+                        bool found;
+                        int chessBoardFlags = CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE | CALIB_CB_FAST_CHECK;
+
+                        switch (calib_setting.calibrationPattern) // Find feature points on the input format
+                        {
+                        case Settings::CHESSBOARD:
+                            found = findChessboardCorners(view, calib_setting.boardSize, pointBuf);
+                            break;
+                        case Settings::CIRCLES_GRID:
+                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf);
+                            break;
+                        case Settings::ASYMMETRIC_CIRCLES_GRID:
+                            found = findCirclesGrid(view, calib_setting.boardSize, pointBuf, CALIB_CB_ASYMMETRIC_GRID);
+                            std::cout << "here?" << std::endl;
+                            break;
+                        default:
+                            found = false;
+                            break;
+                        }
+
+                        std::cout << "\n after finding corner?:" << found << std::endl;
+                        //! [find_pattern]
+                        //! [pattern_found]
+                        if (found) // If done with success,
+                        {
+                            // improve the found corners' coordinate accuracy for chessboard
+                            if (calib_setting.calibrationPattern == Settings::CHESSBOARD)
+                            {
+                                Mat viewGray;
+                                cvtColor(view, viewGray, COLOR_BGR2GRAY);
+                                cornerSubPix(viewGray, pointBuf, Size(winSize, winSize),
+                                                Size(-1, -1), TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 30, 0.0001));
+                            }
+                            calib_data[i].push_back(pointBuf);
+                            // Draw the corners.
+                            drawChessboardCorners(view, calib_setting.boardSize, Mat(pointBuf), found);
+                            bitwise_not(view, view);
+
+                            string cam_calib_estrinsics = "Cam" + std::to_string(cameras_params[i].camera_id) + "_extrinsics.xml";
+                            // estimate extrinsics
+                            if (estimatePose(cam_calib_estrinsics, calib_setting, pointBuf, calib_results[i].k, calib_results[i].dist_coeffs, SOLVEPNP_ITERATIVE))
+                            {
+                                std::cout << "Extrinsics estimated successfully." << std::endl;
+                            }
+                        }
+                    }
+                }
+
+
+                ImGui::Separator();
+                ImGui::Spacing();
                 
                 if (ImGui::Button("Save images all"))
                 {

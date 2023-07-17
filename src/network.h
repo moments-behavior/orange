@@ -7,6 +7,7 @@
 void send_serial_data(ENetHost *server, flatbuffers::FlatBufferBuilder& builder, ArucoMarker3d* marker3d, std::map<unsigned int, cv::Point3f>& yolo_obj_3d)
 {              
     // build the buffer
+    builder.Clear();
     auto position_ramp = FetchGame::Vec3(marker3d->t_vec.x, marker3d->t_vec.y, marker3d->t_vec.z);
     float orientation_ramp = marker3d->angle_x_axis;
     auto ramp_fb = CreateRamp(builder, &position_ramp, orientation_ramp);

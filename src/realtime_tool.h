@@ -18,50 +18,12 @@
 
 #define PI 3.14159265
 
-static void draw_cv_contours(std::vector<cv::Rect> boxes, std::vector<std::string> labels, std::vector<int> class_ids)
-{
-    for (int i=0; i< boxes.size(); i++)
-    {
-        double x[5] = {(double)boxes[i].x, (double)boxes[i].x, (double)boxes[i].x + boxes[i].width, (double)boxes[i].x + boxes[i].width, (double)boxes[i].x};
-        double y[5] = {(double)2200 - boxes[i].y, (double)2200 - boxes[i].y - boxes[i].height, (double)2200 - boxes[i].y - boxes[i].height, (double)2200 - boxes[i].y, (double)2200 - boxes[i].y};
-        
-        if(class_ids[i] == 0){
-            ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0,1.0), 3.0);
-        } else{
-            ImPlot::SetNextLineStyle(ImVec4(0.5, 1.0, 1.0,1.0), 3.0);}
-
-        ImPlot::PlotLine(labels[i].c_str(), &x[0], &y[0], 5); 
-    }
-}
-
 
 struct CPURender
 {
     GLuint image_texture;
     PictureBuffer display_buffer;
 };
-
-void allocate_cpu_render_resources(CPURender *cpu_buffers, u32 image_width, u32 image_height, bool render_flag)
-{
-    u32 size_pic = image_height * image_width * 3 * sizeof(unsigned char);
-
-    cpu_buffers->display_buffer.frame = (unsigned char *)malloc(size_pic);
-    clear_buffer_with_constant_image(cpu_buffers->display_buffer.frame, image_width, image_height);
-    cpu_buffers->display_buffer.frame_number = 0;
-    cpu_buffers->display_buffer.available_to_write = true;
-
-    if(render_flag) {
-        glGenTextures(1, &cpu_buffers->image_texture);
-        glBindTexture(GL_TEXTURE_2D, cpu_buffers->image_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-        // Setup filtering parameters for display
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-}
-
 
 struct CameraCalibResults
 {
@@ -88,6 +50,61 @@ struct ArucoMarker3d
     cv::Point3f normal; 
     f32 angle_x_axis;
 };
+
+
+void allocate_cpu_render_resources(CPURender *cpu_buffers, u32 image_width, u32 image_height)
+{
+    u32 size_pic = image_height * image_width * 3 * sizeof(unsigned char);
+
+    cpu_buffers->display_buffer.frame = (unsigned char *)malloc(size_pic);
+    clear_buffer_with_constant_image(cpu_buffers->display_buffer.frame, image_width, image_height);
+    cpu_buffers->display_buffer.frame_number = 0;
+    cpu_buffers->display_buffer.available_to_write = true;
+
+    glGenTextures(1, &cpu_buffers->image_texture);
+    glBindTexture(GL_TEXTURE_2D, cpu_buffers->image_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+
+static void draw_yolo_boxes(std::vector<cv::Rect> boxes, std::vector<std::string> labels, std::vector<int> class_ids)
+{
+    for (int i=0; i< boxes.size(); i++)
+    {
+        double x[5] = {(double)boxes[i].x, (double)boxes[i].x, (double)boxes[i].x + boxes[i].width, (double)boxes[i].x + boxes[i].width, (double)boxes[i].x};
+        double y[5] = {(double)2200 - boxes[i].y, (double)2200 - boxes[i].y - boxes[i].height, (double)2200 - boxes[i].y - boxes[i].height, (double)2200 - boxes[i].y, (double)2200 - boxes[i].y};
+        
+        if(class_ids[i] == 0){
+            ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0,1.0), 3.0);
+        } else{
+            ImPlot::SetNextLineStyle(ImVec4(0.5, 1.0, 1.0,1.0), 3.0);}
+
+        ImPlot::PlotLine(labels[i].c_str(), &x[0], &y[0], 5); 
+    }
+}
+
+
+static void draw_aruco_markers(ArucoMarker2d* aruco_marker, int camera_id)
+{
+    double x[5] = {(double)aruco_marker->detected_points[camera_id][0].x, 
+        (double)aruco_marker->detected_points[camera_id][1].x, 
+        (double)aruco_marker->detected_points[camera_id][2].x, 
+        (double)aruco_marker->detected_points[camera_id][3].x, 
+        (double)aruco_marker->detected_points[camera_id][0].x};
+    
+    double y[5] = {(double)2200 - (double)aruco_marker->detected_points[camera_id][0].y, 
+        (double)2200 - (double)aruco_marker->detected_points[camera_id][1].y, 
+        (double)2200 - (double)aruco_marker->detected_points[camera_id][2].y, 
+        (double)2200 - (double)aruco_marker->detected_points[camera_id][3].y, 
+        (double)2200 - (double)aruco_marker->detected_points[camera_id][0].y};
+
+    ImPlot::PlotLine("##", &x[0], &y[0], 5); 
+}
 
 
 void load_camera_calibration_results(CameraCalibResults* calib_results, CameraParams *cameras_params) 

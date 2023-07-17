@@ -90,6 +90,7 @@ int main(int argc, char **args)
     std::map<unsigned int, cv::Point3f> yolo_obj_3d;
 
     bool draw_yolo_detection = false;
+    bool draw_aruco_detection = false;
 
     // network and protocal
     if (enet_initialize() != 0)
@@ -531,7 +532,6 @@ int main(int argc, char **args)
                     }
                 }
 
-
                 if (ImGui::Button("Yolo Detect")) {
                     
                     for (int i = 0; i < num_cameras; i++)
@@ -561,6 +561,7 @@ int main(int argc, char **args)
                         cpu_buffers[i].display_buffer.available_to_write = true;
                     }
                     draw_yolo_detection = false;
+                    draw_aruco_detection = false;
                 }
 
                 
@@ -650,7 +651,11 @@ int main(int argc, char **args)
                         }
 
                         if (draw_yolo_detection) {
-                            draw_cv_contours(yolo_boxes.at(i), yolo_labels.at(i), yolo_classid.at(i));
+                            draw_yolo_boxes(yolo_boxes.at(i), yolo_labels.at(i), yolo_classid.at(i));
+                        }
+
+                        if (draw_aruco_detection) {
+                            draw_aruco_markers(&marker2d_all_cams, i);
                         }
 
                         ImPlot::EndPlot();

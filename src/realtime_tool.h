@@ -106,7 +106,8 @@ static void draw_aruco_markers(ArucoMarker3d* aruco_marker, int camera_id)
         (double)2200 - (double)aruco_marker->proj_corners[camera_id][2].y, 
         (double)2200 - (double)aruco_marker->proj_corners[camera_id][3].y, 
         (double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y};
-
+    
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 0.0, 1.0), 3.0);
     ImPlot::PlotLine("##", &x[0], &y[0], 5); 
 }
 
@@ -165,7 +166,7 @@ void aruco_detection(PictureBuffer* display_buffer, CameraParams *cameras_params
     // detect 
     std::vector<aruco::Marker> markers = MDetector.detect(view);
     for (size_t i = 0; i < markers.size(); i++) {
-        std::cout << markers[i] << std::endl;
+        // std::cout << markers[i] << std::endl;
         // markers[i].draw(view);
 
         if (markers[i].id == 0) {

@@ -9,12 +9,10 @@
 #include <imfilebrowser.h>
 #include "project.h"
 #include "gui.h"
-#include "realtime_tool.h"
 #include "yolo_detection.h"
-#include "fetch_generated.h"
 #define ENET_IMPLEMENTATION
-#include "enet.h"
 #include "aruco_detection.h"
+#include "network.h"
 #define MAX_CLIENTS 32
 
 // A nice way of printing out the system time
@@ -474,6 +472,7 @@ int main(int argc, char **args)
 
                     if (draw_aruco_detection) {
                         draw_aruco_markers(&marker3d, i);
+                        send_serial_data(server, builder, &marker3d, yolo_obj_3d);
                     }
 
                     ImPlot::EndPlot();
@@ -522,8 +521,7 @@ int main(int argc, char **args)
                     }
                     marker3d.proj_corners.push_back(marker_per_cam);
                 }
-
-                aruco_detection_thread = std::thread(marker_detection_thread, cpu_buffers, &marker2d_all_cams, &marker3d, cameras_params, calib_results, num_cameras);
+                aruco_detection_thread = std::thread(marker_detection_thread, cpu_buffers, &marker2d_all_cams, &marker3d, cameras_params, calib_results, camera_control, num_cameras);
                 draw_aruco_detection = true;
             }
 
@@ -680,43 +678,6 @@ int main(int argc, char **args)
                      
         }
         ImGui::End();   
-
-        {
-            ImGui::Begin("Unity Rendering");
-
-            if (ImGui::Button("Send Scene Info"))
-            {
-                
-                // build the buffer
-                auto position_ramp = FetchGame::Vec3(marker3d.t_vec.x, marker3d.t_vec.y, marker3d.t_vec.z);
-                float orientation_ramp = marker3d.angle_x_axis;
-                auto ramp_fb = CreateRamp(builder, &position_ramp, orientation_ramp);
-
-
-                auto position_ball = FetchGame::Vec3(yolo_obj_3d[0].x, yolo_obj_3d[0].y, yolo_obj_3d[0].z); 
-                auto ball_fb = CreateBall(builder, &position_ball);
-
-                FetchGame::SceneBuilder scene_builder(builder);
-                scene_builder.add_ramp(ramp_fb);
-                scene_builder.add_ball(ball_fb);
-                auto scene = scene_builder.Finish();
-                builder.Finish(scene);
-                uint8_t *buf = builder.GetBufferPointer();
-                int size = builder.GetSize();
-
-                ENetPacket *packet = enet_packet_create(buf,
-                                                        size,
-                                                        ENET_PACKET_FLAG_RELIABLE);
-                /* Send the packet to the peer over channel id 0. */
-                /* One could also broadcast the packet by         */
-                enet_host_broadcast(server, 0, packet);
-                // enet_peer_send(peer, 0, packet);
-
-                // Receive some events
-                // enet_host_service(client, &event, 0);
-            }
-            ImGui::End();
-        }
 
         render_a_frame(window);
 

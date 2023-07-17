@@ -91,6 +91,7 @@ int main(int argc, char **args)
     std::map<unsigned int, cv::Point3f> yolo_obj_3d;
 
     bool draw_yolo_detection = false;
+    bool draw_aruco_detection = false;
 
     // network and protocal
     if (enet_initialize() != 0)
@@ -534,9 +535,10 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++) {
                         aruco_detection(&cpu_buffers[i].display_buffer, cameras_params, &marker2d_all_cams); 
-                    } 
+                    }
 
                     if(find_marker3d(&marker2d_all_cams, &marker3d, calib_results)) {
+                        draw_aruco_detection = true;
                         std::cout << "Marker tvec: " << marker3d.t_vec << std::endl;
                         std::cout << "Marker normal: " << marker3d.normal << std::endl;
                     }
@@ -561,9 +563,7 @@ int main(int argc, char **args)
                         yolo_labels.push_back(yolo_label_per_cam);
                         yolo_classid.push_back(yolo_classid_per_cam);
                     }
-
                 }
-
 
                 if (ImGui::Button("Yolo Detect")) {
                     
@@ -687,6 +687,7 @@ int main(int argc, char **args)
                         cpu_buffers[i].display_buffer.available_to_write = true;
                     }
                     draw_yolo_detection = false;
+                    draw_aruco_detection = false;
                 }
 
                 for (int i = 0; i < num_cameras; i++)
@@ -883,7 +884,11 @@ int main(int argc, char **args)
                         }
 
                         if (draw_yolo_detection) {
-                            draw_cv_contours(yolo_boxes.at(i), yolo_labels.at(i), yolo_classid.at(i));
+                            draw_yolo_boxes(yolo_boxes.at(i), yolo_labels.at(i), yolo_classid.at(i));
+                        }
+
+                        if (draw_aruco_detection) {
+                            draw_aruco_markers(&marker2d_all_cams, i);
                         }
 
                         ImPlot::EndPlot();

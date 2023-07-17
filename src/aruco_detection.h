@@ -2,7 +2,7 @@
 #define ORANGE_ARUCO_DETECTION
 #include "realtime_tool.h"
 
-void marker_detection_thread(CPURender* cpu_buffers, ArucoMarker2d* marker2d_all_cams, ArucoMarker3d* marker3d, CameraParams* cameras_params, CameraCalibResults* calib_results, int num_cameras)
+void marker_detection_thread(CPURender* cpu_buffers, ArucoMarker2d* marker2d_all_cams, ArucoMarker3d* marker3d, CameraParams* cameras_params, CameraCalibResults* calib_results, int num_cameras, bool* draw_aruco_detection)
 {
     while (true) {
 
@@ -23,10 +23,12 @@ void marker_detection_thread(CPURender* cpu_buffers, ArucoMarker2d* marker2d_all
         } 
 
         if(find_marker3d(marker2d_all_cams, marker3d, calib_results)) {
-            // send the frames 
-            
+            // send the frames     
             std::cout << "Marker tvec: " << marker3d->t_vec << std::endl;
             std::cout << "Marker normal: " << marker3d->normal << std::endl;
+            *draw_aruco_detection = true;
+        } else {
+            *draw_aruco_detection = false;
         }
 
         for (int i = 0; i < num_cameras; i++)

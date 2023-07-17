@@ -14,9 +14,8 @@
 #include "fetch_generated.h"
 #define ENET_IMPLEMENTATION
 #include "enet.h"
-
+#include "aruco_detection.h"
 #define MAX_CLIENTS 32
-#include <random>
 
 // A nice way of printing out the system time
 std::string CurrentTimeStr()
@@ -91,6 +90,8 @@ int main(int argc, char **args)
 
     bool draw_yolo_detection = false;
     bool draw_aruco_detection = false;
+
+    thread aruco_detection_thread;
 
     // network and protocal
     if (enet_initialize() != 0)
@@ -470,6 +471,11 @@ int main(int argc, char **args)
                 if (ImPlot::BeginPlot("##no_plot_name", avail_size))
                 {
                     ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+
+                    if (draw_aruco_detection) {
+                        draw_aruco_markers(&marker2d_all_cams, i);
+                    }
+
                     ImPlot::EndPlot();
                 }
                 ImGui::End();
@@ -479,7 +485,7 @@ int main(int argc, char **args)
         if (ImGui::Begin("Realtime Tools")) 
         {
             
-            ImGui::Checkbox("Next", &show_cpu_buffer);
+            ImGui::Checkbox("Show CPU Buffer", &show_cpu_buffer);
 
 
             if (ImGui::Button("Start Realtime Thread")) {
@@ -507,6 +513,8 @@ int main(int argc, char **args)
                     have_calibration_results = true;
                     // print_calibration_results(&calib_results[i]);
                 }
+
+                aruco_detection_thread = std::thread(marker_detection_thread, cpu_buffers, &marker2d_all_cams, &marker3d, cameras_params, calib_results, num_cameras, &draw_aruco_detection);
             }
 
             if (show_cpu_buffer) {
@@ -652,10 +660,6 @@ int main(int argc, char **args)
 
                         if (draw_yolo_detection) {
                             draw_yolo_boxes(yolo_boxes.at(i), yolo_labels.at(i), yolo_classid.at(i));
-                        }
-
-                        if (draw_aruco_detection) {
-                            draw_aruco_markers(&marker2d_all_cams, i);
                         }
 
                         ImPlot::EndPlot();

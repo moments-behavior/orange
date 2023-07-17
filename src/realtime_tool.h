@@ -52,7 +52,7 @@ struct ArucoMarker3d
 };
 
 
-void allocate_cpu_render_resources(CPURender *cpu_buffers, u32 image_width, u32 image_height)
+void allocate_cpu_render_resources(CPURender *cpu_buffers, u32 image_width, u32 image_height, bool show_flag)
 {
     u32 size_pic = image_height * image_width * 3 * sizeof(unsigned char);
 
@@ -61,14 +61,16 @@ void allocate_cpu_render_resources(CPURender *cpu_buffers, u32 image_width, u32 
     cpu_buffers->display_buffer.frame_number = 0;
     cpu_buffers->display_buffer.available_to_write = true;
 
-    glGenTextures(1, &cpu_buffers->image_texture);
-    glBindTexture(GL_TEXTURE_2D, cpu_buffers->image_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (show_flag) {
+        glGenTextures(1, &cpu_buffers->image_texture);
+        glBindTexture(GL_TEXTURE_2D, cpu_buffers->image_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        // Setup filtering parameters for display
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
 }
 
 
@@ -162,8 +164,8 @@ void aruco_detection(PictureBuffer* display_buffer, CameraParams *cameras_params
     // detect 
     std::vector<aruco::Marker> markers = MDetector.detect(view);
     for (size_t i = 0; i < markers.size(); i++) {
-        // std::cout << markers[i] << std::endl;
-        markers[i].draw(view);
+        std::cout << markers[i] << std::endl;
+        // markers[i].draw(view);
 
         if (markers[i].id == 0) {
             // id 0 is ramp

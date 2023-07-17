@@ -42,10 +42,12 @@ struct ArucoMarker2d
     std::vector<std::vector<cv::Point2f>> detected_points;
 };
 
+
 struct ArucoMarker3d
 {
     int id;
     std::vector<cv::Point3f> corners;
+    std::vector<std::vector<cv::Point2f>> proj_corners;
     cv::Point3f t_vec;
     cv::Point3f normal; 
     f32 angle_x_axis;
@@ -91,19 +93,19 @@ static void draw_yolo_boxes(std::vector<cv::Rect> boxes, std::vector<std::string
 }
 
 
-static void draw_aruco_markers(ArucoMarker2d* aruco_marker, int camera_id)
+static void draw_aruco_markers(ArucoMarker3d* aruco_marker, int camera_id)
 {
-    double x[5] = {(double)aruco_marker->detected_points[camera_id][0].x, 
-        (double)aruco_marker->detected_points[camera_id][1].x, 
-        (double)aruco_marker->detected_points[camera_id][2].x, 
-        (double)aruco_marker->detected_points[camera_id][3].x, 
-        (double)aruco_marker->detected_points[camera_id][0].x};
+    double x[5] = {(double)aruco_marker->proj_corners[camera_id][0].x, 
+        (double)aruco_marker->proj_corners[camera_id][1].x, 
+        (double)aruco_marker->proj_corners[camera_id][2].x, 
+        (double)aruco_marker->proj_corners[camera_id][3].x, 
+        (double)aruco_marker->proj_corners[camera_id][0].x};
     
-    double y[5] = {(double)2200 - (double)aruco_marker->detected_points[camera_id][0].y, 
-        (double)2200 - (double)aruco_marker->detected_points[camera_id][1].y, 
-        (double)2200 - (double)aruco_marker->detected_points[camera_id][2].y, 
-        (double)2200 - (double)aruco_marker->detected_points[camera_id][3].y, 
-        (double)2200 - (double)aruco_marker->detected_points[camera_id][0].y};
+    double y[5] = {(double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][1].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][2].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][3].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y};
 
     ImPlot::PlotLine("##", &x[0], &y[0], 5); 
 }
@@ -135,7 +137,7 @@ void print_calibration_results(CameraCalibResults* calib_results) {
     std::cout << "projection_mat = " << std::endl << cv::format(calib_results->projection_mat, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
 }
 
-cv::Point3f triangulate_points(std::vector<cv::Point2f> image_points, vector<CameraCalibResults*> calib_results)
+cv::Mat triangulate_points(std::vector<cv::Point2f> image_points, vector<CameraCalibResults*> calib_results)
 {
     std::vector<cv::Mat> sfm_points2d;
     std::vector<cv::Mat> projection_matrices;
@@ -152,8 +154,7 @@ cv::Point3f triangulate_points(std::vector<cv::Point2f> image_points, vector<Cam
 
     cv::sfm::triangulatePoints(sfm_points2d, projection_matrices, output3d);
     output3d.convertTo(output3d, CV_32F);
-    cv::Point3f pts3d = cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
-    return pts3d;
+    return output3d;
 }
 
 
@@ -197,7 +198,7 @@ void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
 }
 
 
-bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d, CameraCalibResults* calib_results)
+bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d, CameraCalibResults* calib_results, int num_cameras)
 {
     int num_detected_cams = aruco_marker_2d->detected_cameras.size();
     if (num_detected_cams >= 2) {
@@ -212,9 +213,19 @@ bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
             for (size_t j = 0; j < num_detected_cams; j++) {
                 image_points_all.push_back(aruco_marker_2d->detected_points[j][i]);
             }
-            cv::Point3f output3d = triangulate_points(image_points_all, calib_results_all);
-            aruco_maker_3d->corners.push_back(output3d);
+            cv::Mat output3d = triangulate_points(image_points_all, calib_results_all); 
+            cv::Point3f pts3d = cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
+            aruco_maker_3d->corners.push_back(pts3d);
+
+            // reprojection
+            for (size_t j = 0; j < num_cameras; j++) {
+                cv::Mat image_pts;
+                cv::projectPoints(output3d, calib_results[j].rvec, calib_results[j].tvec, calib_results[j].k, calib_results[j].dist_coeffs, image_pts);
+                aruco_maker_3d->proj_corners[j][i].x = image_pts.at<float>(0, 0);
+                aruco_maker_3d->proj_corners[j][i].y = image_pts.at<float>(0, 1);
+            }
         }
+        
     } else {
         return false;
     }
@@ -264,7 +275,8 @@ std::map<unsigned int, cv::Point3f> get_3d_coordinates(vector<vector<cv::Rect>> 
     {
         if(it->second.size() >= 2){
             // triangulate if there are 2 camera detection
-            cv::Point3f point3d = triangulate_points(it->second, mapOfCameras[it->first]);  
+            cv::Mat output3d = triangulate_points(it->second, mapOfCameras[it->first]);  
+            cv::Point3f point3d = cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
             mapOfPoints3D.insert({it->first, point3d});
         }
     }

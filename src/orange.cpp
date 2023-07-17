@@ -473,7 +473,7 @@ int main(int argc, char **args)
                     ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
 
                     if (draw_aruco_detection) {
-                        draw_aruco_markers(&marker2d_all_cams, i);
+                        draw_aruco_markers(&marker3d, i);
                     }
 
                     ImPlot::EndPlot();
@@ -514,7 +514,17 @@ int main(int argc, char **args)
                     // print_calibration_results(&calib_results[i]);
                 }
 
-                aruco_detection_thread = std::thread(marker_detection_thread, cpu_buffers, &marker2d_all_cams, &marker3d, cameras_params, calib_results, num_cameras, &draw_aruco_detection);
+                for (int i = 0; i < num_cameras; i++) {
+                    std::vector<cv::Point2f> marker_per_cam;
+                    for (int j = 0; j < 4; j++) {
+                        cv::Point2f each_corner;
+                        marker_per_cam.push_back(each_corner);
+                    }
+                    marker3d.proj_corners.push_back(marker_per_cam);
+                }
+
+                aruco_detection_thread = std::thread(marker_detection_thread, cpu_buffers, &marker2d_all_cams, &marker3d, cameras_params, calib_results, num_cameras);
+                draw_aruco_detection = true;
             }
 
             if (show_cpu_buffer) {

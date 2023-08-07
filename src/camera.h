@@ -18,11 +18,11 @@ struct CameraParams{
     unsigned int gain;
     unsigned int exposure;
     unsigned int focus;
-    string pixel_format;
-    string color_temp;
+    std::string pixel_format;
+    std::string color_temp;
     int gpu_id;
     int camera_id;
-    string camera_name;
+    std::string camera_name;
     int num_cameras;
     bool gpu_direct;
     bool need_reorder;
@@ -55,7 +55,7 @@ struct CameraParams{
 
 struct CameraEmergent{
     Emergent::CEmergentCamera camera;
-    Emergent::CEmergentFrame evt_frame[100];
+    Emergent::CEmergentFrame* evt_frame;
     Emergent::CEmergentFrame frame_recv;
     Emergent::CEmergentFrame frame_reorder;
 };

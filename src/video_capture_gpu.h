@@ -50,10 +50,10 @@ struct FrameGPU
 
 struct Writer
 {
-    string video_file;
-    string metadata_file;
+    std::string video_file;
+    std::string metadata_file;
     FFmpegWriter *video;
-    ofstream* metadata;
+    std::ofstream* metadata;
 };
 
 struct EncoderContext
@@ -91,5 +91,5 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams* ptp_params);
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params);
 #endif

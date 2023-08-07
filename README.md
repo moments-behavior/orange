@@ -25,12 +25,11 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 ```
 The project build file `build.sh` assume you install FFmepg at `$HOME/nvidia/ffmpeg/build/include/` and `$HOME/nvidia/ffmpeg/build/lib/`, if you install it at a different location, please change the `build.sh` accordingly. 
 
-3. Install OpenGL and GLEW, GLM
+3. Install OpenGL and GLEW
 ```
 sudo apt-get install libglfw3
 sudo apt-get install libglfw3-dev
 sudo apt-get install libglew-dev
-sudo apt-get install libglm-dev
 ```
 
 4. orange depends on github repos like `Dear Imgui`, `Implot` etc. Once cloned the repo, use the following command to pull submodules

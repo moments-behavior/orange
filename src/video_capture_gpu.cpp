@@ -130,13 +130,13 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, D
     }
 }
 
-static inline void write_meatadata(ofstream *metadata, CameraEmergent *ecam)
+static inline void write_meatadata(std::ofstream *metadata, CameraEmergent *ecam)
 {
     unsigned int offsetx; 
     unsigned int offsety; 
     EVT_CameraGetUInt32Param(&ecam->camera, "OffsetX", &offsetx);
     EVT_CameraGetUInt32Param(&ecam->camera, "OffsetY", &offsety);
-    *metadata << ecam->frame_recv.frame_id << "," << ecam->frame_recv.timestamp << "," << offsetx << "," << offsety << endl;
+    *metadata << ecam->frame_recv.frame_id << "," << ecam->frame_recv.timestamp << "," << offsetx << "," << offsety << std::endl;
 }
 
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
@@ -259,7 +259,7 @@ static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *c
     ck(cudaMallocHost((void **)&frame_original->d_orig_host, frame_original->size_pic));
 }
 
-static inline void initialize_encoder(EncoderContext *encoder, string encoder_str, CameraParams *camera_params)
+static inline void initialize_encoder(EncoderContext *encoder, std::string encoder_str, CameraParams *camera_params)
 {
     encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
     encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str.c_str());
@@ -271,7 +271,7 @@ static inline void initialize_encoder(EncoderContext *encoder, string encoder_st
     InitializeEncoder(encoder->pEnc, encoder->encodeCLIOptions, encoder->eFormat);
 }
 
-static inline void open_metadata_file(ofstream *frame_metadata, string metadata_file)
+static inline void open_metadata_file(std::ofstream *frame_metadata, std::string metadata_file)
 {
     frame_metadata->open(metadata_file.c_str());
 
@@ -283,7 +283,7 @@ static inline void open_metadata_file(ofstream *frame_metadata, string metadata_
     *frame_metadata << "frame_id,timestamp,offsetx,offsety\n";
 }
 
-static inline void initialize_writer(Writer *writer, CameraParams *camera_params, string folder_name, string encoder_str)
+static inline void initialize_writer(Writer *writer, CameraParams *camera_params, std::string folder_name, std::string encoder_str)
 {
     writer->video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
     writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
@@ -297,7 +297,7 @@ static inline void initialize_writer(Writer *writer, CameraParams *camera_params
     } else {
         std::cout << "codec not supported" << '\n';
     }
-    writer->metadata = new ofstream();
+    writer->metadata = new std::ofstream();
     open_metadata_file(writer->metadata, writer->metadata_file);
 }
 
@@ -378,7 +378,7 @@ static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmerge
     printf("\n");
 }
 
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams *ptp_params)
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params)
 {
     ck(cudaSetDevice(camera_params->gpu_id));
 
@@ -443,6 +443,9 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     
     if (camera_control->record_video) {
         close_writer(&encoder, &writer);
+        delete writer.video;
+        delete writer.metadata;
+        delete encoder.pEnc;
     }
     double time_diff = w.Stop();
     report_statistics(camera_params, &camera_state, time_diff);
@@ -454,7 +457,4 @@ void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, Camera
     cudaStreamDestroy(stream1);
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
-    delete writer.video;
-    delete writer.metadata;
-    delete encoder.pEnc;
 }

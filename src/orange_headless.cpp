@@ -9,8 +9,6 @@
 
 int main(int argc, char *argv[])
 {
-
-
     int max_cameras = 20;
     int cam_count;
     GigEVisionDeviceInfo unsorted_device_info[max_cameras];

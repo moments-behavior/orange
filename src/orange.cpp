@@ -177,45 +177,35 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         cudaStreamCreate(&tex[i].streams);
-                        int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
-
-                        create_texture(&tex[i].texture);
                         create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                        bind_pbo(&tex[i].pbo);
-
                         register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                        unbind_texture();
-                        unbind_pbo();
-                        cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                        map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
+                        cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                        create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
 
                 } else {
                     for (auto &t : camera_threads)
                         t.join();
                     
-                    std::cout << "here" << std::endl;
-
                     for (int i = 0; i < num_cameras; i++)
                     {
                         camera_threads.pop_back();
                     }
 
-                    std::cout << "here?" << std::endl;
-
                     for (int i = 0; i < num_cameras; i++)
                     {
                         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
                         delete[] ecams[i].evt_frame;
-                                            std::cout << "here??" << std::endl;
-
                         check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
                         gx_delete_buffer(&tex[i].pbo);
-                        cudaFree(tex[i].display_buffer);
+                        unmap_cuda_resource(&tex[i].cuda_resource);
+                        cuda_unregister_pbo(tex[i].cuda_resource);
                     }
                     delete[] tex;
                 }
@@ -294,19 +284,15 @@ int main(int argc, char **args)
 
                     if (camera_control->stream) {
                         tex = new GL_Texture[num_cameras];
+
                         for (int i = 0; i < num_cameras; i++)
                         {
                             cudaStreamCreate(&tex[i].streams);
-                            int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
-
-                            create_texture(&tex[i].texture);
                             create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                            bind_pbo(&tex[i].pbo);
-
                             register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                            unbind_texture();
-                            unbind_pbo();
-                            cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
+                            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                         }
                     } 
 
@@ -321,7 +307,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -342,7 +328,8 @@ int main(int argc, char **args)
                         check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
                         if (camera_control->stream) {
                             gx_delete_buffer(&tex[i].pbo);
-                            cudaFree(tex[i].display_buffer);  
+                            unmap_cuda_resource(&tex[i].cuda_resource);
+                            cuda_unregister_pbo(tex[i].cuda_resource);
                         }
                     }
                     if (camera_control->stream) {
@@ -366,18 +353,11 @@ int main(int argc, char **args)
         {
             for (int i = 0; i < num_cameras; i++)
             {
-                // Transfer to PBO then OpenGL texture
-                // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-                map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * 4, tex[i].display_buffer, cameras_params[i].width * 4, cameras_params[i].width * 4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
-                unmap_cuda_resource(&tex[i].cuda_resource);
-                // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
                 bind_pbo(&tex[i].pbo);
                 bind_texture(&tex[i].texture);
                 upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
-                unbind_texture();
                 unbind_pbo();
+                unbind_texture();
             }
             
             for (int i = 0; i < num_cameras; i++)

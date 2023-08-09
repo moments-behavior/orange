@@ -1,5 +1,5 @@
 #include "video_capture_gpu.h"
-#include "cuda_line_reorder.h"
+#include "kernel.cuh"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 

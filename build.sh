@@ -1,7 +1,7 @@
 #!/bin/bash
 mkdir -p targets;
 rm -f targets/orange;
-nvcc -c src/cuda_line_reorder.cu -arch=sm_80 -o targets/cuda_line_reorder.o
+nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 
 DIR_IMGUI="third_party/imgui"
 DIR_IMPLOT="third_party/implot"
@@ -20,10 +20,7 @@ g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_items.o 
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
 
 
-
-g++ -Ofast -ffast-math -std=c++17 \
-    targets/cuda_line_reorder.o \
-    -o targets/*.o \
+g++ -Ofast -ffast-math -std=c++17 targets/*.o \
     -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp \
     -I./third_party/imgui \
     -I./third_party/imgui/backends \
@@ -36,7 +33,7 @@ g++ -Ofast -ffast-math -std=c++17 \
     -lm \
     -lpthread \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc \
-    -lGLEW -lGLU -lGL \
+    -lGLEW -lGL \
     -I$HOME/nvidia/ffmpeg/build/include/ \
     -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     `pkg-config --static --libs glfw3`

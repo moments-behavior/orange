@@ -1,5 +1,5 @@
-#include "cuda_line_reorder.h"
-
+#include <iostream>
+#include <cuda_runtime.h>
 
 /* Sensor process data:
     *Every group of 16 lines, change order to (0, 4, 8, 12), (1, 5, 9, 13), (2, 6, 10, 14), (3, 7, 11, 15).

@@ -179,6 +179,14 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
         else
         {
             camera_state->frames_recd++;
+
+
+
+
+
+
+
+            // move this to another thread 
             if(!camera_control->capture_only) {
                 // copy to pinned memory first
                 upload_frame_to_gpu(camera_params, frame_original, ecam);
@@ -193,6 +201,12 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
                     write_meatadata(writer->metadata, ecam);
                 }    
             }
+
+
+
+
+
+
         }
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
@@ -200,6 +214,10 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
             camera_state->id_prev = 0;
         else
             camera_state->id_prev = ecam->frame_recv.frame_id;
+
+
+        // push the image data to display 
+
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
         if (camera_state->camera_return)

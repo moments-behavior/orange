@@ -9,8 +9,6 @@
 
 int main(int argc, char *argv[])
 {
-
-
     int max_cameras = 20;
     int cam_count;
     GigEVisionDeviceInfo unsorted_device_info[max_cameras];
@@ -76,12 +74,12 @@ int main(int argc, char *argv[])
                 std::cout << "Camera" << i << ": EVT_CameraOpenStream: Error" << std::endl;
                 return ReturnVal;
             }
+            ecams[i].evt_frame = new Emergent::CEmergentFrame[frame_buffer_size];
             allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], frame_buffer_size);
             if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
             {
                 allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
             }
-            set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
         }
 
         camera_control->record_video = true; 
@@ -89,9 +87,9 @@ int main(int argc, char *argv[])
         camera_control->stream = false;
         camera_control->sync_camera = sync_flag;
         camera_control->capture_only = capture_only;
-        string encoder_setup = "-codec h264 -preset p1 -fps " + to_string(cameras_params[0].frame_rate);
-        string folder_string = current_date_time();
-        string folder_name = "/home/" + tokenized_path[2] + "/Videos/" + folder_string;
+        std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
+        std::string folder_string = current_date_time();
+        std::string folder_name = "/home/" + tokenized_path[2] + "/Videos/" + folder_string;
 
         // Creating a directory to save recorded video;
         if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -125,6 +123,7 @@ int main(int argc, char *argv[])
         for (int i = 0; i < num_cameras; i++)
         {
             destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, frame_buffer_size);
+            delete[] ecams[i].evt_frame;
             EVT_CameraCloseStream(&ecams[i].camera);
             close_camera(&ecams[i].camera);
         }

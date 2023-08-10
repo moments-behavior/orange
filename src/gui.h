@@ -10,7 +10,6 @@ struct GL_Texture {
     cudaGraphicsResource_t cuda_resource;
     unsigned char* cuda_buffer;
     size_t cuda_pbo_storage_buffer_size;
-    unsigned char *display_buffer;
     cudaStream_t streams;
     int num_channels;
 };

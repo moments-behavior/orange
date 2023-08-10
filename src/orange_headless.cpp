@@ -1,4 +1,4 @@
-#include "video_capture_gpu.h"
+#include "video_capture.h"
 #include <iostream>
 #include "camera.h"
 #include <thread>

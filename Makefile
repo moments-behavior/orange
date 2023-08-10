@@ -34,7 +34,7 @@ DIR_INC = -I$(CUDA_INC_PATH) -I$(DIR_EMERGENT_INC) -I$(IMGUI_DIR) -I$(IMGUI_DIR)
 LDLIBS_FLAGS = -lpthread $(LIBS_EMERGENT) $(LIBS_CUDA) $(LIBS_GL) $(FFMPEG_LIB) 	
 LDLIBS_FLAGS += `pkg-config --static --libs glfw3`
 
-SOURCE_CXX = src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp
+SOURCE_CXX = src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture.cpp
 SOURCE_CXX += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp 
 SOURCE_CXX += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 SOURCE_CXX += $(IMPLOT_DIR)/implot.cpp $(IMPLOT_DIR)/implot_items.cpp $(IMPLOT_DIR)/implot_demo.cpp

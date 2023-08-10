@@ -1,17 +1,9 @@
-#ifndef ORANGE_VIDEO_CAPTURE_GPU
-#define ORANGE_VIDEO_CAPTURE_GPU
-#include "NvEncoder/NvEncoderCuda.h"
-#include "NvEncoder/NvEncoderCLIOptions.h"
-#include "NvEncoder/NvCodecUtils.h"
-#include <cuda.h>
-#include <cuda_runtime_api.h>
-#include <nppi.h>
+#ifndef ORANGE_VIDEO_CAPTURE
+#define ORANGE_VIDEO_CAPTURE
 #include "thread.h"
 #include "camera.h"
 #include <iostream>
-#include "FFmpegWriter.h"
 #include <fstream>
-#include <npp.h>
 
 struct CameraControl
 {
@@ -31,41 +23,6 @@ struct CameraState
     unsigned int frames_recd = 0;
     int frame_count = 0;
 };
-
-struct Debayer
-{
-    unsigned char *d_debayer;
-    NppiSize size;
-    Npp8u nAlpha;
-    NppiRect roi;
-    NppiBayerGridPosition grid;
-};
-
-struct FrameGPU
-{
-    unsigned char *d_orig;
-    unsigned char *d_orig_host;
-    int size_pic;
-};
-
-struct Writer
-{
-    std::string video_file;
-    std::string metadata_file;
-    FFmpegWriter *video;
-    std::ofstream* metadata;
-};
-
-struct EncoderContext
-{
-    NV_ENC_BUFFER_FORMAT eFormat;
-    NvEncoderInitParam encodeCLIOptions;
-    CUcontext cuContext;
-    int num_frame_encode;
-    std::vector<std::vector<uint8_t>> vPacket;
-    NvEncoderCuda *pEnc;
-};
-
 
 struct PTPState 
 {
@@ -91,5 +48,5 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params);
+void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params);
 #endif

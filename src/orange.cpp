@@ -1,4 +1,4 @@
-#include "video_capture_gpu.h"
+#include "video_capture.h"
 #include <iostream>
 #include "camera.h"
 #include <thread>
@@ -10,6 +10,7 @@
 #include "project.h"
 #include "gui.h"
 #include "utils.h"
+#include <sys/stat.h>
 
 int main(int argc, char **args)
 {
@@ -186,7 +187,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
 
                 } else {
@@ -307,7 +308,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->subscribe = true;                    
                 } else {

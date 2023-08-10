@@ -21,10 +21,10 @@ static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *c
 static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params)
 {
     int output_channels = 4;
-    int size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char) * output_channels;
+    int size_pic = camera_params->width * camera_params->height * sizeof(unsigned char) * output_channels;
     cudaMalloc((void **)&debayer->d_debayer, size_pic);
     cudaMemset(debayer->d_debayer, 0xFF, size_pic);
-    
+
     debayer->size.width = camera_params->width;
     debayer->size.height = camera_params->height;
     debayer->nAlpha = 255;
@@ -94,7 +94,7 @@ COpenGLDisplay::~COpenGLDisplay()
 
 void COpenGLDisplay::ThreadRunning()
 {
-
+    ck(cudaSetDevice(camera_params->gpu_id));
     // innitialization
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
@@ -115,6 +115,7 @@ void COpenGLDisplay::ThreadRunning()
                 duplicate_channel_gpu(camera_params, &frame_original, &debayer);
             }
 
+            // probably reduandant copy
             ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
 
         }
@@ -130,7 +131,7 @@ bool COpenGLDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width,
     GetObjectsFromQueueOut((void **)entriesOut, &entriesOutCount);
     if (entriesOutCount)
     { // return the frames to driver, and put entries back to frameSaveEntriesFreeQueue
-        printf("++++++++++++++++++++++++ %s %s %d get WORKER_ENTRY from out entriesOutCount: %d\n", __FILE__, __FUNCTION__, __LINE__, entriesOutCount);
+        // printf("++++++++++++++++++++++++ %s %s %d get WORKER_ENTRY from out entriesOutCount: %d\n", __FILE__, __FUNCTION__, __LINE__, entriesOutCount);
         for (int j = 0; j < entriesOutCount; j++)
         {
             workerEntriesFreeQueue[workerEntriesFreeQueueCount] = entriesOut[j];
@@ -141,7 +142,7 @@ bool COpenGLDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width,
     // get the free entry if there is one and put in to QueueIn, otherwise EVT_CameraQueueFrame.
     if (workerEntriesFreeQueueCount)
     {
-        printf("++++++++++++++++++++++++ %s %s %d put WORKER_ENTRY to in workerEntriesFreeQueueCount: %d\n", __FILE__, __FUNCTION__, __LINE__, workerEntriesFreeQueueCount);
+        // printf("++++++++++++++++++++++++ %s %s %d put WORKER_ENTRY to in workerEntriesFreeQueueCount: %d\n", __FILE__, __FUNCTION__, __LINE__, workerEntriesFreeQueueCount);
         WORKER_ENTRY *entry = workerEntriesFreeQueue[workerEntriesFreeQueueCount - 1];
         workerEntriesFreeQueueCount--;
         entry->imagePtr = imagePtr;

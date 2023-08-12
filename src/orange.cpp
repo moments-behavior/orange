@@ -11,6 +11,9 @@
 #include "gui.h"
 #include "utils.h"
 #include <sys/stat.h>
+#include "NvEncoder/NvCodecUtils.h"
+
+simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
 int main(int argc, char **args)
 {

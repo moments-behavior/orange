@@ -1,31 +1,8 @@
 #pragma once
 #include "threadworker.h"
-#include "video_capture.h"
-#include <nppi.h>
+#include "image_processing.h"
 
 #define WORK_ENTRIES_MAX 10
-typedef struct {
-	void* imagePtr; // source image buffer
-	size_t bufferSize; // size of imagePtr in bytes
-	int width;
-	int height;
-	int pixelFormat;
-} WORKER_ENTRY;
-
-struct FrameGPU
-{
-    unsigned char *d_orig;
-    int size_pic;
-};
-
-struct Debayer
-{
-    unsigned char *d_debayer;
-    NppiSize size;
-    Npp8u nAlpha;
-    NppiRect roi;
-    NppiBayerGridPosition grid;
-};
 
 class COpenGLDisplay : public CThreadWorker
 {

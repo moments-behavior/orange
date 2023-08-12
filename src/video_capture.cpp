@@ -1,6 +1,7 @@
 #include "video_capture.h"
 #include "NvEncoder/NvCodecUtils.h"
 #include "opengldisplay.h"
+#include "gpu_video_encoder.h"
 
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
 {
@@ -26,7 +27,7 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
     ptp_state->frame_ts_prev = ptp_state->frame_ts;
 }
 
-static inline void get_one_frame(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, COpenGLDisplay* openGLDisplay)
+static inline void get_one_frame(CameraState *camera_state, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, COpenGLDisplay* openGLDisplay, GPUVideoEncoder* gpu_encoder)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     if (camera_control->sync_camera)
@@ -51,7 +52,12 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
             camera_state->id_prev = ecam->frame_recv.frame_id;
 
         // push the image data to encode, or display
+        if (camera_control->record_video) {
+            gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, ecam->frame_recv.size_x, ecam->frame_recv.size_y, ecam->frame_recv.pixel_type);
+        }
+        
         openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, ecam->frame_recv.size_x, ecam->frame_recv.size_y, ecam->frame_recv.pixel_type);
+
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
         if (camera_state->camera_return)
             std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
@@ -158,6 +164,13 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraCont
     COpenGLDisplay* openGLDisplay = new COpenGLDisplay("", camera_params, display_buffer);
     openGLDisplay->StartThread();
 
+    GPUVideoEncoder* gpu_encoder;
+    
+    if (camera_control->record_video) {
+        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name);
+        gpu_encoder->StartThread();
+    }
+
     if (camera_control->sync_camera)
     {
         show_ptp_offset(&ptp_state, ecam);
@@ -182,7 +195,7 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraCont
     {
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
-        get_one_frame(&camera_state, camera_control, ecam, camera_params, &ptp_state, openGLDisplay);
+        get_one_frame(&camera_state, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
         // if (offset == 200) {
         //     phase = -1;
         // }
@@ -195,9 +208,10 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraCont
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
-    openGLDisplay->StopThread();
-   
     double time_diff = w.Stop();
+    openGLDisplay->StopThread();
+    if (camera_control->record_video) {
+        gpu_encoder->StopThread();
+    }
     report_statistics(camera_params, &camera_state, time_diff);
-
 }

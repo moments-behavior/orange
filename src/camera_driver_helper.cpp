@@ -1,8 +1,8 @@
 #include "camera_driver_helper.h"
 #include <iostream>
-string get_evt_error_string(EVT_ERROR error)
+std::string get_evt_error_string(EVT_ERROR error)
 {
-    string error_string; 
+    std::string error_string; 
     switch (error)
     {
         case EVT_ENOENT:

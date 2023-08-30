@@ -10,11 +10,11 @@
 #include "video_capture_gpu.h"
 #include "types.h"
 #include "gui.h"
-#include "aruco.h"
 #include <opencv2/sfm.hpp>
 #include "opencv2/core/core_c.h"
 #include "opencv2/core/core.hpp"
 #include <math.h>
+#include "aruco_nano.h"
 
 #define PI 3.14159265
 
@@ -162,9 +162,9 @@ cv::Mat triangulate_points(std::vector<cv::Point2f> image_points, vector<CameraC
 void aruco_detection(PictureBuffer* display_buffer, CameraParams *cameras_params, ArucoMarker2d* aruco_marker_2d) 
 {    
     cv::Mat view = cv::Mat(cameras_params->width * cameras_params->height * 3, 1, CV_8U, display_buffer->frame).reshape(3, cameras_params->height);
-    aruco::MarkerDetector MDetector;
+    aruconano::MarkerDetector MDetector;
     // detect 
-    std::vector<aruco::Marker> markers = MDetector.detect(view);
+    std::vector<aruconano::Marker> markers = MDetector.detect(view);
     for (size_t i = 0; i < markers.size(); i++) {
         // std::cout << markers[i] << std::endl;
         // markers[i].draw(view);
@@ -186,7 +186,7 @@ void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
 {
     aruco_maker_3d->t_vec = aruco_maker_3d->corners[0] + aruco_maker_3d->corners[1] + aruco_maker_3d->corners[2] + aruco_maker_3d->corners[3];
     aruco_maker_3d->t_vec = aruco_maker_3d->t_vec / 4.0;
-        
+    std::cout << aruco_maker_3d->t_vec << std::endl;
     cv::Point3f corner1to4 = aruco_maker_3d->corners[3] - aruco_maker_3d->corners[0];
     cv::Point3f corner1to2 = aruco_maker_3d->corners[1] - aruco_maker_3d->corners[0];
     aruco_maker_3d->normal = corner1to4.cross(corner1to2);
@@ -232,9 +232,9 @@ bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
     }
 
     // print marker corners
-    for (size_t i = 0; i < 4; i++) {
-        std::cout << aruco_maker_3d->corners[i] << ", " << std::endl;
-    }
+    // for (size_t i = 0; i < 4; i++) {
+    //     std::cout << aruco_maker_3d->corners[i] << ", " << std::endl;
+    // }
 
     marker3d_to_pose(aruco_maker_3d);
     return true;

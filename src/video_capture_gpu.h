@@ -13,8 +13,6 @@
 #include <fstream>
 #include <npp.h>
 #include "buffer_utils.h"
-#include "cuda_line_reorder.h"
-#include "color_conversion_gpu.h"
 
 struct CameraControl
 {
@@ -25,6 +23,7 @@ struct CameraControl
     bool sync_camera = false;
     bool m_slave = false;
     bool copy_to_cpu = false;
+    bool capture_only = false;
 };
 
 struct CameraState
@@ -54,10 +53,10 @@ struct FrameGPU
 
 struct Writer
 {
-    string video_file;
-    string metadata_file;
+    std::string video_file;
+    std::string metadata_file;
     FFmpegWriter *video;
-    ofstream* metadata;
+    std::ofstream* metadata;
 };
 
 struct EncoderContext
@@ -95,5 +94,5 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, string encoder_setup, string folder_name, PTPParams* ptp_params, PictureBuffer* display_buffer_cpu);
+void aquire_frames_gpu(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, PictureBuffer* display_buffer_cpu);
 #endif

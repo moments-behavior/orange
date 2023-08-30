@@ -13,6 +13,7 @@
 #define ENET_IMPLEMENTATION
 #include "aruco_detection.h"
 #include "network.h"
+#include "utils.h"
 #define MAX_CLIENTS 32
 
 // A nice way of printing out the system time
@@ -43,7 +44,13 @@ int main(int argc, char **args)
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
     ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
-    file_dialog.SetPwd("/home/user/exp");
+
+    std::filesystem::path cwd = std::filesystem::current_path();
+    std::string delimiter = "/";
+    std::vector<std::string> tokenized_path = string_split (cwd, delimiter);
+    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
+
+    file_dialog.SetPwd(start_folder_name);
     std::string input_folder = file_dialog.GetPwd();
     file_dialog.SetTitle("My files");
 
@@ -51,13 +58,13 @@ int main(int argc, char **args)
 
     CameraParams *cameras_params;
     CameraEmergent *ecams;
-    std::vector<thread> camera_threads;
+    std::vector<std::thread> camera_threads;
     GL_Texture *tex;
     u32 num_cameras = 0;
 
     CameraControl *camera_control = new CameraControl;
 
-    // int buffer_size {500};
+    int evt_buffer_size {150};
     PTPParams* ptp_params = new PTPParams{0, 0};
     std::string encoder_setup;
     std::string encoder_basic_setup = "-codec hevc -preset p1 -fps "; // h264
@@ -208,11 +215,17 @@ int main(int argc, char **args)
                                 init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 int gpu_id = 0;
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); 
-                                // init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 30); // 2000, 3000
+                                // init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); 
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 30); // 2000, 3000
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
                                 int gpu_id = 0;
-                                init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 18000, gpu_id, 30); 
+                                init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
+                            } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SM")==0) {
+                                int gpu_id = 0;
+                                init_7MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
+                            } else {
+                                printf("Camera not supported...Exit");
+                                return 1;
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -251,35 +264,31 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {               
                         camera_open_stream(&ecams[i].camera);
-                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
+                        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
+
                         if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
                         {
                             allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
                         }
-                        set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                     }
 
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
                         cudaStreamCreate(&tex[i].streams);
-                        int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
-
-                        create_texture(&tex[i].texture);
                         create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                        bind_pbo(&tex[i].pbo);
-
                         register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                        unbind_texture();
-                        unbind_pbo();
-                        cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                        map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
+                        cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                        create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                     }
 
                     cpu_buffers = new CPURender[num_cameras];
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
                     }
 
                 } else {
@@ -290,14 +299,17 @@ int main(int argc, char **args)
                     {
                         camera_threads.pop_back();
                     }
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);
-                        EVT_CameraCloseStream(&ecams[i].camera);
+                        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                        delete[] ecams[i].evt_frame;
+                        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
                         gx_delete_buffer(&tex[i].pbo);
-                        cudaFree(tex[i].display_buffer);  
+                        unmap_cuda_resource(&tex[i].cuda_resource);
+                        cuda_unregister_pbo(tex[i].cuda_resource);
                     }
-                    delete[] tex; 
+                    delete[] tex;
                 }
             }
 
@@ -346,7 +358,7 @@ int main(int argc, char **args)
                 (camera_control->record_video) = !(camera_control->record_video);
                 if (camera_control->record_video)
                 {
-                    string folder_string = current_date_time();
+                    std::string folder_string = current_date_time();
                     folder_name = file_dialog.GetSelected().string() + "/" + folder_string;
 
                     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -361,32 +373,28 @@ int main(int argc, char **args)
                     
                     for (int i = 0; i < num_cameras; i++)
                     {               
-                        EVT_CameraOpenStream(&ecams[i].camera);
-                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], 100);
+                        camera_open_stream(&ecams[i].camera);
+                        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
                         if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
                         {
                             allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
                         }
-                        set_frame_buffer(&ecams[i].frame_recv, &cameras_params[i]);
                     }
                     
                     // camera_control->stream = false;
 
                     if (camera_control->stream) {
                         tex = new GL_Texture[num_cameras];
+
                         for (int i = 0; i < num_cameras; i++)
                         {
                             cudaStreamCreate(&tex[i].streams);
-                            int size_pic = cameras_params[i].width * cameras_params[i].height * 4 * sizeof(unsigned char);
-
-                            create_texture(&tex[i].texture);
                             create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                            bind_pbo(&tex[i].pbo);
-
                             register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                            unbind_texture();
-                            unbind_pbo();
-                            cudaMalloc((void **)&tex[i].display_buffer, size_pic);
+                            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
+                            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                         }
                     } 
 
@@ -400,8 +408,8 @@ int main(int argc, char **args)
                     
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        encoder_setup = encoder_basic_setup + to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].display_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
+                        encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -417,11 +425,13 @@ int main(int argc, char **args)
                     }
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, 100);
-                        EVT_CameraCloseStream(&ecams[i].camera);
+                        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                        delete[] ecams[i].evt_frame;
+                        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
                         if (camera_control->stream) {
                             gx_delete_buffer(&tex[i].pbo);
-                            cudaFree(tex[i].display_buffer);  
+                            unmap_cuda_resource(&tex[i].cuda_resource);
+                            cuda_unregister_pbo(tex[i].cuda_resource);
                         }
                     }
                     if (camera_control->stream) {
@@ -445,23 +455,16 @@ int main(int argc, char **args)
         {
             for (int i = 0; i < num_cameras; i++)
             {
-                // Transfer to PBO then OpenGL texture
-                // CUDA-GL INTEROP STARTS HERE -------------------------------------------------------------------------
-                map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                cudaMemcpy2DAsync(tex[i].cuda_buffer, cameras_params[i].width * 4, tex[i].display_buffer, cameras_params[i].width * 4, cameras_params[i].width * 4, cameras_params[i].height, cudaMemcpyDeviceToDevice, tex[i].streams);
-                unmap_cuda_resource(&tex[i].cuda_resource);
-                // CUDA-GL INTEROP ENDS HERE ---------------------------------------------------------------------------
                 bind_pbo(&tex[i].pbo);
                 bind_texture(&tex[i].texture);
                 upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
-                unbind_texture();
                 unbind_pbo();
+                unbind_texture();
             }
             
             for (int i = 0; i < num_cameras; i++)
             {
-                string window_name = std::to_string(cameras_params[i].camera_id);
+                std::string window_name = std::to_string(cameras_params[i].camera_id);
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

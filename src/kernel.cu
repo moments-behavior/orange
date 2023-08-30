@@ -1,5 +1,5 @@
-#include "cuda_line_reorder.h"
-
+#include <iostream>
+#include <cuda_runtime.h>
 
 /* Sensor process data:
     *Every group of 16 lines, change order to (0, 4, 8, 12), (1, 5, 9, 13), (2, 6, 10, 14), (3, 7, 11, 15).
@@ -56,4 +56,45 @@ void GSPRINT4521_Convert(unsigned char* dest, const unsigned char* src, int widt
     GSPRINT4521_ConvertKernel << <height, threadPerBlock >> > (dest, src, width, height, strideS, strideD, leftShift);  // this opens height blocks, 2 thread per block
     cudaError_t err = cudaDeviceSynchronize();
     if(err != cudaSuccess) printf("GSPRINT4521_ConvertKernel failed: %s\n", cudaGetErrorString(err));
+}
+
+__global__ void rgba2rgb_kernel(unsigned char* dest, unsigned char* src, int width, int height)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = blockIdx.y * blockDim.y + threadIdx.y;
+	if ((x < width) && (y < height)) {
+        *(dest + ((y * width * 3) + (x * 3))) = *(src + ((y * width * 4) + (x * 4)));            
+        *(dest + ((y * width * 3) + (x * 3)) + 1) = *(src + ((y * width * 4) + (x * 4)) + 1);
+        *(dest + ((y * width * 3) + (x * 3)) + 2) = *(src + ((y * width * 4) + (x * 4)) + 2);
+    }
+}
+
+
+
+void rgba2rgb_convert(unsigned char* dest, unsigned char* src, int width, int height, cudaStream_t stream)
+{
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
+    rgba2rgb_kernel << <num_blocks, threads_per_block, 0, stream>> > (dest, src, width, height);
+}
+
+
+__global__ void rgba2bgr_kernel(unsigned char* dest, unsigned char* src, int width, int height)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = blockIdx.y * blockDim.y + threadIdx.y;
+	if ((x < width) && (y < height)) {
+        *(dest + ((y * width * 3) + (x * 3))) = *(src + ((y * width * 4) + (x * 4)) + 2);            
+        *(dest + ((y * width * 3) + (x * 3)) + 1) = *(src + ((y * width * 4) + (x * 4)) + 1);
+        *(dest + ((y * width * 3) + (x * 3)) + 2) = *(src + ((y * width * 4) + (x * 4)));
+    }
+}
+
+
+
+void rgba2bgr_convert(unsigned char* dest, unsigned char* src, int width, int height, cudaStream_t stream)
+{
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
+    rgba2bgr_kernel << <num_blocks, threads_per_block, 0, stream>> > (dest, src, width, height);
 }

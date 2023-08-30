@@ -1,10 +1,7 @@
-#ifndef ORANGE_COLORCONVERSIONGPU
-#define ORANGE_COLORCONVERSIONGPU
+#ifndef KERNEL_H
+#define KERNEL_H
 
-#include <iostream>
-#include <cuda_runtime.h>
-
+void GSPRINT4521_Convert(unsigned char* dest, const unsigned char* src, int width, int height, int strideS, int strideD, int leftShift);
 void rgba2rgb_convert(unsigned char* dest, unsigned char* src, int width, int height, cudaStream_t stream);
 void rgba2bgr_convert(unsigned char* dest, unsigned char* src, int width, int height, cudaStream_t stream);
-
-#endif
+#endif // KERNEL_H

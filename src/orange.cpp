@@ -9,11 +9,23 @@
 #include <imfilebrowser.h>
 #include "project.h"
 #include "gui.h"
+#include "yolo_detection.h"
+#define ENET_IMPLEMENTATION
+#include "aruco_detection.h"
+#include "network.h"
 #include "utils.h"
+#define MAX_CLIENTS 32
+
+// A nice way of printing out the system time
+std::string CurrentTimeStr()
+{
+    time_t now = time(NULL);
+    return std::string(ctime(&now));
+}
+#define CURRENT_TIME_STR CurrentTimeStr().c_str()
 
 int main(int argc, char **args)
 {
-
     gx_context *window = (gx_context *)malloc(sizeof(gx_context));
     *window = (gx_context){
         .swap_interval = 1, // use vsync
@@ -55,13 +67,93 @@ int main(int argc, char **args)
     int evt_buffer_size {150};
     PTPParams* ptp_params = new PTPParams{0, 0};
     std::string encoder_setup;
-    std::string encoder_basic_setup = "-codec h264 -preset p1 -fps ";
-    std::string encoder_codec = "h264"; 
+    std::string encoder_basic_setup = "-codec hevc -preset p1 -fps "; // h264
+    std::string encoder_codec = "hevc";  // h264
     std::string encoder_preset = "p1";
     std::string folder_name;
 
+    CPURender *cpu_buffers;
+    CameraCalibResults* calib_results;
+
+    Settings calib_setting;
+
+    std::vector<int> image_save_index;
+    bool *selected_images_to_save;
+
+    bool show_cpu_buffer = false;
+
+    ArucoMarker2d marker2d_all_cams;
+    ArucoMarker3d marker3d;
+    bool have_calibration_results = false;
+
+    yolo_param yolo_setting = yolo_param();
+    std::vector<std::vector<cv::Rect>> yolo_boxes;
+    std::vector<std::vector<std::string>> yolo_labels;
+    std::vector<std::vector<int>> yolo_classid;
+    cv::dnn::Net yolo_net;
+    std::map<unsigned int, cv::Point3f> yolo_obj_3d;
+
+    bool draw_yolo_detection = false;
+    bool draw_aruco_detection = false;
+
+    thread aruco_detection_thread;
+
+    // network and protocal
+    if (enet_initialize() != 0)
+    {
+        printf("An error occurred while initializing ENet.\n");
+        return 1;
+    }
+
+    ENetAddress address;
+    enet_address_set_ip(&address, "127.0.0.1");
+    address.port = 6005;
+
+    ENetHost *server = enet_host_create(&address, MAX_CLIENTS, 2, 0, 0, 1024);
+    if (server == NULL)
+    {
+        fprintf(stderr,
+                "An error occurred while trying to create an ENet server host.\n");
+        exit(EXIT_FAILURE);
+    } else {
+        printf("Started a server...\n");
+    }
+
+    ENetEvent event;
+
+    flatbuffers::FlatBufferBuilder builder(1024);
+
     while (!glfwWindowShouldClose(window->render_target))
     {
+
+        while (enet_host_service(server, &event, 0) > 0) {
+            switch (event.type) {
+                case ENET_EVENT_TYPE_CONNECT:
+                    printf("\nA new client connected from %x:%u. %s\n", event.peer->host, event.peer->address.port, CURRENT_TIME_STR);
+                    /* Store any relevant client information here. */
+                    break;
+
+                case ENET_EVENT_TYPE_RECEIVE:
+                    printf("\nA packet of length %lu containing %s was received from %s on channel %u. %s.\n",
+                        event.packet->dataLength,
+                        event.packet->data,
+                        event.peer->data,
+                        event.channelID,
+                        CURRENT_TIME_STR);
+
+                    /* Clean up the packet now that we're done using it. */
+                    enet_packet_destroy(event.packet);
+                    break;
+                case ENET_EVENT_TYPE_DISCONNECT:
+                    printf("\n%s disconnected. %s\n", event.peer->data, CURRENT_TIME_STR);
+                    /* Reset the peer's client information. */
+                    event.peer->data = NULL;
+                    break;
+                case ENET_EVENT_TYPE_NONE:
+                    break;                    
+            }
+        }
+
         create_new_frame();
 
         if (ImGui::Begin("Orange Streaming"))
@@ -84,6 +176,13 @@ int main(int argc, char **args)
                     ImGui::Text(device_info[i].currentIp);
                 }
                 ImGui::EndTable();
+            }
+
+            if (ImGui::Button("Select all")) {
+                for (int i = 0; i < cam_count; i++)
+                {
+                    check[i] = true;
+                }
             }
 
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
@@ -116,7 +215,8 @@ int main(int argc, char **args)
                                 init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
                                 int gpu_id = 0;
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
+                                // init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); 
+                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 30); // 2000, 3000
                             } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
                                 int gpu_id = 0;
                                 init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
@@ -184,9 +284,11 @@ int main(int argc, char **args)
                         create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                     }
 
+                    cpu_buffers = new CPURender[num_cameras];
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
                     }
 
                 } else {
@@ -222,7 +324,7 @@ int main(int argc, char **args)
             ImGui::Text(input_folder.c_str());
 
             {
-                const char* items[] = { "h264", "hevc"};
+                const char* items[] = { "hevc", "h264"};
                 static int item_current = 0;
                 ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
                 encoder_codec = items[item_current];
@@ -303,11 +405,11 @@ int main(int argc, char **args)
                     //     }
                     //     camera_control->sync_camera = true;
                     // }
-
+                    
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cpu_buffers[i].display_buffer));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -340,8 +442,8 @@ int main(int argc, char **args)
             ImGui::PopStyleColor(1);
         }
         ImGui::End();
-        file_dialog.Display();
 
+        file_dialog.Display();
         if (file_dialog.HasSelected())
         {
             input_folder = file_dialog.GetSelected().string();
@@ -370,13 +472,218 @@ int main(int argc, char **args)
                 if (ImPlot::BeginPlot("##no_plot_name", avail_size))
                 {
                     ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+
+                    if (draw_aruco_detection) {
+                        draw_aruco_markers(&marker3d, i);
+                        send_serial_data(server, builder, &marker3d, yolo_obj_3d);
+                    }
+
                     ImPlot::EndPlot();
                 }
                 ImGui::End();
             }
         }
 
+        if (ImGui::Begin("Realtime Tools")) 
+        {
+            
+            ImGui::Checkbox("Show CPU Buffer", &show_cpu_buffer);
+
+
+            if (ImGui::Button("Start Realtime Thread")) {
+                // allocate cpu buffers
+                for (int i = 0; i < num_cameras; i++) {
+                    allocate_cpu_render_resources(&cpu_buffers[i], cameras_params[i].width, cameras_params[i].height, show_cpu_buffer);
+                }
+                camera_control->copy_to_cpu = true;
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    image_save_index.push_back(0);
+                }
+
+                selected_images_to_save = new bool[num_cameras];
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    selected_images_to_save[i] = false;
+                }
+                calib_results = new CameraCalibResults[num_cameras];
+                
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
+                    have_calibration_results = true;
+                    // print_calibration_results(&calib_results[i]);
+                }
+
+                for (int i = 0; i < num_cameras; i++) {
+                    std::vector<cv::Point2f> marker_per_cam;
+                    for (int j = 0; j < 4; j++) {
+                        cv::Point2f each_corner;
+                        marker_per_cam.push_back(each_corner);
+                    }
+                    marker3d.proj_corners.push_back(marker_per_cam);
+                }
+                aruco_detection_thread = std::thread(marker_detection_thread, cpu_buffers, &marker2d_all_cams, &marker3d, cameras_params, calib_results, camera_control, num_cameras);
+                draw_aruco_detection = true;
+            }
+
+            if (show_cpu_buffer) {
+                
+                if (ImGui::Button("Load Yolo Models")) {
+                    std::string yolov5_onnx = "/home/user/dev/clips0/yolo_models/best.onnx";
+                    std::string yolov5_labelname = "/home/user/dev/clips0/yolo_models/label.names";
+                    read_yolo_labels(yolov5_labelname, &yolo_setting);
+
+                    yolo_net = cv::dnn::readNet(yolov5_onnx);
+                    yolo_net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+                    yolo_net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+                    std::cout << "model loaded" << std::endl;
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        std::vector<cv::Rect> yolo_box_per_cam;
+                        std::vector<std::string> yolo_label_per_cam;
+                        std::vector<int> yolo_classid_per_cam;
+                        yolo_boxes.push_back(yolo_box_per_cam);
+                        yolo_labels.push_back(yolo_label_per_cam);
+                        yolo_classid.push_back(yolo_classid_per_cam);
+                    }
+                }
+
+                if (ImGui::Button("Yolo Detect")) {
+                    
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+
+                    for (int i = 0; i < num_cameras; i++) {
+                        yolo_detection(yolo_net, &yolo_setting, &cpu_buffers[i].display_buffer, i, yolo_boxes, yolo_labels, yolo_classid);
+                    }
+
+                    yolo_obj_3d = get_3d_coordinates(yolo_boxes, yolo_classid, calib_results);
+                    for ( auto it = yolo_obj_3d.begin(); it != yolo_obj_3d.end(); ++it) {
+                            std::cout << "yolo_object: " << it->first << ", " << it->second << std::endl;
+                    }
+                    draw_yolo_detection = true;
+                }
+
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                if (ImGui::Button("Get new frame"))
+                {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = true;
+                    }
+                    draw_yolo_detection = false;
+                    draw_aruco_detection = false;
+                }
+
+                
+                if (ImGui::Button("Save images all"))
+                {
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
+                        string image_name = "/home/user/Calibration/rob_calibration/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                        // string image_name = "/home/user/Calibration/realtime_calib/" + std::to_string(cameras_params[i].camera_id) + "-" + std::to_string(image_save_index[i]) + ".png";
+                        std::cout << image_name << std::endl;
+                        
+                        cv::imwrite(image_name, view);
+                        image_save_index[i]++;
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = true;
+                    }
+                }
+
+               
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    ImGui::InputInt("Saving image index: ", &image_save_index[i]);
+                }
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    char label[32];
+                    sprintf(label, "Cam%d", i);
+                    ImGui::Checkbox(label, &selected_images_to_save[i]);
+                    ImGui::SameLine();
+                }
+
+                if (ImGui::Button("Save selected"))
+                {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = false;
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        if (selected_images_to_save[i])
+                        {
+                            cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
+                            string image_name = "/home/user/Calibration/rob_calibration/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                            std::cout << image_name << std::endl;
+                            cv::imwrite(image_name, view);
+                            image_save_index[i]++;
+                        }
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        cpu_buffers[i].display_buffer.available_to_write = true;
+                    }
+                }
+
+
+                for(int i=0; i < num_cameras; i++){
+                    bind_texture(&cpu_buffers[i].image_texture);
+                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cameras_params[i].width, cameras_params[i].height, GL_RGB, GL_UNSIGNED_BYTE, cpu_buffers[i].display_buffer.frame);
+                    unbind_texture();
+                }
+
+                for (int i = 0; i < num_cameras; i++) {
+                    string window_name = "CCam" + std::to_string(cameras_params[i].camera_id);            
+                    ImGui::Begin(window_name.c_str());
+                    ImVec2 avail_size = ImGui::GetContentRegionAvail();
+
+                    //ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+                    if (ImPlot::BeginPlot("##no_plot_name", avail_size)){
+                        ImPlot::PlotImage("##no_image_name", (void*)(intptr_t)cpu_buffers[i].image_texture, ImVec2(0,0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+
+                        if (have_calibration_results)
+                        {
+                            gui_plot_world_coordinates(&calib_results[i], i);
+                        }
+
+                        if (draw_yolo_detection) {
+                            draw_yolo_boxes(yolo_boxes.at(i), yolo_labels.at(i), yolo_classid.at(i));
+                        }
+
+                        ImPlot::EndPlot();
+                    }
+                    ImGui::End();            
+                }
+            }
+                     
+        }
+        ImGui::End();   
+
         render_a_frame(window);
+
     }
 
     // Cleanup

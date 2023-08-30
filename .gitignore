@@ -53,7 +53,7 @@
 *.bmp
 
 imgui.ini
-
+*.xml
 
 .vscode/
 profile/

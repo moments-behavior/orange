@@ -6,6 +6,7 @@ nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 DIR_IMGUI="third_party/imgui"
 DIR_IMGUI_BACKEND="third_party/imgui/backends"
 DIR_IMPLOT="third_party/implot"
+DIR_ENET="third_party/EnetCsharp"
 DIR_FILEBROWSER="third_party/imgui-filebrowser"
 DIR_ICONFONT="third_party/IconFontCppHeaders"
 
@@ -22,12 +23,14 @@ g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_items.o 
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
 
 g++ -Ofast -ffast-math -std=c++17 targets/*.o \
-    -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp \
+    -o targets/orange -I ./src/ src/orange.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture_gpu.cpp src/buffer_utils.cpp \
+    -I$DIR_ENET \
     -I$DIR_IMGUI \
     -I$DIR_IMGUI_BACKEND \
     -I$DIR_IMPLOT \
     -I$DIR_FILEBROWSER \
     -I$DIR_ICONFONT \
+    -I./third_party/flatbuffers/include \
     -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
     -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
@@ -37,6 +40,9 @@ g++ -Ofast -ffast-math -std=c++17 targets/*.o \
     -lGLEW -lGL \
     -I$HOME/nvidia/ffmpeg/build/include/ \
     -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I/usr/local/include/opencv4 \
+    -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d -lopencv_dnn -lopencv_features2d \
+    -lrtde \
     `pkg-config --static --libs glfw3`
 
 sudo ./targets/orange;

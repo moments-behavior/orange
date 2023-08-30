@@ -51,6 +51,9 @@ struct CameraParams{
     unsigned int focus_min;
     unsigned int focus_inc;
     bool color;
+    int sens_temp;
+    int sens_temp_max; 
+    int sens_temp_min;
 }; 
 
 struct CameraEmergent{
@@ -89,4 +92,5 @@ int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
 void allocate_frame_reorder_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_reorder, CameraParams* camera_params);
 void camera_open_stream(Emergent::CEmergentCamera* camera);
 void sort_cameras_ip(GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *sorted_device_info, int cam_count);
+void get_senstemp_value(Emergent::CEmergentCamera *camera, CameraParams *camera_params);
 #endif

@@ -69,6 +69,8 @@ int main(int argc, char **args)
     std::vector<std::string> camera_config_files;
     std::vector<std::string> camera_config_names;
 
+    ScrollingBuffer* realtime_plot_data;
+
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
@@ -165,6 +167,8 @@ int main(int argc, char **args)
                             // ecams[i].camera.portMulticast = 60646 + i;
                             // ecams[i].camera.multicastMasterSubscribe = true; 
                         }
+
+                        realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
 
                 } else {
@@ -419,6 +423,38 @@ int main(int argc, char **args)
                 if (ImPlot::BeginPlot("##no_plot_name", avail_size))
                 {
                     ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+                    ImPlot::EndPlot();
+                }
+                ImGui::End();
+            }
+        }
+        
+        
+        if (camera_control->open) { 
+            ImGui::Begin("Realtime Plots"); {                              
+                static float t = 0;
+                t += ImGui::GetIO().DeltaTime;
+                for (int i = 0; i < num_cameras; i++) {
+                    get_senstemp_value(&ecams[i].camera, &cameras_params[i]);
+                    realtime_plot_data[i].AddPoint(t, cameras_params[i].sens_temp);
+                }
+            
+                static float history = 10.0f;
+                ImGui::SliderFloat("History",&history,1,30,"%.1f s");
+
+                static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickMarks;
+                ImVec2 avail_size = ImGui::GetContentRegionAvail();
+
+                if (ImPlot::BeginPlot("Camera Sensor Temperature", avail_size)) {
+                    ImPlot::SetupAxes(nullptr, nullptr, flags, flags);
+                    ImPlot::SetupAxisLimits(ImAxis_X1,t - history, t, ImGuiCond_Always);
+                    ImPlot::SetupAxisLimits(ImAxis_Y1,30,90);
+                    ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL,0.5f);
+
+                    for (int i = 0; i < num_cameras; i++) {
+                        std::string line_name = "Cam" + std::to_string(cameras_params[i].camera_id);
+                        ImPlot::PlotLine(line_name.c_str(), &realtime_plot_data[i].Data[0].x, &realtime_plot_data[i].Data[0].y, realtime_plot_data[i].Data.size(), 0, realtime_plot_data[i].Offset, 2*sizeof(float));
+                    }
                     ImPlot::EndPlot();
                 }
                 ImGui::End();

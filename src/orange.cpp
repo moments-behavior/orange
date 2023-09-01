@@ -70,6 +70,7 @@ int main(int argc, char **args)
     std::vector<std::string> camera_config_names;
 
     ScrollingBuffer* realtime_plot_data;
+    bool show_realtime_plot = false;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -80,6 +81,7 @@ int main(int argc, char **args)
         {
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::Checkbox("Show realtime plot", &show_realtime_plot);
 
             if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -430,7 +432,7 @@ int main(int argc, char **args)
         }
         
         
-        if (camera_control->open) { 
+        if (camera_control->open && show_realtime_plot) { 
             ImGui::Begin("Realtime Plots"); {                              
                 static float t = 0;
                 t += ImGui::GetIO().DeltaTime;

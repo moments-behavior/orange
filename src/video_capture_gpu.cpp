@@ -180,12 +180,6 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
         {
             camera_state->frames_recd++;
 
-
-
-
-
-
-
             // move this to another thread 
             if(!camera_control->capture_only) {
                 // copy to pinned memory first
@@ -201,11 +195,6 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
                     write_meatadata(writer->metadata, ecam);
                 }    
             }
-
-
-
-
-
 
         }
 

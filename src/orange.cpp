@@ -485,15 +485,12 @@ int main(int argc, char **args)
         }
 
         if (ImGui::Begin("Realtime Tools")) 
-        {
-            
-            ImGui::Checkbox("Show CPU Buffer", &show_cpu_buffer);
-
-
-            if (ImGui::Button("Start Realtime Thread")) {
+        {        
+            if (ImGui::Button("Allocate Real Time Resources")) {
+                
                 // allocate cpu buffers
                 for (int i = 0; i < num_cameras; i++) {
-                    allocate_cpu_render_resources(&cpu_buffers[i], cameras_params[i].width, cameras_params[i].height, show_cpu_buffer);
+                    allocate_cpu_render_resources(&cpu_buffers[i], cameras_params[i].width, cameras_params[i].height);
                 }
                 camera_control->copy_to_cpu = true;
 
@@ -506,9 +503,14 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     selected_images_to_save[i] = false;
-                }
+                }                      
+                show_cpu_buffer = true;
+            }
+
+
+            if (ImGui::Button("Start Aruco Detection")) {
+
                 calib_results = new CameraCalibResults[num_cameras];
-                
                 for (int i = 0; i < num_cameras; i++)
                 {
                     load_camera_calibration_results(&calib_results[i], &cameras_params[i]);
@@ -587,6 +589,8 @@ int main(int argc, char **args)
                 if (ImGui::Button("Save images all"))
                 {
 
+                    folder_name = file_dialog.GetSelected().string();
+
                     for (int i = 0; i < num_cameras; i++)
                     {
                         cpu_buffers[i].display_buffer.available_to_write = false;
@@ -595,7 +599,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
-                        string image_name = "/home/user/Calibration/rob_calibration/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                        std::string image_name = folder_name + "/Cam" + std::to_string(cameras_params[i].camera_id) + "_image" + std::to_string(image_save_index[i]) + ".tif";
                         // string image_name = "/home/user/Calibration/realtime_calib/" + std::to_string(cameras_params[i].camera_id) + "-" + std::to_string(image_save_index[i]) + ".png";
                         std::cout << image_name << std::endl;
                         
@@ -625,6 +629,8 @@ int main(int argc, char **args)
 
                 if (ImGui::Button("Save selected"))
                 {
+                    folder_name = file_dialog.GetSelected().string();
+
                     for (int i = 0; i < num_cameras; i++)
                     {
                         cpu_buffers[i].display_buffer.available_to_write = false;
@@ -635,7 +641,7 @@ int main(int argc, char **args)
                         if (selected_images_to_save[i])
                         {
                             cv::Mat view = cv::Mat(3208 * 2200 * 3, 1, CV_8U, cpu_buffers[i].display_buffer.frame).reshape(3, 2200);
-                            string image_name = "/home/user/Calibration/rob_calibration/Cam" + std::to_string(cameras_params[i].camera_id) + "/image_" + std::to_string(image_save_index[i]) + ".tif";
+                            string image_name = folder_name + "/Cam" + std::to_string(cameras_params[i].camera_id) + "_image" + std::to_string(image_save_index[i]) + ".tif";
                             std::cout << image_name << std::endl;
                             cv::imwrite(image_name, view);
                             image_save_index[i]++;

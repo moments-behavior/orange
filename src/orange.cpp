@@ -622,7 +622,7 @@ int main(int argc, char **args)
                 for (int i = 0; i < num_cameras; i++)
                 {
                     char label[32];
-                    sprintf(label, "Cam%d", i);
+                    sprintf(label, "Cam%d", cameras_params[i].camera_id);
                     ImGui::Checkbox(label, &selected_images_to_save[i]);
                     ImGui::SameLine();
                 }

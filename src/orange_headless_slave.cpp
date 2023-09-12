@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
 {
     CameraParams *cameras_params;
     CameraEmergent *ecams;
-    std::vector<thread> camera_threads;
+    std::vector<std::thread> camera_threads;
 
     CameraControl *camera_control = new CameraControl;
     PTPParams* ptp_params = new PTPParams{0, 0};
@@ -25,12 +25,12 @@ int main(int argc, char *argv[])
         // init_65MP_camera_params_mono(&cameras_params[i], i, num_cameras, 2000, 1000, 1, 400); //458 
         init_7MP_camera_params_color(&cameras_params[i], i, num_cameras, 2000, 1000, 1, 30); 
 
-        string multicast_ip = "239.255.255.255"; //+ std::to_string(i);
+        std::string multicast_ip = "239.255.255.255"; //+ std::to_string(i);
         // string iface_address = "192.168.1." + std::to_string(2*i + 20);
-        string iface_address = "192.168.1.20";
+        std::string iface_address = "192.168.1.20";
 
         std::cout << "Ip: " << multicast_ip << ", iface_ip: " << iface_address << std::endl;
-        cameras_params[i].camera_name.append(multicast_ip);
+        cameras_params[i].camera_serial.append(multicast_ip);
         ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
         ecams[i].camera.ifaceAddress = iface_address.c_str();
         ecams[i].camera.portMulticast = 60646 + i;    
@@ -52,8 +52,8 @@ int main(int argc, char *argv[])
     }
     
      
-    string folder_string = current_date_time();
-    string folder_name = "/home/user/Videos/" + folder_string;
+    std::string folder_string = current_date_time();
+    std::string folder_name = "/home/user/Videos/" + folder_string;
 
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)

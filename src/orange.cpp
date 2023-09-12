@@ -97,6 +97,9 @@ int main(int argc, char **args)
     bool draw_aruco_detection = false;
 
     thread aruco_detection_thread;
+    bool load_camera_config = false;
+    std::vector<std::string> camera_config_files;
+    std::vector<std::string> camera_config_names;
 
     // network and protocal
     if (enet_initialize() != 0)
@@ -185,6 +188,11 @@ int main(int argc, char **args)
                 }
             }
 
+            if (ImGui::Button("Load camera config")) {
+                load_camera_config = true;          
+                file_dialog.Open();  
+            }
+
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
                 (camera_control->open) = !(camera_control->open);
                 if (camera_control->open) 
@@ -209,23 +217,31 @@ int main(int argc, char **args)
 
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            cameras_params[i].camera_name.append(device_info[selected_cameras[i]].serialNumber);
-                            if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
-                                int gpu_id = 0;
-                                init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
-                            } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
-                                int gpu_id = 0;
-                                // init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); 
-                                init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 3000, gpu_id, 30); // 2000, 3000
-                            } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
-                                int gpu_id = 0;
-                                init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
-                            } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SM")==0) {
-                                int gpu_id = 0;
-                                init_7MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
+                            // first checkt to see if it is in the config files 
+                            cameras_params[i].camera_serial.append(device_info[selected_cameras[i]].serialNumber);
+                            auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
+                            if (it == camera_config_names.end())
+                            {
+                                if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
+                                    int gpu_id = 0;
+                                    init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
+                                } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
+                                    int gpu_id = 0;
+                                    init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
+                                } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
+                                    int gpu_id = 0;
+                                    init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
+                                } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SM")==0) {
+                                    int gpu_id = 0;
+                                    init_7MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
+                                } else {
+                                    printf("Camera not supported...Exit");
+                                    return 1;
+                                }
                             } else {
-                                printf("Camera not supported...Exit");
-                                return 1;
+                                auto config_idx = std::distance(camera_config_names.begin(), it);
+                                std::cout << "Load camera json file: " << camera_config_files[config_idx] << std::endl;
+                                load_camera_json_config_files(camera_config_files[config_idx], &cameras_params[i], selected_cameras[i], num_cameras); 
                             }
                         }
                         ecams = new CameraEmergent[num_cameras];
@@ -446,9 +462,30 @@ int main(int argc, char **args)
         file_dialog.Display();
         if (file_dialog.HasSelected())
         {
-            input_folder = file_dialog.GetSelected().string();
-            std::cout << input_folder << std::endl;
-            file_dialog.ClearSelected();
+            if (load_camera_config)
+            {
+                std::string camera_config_dir = file_dialog.GetSelected().string();
+
+                // load camera_config
+                for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
+                {
+                    camera_config_files.push_back(entry.path().string());
+                }
+                std::sort(camera_config_files.begin(), camera_config_files.end());
+
+                for (auto &camera_serial : camera_config_files) {
+                    // get the serial number
+                    std::string delimiter = "/";
+                    std::vector<std::string> tokenized_path = string_split(camera_serial, delimiter);
+                    camera_config_names.push_back(tokenized_path.back());
+                }
+                file_dialog.ClearSelected();
+            }
+            else {
+                input_folder = file_dialog.GetSelected().string();
+                std::cout << input_folder << std::endl;
+                file_dialog.ClearSelected();                
+            }
         }
 
         if (camera_control->subscribe && camera_control->stream)

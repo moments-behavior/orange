@@ -100,6 +100,13 @@ int main(int argc, char **args)
                 ImGui::EndTable();
             }
 
+            if (ImGui::Button("Select all")) {
+                for (int i = 0; i < cam_count; i++)
+                {
+                    check[i] = true;
+                }
+            }
+
             if (ImGui::Button("Load camera config")) {
                 load_camera_config = true;          
                 file_dialog.Open();  

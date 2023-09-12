@@ -138,9 +138,8 @@ int main(int argc, char **args)
                         for (int i = 0; i < num_cameras; i++)
                         {
                             // first checkt to see if it is in the config files 
-                            cameras_params[i].camera_name.append(device_info[selected_cameras[i]].serialNumber);
-
-                            auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_name + ".json");
+                            cameras_params[i].camera_serial.append(device_info[selected_cameras[i]].serialNumber);
+                            auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
                             if (it == camera_config_names.end())
                             {
                                 if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
@@ -395,10 +394,10 @@ int main(int argc, char **args)
                 }
                 std::sort(camera_config_files.begin(), camera_config_files.end());
 
-                for (auto &camera_name : camera_config_files) {
+                for (auto &camera_serial : camera_config_files) {
                     // get the serial number
                     std::string delimiter = "/";
-                    std::vector<std::string> tokenized_path = string_split(camera_name, delimiter);
+                    std::vector<std::string> tokenized_path = string_split(camera_serial, delimiter);
                     camera_config_names.push_back(tokenized_path.back());
                 }
                 file_dialog.ClearSelected();
@@ -424,7 +423,7 @@ int main(int argc, char **args)
             
             for (int i = 0; i < num_cameras; i++)
             {
-                std::string window_name = std::to_string(cameras_params[i].camera_id);
+                std::string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

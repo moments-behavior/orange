@@ -23,7 +23,7 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
 
         for (int n = 0; n < num_cameras; n++)
         {
-            if (ImGui::Selectable(cameras_params[n].camera_name.c_str(), selected_camera == n))
+            if (ImGui::Selectable(cameras_params[n].camera_serial.c_str(), selected_camera == n))
                 selected_camera = n;
                 slider_gain = cameras_params[selected_camera].gain;
                 slider_focus = cameras_params[selected_camera].focus;

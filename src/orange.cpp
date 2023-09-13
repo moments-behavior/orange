@@ -138,9 +138,10 @@ int main(int argc, char **args)
                         for (int i = 0; i < num_cameras; i++)
                         {
                             // first checkt to see if it is in the config files 
-                            cameras_params[i].camera_name.append(device_info[selected_cameras[i]].serialNumber);
+                            cameras_params[i].camera_serial.append(device_info[selected_cameras[i]].serialNumber);
+                            cameras_params[i].camera_name = cameras_params[i].camera_serial;
 
-                            auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_name + ".json");
+                            auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
                             if (it == camera_config_names.end())
                             {
                                 if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
@@ -281,7 +282,7 @@ int main(int argc, char **args)
             }
 
 
-            if (camera_control->record_video)
+            if (camera_control->stop_record)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.5f, 0, 0, 1.0f});
             }
@@ -290,11 +291,12 @@ int main(int argc, char **args)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
             }
 
-            if (ImGui::Button(camera_control->record_video ? ICON_FK_PAUSE : ICON_FK_PLAY))
+            if (ImGui::Button(camera_control->stop_record ? ICON_FK_PAUSE : ICON_FK_PLAY))
             {
-                (camera_control->record_video) = !(camera_control->record_video);
-                if (camera_control->record_video)
+                (camera_control->stop_record) = !(camera_control->stop_record);
+                if (camera_control->stop_record)
                 {
+                    camera_control->record_video = true;
                     std::string folder_string = current_date_time();
                     folder_name = file_dialog.GetSelected().string() + "/" + folder_string;
 
@@ -374,6 +376,7 @@ int main(int argc, char **args)
                     if (camera_control->stream) {
                         delete[] tex;                     
                     }
+                    camera_control->record_video = false;
                 }
             }
             ImGui::PopStyleColor(1);
@@ -395,10 +398,10 @@ int main(int argc, char **args)
                 }
                 std::sort(camera_config_files.begin(), camera_config_files.end());
 
-                for (auto &camera_name : camera_config_files) {
+                for (auto &camera_serial : camera_config_files) {
                     // get the serial number
                     std::string delimiter = "/";
-                    std::vector<std::string> tokenized_path = string_split(camera_name, delimiter);
+                    std::vector<std::string> tokenized_path = string_split(camera_serial, delimiter);
                     camera_config_names.push_back(tokenized_path.back());
                 }
                 file_dialog.ClearSelected();
@@ -424,7 +427,7 @@ int main(int argc, char **args)
             
             for (int i = 0; i < num_cameras; i++)
             {
-                std::string window_name = std::to_string(cameras_params[i].camera_id);
+                std::string window_name = cameras_params[i].camera_name;
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

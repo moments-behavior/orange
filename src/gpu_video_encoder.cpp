@@ -129,8 +129,8 @@ void GPUVideoEncoder::ThreadRunning()
             encode_frame(&encoder, writer.video, &debayer);
         }
     }
-
     close_writer(&encoder, &writer);
+    printf("\nCamera id: \t%d, frame encoded %d.\n", camera_params->camera_id, encoder.num_frame_encode);
     delete writer.video;
     delete writer.metadata;
     delete encoder.pEnc;

@@ -30,6 +30,7 @@ void load_camera_json_config_files(std::string file_name, CameraParams* camera_p
     camera_params->num_cameras = num_cameras;
     camera_params->need_reorder = false;
 
+    camera_params->camera_name = camera_config["name"];
     camera_params->width = camera_config["width"];
     camera_params->height = camera_config["height"];
     camera_params->frame_rate = camera_config["frame_rate"];

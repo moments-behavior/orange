@@ -10,6 +10,7 @@ struct CameraControl
     bool open = false;
     bool subscribe = false;
     bool stream = true;
+    bool stop_record = false;
     bool record_video = false;
     bool sync_camera = false;
     bool capture_only = false;

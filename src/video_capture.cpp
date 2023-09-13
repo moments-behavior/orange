@@ -82,7 +82,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
 static inline void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff)
 {
     printf("\n");
-    printf("Camera id: \t%d\n", camera_params->camera_id);
+    printf("\n Camera id: \t%d\n", camera_params->camera_id);
     printf("Frame count: \t%d\n", camera_state->frame_count);
     printf("Frame received: \t%d\n", camera_state->frames_recd);
     printf("Dropped Frames: \t%d\n", camera_state->dropped_frames);

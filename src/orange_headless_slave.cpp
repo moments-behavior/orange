@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
         std::string iface_address = "192.168.1.20";
 
         std::cout << "Ip: " << multicast_ip << ", iface_ip: " << iface_address << std::endl;
-        cameras_params[i].camera_name.append(multicast_ip);
+        cameras_params[i].camera_serial.append(multicast_ip);
         ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
         ecams[i].camera.ifaceAddress = iface_address.c_str();
         ecams[i].camera.portMulticast = 60646 + i;    

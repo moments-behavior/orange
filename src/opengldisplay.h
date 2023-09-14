@@ -2,7 +2,7 @@
 #include "threadworker.h"
 #include "image_processing.h"
 
-#define WORK_ENTRIES_MAX 10
+#define WORK_ENTRIES_MAX 2
 
 class COpenGLDisplay : public CThreadWorker
 {
@@ -10,12 +10,10 @@ public:
     COpenGLDisplay(const char* name, CameraParams *camera_params, unsigned char *display_buffer); // name is the thread name
     ~COpenGLDisplay ();
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat);
+	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned short frame_id);
 
 	//open gl dimensions:
-	CameraParams* camera_params;
-	CameraEmergent* ecam;
-	
+	CameraParams* camera_params;	
 	unsigned char* display_buffer;
 	FrameGPU frame_original; // frame on gpu device 
 	Debayer debayer;

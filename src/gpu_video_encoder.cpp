@@ -32,10 +32,30 @@ static inline void initialize_encoder(EncoderContext *encoder, std::string encod
     InitializeEncoder(encoder->pEnc, encoder->encodeCLIOptions, encoder->eFormat);
 }
 
+static inline void open_metadata_file(std::ofstream *frame_metadata, std::string metadata_file)
+{
+    frame_metadata->open(metadata_file.c_str());
+
+    if (!(*frame_metadata))
+    {
+        std::cout << "File did not open!";
+        return;
+    }
+    *frame_metadata << "frame_id,timestamp\n";
+}
+
+static inline void write_meatadata(std::ofstream *metadata, unsigned short frame_id, unsigned long long timestamp)
+{
+    *metadata << frame_id << "," << timestamp << std::endl;
+}
+
+
 static inline void initialize_writer(Writer *writer, CameraParams *camera_params, std::string folder_name, std::string encoder_str)
 {
-    writer->video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
-    writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
+    // writer->video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
+    // writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
+    writer->video_file = folder_name + "/Cam" + camera_params->camera_serial + ".mp4";
+    writer->metadata_file = folder_name + "/Cam" + camera_params->camera_serial + "_meta.csv";
 
     if (encoder_str.find("h264") != std::string::npos) {
         std::cout << "h264 encoding" << '\n';
@@ -47,7 +67,7 @@ static inline void initialize_writer(Writer *writer, CameraParams *camera_params
         std::cout << "codec not supported" << '\n';
     }
     writer->metadata = new std::ofstream();
-    // open_metadata_file(writer->metadata, writer->metadata_file);
+    open_metadata_file(writer->metadata, writer->metadata_file);
 }
 
 static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, Debayer *debayer)
@@ -100,6 +120,24 @@ GPUVideoEncoder::~GPUVideoEncoder()
 {
 }
 
+void GPUVideoEncoder::ProcessOneFrame(void* f)
+{
+    WORKER_ENTRY entry = *(WORKER_ENTRY*)f;
+    PutObjectToQueueOut(f);
+    
+    // copy frame from cpu to gpu
+    ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+
+    if (camera_params->color){
+        debayer_frame_gpu(camera_params, &frame_original, &debayer);
+    } else {
+        duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+    }
+
+    encode_frame(&encoder, writer.video, &debayer);
+    write_meatadata(writer.metadata, entry.frame_id, entry.timestamp);
+}
+
 void GPUVideoEncoder::ThreadRunning()
 {
     ck(cudaSetDevice(camera_params->gpu_id));
@@ -114,23 +152,21 @@ void GPUVideoEncoder::ThreadRunning()
     {
         void* f = GetObjectFromQueueIn();
         if(f) {
-            WORKER_ENTRY entry = *(WORKER_ENTRY*)f;
-            PutObjectToQueueOut(f);
-            
-            // copy frame from cpu to gpu
-            ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
-
-            if (camera_params->color){
-                debayer_frame_gpu(camera_params, &frame_original, &debayer);
-            } else {
-                duplicate_channel_gpu(camera_params, &frame_original, &debayer);
-            }
-
-            encode_frame(&encoder, writer.video, &debayer);
+            ProcessOneFrame(f);
         }
     }
+
+    // empty queue
+    while(GetCountQueueInSize()) 
+    {
+        void* f = GetObjectFromQueueIn();
+        if(f) {
+            ProcessOneFrame(f);
+        }
+    }
+    
     close_writer(&encoder, &writer);
-    printf("\nCamera id: \t%d, frame encoded %d.\n", camera_params->camera_id, encoder.num_frame_encode);
+    printf("\nCamera id: %d, frame encoded %d.\n", camera_params->camera_id, encoder.num_frame_encode);
     delete writer.video;
     delete writer.metadata;
     delete encoder.pEnc;
@@ -139,7 +175,7 @@ void GPUVideoEncoder::ThreadRunning()
 }
 
 
-bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat)
+bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned short frame_id)
 {
     WORKER_ENTRY *entriesOut[ENCODER_ENTRIES_MAX]; // entris got out from saver thread, their frames should be returned to driver queue.
     int entriesOutCount = ENCODER_ENTRIES_MAX;
@@ -165,6 +201,8 @@ bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width
         entry->width = width;
         entry->height = height;
         entry->pixelFormat = pixelFormat;
+        entry->timestamp = timestamp;
+        entry->frame_id = frame_id;
         PutObjectToQueueIn(entry);
         return true;
     }

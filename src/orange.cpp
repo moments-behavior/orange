@@ -57,7 +57,7 @@ int main(int argc, char **args)
 
     CameraControl *camera_control = new CameraControl;
 
-    int evt_buffer_size {150};
+    int evt_buffer_size {100};
     PTPParams* ptp_params = new PTPParams{0, 0};
     std::string encoder_setup;
     std::string encoder_basic_setup = "-codec h264 -preset p1 -fps ";

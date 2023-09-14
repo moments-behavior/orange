@@ -56,13 +56,14 @@ static inline void initialize_writer(Writer *writer, CameraParams *camera_params
     // writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
     writer->video_file = folder_name + "/Cam" + camera_params->camera_serial + ".mp4";
     writer->metadata_file = folder_name + "/Cam" + camera_params->camera_serial + "_meta.csv";
+    writer->keyframe_file = folder_name + "/Cam" + camera_params->camera_serial + "_keyframe.csv";
 
     if (encoder_str.find("h264") != std::string::npos) {
         std::cout << "h264 encoding" << '\n';
-        writer->video = new FFmpegWriter(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str());
+        writer->video = new FFmpegWriter(AV_CODEC_ID_H264, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str(), writer->keyframe_file.c_str());
     } else if (encoder_str.find("hevc") != std::string::npos){
         std::cout << "hevc encoding" << '\n';
-        writer->video = new FFmpegWriter(AV_CODEC_ID_HEVC, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str());
+        writer->video = new FFmpegWriter(AV_CODEC_ID_HEVC, camera_params->width, camera_params->height, camera_params->frame_rate, writer->video_file.c_str(), writer->keyframe_file.c_str());
     } else {
         std::cout << "codec not supported" << '\n';
     }

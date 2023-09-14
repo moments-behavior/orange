@@ -9,15 +9,14 @@ extern "C" {
 #include <libswresample/swresample.h>
 };
 
-
 class FFmpegWriter {
 private:
     AVFormatContext *oc = NULL;
     AVStream *vs = NULL;
     int nFps = 0;
-
+    std::ofstream* metadata;
 public:
-    FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps, const char *szOutFilePath) : nFps(nFps) {
+    FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps, const char *szOutFilePath, const char *metadata_file) : nFps(nFps) {
         oc = avformat_alloc_context();
         if (!oc) {
             printf("FFMPEG: avformat_alloc_context error");
@@ -59,22 +58,32 @@ public:
             printf("FFMPEG: avformat_write_header error!");
             return;
         }
+        
+        metadata = new std::ofstream();
+        metadata->open(metadata_file);
+        if (!(*metadata))
+        {
+            std::cout << "File did not open!";
+            return;
+        }
+        *metadata << "frame_id, keyframe\n";
     }
+
     ~FFmpegWriter() {
         if (oc) {
             av_write_trailer(oc);
             avio_close(oc->pb);
             avformat_free_context(oc);
         }
+        metadata->close();
     }
 
     bool Write(uint8_t *pData, int nBytes, int nPts) {
+                
         //AVPacket pkt = {0};
         //av_init_packet(&pkt);
         AVPacket *pkt;
         pkt = av_packet_alloc();
-
-
 
         pkt->pts = av_rescale_q(nPts++, AVRational {1, nFps}, vs->time_base);
         // No B-frames
@@ -85,6 +94,9 @@ public:
 
         if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
             pkt->flags |= AV_PKT_FLAG_KEY;
+            *metadata << nPts << "," << 1 << std::endl;
+        } else {
+            *metadata << nPts << "," << 0 << std::endl;
         }
 
         // Write the compressed frame into the output

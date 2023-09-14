@@ -431,10 +431,16 @@ int main(int argc, char **args)
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
+                static ImVec2 bmin(0,0);
+                static ImVec2 uv0(0,0);
+                static ImVec2 uv1(1,1);
+                static ImVec4 tint(1,1,1,1);
+
                 // ImGui::Image((void*)(intptr_t)texture[i], avail_size);
-                if (ImPlot::BeginPlot("##no_plot_name", avail_size))
+                if (ImPlot::BeginPlot("##no_plot_name", avail_size, ImPlotFlags_Equal | ImPlotAxisFlags_AutoFit))
                 {
-                    ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+                    ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
+                    ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));                    
                     ImPlot::EndPlot();
                 }
                 ImGui::End();

@@ -53,10 +53,22 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
 
         // push the image data to encode, or display
         if (camera_control->record_video) {
-            gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, ecam->frame_recv.size_x, ecam->frame_recv.size_y, ecam->frame_recv.pixel_type);
+            gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, 
+                ecam->frame_recv.bufferSize, 
+                ecam->frame_recv.size_x, 
+                ecam->frame_recv.size_y, 
+                ecam->frame_recv.pixel_type, 
+                ecam->frame_recv.timestamp,
+                ecam->frame_recv.frame_id);
         }
         
-        openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, ecam->frame_recv.size_x, ecam->frame_recv.size_y, ecam->frame_recv.pixel_type);
+        openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, 
+            ecam->frame_recv.bufferSize, 
+            ecam->frame_recv.size_x, 
+            ecam->frame_recv.size_y, 
+            ecam->frame_recv.pixel_type, 
+            ecam->frame_recv.timestamp,
+            ecam->frame_recv.frame_id);
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
         if (camera_state->camera_return)
@@ -81,12 +93,14 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
 
 static inline void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff)
 {
-    printf("\n");
-    printf("\n Camera id: \t%d\n", camera_params->camera_id);
-    printf("Frame count: \t%d\n", camera_state->frame_count);
-    printf("Frame received: \t%d\n", camera_state->frames_recd);
-    printf("Dropped Frames: \t%d\n", camera_state->dropped_frames);
-    printf("Calculated Frame Rate: \t%f\n", camera_state->frames_recd / time_diff);
+    std::string print_out;
+    print_out += "\nCamera id: " + std::to_string(camera_params->camera_id);
+    print_out += ", Frame count: " + std::to_string(camera_state->frame_count);
+    print_out += ", Frame received: " + std::to_string(camera_state->frames_recd);
+    print_out += ", Dropped Frames: " + std::to_string(camera_state->dropped_frames);
+    float calc_frame_rate = camera_state->frames_recd / time_diff;
+    print_out += ", Calculated Frame Rate: " + std::to_string(calc_frame_rate);
+    std::cout << print_out << std::endl;
 }
 
 static inline void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam)

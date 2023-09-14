@@ -56,7 +56,7 @@ void COpenGLDisplay::ThreadRunning()
 }
 
 
-bool COpenGLDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat)
+bool COpenGLDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned short frame_id)
 {
     WORKER_ENTRY *entriesOut[WORK_ENTRIES_MAX]; // entris got out from saver thread, their frames should be returned to driver queue.
     int entriesOutCount = WORK_ENTRIES_MAX;
@@ -82,6 +82,8 @@ bool COpenGLDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width,
         entry->width = width;
         entry->height = height;
         entry->pixelFormat = pixelFormat;
+        entry->timestamp = timestamp;
+        entry->frame_id = frame_id;
         PutObjectToQueueIn(entry);
         return true;
     }

@@ -11,6 +11,8 @@ typedef struct {
 	int width;
 	int height;
 	int pixelFormat;
+    unsigned long long timestamp;
+    unsigned short frame_id;
 } WORKER_ENTRY;
 
 struct FrameGPU

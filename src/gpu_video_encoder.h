@@ -8,7 +8,7 @@
 #include "NvEncoder/NvEncoderCLIOptions.h"
 #include "image_processing.h"
 
-#define ENCODER_ENTRIES_MAX 10
+#define ENCODER_ENTRIES_MAX 20
 
 struct Writer
 {
@@ -34,12 +34,11 @@ public:
     GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name); // name is the thread name
     ~GPUVideoEncoder ();
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat);
+	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned short frame_id);
+	void ProcessOneFrame(void *f);
 
 	//open gl dimensions:
-	CameraParams* camera_params;
-	CameraEmergent* ecam;
-	
+	CameraParams* camera_params;	
 	unsigned char* display_buffer;
 	FrameGPU frame_original; // frame on gpu device 
 	Debayer debayer;

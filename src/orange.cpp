@@ -72,6 +72,8 @@ int main(int argc, char **args)
     ScrollingBuffer* realtime_plot_data;
     bool show_realtime_plot = false;
 
+    bool ptp_stream_sync = false;
+
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
@@ -195,6 +197,14 @@ int main(int argc, char **args)
                 set_camera_properties(ecams, cameras_params, num_cameras);
             }
 
+            
+            ImGui::Separator();
+            ImGui::Spacing();
+            
+            if (ImGui::Button(ptp_stream_sync ? "PTP off": "PTP on")) {
+                ptp_stream_sync = !ptp_stream_sync;
+            }
+
             if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))
             {
                 (camera_control->subscribe) = !(camera_control->subscribe);
@@ -224,6 +234,16 @@ int main(int argc, char **args)
                         create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                     }
 
+                    if (ptp_stream_sync) {
+                        if (num_cameras > 1){
+                            for (int i = 0; i < num_cameras; i++)
+                            {
+                                ptp_camera_sync(&ecams[i].camera);
+                            }
+                            camera_control->sync_camera = true;
+                        }
+                    }
+
                     for (int i = 0; i < num_cameras; i++)
                     {
                         camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
@@ -248,6 +268,16 @@ int main(int argc, char **args)
                         cuda_unregister_pbo(tex[i].cuda_resource);
                     }
                     delete[] tex;
+                    
+                    if (num_cameras > 1) {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            ptp_sync_off(&ecams[i].camera);
+                        }
+                        ptp_params->ptp_counter = 0;
+                        ptp_params->ptp_global_time = 0;
+                        camera_control->sync_camera = false;
+                    }
                 }
             }
 
@@ -353,7 +383,6 @@ int main(int argc, char **args)
                     camera_control->subscribe = true;                    
                 } else {
                     camera_control->subscribe = false;
-                    camera_control->sync_camera = false;
 
                     for (auto &t : camera_threads)
                         t.join();
@@ -376,6 +405,16 @@ int main(int argc, char **args)
                     if (camera_control->stream) {
                         delete[] tex;                     
                     }
+
+                    if (num_cameras > 1) {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            ptp_sync_off(&ecams[i].camera);
+                        }
+                        ptp_params->ptp_counter = 0;
+                        ptp_params->ptp_global_time = 0;
+                        camera_control->sync_camera = false;
+                    }
                     camera_control->record_video = false;
                 }
             }
@@ -391,6 +430,7 @@ int main(int argc, char **args)
             {
                 std::string camera_config_dir = file_dialog.GetSelected().string();
 
+                camera_config_files.clear();
                 // load camera_config
                 for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
                 {

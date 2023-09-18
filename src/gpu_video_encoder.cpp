@@ -71,6 +71,7 @@ static inline void initialize_writer(Writer *writer, CameraParams *camera_params
     open_metadata_file(writer->metadata, writer->metadata_file);
 }
 
+
 static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, Debayer *debayer)
 {
     // encoding
@@ -86,11 +87,13 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, D
                                      encoderInputFrame->bufferFormat,
                                      encoderInputFrame->chromaOffsets,
                                      encoderInputFrame->numChromaPlanes);
+
     encoder->pEnc->EncodeFrame(encoder->vPacket);
     for (std::vector<uint8_t> &packet : encoder->vPacket)
     {
         // For each encoded packet
-        writer->Write(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        writer->write_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        // writer->push_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
     }
 }
 
@@ -99,7 +102,7 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
     encoder->pEnc->EndEncode(encoder->vPacket);
     for (std::vector<uint8_t> &packet : encoder->vPacket)
     {
-        writer->video->Write(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        writer->video->write_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
     }
     encoder->pEnc->DestroyEncoder();
     (*writer->metadata).close();

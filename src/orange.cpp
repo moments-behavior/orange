@@ -141,11 +141,8 @@ int main(int argc, char **args)
                         {
                             // first checkt to see if it is in the config files 
                             cameras_params[i].camera_serial.append(device_info[selected_cameras[i]].serialNumber);
-<<<<<<< HEAD
                             cameras_params[i].camera_name = cameras_params[i].camera_serial;
 
-=======
->>>>>>> update_dep
                             auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
                             if (it == camera_config_names.end())
                             {
@@ -287,6 +284,9 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
+            static char prefix_buf[64] = ""; 
+            ImGui::InputText("prefix", prefix_buf, 64);
+
             if (ImGui::Button("Save to"))
             {
                 file_dialog.Open();
@@ -331,7 +331,8 @@ int main(int argc, char **args)
                 {
                     camera_control->record_video = true;
                     std::string folder_string = current_date_time();
-                    folder_name = file_dialog.GetSelected().string() + "/" + folder_string;
+                    std::string folder_prefix(prefix_buf);
+                    folder_name = file_dialog.GetSelected().string() + "/" + folder_prefix + folder_string;
 
                     if (mkdir(folder_name.c_str(), 0777) == -1)
                     {
@@ -470,11 +471,7 @@ int main(int argc, char **args)
             
             for (int i = 0; i < num_cameras; i++)
             {
-<<<<<<< HEAD
                 std::string window_name = cameras_params[i].camera_name;
-=======
-                std::string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);
->>>>>>> update_dep
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

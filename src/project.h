@@ -11,7 +11,7 @@ const std::string current_date_time() {
     struct tm  tstruct;
     char       buf[80];
     tstruct = *localtime(&now);
-    strftime(buf, sizeof(buf), "%Y-%m-%d_%X", &tstruct);
+    strftime(buf, sizeof(buf), "%Y_%m_%d_%X", &tstruct);
     return buf;
 }
 

@@ -141,8 +141,11 @@ int main(int argc, char **args)
                         {
                             // first checkt to see if it is in the config files 
                             cameras_params[i].camera_serial.append(device_info[selected_cameras[i]].serialNumber);
+<<<<<<< HEAD
                             cameras_params[i].camera_name = cameras_params[i].camera_serial;
 
+=======
+>>>>>>> update_dep
                             auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
                             if (it == camera_config_names.end())
                             {
@@ -467,7 +470,11 @@ int main(int argc, char **args)
             
             for (int i = 0; i < num_cameras; i++)
             {
+<<<<<<< HEAD
                 std::string window_name = cameras_params[i].camera_name;
+=======
+                std::string window_name = "Cam" + std::to_string(cameras_params[i].camera_id);
+>>>>>>> update_dep
                 ImGui::Begin(window_name.c_str());
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 

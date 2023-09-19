@@ -450,12 +450,10 @@ int main(int argc, char **args)
                 }
                 file_dialog.ClearSelected();
 
-            } else {
-                input_folder = file_dialog.GetSelected().string();
-                std::cout << input_folder << std::endl;
-                file_dialog.ClearSelected();
-            }
-
+            } 
+            input_folder = file_dialog.GetSelected().string();
+            std::cout << input_folder << std::endl;
+            file_dialog.ClearSelected();
         }
 
         if (camera_control->subscribe && camera_control->stream)

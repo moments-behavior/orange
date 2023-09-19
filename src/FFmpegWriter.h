@@ -10,10 +10,8 @@ extern "C"
 };
 #include <iostream>
 #include <fstream>
-#include <mutex>
-#include <queue>
-#include <condition_variable>
 #include <thread>
+#include "thread.h"
 
 class FFmpegWriter
 {
@@ -22,25 +20,17 @@ public:
     ~FFmpegWriter();
     bool write_packet(uint8_t *pData, int nBytes, int nPts);
     void push_packet(uint8_t* pData, int nBytes, int nPts);
-    AVPacket* pop_packet();
     void create_thread();
-    void quit_thread()
-    {
-        m_quitting = true;
-    };
-    void join_thread()
-    {
-        m_thread.join();
-    };
+    void quit_thread();
+    void join_thread();
+    void write_one_pkt(AVPacket* pkt); 
 private:
     AVFormatContext *oc = NULL;
     AVStream *vs = NULL;
     int nFps = 0;
     int nPts = 0;
     std::ofstream *metadata;
-    std::vector<AVPacket*> m_queue;
-    std::mutex m_mutex;
-    std::condition_variable m_cond;
+    lock_free_queue<AVPacket*> m_queue;
     std::thread m_thread;
     bool m_quitting;
     void write_thread();

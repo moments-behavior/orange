@@ -67,8 +67,6 @@ FFmpegWriter::~FFmpegWriter()
 
 void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
-
     AVPacket *pkt = av_packet_alloc();
     if (av_new_packet(pkt, nBytes) < 0) {
         std::cout << "Error, av_new_packet..." << std::endl;
@@ -82,23 +80,7 @@ void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
     if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
         pkt->flags |= AV_PKT_FLAG_KEY;
     }
-    m_queue.push_back(pkt);
-    m_cond.notify_one();
-}
-
-AVPacket* FFmpegWriter::pop_packet()
-{
-    std::unique_lock<std::mutex> lock(m_mutex);
-
-    // wait until queue is not empty 
-    m_cond.wait(lock,
-                [this]() { return !m_queue.empty(); });
-
-    // retrieve item
-    AVPacket* item = m_queue.front();
-    m_queue.erase(m_queue.begin());
-    // return item
-    return item;
+    m_queue.push(pkt);
 }
 
 void FFmpegWriter::create_thread()
@@ -106,19 +88,46 @@ void FFmpegWriter::create_thread()
     m_thread = std::thread(&FFmpegWriter::write_thread, this);
 };
 
+void FFmpegWriter::quit_thread()
+{
+    m_quitting = true;
+};
+
+void FFmpegWriter::join_thread()
+{
+    m_thread.join();
+};
+
+void FFmpegWriter::write_one_pkt(AVPacket* pkt) 
+{
+    int ret = av_write_frame(oc, pkt);
+    av_write_frame(oc, NULL);
+    if (ret < 0) {
+        std::cout << "FFMPEG: Error while writing video frame" << std::endl;
+    } else {
+        av_packet_unref(pkt);
+    }
+}
+
 // off-thread saving
 void FFmpegWriter::write_thread()
 {
     while(!m_quitting) {
-        while(!m_queue.empty()) {
-            AVPacket* pkt = pop_packet();
-            int ret = av_write_frame(oc, pkt);
-            av_write_frame(oc, NULL);
-            if (ret < 0) {
-                std::cout << "FFMPEG: Error while writing video frame" << std::endl;
-            } else {
-                av_packet_unref(pkt);
-            }
+        std::shared_ptr<AVPacket*> pkt(m_queue.pop());
+        if(pkt) {
+            write_one_pkt(*pkt.get());
+        }
+    }   
+
+    // check if there is more in the queue 
+    while(true) {
+        std::shared_ptr<AVPacket*> pkt(m_queue.pop());
+        if (!pkt) {
+            // empty queue
+            break;
+        } 
+        else {
+            write_one_pkt(*pkt.get());
         }
     }
 }

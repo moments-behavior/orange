@@ -92,8 +92,8 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, D
     for (std::vector<uint8_t> &packet : encoder->vPacket)
     {
         // For each encoded packet
-        writer->write_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
-        // writer->push_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        // writer->write_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        writer->push_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
     }
 }
 
@@ -102,7 +102,8 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
     encoder->pEnc->EndEncode(encoder->vPacket);
     for (std::vector<uint8_t> &packet : encoder->vPacket)
     {
-        writer->video->write_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        // writer->video->write_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        writer->video->push_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
     }
     encoder->pEnc->DestroyEncoder();
     (*writer->metadata).close();
@@ -152,6 +153,9 @@ void GPUVideoEncoder::ThreadRunning()
     initialize_encoder(&encoder, encoder_setup, camera_params);
     initialize_writer(&writer, camera_params, folder_name, encoder_setup);
 
+    // start writing thread
+    writer.video->create_thread();
+
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();
@@ -171,6 +175,10 @@ void GPUVideoEncoder::ThreadRunning()
     
     close_writer(&encoder, &writer);
     printf("\nCamera id: %d, frame encoded %d.\n", camera_params->camera_id, encoder.num_frame_encode);
+    
+    writer.video->quit_thread();
+    writer.video->join_thread();
+
     delete writer.video;
     delete writer.metadata;
     delete encoder.pEnc;

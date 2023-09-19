@@ -65,27 +65,37 @@ FFmpegWriter::~FFmpegWriter()
     metadata->close();
 }
 
-void FFmpegWriter::push_packet(uint8_t* pData, int nBytes)
+void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
-    // allocate memory for copying the data 
-    nPts++;
-    uint8_t* pkt_buffer = (uint8_t*)malloc(nBytes);
-    // copy data to buffer
-    memcpy(pkt_buffer, pData, nBytes);
-    m_queue.push_back(pkt_buffer);
+
+    AVPacket *pkt = av_packet_alloc();
+    if (av_new_packet(pkt, nBytes) < 0) {
+        std::cout << "Error, av_new_packet..." << std::endl;
+        return;
+    }
+    memcpy(pkt->data, pData, nBytes);   
+    pkt->pts = av_rescale_q(nPts++, AVRational {1, nFps}, vs->time_base);
+    // No B-frames
+    pkt->dts = pkt->pts;
+    pkt->stream_index = vs->index;    
+    if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
+        pkt->flags |= AV_PKT_FLAG_KEY;
+    }
+    m_queue.push_back(pkt);
+    m_cond.notify_one();
 }
 
-uint8_t* FFmpegWriter::pop_packet()
+AVPacket* FFmpegWriter::pop_packet()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
 
-    // wait until queue is not empty
+    // wait until queue is not empty 
     m_cond.wait(lock,
                 [this]() { return !m_queue.empty(); });
 
     // retrieve item
-    uint8_t* item = m_queue.front();
+    AVPacket* item = m_queue.front();
     m_queue.erase(m_queue.begin());
     // return item
     return item;
@@ -100,13 +110,21 @@ void FFmpegWriter::create_thread()
 void FFmpegWriter::write_thread()
 {
     while(!m_quitting) {
-        uint8_t* pkt_data = pop_packet();
+        while(!m_queue.empty()) {
+            AVPacket* pkt = pop_packet();
+            int ret = av_write_frame(oc, pkt);
+            av_write_frame(oc, NULL);
+            if (ret < 0) {
+                std::cout << "FFMPEG: Error while writing video frame" << std::endl;
+            } else {
+                av_packet_unref(pkt);
+            }
+        }
     }
-
 }
 
 // this function only used for on thread saving
-bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts0)
+bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts)
 {
 
     //AVPacket pkt = {0};
@@ -114,7 +132,7 @@ bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts0)
     AVPacket *pkt;
     pkt = av_packet_alloc();
 
-    pkt->pts = av_rescale_q(nPts0++, AVRational {1, nFps}, vs->time_base);
+    pkt->pts = av_rescale_q(nPts++, AVRational {1, nFps}, vs->time_base);
     // No B-frames
     pkt->dts = pkt->pts;
     pkt->stream_index = vs->index;
@@ -123,16 +141,15 @@ bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts0)
 
     if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
         pkt->flags |= AV_PKT_FLAG_KEY;
-        *metadata << nPts0 << "," << 1 << std::endl;
+        *metadata << nPts << "," << 1 << std::endl;
     } else {
-        *metadata << nPts0 << "," << 0 << std::endl;
+        *metadata << nPts << "," << 0 << std::endl;
     }
 
     // Write the compressed frame into the output
     int ret = av_write_frame(oc, pkt);
     av_write_frame(oc, NULL);
     if (ret < 0) {
-        // LOG(ERROR) << "FFMPEG: Error while writing video frame";
         std::cout << "FFMPEG: Error while writing video frame" << std::endl;
 
     }

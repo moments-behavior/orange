@@ -174,8 +174,11 @@ void GPUVideoEncoder::ThreadRunning()
     }
     
     close_writer(&encoder, &writer);
-    printf("\nCamera id: %d, frame encoded %d.\n", camera_params->camera_id, encoder.num_frame_encode);
-    
+    std::string print_out;
+    print_out += "\n" + camera_params->camera_serial;
+    print_out += ", Frame encoded: " + std::to_string(encoder.num_frame_encode);
+    std::cout << print_out << std::endl;
+
     writer.video->quit_thread();
     writer.video->join_thread();
 

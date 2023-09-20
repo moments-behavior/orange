@@ -45,14 +45,14 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps
         return;
     }
     
-    metadata = new std::ofstream();
-    metadata->open(metadata_file);
-    if (!(*metadata))
-    {
-        std::cout << "File did not open!";
-        return;
-    }
-    *metadata << "frame_id, keyframe\n";
+    // metadata = new std::ofstream();
+    // metadata->open(metadata_file);
+    // if (!(*metadata))
+    // {
+    //     std::cout << "File did not open!";
+    //     return;
+    // }
+    // *metadata << "frame_id, keyframe\n";
 }
 
 FFmpegWriter::~FFmpegWriter()
@@ -62,7 +62,7 @@ FFmpegWriter::~FFmpegWriter()
         avio_close(oc->pb);
         avformat_free_context(oc);
     }
-    metadata->close();
+    // metadata->close();
 }
 
 void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
@@ -150,9 +150,9 @@ bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts)
 
     if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
         pkt->flags |= AV_PKT_FLAG_KEY;
-        *metadata << nPts << "," << 1 << std::endl;
+        // *metadata << nPts << "," << 1 << std::endl;
     } else {
-        *metadata << nPts << "," << 0 << std::endl;
+        // *metadata << nPts << "," << 0 << std::endl;
     }
 
     // Write the compressed frame into the output

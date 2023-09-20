@@ -94,7 +94,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
 static inline void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff)
 {
     std::string print_out;
-    print_out += "\nCamera id: " + std::to_string(camera_params->camera_id);
+    print_out += "\n" + camera_params->camera_serial;
     print_out += ", Frame count: " + std::to_string(camera_state->frame_count);
     print_out += ", Frame received: " + std::to_string(camera_state->frames_recd);
     print_out += ", Dropped Frames: " + std::to_string(camera_state->dropped_frames);

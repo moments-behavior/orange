@@ -24,7 +24,7 @@ struct EncoderContext
     NV_ENC_BUFFER_FORMAT eFormat;
     NvEncoderInitParam encodeCLIOptions;
     CUcontext cuContext;
-    int num_frame_encode;
+    int num_frame_encode = 0;
     std::vector<std::vector<uint8_t>> vPacket;
     NvEncoderCuda *pEnc;
 };

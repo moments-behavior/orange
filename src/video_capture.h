@@ -22,7 +22,7 @@ struct CameraState
     unsigned short id_prev = 0;
     unsigned short dropped_frames = 0;
     unsigned int frames_recd = 0;
-    int frame_count = 0;
+    unsigned long long frame_count = 0;
 };
 
 struct PTPState 

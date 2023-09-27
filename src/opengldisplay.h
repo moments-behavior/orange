@@ -10,7 +10,7 @@ public:
     COpenGLDisplay(const char* name, CameraParams *camera_params, unsigned char *display_buffer); // name is the thread name
     ~COpenGLDisplay ();
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned short frame_id);
+	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id);
 
 	//open gl dimensions:
 	CameraParams* camera_params;	

@@ -24,7 +24,7 @@ struct EncoderContext
     NV_ENC_BUFFER_FORMAT eFormat;
     NvEncoderInitParam encodeCLIOptions;
     CUcontext cuContext;
-    int num_frame_encode = 0;
+    unsigned long long num_frame_encode = 0;
     std::vector<std::vector<uint8_t>> vPacket;
     NvEncoderCuda *pEnc;
 };
@@ -35,7 +35,7 @@ public:
     GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name); // name is the thread name
     ~GPUVideoEncoder ();
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned short frame_id);
+	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id);
 	void ProcessOneFrame(void *f);
 
 	//open gl dimensions:

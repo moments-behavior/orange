@@ -45,6 +45,8 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
             camera_state->frames_recd++;
         }
 
+        camera_state->frame_count++;
+
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
         if (ecam->frame_recv.frame_id == 65535)
             camera_state->id_prev = 0;
@@ -59,7 +61,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
                 ecam->frame_recv.size_y, 
                 ecam->frame_recv.pixel_type, 
                 ecam->frame_recv.timestamp,
-                ecam->frame_recv.frame_id);
+                camera_state->frame_count);
         }
         
         openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, 
@@ -68,21 +70,19 @@ static inline void get_one_frame(CameraState *camera_state, CameraControl *camer
             ecam->frame_recv.size_y, 
             ecam->frame_recv.pixel_type, 
             ecam->frame_recv.timestamp,
-            ecam->frame_recv.frame_id);
+            camera_state->frame_count);
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
         if (camera_state->camera_return)
             std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
 
-        if (camera_state->frame_count % 100 == 99)
+        if (camera_state->frame_count % 500 == 99)
         {
             printf(".");
             fflush(stdout);
         }
-        if (camera_state->frame_count % 10000 == 9999)
+        if (camera_state->frame_count % 20000 == 9999)
             printf("\n");
-
-        camera_state->frame_count++;
     }
     else
     {

@@ -44,7 +44,7 @@ static inline void open_metadata_file(std::ofstream *frame_metadata, std::string
     *frame_metadata << "frame_id,timestamp\n";
 }
 
-static inline void write_meatadata(std::ofstream *metadata, unsigned short frame_id, unsigned long long timestamp)
+static inline void write_meatadata(std::ofstream *metadata, unsigned long long frame_id, unsigned long long timestamp)
 {
     *metadata << frame_id << "," << timestamp << std::endl;
 }
@@ -190,7 +190,7 @@ void GPUVideoEncoder::ThreadRunning()
 }
 
 
-bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned short frame_id)
+bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id)
 {
     WORKER_ENTRY *entriesOut[ENCODER_ENTRIES_MAX]; // entris got out from saver thread, their frames should be returned to driver queue.
     int entriesOutCount = ENCODER_ENTRIES_MAX;

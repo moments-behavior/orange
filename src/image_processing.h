@@ -12,7 +12,7 @@ typedef struct {
 	int height;
 	int pixelFormat;
     unsigned long long timestamp;
-    unsigned short frame_id;
+    unsigned long long frame_id;
 } WORKER_ENTRY;
 
 struct FrameGPU

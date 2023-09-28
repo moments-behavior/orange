@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
     EnetContext client;
     if(enet_initialize(&client, 0, 1)) {
         printf("Network Initialized!\n");
-        server_connection = connect_peer(&client, 127, 0, 0, 1, 3333);
+        server_connection = connect_peer(&client, 10, 123, 1, 142, 3333);
         printf("Connecting to server.\n");
     }
 

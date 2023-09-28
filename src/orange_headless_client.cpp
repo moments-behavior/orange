@@ -28,7 +28,6 @@ int main(int argc, char *argv[])
 		quit_process(true, "ENET failed to initialize!");
 	}
 
-
 	ENetPeer* server_connection;
     EnetContext client;
     if(enet_initialize(&client, 0, 1)) {

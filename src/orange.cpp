@@ -12,6 +12,7 @@
 #include "utils.h"
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
+#include "network_base.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -71,13 +72,44 @@ int main(int argc, char **args)
 
     ScrollingBuffer* realtime_plot_data;
     bool show_realtime_plot = false;
-
     bool ptp_stream_sync = false;
+
+
+	if (enet_initialize() != 0)
+	{
+		fprintf(stderr, "An error occurred while initializing ENet.\n");
+		return EXIT_FAILURE;
+	}
+
+    EnetContext server;
+    if (enet_initialize(&server, 3333, 5)) {
+        printf("Server Initiated\n");
+    }
 
     while (!glfwWindowShouldClose(window->render_target))
     {
-        create_new_frame();
 
+		//Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
+		service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
+		{
+			switch (evnt.type)
+			{
+			case ENET_EVENT_TYPE_CONNECT:
+				printf("- New Client Connected\n");
+				break;
+
+			case ENET_EVENT_TYPE_RECEIVE:
+				printf("\t Client %d says: %s\n", evnt.peer->incomingPeerID, evnt.packet->data);
+				enet_packet_destroy(evnt.packet);
+				break;
+
+			case ENET_EVENT_TYPE_DISCONNECT:
+				printf("- Client %d has disconnected.\n", evnt.peer->incomingPeerID);
+				break;
+			}
+		});
+
+        create_new_frame();
 
         if (ImGui::Begin("Orange Streaming", NULL, ImGuiWindowFlags_MenuBar))
         {
@@ -527,5 +559,6 @@ int main(int argc, char **args)
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();
+    enet_release(&server);
     return 0;
 }

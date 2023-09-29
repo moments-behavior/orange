@@ -9,7 +9,6 @@
 #include <imfilebrowser.h>
 #include "project.h"
 #include "gui.h"
-#include "utils.h"
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
@@ -51,6 +50,7 @@ int main(int argc, char **args)
     bool check[cam_count] = {};
 
     CameraParams *cameras_params;
+    CameraEachSelect *cameras_select;
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
     GL_Texture *tex;
@@ -73,7 +73,7 @@ int main(int argc, char **args)
     ScrollingBuffer* realtime_plot_data;
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
-
+    
 
 	if (enet_initialize() != 0)
 	{
@@ -111,6 +111,18 @@ int main(int argc, char **args)
 
         create_new_frame();
 
+
+        if (ImGui::Begin("Networking")) 
+        {
+            if(ImGui::Button("Clients start camera threads")) {
+                // broadcast data
+                char* text_data = "start_camera_thread";
+                ENetPacket* start_camera_thread = enet_packet_create(text_data, strlen(text_data) + 1, 0);
+			    enet_host_broadcast(server.m_pNetwork, 0, start_camera_thread);
+            }
+        }
+        ImGui::End();
+
         if (ImGui::Begin("Orange Streaming", NULL, ImGuiWindowFlags_MenuBar))
         {
 
@@ -119,6 +131,7 @@ int main(int argc, char **args)
 
             if (ImGui::BeginTable("Cameras", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
+
                 for (int i = 0; i < cam_count; i++)
                 {
                     char label[32];
@@ -161,6 +174,8 @@ int main(int argc, char **args)
                     }
                     if (num_cameras > 0) {
                         cameras_params = new CameraParams[num_cameras];
+                        cameras_select = new CameraEachSelect[num_cameras];
+                        
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++)
                         {
@@ -204,12 +219,6 @@ int main(int argc, char **args)
                         for (int i = 0; i < num_cameras; i++)
                         {
                             open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
-                            // mcast
-                            // string multicast_ip = "239.255.255.255"; // + std::to_string(i);
-                            // ecams[i].camera.multicastAddress = multicast_ip.c_str(); 
-                            // std::cout << ecams[i].camera.multicastAddress << std::endl;
-                            // ecams[i].camera.portMulticast = 60646 + i;
-                            // ecams[i].camera.multicastMasterSubscribe = true; 
                         }
 
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
@@ -227,9 +236,30 @@ int main(int argc, char **args)
 
             if (camera_control->open) {
                 set_camera_properties(ecams, cameras_params, num_cameras);
+                
+                if (ImGui::BeginTable("Camera Control Setting", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+                {
+                    
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("name"); 
+                    ImGui::TableNextColumn();
+                    ImGui::Text("stream");
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        char label[32];
+                        sprintf(label, "##checkbox_control%d", i);
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::Text(cameras_params[i].camera_name.c_str());
+                        ImGui::TableNextColumn();
+                        ImGui::Checkbox(label, &cameras_select[i].stream_on);
+                    }
+                    ImGui::EndTable();
+                }
+
             }
 
-            
             ImGui::Separator();
             ImGui::Spacing();
             
@@ -242,7 +272,6 @@ int main(int argc, char **args)
                 (camera_control->subscribe) = !(camera_control->subscribe);
                 if (camera_control->subscribe)
                 {   
-                    camera_control->stream = true;     
                     for (int i = 0; i < num_cameras; i++)
                     {               
                         camera_open_stream(&ecams[i].camera);
@@ -258,12 +287,14 @@ int main(int argc, char **args)
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        cudaStreamCreate(&tex[i].streams);
-                        create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                        register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                        map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                        cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                        create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                        if (cameras_select[i].stream_on) {
+                            cudaStreamCreate(&tex[i].streams);
+                            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                            register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
+                            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
+                            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                        }
                     }
 
                     if (ptp_stream_sync) {
@@ -278,7 +309,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
 
                 } else {
@@ -295,9 +326,12 @@ int main(int argc, char **args)
                         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
                         delete[] ecams[i].evt_frame;
                         check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                        gx_delete_buffer(&tex[i].pbo);
-                        unmap_cuda_resource(&tex[i].cuda_resource);
-                        cuda_unregister_pbo(tex[i].cuda_resource);
+                        
+                        if (cameras_select[i].stream_on) {
+                            gx_delete_buffer(&tex[i].pbo);
+                            unmap_cuda_resource(&tex[i].cuda_resource);
+                            cuda_unregister_pbo(tex[i].cuda_resource);
+                        }
                     }
                     delete[] tex;
                     
@@ -387,13 +421,10 @@ int main(int argc, char **args)
                         }
                     }
                     
-                    // camera_control->stream = false;
-
-                    if (camera_control->stream) {
-                        tex = new GL_Texture[num_cameras];
-
-                        for (int i = 0; i < num_cameras; i++)
-                        {
+                    tex = new GL_Texture[num_cameras];
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        if (cameras_select[i].stream_on) {
                             cudaStreamCreate(&tex[i].streams);
                             create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
                             register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
@@ -401,7 +432,7 @@ int main(int argc, char **args)
                             cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
                             create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                         }
-                    } 
+                    }
 
                     if (num_cameras > 1){
                         for (int i = 0; i < num_cameras; i++)
@@ -414,7 +445,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -432,15 +463,14 @@ int main(int argc, char **args)
                         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
                         delete[] ecams[i].evt_frame;
                         check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                        if (camera_control->stream) {
+                        if (cameras_select[i].stream_on) {
                             gx_delete_buffer(&tex[i].pbo);
                             unmap_cuda_resource(&tex[i].cuda_resource);
                             cuda_unregister_pbo(tex[i].cuda_resource);
                         }
                     }
-                    if (camera_control->stream) {
-                        delete[] tex;                     
-                    }
+                    
+                    delete[] tex;                     
 
                     if (num_cameras > 1) {
                         for (int i = 0; i < num_cameras; i++)
@@ -488,36 +518,41 @@ int main(int argc, char **args)
             file_dialog.ClearSelected();
         }
 
-        if (camera_control->subscribe && camera_control->stream)
+        if (camera_control->subscribe)
         {
             for (int i = 0; i < num_cameras; i++)
             {
-                bind_pbo(&tex[i].pbo);
-                bind_texture(&tex[i].texture);
-                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
-                unbind_pbo();
-                unbind_texture();
+                if (cameras_select[i].stream_on) {
+                    bind_pbo(&tex[i].pbo);
+                    bind_texture(&tex[i].texture);
+                    upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                    unbind_pbo();
+                    unbind_texture();
+                }
             }
             
             for (int i = 0; i < num_cameras; i++)
             {
-                std::string window_name = cameras_params[i].camera_name;
-                ImGui::Begin(window_name.c_str());
-                ImVec2 avail_size = ImGui::GetContentRegionAvail();
+                if (cameras_select[i].stream_on) {
+                    std::string window_name = cameras_params[i].camera_name;
+                    ImGui::Begin(window_name.c_str());
+                    ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-                static ImVec2 bmin(0,0);
-                static ImVec2 uv0(0,0);
-                static ImVec2 uv1(1,1);
-                static ImVec4 tint(1,1,1,1);
+                    static ImVec2 bmin(0,0);
+                    static ImVec2 uv0(0,0);
+                    static ImVec2 uv1(1,1);
+                    static ImVec4 tint(1,1,1,1);
 
-                // ImGui::Image((void*)(intptr_t)texture[i], avail_size);
-                if (ImPlot::BeginPlot("##no_plot_name", avail_size, ImPlotFlags_Equal | ImPlotAxisFlags_AutoFit))
-                {
-                    ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
-                    ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));                    
-                    ImPlot::EndPlot();
+                    // ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+                    if (ImPlot::BeginPlot("##no_plot_name", avail_size, ImPlotFlags_Equal | ImPlotAxisFlags_AutoFit))
+                    {
+                        ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
+                        ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));                    
+                        ImPlot::EndPlot();
+                    }
+                    ImGui::End();
                 }
-                ImGui::End();
+
             }
         }
         

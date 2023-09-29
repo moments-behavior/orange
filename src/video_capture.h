@@ -9,11 +9,14 @@ struct CameraControl
 {
     bool open = false;
     bool subscribe = false;
-    bool stream = true;
     bool stop_record = false;
     bool record_video = false;
     bool sync_camera = false;
-    bool capture_only = false;
+};
+
+struct CameraEachSelect
+{
+    bool stream_on = true;
 };
 
 struct CameraState
@@ -49,5 +52,5 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params);
+void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl* camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params);
 #endif

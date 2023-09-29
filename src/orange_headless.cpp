@@ -1,11 +1,11 @@
 #include "video_capture.h"
+#include "project.h"
 #include <iostream>
 #include "camera.h"
 #include <thread>
 #include "project.h"
 #include <filesystem>
 #include <iostream>
-#include "utils.h"
 
 int main(int argc, char *argv[])
 {
@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
 
     if (argc < 6)
     {
-        std::cout << "Missing arguments. Use: sudo ./targets2/orange_headless num_cameras frame_rate frame_buffer_size num_gpus sync_bool capture_only" << std::endl; 
+        std::cout << "Missing arguments. Use: sudo ./targets2/orange_headless num_cameras frame_rate frame_buffer_size num_gpus sync_bool" << std::endl; 
         return 1;
     }
 
@@ -27,11 +27,6 @@ int main(int argc, char *argv[])
     int frame_rate = atoi(argv[2]);
     int frame_buffer_size = atoi(argv[3]);
     int num_gpus = atoi(argv[4]);
-
-    bool capture_only = false;
-    if (argc = 7) {
-        capture_only = true;
-    }
 
     bool sync_flag; 
     if (strcmp(argv[5], "true") == 0) {
@@ -84,9 +79,7 @@ int main(int argc, char *argv[])
 
         camera_control->record_video = true; 
         camera_control->subscribe = true;
-        camera_control->stream = false;
         camera_control->sync_camera = sync_flag;
-        camera_control->capture_only = capture_only;
         std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
         std::string folder_string = current_date_time();
         std::string folder_name = "/home/" + tokenized_path[2] + "/Videos/" + folder_string;
@@ -112,7 +105,7 @@ int main(int argc, char *argv[])
 
         for (int i = 0; i < num_cameras; i++)
         {
-            camera_threads.push_back(std::thread(&aquire_frames_gpu, &ecams[i], &cameras_params[i], camera_control, nullptr, encoder_setup, folder_name, ptp_params));
+            camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], camera_control, nullptr, encoder_setup, folder_name, ptp_params));
         }
 
         getchar();

@@ -185,9 +185,8 @@ int main(int argc, char *argv[])
                 //Server has sent us a new packet
                 case ENET_EVENT_TYPE_RECEIVE:
                     {
-                        printf ("A packet of length %u containing %s was received from %s on channel %u.\n",
+                        printf ("A packet of length %u was received from %s on channel %u.\n",
                                 evnt.packet -> dataLength,
-                                evnt.packet -> data,
                                 evnt.peer -> data,
                                 evnt.channelID);
 
@@ -202,6 +201,7 @@ int main(int argc, char *argv[])
                             //     printf("Camera threads started...\n");
                             // };
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
+                            printf("Exit \n");
                             quit_recording = true;
                         }
 

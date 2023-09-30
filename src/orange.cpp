@@ -47,7 +47,7 @@ int main(int argc, char **args)
     std::string input_folder = file_dialog.GetPwd();
     file_dialog.SetTitle("My files");
 
-    bool check[cam_count] = {};
+    bool check[cam_count] {0};
 
     CameraParams *cameras_params;
     CameraEachSelect *cameras_select;
@@ -74,6 +74,7 @@ int main(int argc, char **args)
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
     
+    flatbuffers::FlatBufferBuilder builder(1024);
 
 	if (enet_initialize() != 0)
 	{
@@ -116,9 +117,15 @@ int main(int argc, char **args)
         {
             if(ImGui::Button("Clients start camera threads")) {
                 // broadcast data
-                char* text_data = "start_camera_thread";
-                ENetPacket* start_camera_thread = enet_packet_create(text_data, strlen(text_data) + 1, 0);
-			    enet_host_broadcast(server.m_pNetwork, 0, start_camera_thread);
+                builder.Clear();
+                FetchGame::ServerBuilder server_builder(builder);
+                server_builder.add_control(FetchGame::ServerControl_START);
+                auto my_server = server_builder.Finish();
+                builder.Finish(my_server);
+                uint8_t *server_buffer = builder.GetBufferPointer();
+                int server_buf_size = builder.GetSize();
+                ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+			    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
             }
         }
         ImGui::End();

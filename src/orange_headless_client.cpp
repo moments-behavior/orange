@@ -10,6 +10,8 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "project.h"
 #include "video_capture.h"
+#include "fetch_generated.h"
+
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -155,7 +157,9 @@ int main(int argc, char *argv[])
     PTPParams* ptp_params = new PTPParams{0, 0};
     CameraEachSelect *cameras_select;
 
-    while(true) {
+    bool quit_recording = false;
+
+    while(!quit_recording) {
         current_time = tick();
         //Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
         service_network(&client, current_time - last_time, [&](const ENetEvent& evnt)
@@ -187,10 +191,17 @@ int main(int argc, char *argv[])
                                 evnt.peer -> data,
                                 evnt.channelID);
 
+                        uint8_t* buffer_pointer = evnt.packet->data;
+                        auto server_control = FetchGame::GetServer(buffer_pointer);
+                        auto server_signal = server_control->control();
 
-                        if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
-                            printf("Camera threads started...\n");
-                        };
+                        if (server_signal == FetchGame::ServerControl_START)
+                        {
+                            printf("Start camera thread...");
+                            // if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
+                            //     printf("Camera threads started...\n");
+                            // };
+                        } 
 
                         enet_packet_destroy(evnt.packet);
                     }

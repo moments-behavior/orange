@@ -3,6 +3,7 @@
 #include <iostream>
 #include <functional>
 #include <enet/enet.h>
+#include "fetch_generated.h"
 
 enum PacketTransportType
 {

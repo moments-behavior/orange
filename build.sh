@@ -33,6 +33,7 @@ g++ -Ofast -ffast-math -std=c++17 targets/*.o \
     -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
     -lm \
     -lpthread \
+    -I./third_party/flatbuffers/include \
     -lenet -I/usr/local/include/ \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc \
     -lGLEW -lGL \

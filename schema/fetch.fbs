@@ -1,0 +1,13 @@
+namespace FetchGame;
+
+enum ServerControl : byte {
+    IDEL = 0,
+    START = 1,
+    QUIT = 2
+}
+
+table Server {
+    control:ServerControl = IDEL;
+}
+
+root_type Server;

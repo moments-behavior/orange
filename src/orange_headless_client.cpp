@@ -201,7 +201,9 @@ int main(int argc, char *argv[])
                             // if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
                             //     printf("Camera threads started...\n");
                             // };
-                        } 
+                        } else if (server_signal == FetchGame::ServerControl_QUIT) {
+                            quit_recording = true;
+                        }
 
                         enet_packet_destroy(evnt.packet);
                     }

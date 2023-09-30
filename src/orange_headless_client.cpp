@@ -13,15 +13,7 @@
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
-std::vector<std::thread> camera_threads;
-CameraParams* cameras_params;
-CameraEmergent* ecams;
-CameraControl* camera_control; 
-CameraEachSelect* cameras_select;
-GigEVisionDeviceInfo* device_info;
-int num_cameras;
-std::string camera_config_dir;
-PTPParams* ptp_params;
+
 
 void quit_process(bool error = false, const std::string &reason = "") {
     enet_deinitialize(); 
@@ -34,7 +26,7 @@ void quit_process(bool error = false, const std::string &reason = "") {
 }
 
 
-bool start_camera_thread()
+bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams* cameras_params, CameraEmergent* ecams, CameraControl* camera_control, CameraEachSelect* cameras_select, GigEVisionDeviceInfo* device_info, int num_cameras, PTPParams* ptp_params)
 {
     std::filesystem::path cwd = std::filesystem::current_path();
     std::string delimiter = "/";
@@ -50,7 +42,7 @@ bool start_camera_thread()
 
     // load camera configs
     std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp"; 
-    camera_config_dir = start_folder_name + "/5_camera_with_names/";
+    std::string camera_config_dir = start_folder_name + "/5_camera_with_names/";
 
     for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
     {
@@ -64,8 +56,10 @@ bool start_camera_thread()
         camera_config_names.push_back(tokenized_path.back());
     }
 
+
     for (int i = 0; i < num_cameras; i++)
     {
+        cameras_params[i].camera_serial.append(device_info[i].serialNumber);
         auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");  
         if (it != camera_config_names.end()) {
             auto config_idx = std::distance(camera_config_names.begin(), it);
@@ -194,7 +188,7 @@ int main(int argc, char *argv[])
                                 evnt.channelID);
 
 
-                        if(start_camera_thread()) {
+                        if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
                             printf("Camera threads started...\n");
                         };
 

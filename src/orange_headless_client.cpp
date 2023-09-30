@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
 
                         if (server_signal == FetchGame::ServerControl_START)
                         {
-                            printf("Start camera thread...");
+                            printf("Start camera thread...\n");
                             // if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
                             //     printf("Camera threads started...\n");
                             // };

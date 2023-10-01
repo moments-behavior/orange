@@ -70,7 +70,6 @@ bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams*
         }
     }
 
-    ecams = new CameraEmergent[num_cameras];
     for (int i = 0; i < num_cameras; i++)
     {
         open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
@@ -157,8 +156,9 @@ int main(int argc, char *argv[])
     PTPParams* ptp_params = new PTPParams{0, 0};
     CameraEachSelect *cameras_select;
 
-    bool quit_recording = false;
+    ecams = new CameraEmergent[cam_count];
 
+    bool quit_recording = false;
     while(!quit_recording) {
         current_time = tick();
         //Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
     {
         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
         delete[] ecams[i].evt_frame;
-        EVT_CameraCloseStream(&ecams[i].camera);
+        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
         close_camera(&ecams[i].camera);
     }
 

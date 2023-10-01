@@ -135,6 +135,24 @@ int main(int argc, char **args)
                 enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
             }
 
+            if (ImGui::Button("Start recording")) {
+                get_current_PTP_time(ecam)
+            }
+
+            if(ImGui::Button("Clients start camera threads")) {
+                ptp_params->network_sync = true;
+                // broadcast data
+                builder.Clear();
+                FetchGame::ServerBuilder server_builder(builder);
+                server_builder.add_control(FetchGame::ServerControl_START);
+                auto my_server = server_builder.Finish();
+                builder.Finish(my_server);
+                uint8_t *server_buffer = builder.GetBufferPointer();
+                int server_buf_size = builder.GetSize();
+                ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+            }
+
             if(ImGui::Button("Clients close")) {
                 // broadcast data
                 builder.Clear();

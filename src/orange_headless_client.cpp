@@ -160,6 +160,8 @@ int main(int argc, char *argv[])
     ptp_params->network_sync = true;
     flatbuffers::FlatBufferBuilder builder(1024);
 
+
+    bool has_sent_ptp_time = false;
     bool quit_recording = false;
     while (!quit_recording)
     {
@@ -214,7 +216,7 @@ int main(int argc, char *argv[])
                     break;
                 } });
 
-        if (ptp_params->this_server_ready == true)
+        if (ptp_params->this_server_ready == true && !has_sent_ptp_time)
         {
             // send the ptp_global_time 
             builder.Clear();
@@ -226,6 +228,7 @@ int main(int argc, char *argv[])
             int server_buf_size = builder.GetSize();
             ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
             enet_peer_send(server_connection, 0, enet_packet);
+            has_sent_ptp_time = true;
         }
 
         usleep(10000); // sleep for 10ms

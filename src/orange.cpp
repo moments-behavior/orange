@@ -76,11 +76,11 @@ int main(int argc, char **args)
     
     flatbuffers::FlatBufferBuilder builder(1024);
 
-	if (enet_initialize() != 0)
-	{
-		fprintf(stderr, "An error occurred while initializing ENet.\n");
-		return EXIT_FAILURE;
-	}
+    if (enet_initialize() != 0)
+    {
+        fprintf(stderr, "An error occurred while initializing ENet.\n");
+        return EXIT_FAILURE;
+    }
 
     EnetContext server;
     if (enet_initialize(&server, 3333, 5)) {
@@ -90,25 +90,29 @@ int main(int argc, char **args)
     while (!glfwWindowShouldClose(window->render_target))
     {
 
-		//Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
-		service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
-		{
-			switch (evnt.type)
-			{
-			case ENET_EVENT_TYPE_CONNECT:
-				printf("- New Client Connected\n");
-				break;
+        //Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
+        service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
+        {
+            switch (evnt.type)
+            {
+            case ENET_EVENT_TYPE_CONNECT:
+                printf("- New Client Connected\n");
+                break;
 
-			case ENET_EVENT_TYPE_RECEIVE:
-				printf("\t Client %d says: %s\n", evnt.peer->incomingPeerID, evnt.packet->data);
-				enet_packet_destroy(evnt.packet);
-				break;
+            case ENET_EVENT_TYPE_RECEIVE:
+                printf("\t Client %d says: %s\n", evnt.peer->incomingPeerID, evnt.packet->data);
+                uint8_t* buffer_pointer = evnt.packet->data;
+                auto server_control = FetchGame::GetServer(buffer_pointer);
+                auto server_signal = server_control->ptp_global_time();
+                std::cout << server_signal << std::endl;
+                enet_packet_destroy(evnt.packet);
+                break;
 
-			case ENET_EVENT_TYPE_DISCONNECT:
-				printf("- Client %d has disconnected.\n", evnt.peer->incomingPeerID);
-				break;
-			}
-		});
+            case ENET_EVENT_TYPE_DISCONNECT:
+                printf("- Client %d has disconnected.\n", evnt.peer->incomingPeerID);
+                break;
+            }
+        });
 
         create_new_frame();
 
@@ -116,6 +120,7 @@ int main(int argc, char **args)
         if (ImGui::Begin("Networking")) 
         {
             if(ImGui::Button("Clients start camera threads")) {
+                ptp_params->network_sync = true;
                 // broadcast data
                 builder.Clear();
                 FetchGame::ServerBuilder server_builder(builder);
@@ -125,7 +130,7 @@ int main(int argc, char **args)
                 uint8_t *server_buffer = builder.GetBufferPointer();
                 int server_buf_size = builder.GetSize();
                 ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-			    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
             }
 
             if(ImGui::Button("Clients close")) {
@@ -138,7 +143,7 @@ int main(int argc, char **args)
                 uint8_t *server_buffer = builder.GetBufferPointer();
                 int server_buf_size = builder.GetSize();
                 ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-			    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
             }
 
         }

@@ -129,6 +129,7 @@ static inline void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, Ca
     {
         ptp_state->ptp_time = get_current_PTP_time(&ecam->camera);
         ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_state->ptp_time;
+        ptp_params->this_server_ready = true;
     }
     uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
     printf("%lu\n", ptp_counter);
@@ -136,6 +137,12 @@ static inline void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, Ca
     {
         printf(".");
         fflush(stdout);
+    }
+
+    if (ptp_params->network_sync) {
+        while(!ptp_params->servers_ready) {
+            usleep(1000); // sleep 1ms
+        }
     }
 
     unsigned long long ptp_time_plus_delta_to_start = ptp_params->ptp_global_time;
@@ -147,6 +154,7 @@ static inline void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, Ca
     ptp_state->ptp_time_plus_delta_to_start = ptp_params->ptp_global_time;
     printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
 }
+
 
 static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam)
 {

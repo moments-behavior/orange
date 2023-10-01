@@ -8,6 +8,7 @@ enum ServerControl : byte {
 
 table Server {
     control:ServerControl = IDEL;
+    ptp_global_time:ulong;
 }
 
 root_type Server;

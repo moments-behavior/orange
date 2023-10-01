@@ -16,20 +16,19 @@
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
-
-
-void quit_process(bool error = false, const std::string &reason = "") {
-    enet_deinitialize(); 
-    //Show console reason before exit
-    if (error) {
+void quit_process(bool error = false, const std::string &reason = "")
+{
+    enet_deinitialize();
+    // Show console reason before exit
+    if (error)
+    {
         std::cout << reason << std::endl;
         system("PAUSE");
         exit(-1);
     }
 }
 
-
-bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams* cameras_params, CameraEmergent* ecams, CameraControl* camera_control, CameraEachSelect* cameras_select, GigEVisionDeviceInfo* device_info, int num_cameras, PTPParams* ptp_params)
+bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params)
 {
     std::filesystem::path cwd = std::filesystem::current_path();
     std::string delimiter = "/";
@@ -43,7 +42,7 @@ bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams*
     cameras_select = new CameraEachSelect[num_cameras];
 
     // load camera configs
-    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp"; 
+    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
     std::string camera_config_dir = start_folder_name + "/5_camera_with_names/";
 
     for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
@@ -51,22 +50,23 @@ bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams*
         camera_config_files.push_back(entry.path().string());
     }
     std::sort(camera_config_files.begin(), camera_config_files.end());
-    for (auto &camera_serial : camera_config_files) {
+    for (auto &camera_serial : camera_config_files)
+    {
         // get the serial number
         std::string delimiter = "/";
         std::vector<std::string> tokenized_path = string_split(camera_serial, delimiter);
         camera_config_names.push_back(tokenized_path.back());
     }
 
-
     for (int i = 0; i < num_cameras; i++)
     {
         cameras_params[i].camera_serial.append(device_info[i].serialNumber);
-        auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");  
-        if (it != camera_config_names.end()) {
+        auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
+        if (it != camera_config_names.end())
+        {
             auto config_idx = std::distance(camera_config_names.begin(), it);
             std::cout << "Load camera json file: " << camera_config_files[config_idx] << std::endl;
-            load_camera_json_config_files(camera_config_files[config_idx], &cameras_params[i], i, num_cameras); 
+            load_camera_json_config_files(camera_config_files[config_idx], &cameras_params[i], i, num_cameras);
         }
     }
 
@@ -76,7 +76,7 @@ bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams*
     }
 
     for (int i = 0; i < num_cameras; i++)
-    {               
+    {
         camera_open_stream(&ecams[i].camera);
         ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
         allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
@@ -86,13 +86,13 @@ bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams*
             allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
         }
     }
-    
-    camera_control->record_video = true; 
+
+    camera_control->record_video = true;
     camera_control->subscribe = true;
     camera_control->sync_camera = true;
     std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
     std::string folder_string = current_date_time();
-    std::string folder_name = "/home/" + tokenized_path[2] + "/Videos/" + folder_string;    
+    std::string folder_name = "/home/" + tokenized_path[2] + "/Videos/" + folder_string;
 
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -123,7 +123,6 @@ bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams*
     return true;
 }
 
-
 int main(int argc, char *argv[])
 {
     if (enet_initialize() != 0)
@@ -131,9 +130,10 @@ int main(int argc, char *argv[])
         quit_process(true, "ENET failed to initialize!");
     }
 
-    ENetPeer* server_connection;
+    ENetPeer *server_connection;
     EnetContext client;
-    if(enet_initialize(&client, 0, 1)) {
+    if (enet_initialize(&client, 0, 1))
+    {
         printf("Network Initialized!\n");
         server_connection = connect_peer(&client, 10, 123, 1, 142, 3333);
     }
@@ -148,22 +148,25 @@ int main(int argc, char *argv[])
     GigEVisionDeviceInfo device_info[max_cameras];
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
     std::cout << "available no of cameras: " << cam_count << std::endl;
-    
+
     CameraParams *cameras_params;
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
-    CameraControl *camera_control = new CameraControl;
-    PTPParams* ptp_params = new PTPParams{0, 0};
     CameraEachSelect *cameras_select;
 
     ecams = new CameraEmergent[cam_count];
+    CameraControl *camera_control = new CameraControl;
+    PTPParams *ptp_params = new PTPParams{0, 0};
+    ptp_params->network_sync = true;
+    flatbuffers::FlatBufferBuilder builder(1024);
 
     bool quit_recording = false;
-    while(!quit_recording) {
+    while (!quit_recording)
+    {
         current_time = tick();
-        //Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
-        service_network(&client, current_time - last_time, [&](const ENetEvent& evnt)
-        {
+        // Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
+        service_network(&client, current_time - last_time, [&](const ENetEvent &evnt)
+                        {
             switch (evnt.type)
                 {
                 //New connection request or an existing peer accepted our connection request
@@ -172,11 +175,6 @@ int main(int argc, char *argv[])
                         if (evnt.peer == server_connection)
                         {
                             printf("Network: Successfully connected to server! \n");
-
-                            //Send a 'hello' packet
-                            char* text_data = "Hellooo!";
-                            ENetPacket* packet = enet_packet_create(text_data, strlen(text_data) + 1, 0);
-                            enet_peer_send(server_connection, 0, packet);
                         }	
                     }
                     break;
@@ -185,7 +183,7 @@ int main(int argc, char *argv[])
                 //Server has sent us a new packet
                 case ENET_EVENT_TYPE_RECEIVE:
                     {
-                        printf ("A packet of length %u was received from %s on channel %u.\n",
+                        printf ("\n A packet of length %u was received from %s on channel %u.\n",
                                 evnt.packet -> dataLength,
                                 evnt.peer -> data,
                                 evnt.channelID);
@@ -214,12 +212,25 @@ int main(int argc, char *argv[])
                         printf("Network: Server has disconnected!");
                     }
                     break;
-                }
-        });
-        last_time = current_time;
-        sleep(1);
-    }
+                } });
 
+        if (ptp_params->this_server_ready == true)
+        {
+            // send the ptp_global_time 
+            builder.Clear();
+            FetchGame::ServerBuilder server_builder(builder);
+            server_builder.add_ptp_global_time(ptp_params->ptp_global_time);
+            auto my_server = server_builder.Finish();
+            builder.Finish(my_server);
+            uint8_t *server_buffer = builder.GetBufferPointer();
+            int server_buf_size = builder.GetSize();
+            ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+            enet_peer_send(server_connection, 0, enet_packet);
+        }
+
+        usleep(10000); // sleep for 10ms
+        last_time = current_time;
+    }
 
     camera_control->subscribe = false;
     for (auto &t : camera_threads)

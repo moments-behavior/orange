@@ -140,6 +140,7 @@ static inline void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, Ca
     }
 
     if (ptp_params->network_sync) {
+        std::cout << ptp_params->ptp_global_time << std::endl;
         while(!ptp_params->servers_ready) {
             usleep(1000); // sleep 1ms
         }

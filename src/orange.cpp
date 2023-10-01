@@ -100,12 +100,14 @@ int main(int argc, char **args)
                 break;
 
             case ENET_EVENT_TYPE_RECEIVE:
-                printf("\t Client %d says: %s\n", evnt.peer->incomingPeerID, evnt.packet->data);
-                uint8_t* buffer_pointer = evnt.packet->data;
-                auto server_control = FetchGame::GetServer(buffer_pointer);
-                auto server_signal = server_control->ptp_global_time();
-                std::cout << server_signal << std::endl;
-                enet_packet_destroy(evnt.packet);
+                {
+                    printf("\t Client %d says: %s\n", evnt.peer->incomingPeerID, evnt.packet->data);
+                    uint8_t* buffer_pointer = evnt.packet->data;
+                    auto server_control = FetchGame::GetServer(buffer_pointer);
+                    auto server_signal = server_control->ptp_global_time();
+                    std::cout << server_signal << std::endl;
+                    enet_packet_destroy(evnt.packet);
+                }
                 break;
 
             case ENET_EVENT_TYPE_DISCONNECT:

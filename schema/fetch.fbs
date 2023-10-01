@@ -3,7 +3,8 @@ namespace FetchGame;
 enum ServerControl : byte {
     IDEL = 0,
     START = 1,
-    QUIT = 2
+    SETPTP = 2,
+    QUIT = 3
 }
 
 table Server {

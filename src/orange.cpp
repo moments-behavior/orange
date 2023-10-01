@@ -136,7 +136,19 @@ int main(int argc, char **args)
             }
 
             if (ImGui::Button("Start recording")) {
-                get_current_PTP_time(ecam[0])
+                unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
+                int delay_in_second = 10;
+                ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+                //send the global time to servers
+                builder.Clear();
+                FetchGame::ServerBuilder server_builder(builder);
+                server_builder.add_control(FetchGame::ServerControl_START);
+                auto my_server = server_builder.Finish();
+                builder.Finish(my_server);
+                uint8_t *server_buffer = builder.GetBufferPointer();
+                int server_buf_size = builder.GetSize();
+                ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
             }
 
             if(ImGui::Button("Clients start camera threads")) {

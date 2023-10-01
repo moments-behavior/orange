@@ -12,6 +12,7 @@
 #include "video_capture.h"
 #include "fetch_generated.h"
 
+#define evt_buffer_size 100
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -36,7 +37,6 @@ bool start_camera_thread(std::vector<std::thread>& camera_threads, CameraParams*
 
     std::vector<std::string> camera_config_files;
     std::vector<std::string> camera_config_names;
-    int evt_buffer_size {100};
 
     printf("Start camera thread \n");
     cameras_params = new CameraParams[num_cameras];
@@ -196,10 +196,9 @@ int main(int argc, char *argv[])
 
                         if (server_signal == FetchGame::ServerControl_START)
                         {
-                            printf("Start camera thread...\n");
-                            // if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
-                            //     printf("Camera threads started...\n");
-                            // };
+                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
+                                printf("Camera threads started...\n");
+                            };
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
                             quit_recording = true;
@@ -221,6 +220,45 @@ int main(int argc, char *argv[])
         sleep(1);
     }
 
+
+    camera_control->subscribe = false;
+    for (auto &t : camera_threads)
+        t.join();
+
+    for (int i = 0; i < cam_count; i++)
+    {
+        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+        delete[] ecams[i].evt_frame;
+        EVT_CameraCloseStream(&ecams[i].camera);
+        close_camera(&ecams[i].camera);
+    }
+
+    // Disconnect
+    enet_peer_disconnect(server_connection, 0);
+    uint8_t disconnected = false;
+    /* Allow up to 3 seconds for the disconnect to succeed
+     * and drop any packets received packets.
+     */
+    ENetEvent evnt;
+    while (enet_host_service(client.m_pNetwork, &evnt, 3000) > 0)
+    {
+        switch (evnt.type)
+        {
+        case ENET_EVENT_TYPE_RECEIVE:
+            enet_packet_destroy(evnt.packet);
+            break;
+        case ENET_EVENT_TYPE_DISCONNECT:
+            puts("Disconnection succeeded.");
+            disconnected = true;
+            break;
+        }
+    }
+    // Drop connection, since disconnection didn't successed
+    if (!disconnected)
+    {
+        enet_peer_reset(server_connection);
+    }
+    enet_host_destroy(client.m_pNetwork);
     quit_process();
     return 0;
 }

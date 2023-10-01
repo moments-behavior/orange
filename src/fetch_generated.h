@@ -54,14 +54,19 @@ inline const char *EnumNameServerControl(ServerControl e) {
 struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ServerBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_CONTROL = 4
+    VT_CONTROL = 4,
+    VT_PTP_GLOBAL_TIME = 6
   };
   FetchGame::ServerControl control() const {
     return static_cast<FetchGame::ServerControl>(GetField<int8_t>(VT_CONTROL, 0));
   }
+  uint64_t ptp_global_time() const {
+    return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_CONTROL, 1) &&
+           VerifyField<uint64_t>(verifier, VT_PTP_GLOBAL_TIME, 8) &&
            verifier.EndTable();
   }
 };
@@ -72,6 +77,9 @@ struct ServerBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_control(FetchGame::ServerControl control) {
     fbb_.AddElement<int8_t>(Server::VT_CONTROL, static_cast<int8_t>(control), 0);
+  }
+  void add_ptp_global_time(uint64_t ptp_global_time) {
+    fbb_.AddElement<uint64_t>(Server::VT_PTP_GLOBAL_TIME, ptp_global_time, 0);
   }
   explicit ServerBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -86,8 +94,10 @@ struct ServerBuilder {
 
 inline ::flatbuffers::Offset<Server> CreateServer(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    FetchGame::ServerControl control = FetchGame::ServerControl_IDEL) {
+    FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
+    uint64_t ptp_global_time = 0) {
   ServerBuilder builder_(_fbb);
+  builder_.add_ptp_global_time(ptp_global_time);
   builder_.add_control(control);
   return builder_.Finish();
 }

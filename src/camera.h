@@ -67,6 +67,9 @@ struct CameraEmergent{
 struct PTPParams{
     unsigned long long ptp_global_time; 
     uint64_t ptp_counter;
+    bool network_sync = false;
+    bool servers_ready = false;
+    bool this_server_ready = false;
 };
 
 

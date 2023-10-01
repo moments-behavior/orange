@@ -142,13 +142,15 @@ int main(int argc, char **args)
                 //send the global time to servers
                 builder.Clear();
                 FetchGame::ServerBuilder server_builder(builder);
-                server_builder.add_control(FetchGame::ServerControl_START);
+                server_builder.add_control(FetchGame::ServerControl_SETPTP);
+                server_builder.add_ptp_global_time(ptp_params->ptp_global_time);
                 auto my_server = server_builder.Finish();
                 builder.Finish(my_server);
                 uint8_t *server_buffer = builder.GetBufferPointer();
                 int server_buf_size = builder.GetSize();
                 ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                 enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                ptp_params->servers_ready = true;
             }
 
             if(ImGui::Button("Clients start camera threads")) {
@@ -492,13 +494,13 @@ int main(int argc, char **args)
                         }
                     }
 
-                    if (num_cameras > 1){
+                    // if (num_cameras > 1){
                         for (int i = 0; i < num_cameras; i++)
                         {
                             ptp_camera_sync(&ecams[i].camera);
                         }
                         camera_control->sync_camera = true;
-                    }
+                    // }
 
                     for (int i = 0; i < num_cameras; i++)
                     {

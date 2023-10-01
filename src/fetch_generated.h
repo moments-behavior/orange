@@ -21,24 +21,27 @@ struct ServerBuilder;
 enum ServerControl : int8_t {
   ServerControl_IDEL = 0,
   ServerControl_START = 1,
-  ServerControl_QUIT = 2,
+  ServerControl_SETPTP = 2,
+  ServerControl_QUIT = 3,
   ServerControl_MIN = ServerControl_IDEL,
   ServerControl_MAX = ServerControl_QUIT
 };
 
-inline const ServerControl (&EnumValuesServerControl())[3] {
+inline const ServerControl (&EnumValuesServerControl())[4] {
   static const ServerControl values[] = {
     ServerControl_IDEL,
     ServerControl_START,
+    ServerControl_SETPTP,
     ServerControl_QUIT
   };
   return values;
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[4] = {
+  static const char * const names[5] = {
     "IDEL",
     "START",
+    "SETPTP",
     "QUIT",
     nullptr
   };

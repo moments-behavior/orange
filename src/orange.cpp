@@ -136,7 +136,7 @@ int main(int argc, char **args)
             }
 
             if (ImGui::Button("Start recording")) {
-                get_current_PTP_time(ecam)
+                get_current_PTP_time(ecam[0])
             }
 
             if(ImGui::Button("Clients start camera threads")) {

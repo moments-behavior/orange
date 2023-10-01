@@ -202,6 +202,10 @@ int main(int argc, char *argv[])
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
                             quit_recording = true;
+                        } else if (server_signal == FetchGame::ServerControl_SETPTP) {
+                            ptp_params->ptp_global_time = server_control->ptp_global_time();
+                            std::cout << ptp_params->ptp_global_time << std::endl;
+                            ptp_params->servers_ready = true;
                         }
 
                         enet_packet_destroy(evnt.packet);

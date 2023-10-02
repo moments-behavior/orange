@@ -43,7 +43,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
 
     // load camera configs
     std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
-    std::string camera_config_dir = start_folder_name + "/5_camera_with_names/";
+    std::string camera_config_dir = start_folder_name + "/";
 
     for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
     {
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
     if (enet_initialize(&client, 0, 1))
     {
         printf("Network Initialized!\n");
-        server_connection = connect_peer(&client, 10, 123, 1, 142, 3333);
+        server_connection = connect_peer(&client, 192, 168, 20, 10, 3333);
     }
 
     f32 last_time = tick();

@@ -214,14 +214,6 @@ int main(int argc, char *argv[])
 
                             for (int i = 0; i < cam_count; i++)
                             {
-                                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-                                delete[] ecams[i].evt_frame;
-                                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                                close_camera(&ecams[i].camera);
-                            }
-
-                            for (int i = 0; i < cam_count; i++)
-                            {
                                 ptp_sync_off(&ecams[i].camera);
                             }
                             ptp_params->ptp_counter = 0;
@@ -230,6 +222,15 @@ int main(int argc, char *argv[])
                             ptp_params->servers_ready = false;
                             camera_control->sync_camera = false;
                             has_sent_ptp_time = false;
+
+                            for (int i = 0; i < cam_count; i++)
+                            {
+                                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                                delete[] ecams[i].evt_frame;
+                                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
+                                close_camera(&ecams[i].camera);
+                            }
+
                         }
 
                         enet_packet_destroy(evnt.packet);

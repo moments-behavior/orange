@@ -162,8 +162,8 @@ int main(int argc, char *argv[])
 
 
     bool has_sent_ptp_time = false;
-    bool quit_recording = false;
-    while (!quit_recording)
+    bool quit_server = false;
+    while (!quit_server)
     {
         current_time = tick();
         // Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
@@ -201,11 +201,35 @@ int main(int argc, char *argv[])
                             };
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
-                            quit_recording = true;
+                            quit_server = true;
                         } else if (server_signal == FetchGame::ServerControl_SETPTP) {
                             ptp_params->ptp_global_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_global_time << std::endl;
                             ptp_params->servers_ready = true;
+                        } else if (server_signal == FetchGame::ServerControl_STOP) {
+                            // stop recording 
+                            camera_control->subscribe = false;
+                            for (auto &t : camera_threads)
+                                t.join();
+
+                            for (int i = 0; i < cam_count; i++)
+                            {
+                                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                                delete[] ecams[i].evt_frame;
+                                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
+                                close_camera(&ecams[i].camera);
+                            }
+
+                            for (int i = 0; i < cam_count; i++)
+                            {
+                                ptp_sync_off(&ecams[i].camera);
+                            }
+                            ptp_params->ptp_counter = 0;
+                            ptp_params->ptp_global_time = 0;
+                            ptp_params->this_server_ready = false;
+                            ptp_params->servers_ready = false;
+                            camera_control->sync_camera = false;
+                            has_sent_ptp_time = false;
                         }
 
                         enet_packet_destroy(evnt.packet);
@@ -237,18 +261,6 @@ int main(int argc, char *argv[])
 
         usleep(10000); // sleep for 10ms
         last_time = current_time;
-    }
-
-    camera_control->subscribe = false;
-    for (auto &t : camera_threads)
-        t.join();
-
-    for (int i = 0; i < cam_count; i++)
-    {
-        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-        delete[] ecams[i].evt_frame;
-        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-        close_camera(&ecams[i].camera);
     }
 
     // Disconnect

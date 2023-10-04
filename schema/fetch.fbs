@@ -4,7 +4,8 @@ enum ServerControl : byte {
     IDEL = 0,
     START = 1,
     SETPTP = 2,
-    QUIT = 3
+    STOP = 3,
+    QUIT = 4
 }
 
 table Server {

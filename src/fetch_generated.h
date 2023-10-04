@@ -22,26 +22,29 @@ enum ServerControl : int8_t {
   ServerControl_IDEL = 0,
   ServerControl_START = 1,
   ServerControl_SETPTP = 2,
-  ServerControl_QUIT = 3,
+  ServerControl_STOP = 3,
+  ServerControl_QUIT = 4,
   ServerControl_MIN = ServerControl_IDEL,
   ServerControl_MAX = ServerControl_QUIT
 };
 
-inline const ServerControl (&EnumValuesServerControl())[4] {
+inline const ServerControl (&EnumValuesServerControl())[5] {
   static const ServerControl values[] = {
     ServerControl_IDEL,
     ServerControl_START,
     ServerControl_SETPTP,
+    ServerControl_STOP,
     ServerControl_QUIT
   };
   return values;
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[5] = {
+  static const char * const names[6] = {
     "IDEL",
     "START",
     "SETPTP",
+    "STOP",
     "QUIT",
     nullptr
   };

@@ -214,30 +214,30 @@ int main(int argc, char *argv[])
                             ptp_params->ptp_stop_signal = true;
                             std::cout << ptp_params->ptp_stop_time << std::endl;
 
-                            // wait for the video capture done 
-                            for (auto &t : camera_threads)
-                                t.join();
+                            // // wait for the video capture done 
+                            // for (auto &t : camera_threads)
+                            //     t.join();
 
-                            for (int i = 0; i < cam_count; i++)
-                            {
-                                ptp_sync_off(&ecams[i].camera);
-                            }
-                            ptp_params->ptp_counter = 0;
-                            ptp_params->ptp_global_time = 0;
-                            ptp_params->ptp_stop_signal = false;
-                            ptp_params->ptp_stop_time = 0;
-                            ptp_params->this_server_ready = false;
-                            ptp_params->servers_ready = false;
-                            camera_control->sync_camera = false;
-                            has_sent_ptp_time = false;
+                            // for (int i = 0; i < cam_count; i++)
+                            // {
+                            //     ptp_sync_off(&ecams[i].camera);
+                            // }
+                            // ptp_params->ptp_counter = 0;
+                            // ptp_params->ptp_global_time = 0;
+                            // ptp_params->ptp_stop_signal = false;
+                            // ptp_params->ptp_stop_time = 0;
+                            // ptp_params->this_server_ready = false;
+                            // ptp_params->servers_ready = false;
+                            // camera_control->sync_camera = false;
+                            // has_sent_ptp_time = false;
 
-                            for (int i = 0; i < cam_count; i++)
-                            {
-                                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-                                delete[] ecams[i].evt_frame;
-                                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                                close_camera(&ecams[i].camera);
-                            }
+                            // for (int i = 0; i < cam_count; i++)
+                            // {
+                            //     destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                            //     delete[] ecams[i].evt_frame;
+                            //     check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
+                            //     close_camera(&ecams[i].camera);
+                            // }
 
                         }
 

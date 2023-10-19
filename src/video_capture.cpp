@@ -224,6 +224,11 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
         get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
+        if (ptp_params->ptp_stop_signal) {
+            // TODO: add count down 
+            if (ptp_state.ptp_time >= ptp_params->ptp_stop_time)
+                break;
+        }
         // if (offset == 200) {
         //     phase = -1;
         // }
@@ -235,6 +240,7 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
         // } else { offset++; }
     }
 
+    camera_control->subscribe = false;
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
     double time_diff = w.Stop();
 

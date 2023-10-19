@@ -168,13 +168,6 @@ int main(int argc, char **args)
                 int server_buf_size = builder.GetSize();
                 ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                 enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
-                ptp_params->ptp_counter = 0;
-                ptp_params->ptp_global_time = 0;
-                ptp_params->ptp_stop_signal = false;
-                ptp_params->ptp_stop_time = 0;
-                ptp_params->this_server_ready = false;
-                ptp_params->servers_ready = false;
-
 
                 for (auto &t : camera_threads)
                     t.join();
@@ -207,6 +200,12 @@ int main(int argc, char **args)
                     camera_control->sync_camera = false;
                 }
                 camera_control->record_video = false;
+                ptp_params->ptp_counter = 0;
+                ptp_params->ptp_global_time = 0;
+                ptp_params->ptp_stop_signal = false;
+                ptp_params->ptp_stop_time = 0;
+                ptp_params->this_server_ready = false;
+                ptp_params->servers_ready = false;
             }
 
             if(ImGui::Button("Clients close")) {

@@ -70,6 +70,8 @@ struct PTPParams{
     bool network_sync = false;
     bool servers_ready = false;
     bool this_server_ready = false;
+    unsigned long long ptp_stop_time;
+    bool ptp_stop_signal = false;
 };
 
 

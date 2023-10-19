@@ -207,7 +207,12 @@ int main(int argc, char *argv[])
                             std::cout << ptp_params->ptp_global_time << std::endl;
                             ptp_params->servers_ready = true;
                         } else if (server_signal == FetchGame::ServerControl_STOP) {
-                            // stop recording 
+                            // stop recording
+                            ptp_params->ptp_stop_signal = true;
+                            ptp_params->ptp_stop_time = server_control->ptp_global_time();
+                            // wait for the video capture done 
+
+
                             camera_control->subscribe = false;
                             for (auto &t : camera_threads)
                                 t.join();
@@ -218,6 +223,8 @@ int main(int argc, char *argv[])
                             }
                             ptp_params->ptp_counter = 0;
                             ptp_params->ptp_global_time = 0;
+                            ptp_params->ptp_stop_signal = false;
+                            ptp_params->ptp_stop_time = 0;
                             ptp_params->this_server_ready = false;
                             ptp_params->servers_ready = false;
                             camera_control->sync_camera = false;

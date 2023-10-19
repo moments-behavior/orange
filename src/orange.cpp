@@ -157,6 +157,7 @@ int main(int argc, char **args)
                 unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                 int delay_in_second = 10;
                 ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+                std::cout << ptp_params->ptp_stop_time << std::endl;
                 ptp_params->ptp_stop_signal = true;
                 builder.Clear();
                 FetchGame::ServerBuilder server_builder(builder);

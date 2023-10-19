@@ -209,6 +209,7 @@ int main(int argc, char *argv[])
                             ptp_params->servers_ready = true;
                         } else if (server_signal == FetchGame::ServerControl_STOP) {
                             // stop recording
+                            std::cout << server_control->ptp_global_time() << std::endl;
                             ptp_params->ptp_stop_time = server_control->ptp_global_time();
                             ptp_params->ptp_stop_signal = true;
                             std::cout << ptp_params->ptp_stop_time << std::endl;

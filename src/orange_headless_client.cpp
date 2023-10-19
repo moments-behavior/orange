@@ -42,12 +42,13 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
     cameras_select = new CameraEachSelect[num_cameras];
 
     // load camera configs
-    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
+    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp/animal";
     std::string camera_config_dir = start_folder_name + "/";
 
     for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
     {
         camera_config_files.push_back(entry.path().string());
+	std::cout << entry.path().string() << std::endl;
     }
     std::sort(camera_config_files.begin(), camera_config_files.end());
     for (auto &camera_serial : camera_config_files)

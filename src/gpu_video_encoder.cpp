@@ -110,8 +110,8 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
 }
 
 
-GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name)
-    : CThreadWorker(name), camera_params(camera_params), display_buffer(display_buffer), encoder_setup(encoder_setup), folder_name(folder_name)
+GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params, CameraControl* camera_control, CameraEachSelect* camera_select, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name)
+    : CThreadWorker(name), camera_params(camera_params), camera_control(camera_control), camera_select(camera_select), display_buffer(display_buffer), encoder_setup(encoder_setup), folder_name(folder_name)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = ENCODER_ENTRIES_MAX;
@@ -139,8 +139,15 @@ void GPUVideoEncoder::ProcessOneFrame(void* f)
         duplicate_channel_gpu(camera_params, &frame_original, &debayer);
     }
 
-    encode_frame(&encoder, writer.video, &debayer);
-    write_meatadata(writer.metadata, entry.frame_id, entry.timestamp);
+    if (camera_select->stream_on) {
+        // need to decide when to copy
+        ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
+    }
+
+    if (camera_control->record_video) {
+        encode_frame(&encoder, writer.video, &debayer);
+        write_meatadata(writer.metadata, entry.frame_id, entry.timestamp);
+    }
 }
 
 void GPUVideoEncoder::ThreadRunning()
@@ -150,11 +157,11 @@ void GPUVideoEncoder::ThreadRunning()
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
 
-    initialize_encoder(&encoder, encoder_setup, camera_params);
-    initialize_writer(&writer, camera_params, folder_name, encoder_setup);
-
-    // start writing thread
-    writer.video->create_thread();
+    if (camera_control->record_video) {
+        initialize_encoder(&encoder, encoder_setup, camera_params);
+        initialize_writer(&writer, camera_params, folder_name, encoder_setup);
+        writer.video->create_thread();
+    }
 
     while(IsMachineOn())
     {
@@ -173,18 +180,19 @@ void GPUVideoEncoder::ThreadRunning()
         }
     }
     
-    close_writer(&encoder, &writer);
-    std::string print_out;
-    print_out += "\n" + camera_params->camera_serial;
-    print_out += ", Frame encoded: " + std::to_string(encoder.num_frame_encode);
-    std::cout << print_out << std::endl;
-
-    writer.video->quit_thread();
-    writer.video->join_thread();
-
-    delete writer.video;
-    delete writer.metadata;
-    delete encoder.pEnc;
+    if (camera_control->record_video) {
+        close_writer(&encoder, &writer);
+        std::string print_out;
+        print_out += "\n" + camera_params->camera_serial;
+        print_out += ", Frame encoded: " + std::to_string(encoder.num_frame_encode);
+        std::cout << print_out << std::endl;
+        writer.video->quit_thread();
+        writer.video->join_thread();
+        delete writer.video;
+        delete writer.metadata;
+        delete encoder.pEnc;
+    }
+  
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
 }

@@ -32,14 +32,16 @@ struct EncoderContext
 class GPUVideoEncoder : public CThreadWorker
 {
 public:
-    GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name); // name is the thread name
+    GPUVideoEncoder(const char* name, CameraParams *camera_params, CameraControl* camera_control, CameraEachSelect* camera_select, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name); // name is the thread name
     ~GPUVideoEncoder ();
 
 	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id);
 	void ProcessOneFrame(void *f);
 
 	//open gl dimensions:
-	CameraParams* camera_params;	
+	CameraParams* camera_params;
+	CameraControl* camera_control;
+	CameraEachSelect* camera_select;	
 	unsigned char* display_buffer;
 	FrameGPU frame_original; // frame on gpu device 
 	Debayer debayer;

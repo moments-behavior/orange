@@ -27,7 +27,7 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
     ptp_state->frame_ts_prev = ptp_state->frame_ts;
 }
 
-static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, COpenGLDisplay* openGLDisplay, GPUVideoEncoder* gpu_encoder)
+static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, GPUVideoEncoder* gpu_encoder)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     if (camera_control->sync_camera)
@@ -54,26 +54,14 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
             camera_state->id_prev = ecam->frame_recv.frame_id;
 
         // push the image data to encode, or display
-        if (camera_control->record_video) {
-            gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, 
-                ecam->frame_recv.bufferSize, 
-                ecam->frame_recv.size_x, 
-                ecam->frame_recv.size_y, 
-                ecam->frame_recv.pixel_type, 
-                ecam->frame_recv.timestamp,
-                camera_state->frame_count);
-        }
+        gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, 
+            ecam->frame_recv.bufferSize, 
+            ecam->frame_recv.size_x, 
+            ecam->frame_recv.size_y, 
+            ecam->frame_recv.pixel_type, 
+            ecam->frame_recv.timestamp,
+            camera_state->frame_count);
         
-        if (camera_select->stream_on) {
-            openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, 
-                ecam->frame_recv.bufferSize, 
-                ecam->frame_recv.size_x, 
-                ecam->frame_recv.size_y, 
-                ecam->frame_recv.pixel_type, 
-                ecam->frame_recv.timestamp,
-                camera_state->frame_count);
-        }
-
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
         if (camera_state->camera_return)
             std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
@@ -186,18 +174,10 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
     CameraState camera_state;
     PTPState ptp_state;
     
-    COpenGLDisplay* openGLDisplay;
-    if (camera_select->stream_on) {
-        openGLDisplay = new COpenGLDisplay("", camera_params, display_buffer);
-        openGLDisplay->StartThread();
-    }
-
     GPUVideoEncoder* gpu_encoder;
     
-    if (camera_control->record_video) {
-        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name);
-        gpu_encoder->StartThread();
-    }
+    gpu_encoder = new GPUVideoEncoder("", camera_params, camera_control, camera_select, display_buffer, encoder_setup, folder_name);
+    gpu_encoder->StartThread();
 
     if (camera_control->sync_camera)
     {
@@ -223,7 +203,7 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
     {
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
-        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
+        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, gpu_encoder);
         if (ptp_params->ptp_stop_signal) {
             // TODO: add count down 
             if (ptp_state.ptp_time >= ptp_params->ptp_stop_time)
@@ -244,11 +224,6 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
     double time_diff = w.Stop();
 
-    if (camera_select->stream_on) {
-        openGLDisplay->StopThread();
-    }
-    if (camera_control->record_video) {
-        gpu_encoder->StopThread();
-    }
+    gpu_encoder->StopThread();
     report_statistics(camera_params, &camera_state, time_diff);
 }

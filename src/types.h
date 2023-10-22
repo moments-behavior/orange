@@ -5,6 +5,7 @@
 typedef double f64;
 typedef float f32;
 typedef uint32_t u32;
+typedef uint16_t u16;
 
 struct triple_f{
     f32 x; 

@@ -74,14 +74,15 @@ int main(int argc, char **args)
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
     
-    flatbuffers::FlatBufferBuilder builder(1024);
+    std::thread sync_thread;
 
+    // for networking 
+    flatbuffers::FlatBufferBuilder builder(1024);
     if (enet_initialize() != 0)
     {
         fprintf(stderr, "An error occurred while initializing ENet.\n");
         return EXIT_FAILURE;
     }
-
     EnetContext server;
     if (enet_initialize(&server, 3333, 5)) {
         printf("Server Initiated\n");
@@ -369,6 +370,8 @@ int main(int argc, char **args)
             if (ImGui::Button(ptp_stream_sync ? "PTP off": "PTP on")) {
                 ptp_stream_sync = !ptp_stream_sync;
             }
+
+            ImGui::Checkbox("Detection", &camera_control->detection);
 
             if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))
             {

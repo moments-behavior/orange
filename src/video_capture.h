@@ -12,6 +12,7 @@ struct CameraControl
     bool stop_record = false;
     bool record_video = false;
     bool sync_camera = false;
+    bool detection = false;
 };
 
 struct CameraEachSelect

@@ -29,7 +29,7 @@ private:
     std::thread m_thread;
 
 	enum SyncStateEnum {
-		SYNC_SLEEP,
+		SYNC_WAIT,
 		SYNC_PUSH_FRAME,
 		SYNC_EXITED
 	};

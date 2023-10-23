@@ -12,8 +12,8 @@ void SyncQueue::SyncMain()
     while(!m_quitting) {
         // push into detection every 16ms   
         switch (m_state) {
-            case SYNC_SLEEP:
-                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            case SYNC_WAIT:
+                
         }
         
 

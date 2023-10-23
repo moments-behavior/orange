@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
+#include "synchronized_queue.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -74,7 +75,8 @@ int main(int argc, char **args)
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
     
-    std::thread sync_thread;
+    SyncQueue* sync_queue;
+
 
     // for networking 
     flatbuffers::FlatBufferBuilder builder(1024);
@@ -412,6 +414,10 @@ int main(int argc, char **args)
                             camera_control->sync_camera = true;
                         }
                     }
+
+                    // add a sync queue 
+                    sync_queue = new SyncQueue(num_cameras);
+                    sync_queue->CreateThread();
 
                     for (int i = 0; i < num_cameras; i++)
                     {

@@ -27,7 +27,7 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
     ptp_state->frame_ts_prev = ptp_state->frame_ts;
 }
 
-static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, COpenGLDisplay* openGLDisplay, GPUVideoEncoder* gpu_encoder)
+static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, SyncDisplay* sync_display, GPUVideoEncoder* gpu_encoder)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     if (camera_control->sync_camera)
@@ -65,13 +65,14 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
         }
         
         if (camera_select->stream_on) {
-            openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, 
+            sync_display->PushToDisplay(ecam->frame_recv.imagePtr, 
                 ecam->frame_recv.bufferSize, 
                 ecam->frame_recv.size_x, 
                 ecam->frame_recv.size_y, 
                 ecam->frame_recv.pixel_type, 
                 ecam->frame_recv.timestamp,
-                camera_state->frame_count);
+                camera_state->frame_count,
+                camera_params->camera_id);
         }
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
@@ -180,17 +181,17 @@ static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmerge
     printf("\n");
 }
 
-void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params)
+void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, SyncDisplay* sync_display)
 {
 
     CameraState camera_state;
     PTPState ptp_state;
     
-    COpenGLDisplay* openGLDisplay;
-    if (camera_select->stream_on) {
-        openGLDisplay = new COpenGLDisplay("", camera_params, display_buffer);
-        openGLDisplay->StartThread();
-    }
+    // COpenGLDisplay* openGLDisplay;
+    // if (camera_select->stream_on) {
+    //     openGLDisplay = new COpenGLDisplay("", camera_params, display_buffer);
+    //     openGLDisplay->StartThread();
+    // }
 
     GPUVideoEncoder* gpu_encoder;
     
@@ -223,7 +224,7 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
     {
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
-        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
+        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, sync_display, gpu_encoder);
         if (ptp_params->ptp_stop_signal) {
             // TODO: add count down 
             if (ptp_state.ptp_time >= ptp_params->ptp_stop_time)

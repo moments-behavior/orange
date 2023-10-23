@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
+#include "SynchronizedDisplay.h"
+#include "detection.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -73,7 +75,11 @@ int main(int argc, char **args)
     ScrollingBuffer* realtime_plot_data;
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
-    
+
+    // realtime processing
+    SyncDisplay* sync_display;
+    std::vector<std::thread> detection_threads;
+
     flatbuffers::FlatBufferBuilder builder(1024);
 
     if (enet_initialize() != 0)
@@ -410,9 +416,16 @@ int main(int argc, char **args)
                         }
                     }
 
+                    sync_display = new SyncDisplay(num_cameras);
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        detection_threads.push_back(std::thread(&detection_proc, sync_display, i));
+                    }
+
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, sync_display));
                     }
 
                 } else {

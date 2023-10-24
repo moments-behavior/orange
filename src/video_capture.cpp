@@ -245,9 +245,9 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
     double time_diff = w.Stop();
 
-    if (camera_select->stream_on) {
-        openGLDisplay->StopThread();
-    }
+    // if (camera_select->stream_on) {
+    //     openGLDisplay->StopThread();
+    // }
     if (camera_control->record_video) {
         gpu_encoder->StopThread();
     }

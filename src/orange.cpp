@@ -423,6 +423,7 @@ int main(int argc, char **args)
                         detection_threads.push_back(std::thread(&detection_proc, sync_display, i));
                     }
 
+
                     for (int i = 0; i < num_cameras; i++)
                     {
                         camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, sync_display));
@@ -550,6 +551,7 @@ int main(int argc, char **args)
                         }
                     }
 
+
                     // if (num_cameras > 1){
                         for (int i = 0; i < num_cameras; i++)
                         {
@@ -561,7 +563,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, sync_display));
                     }
                     camera_control->subscribe = true;                    
                 } else {

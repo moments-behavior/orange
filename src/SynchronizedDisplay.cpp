@@ -54,6 +54,7 @@ void SyncDisplay::SyncMain()
         case SYNC_WAIT_FOR_DETECTION:
             ResetCondition(m_nodesKicked);
             WaitForCondition(m_nodesDone);
+            ResetCondition(m_detection_ready, m_nodesDone);
             m_state = SYNC_WAIT_FOR_FRAME;
             break; 
         }

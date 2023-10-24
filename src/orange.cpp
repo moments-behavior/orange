@@ -425,7 +425,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        detection_threads.push_back(std::thread(&detection_proc, sync_display, i));
+                        detection_threads.push_back(std::thread(&detection_proc, sync_display, cameras_params, camera_control, tex[i].cuda_buffer, i));
                     }
 
 
@@ -466,6 +466,8 @@ int main(int argc, char **args)
                         ptp_params->ptp_global_time = 0;
                         camera_control->sync_camera = false;
                     }
+                    // sync_display->Quit();
+                    // sync_display->Terminate();
                 }
             }
 

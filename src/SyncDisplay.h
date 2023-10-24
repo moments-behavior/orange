@@ -42,9 +42,14 @@ public:
     void WaitForKick();	
     void SignalMoveSent(int nodeNum);
     void SignalDetectionDone(int nodeNum);
-
-private:
+    void Quit() {
+        m_quitting = true;
+    }
+    void Terminate() {
+        m_thread.join();
+    }
     std::vector<CameraEntry*> m_frames;
+private:
     std::thread m_thread;
     std::mutex m_mutex;
     std::condition_variable m_cond;

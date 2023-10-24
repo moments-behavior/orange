@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
-#include "SynchronizedDisplay.h"
+#include "SyncDisplay.h"
 #include "detection.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();

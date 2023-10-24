@@ -1,4 +1,4 @@
-#include "SynchronizedDisplay.h"
+#include "SyncDisplay.h"
 
 SyncDisplay::SyncDisplay(int num_sync_cameras): num_sync_cameras(num_sync_cameras)
 {
@@ -8,6 +8,8 @@ SyncDisplay::SyncDisplay(int num_sync_cameras): num_sync_cameras(num_sync_camera
         m_frames_ready.push_back(false);
         m_detection_ready.push_back(false);
     }
+    m_nodesKicked = false;
+    m_nodesDone = false;
 }
 
 void SyncDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id, int camera_idx)
@@ -23,12 +25,12 @@ void SyncDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width, in
 }
 
 void SyncDisplay::WaitForKick(){
-	WaitForCondition(m_nodesKicked);
+    WaitForCondition(m_nodesKicked);
 }
 
 
 void SyncDisplay::SignalDetectionDone(int nodeNum){
-	SignalPerNode(m_detection_ready, m_nodesDone, nodeNum);
+    SignalPerNode(m_detection_ready, m_nodesDone, nodeNum);
 }
 
 void SyncDisplay::SyncMain()

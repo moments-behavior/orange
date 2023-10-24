@@ -4,7 +4,7 @@
 #include "camera.h"
 #include <iostream>
 #include <fstream>
-#include "SynchronizedDisplay.h"
+#include "SyncDisplay.h"
 
 struct CameraControl
 {

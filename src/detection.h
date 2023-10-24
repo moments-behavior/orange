@@ -1,4 +1,4 @@
-#include "SynchronizedDisplay.h"
+#include "SyncDisplay.h"
 
 void detection_proc(SyncDisplay* sync_manager, int idx)
 {

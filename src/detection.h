@@ -29,7 +29,14 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
         } else {
             duplicate_channel_gpu(camera_params, &frame_original, &debayer);
         }
+        // detection, aruco marker and yolo per thread goes here
+        
+         
+        // display
         ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
+       
+        
+        
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         // end of per process operations
 

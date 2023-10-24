@@ -72,7 +72,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
                 ecam->frame_recv.pixel_type, 
                 ecam->frame_recv.timestamp,
                 camera_state->frame_count,
-                camera_params->camera_id);
+                camera_params->sync_id);
         }
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.

@@ -22,6 +22,7 @@ struct CameraParams{
     std::string color_temp;
     int gpu_id;
     int camera_id;
+    int sync_id;
     std::string camera_name;
     std::string camera_serial;
     int num_cameras;

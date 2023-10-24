@@ -40,5 +40,3 @@ g++ -Ofast -ffast-math -std=c++17 targets/*.o \
     -I$HOME/nvidia/ffmpeg/build/include/ \
     -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     `pkg-config --static --libs glfw3`
-
-sudo ./targets/orange

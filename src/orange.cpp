@@ -293,6 +293,10 @@ int main(int argc, char **args)
                             }
                         }
 
+                        for (int i = 0; i < cam_count; i++) {
+                            cameras_params[i].sync_id = i;
+                        }
+                        
                         for (int i = 0; i < num_cameras; i++)
                         {
                             // first checkt to see if it is in the config files 

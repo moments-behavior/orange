@@ -417,6 +417,7 @@ int main(int argc, char **args)
                     }
 
                     sync_display = new SyncDisplay(num_cameras);
+                    sync_display->CreateThread();
 
                     for (int i = 0; i < num_cameras; i++)
                     {

@@ -4,16 +4,16 @@
 #include "realtime_tool.h"
 
 struct DetectionPerCam {
-    calib_results* camera_calib;
+    CameraCalibResults* camera_calib;
     bool have_calibration_results;
-    std::vector<cv::Point2f> marker_per_cam
+    std::vector<cv::Point2f> marker_per_cam;
     unsigned char* cpu_frame;
     int frame_number;
-}
+};
 
 struct DetectionData {
     DetectionPerCam* detection_per_cam;    
-}
+};
 
 void allocate_detection_resources(DetectionData* detection_data, int num_cams, u32 size_pic) {
     // for opencv, use bgr 

@@ -5,6 +5,8 @@
 #include "opencv2/core/core_c.h"
 #include "opencv2/core/core.hpp"
 #include "aruco_nano.h"
+#include "types.h"
+#include "camera.h"
 
 struct CameraCalibResults
 {
@@ -44,7 +46,7 @@ void print_calibration_results(CameraCalibResults* calib_results) {
     std::cout << "projection_mat = " << std::endl << cv::format(calib_results->projection_mat, cv::Formatter::FMT_PYTHON) << std::endl << std::endl;
 }
 
-cv::Mat triangulate_points(std::vector<cv::Point2f> image_points, vector<CameraCalibResults*> calib_results)
+cv::Mat triangulate_points(std::vector<cv::Point2f> image_points, std::vector<CameraCalibResults*> calib_results)
 {
     std::vector<cv::Mat> sfm_points2d;
     std::vector<cv::Mat> projection_matrices;

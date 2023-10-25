@@ -1,6 +1,23 @@
 #include "SyncDisplay.h"
 #include "image_processing.h"
 #include <cuda_runtime_api.h>
+#include "realtime_tool.h"
+
+struct DetectionPerCam {
+    calib_results* camera_calib;
+    bool have_calibration_results;
+    std::vector<cv::Point2f> marker_per_cam
+    unsigned char* cpu_frame;
+    int frame_number;
+}
+
+struct DetectionData {
+    DetectionPerCam* detection_per_cam;    
+}
+
+void allocate_detection_resources(DetectionData* detection_data, int num_cams, u32 size_pic) {
+    // for opencv, use bgr 
+}
 
 void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, CameraControl* camera_control, unsigned char* display_buffer, int idx)
 {
@@ -12,7 +29,6 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
 
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
-
 
     while(camera_control->subscribe) {        
         // wait for frame ready

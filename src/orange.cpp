@@ -79,6 +79,7 @@ int main(int argc, char **args)
     // realtime processing
     SyncDisplay* sync_display;
     std::vector<std::thread> detection_threads;
+    
 
     flatbuffers::FlatBufferBuilder builder(1024);
 

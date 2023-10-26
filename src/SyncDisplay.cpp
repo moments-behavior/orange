@@ -90,6 +90,7 @@ void SyncDisplay::SyncMain()
             m_state = F_SYNC_WAIT_FOR_DETECTION;
             break;
         case F_SYNC_WAIT_FOR_DETECTION:
+            // maybe can change wiat for condition to remove one more state
             WaitForCondition(m_nodesDone);
             ResetCondition(m_detection_ready, m_nodesDone);
             m_state = F_SYNC_START_TRIANGULATION;

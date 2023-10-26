@@ -31,7 +31,7 @@ void allocate_detection_resources(DetectionData* detection_data, int num_cams, C
     }
 }
 
-void detection3d_proc(SyncDisplay* sync_manager, CameraControl* camera_control, DetectionData* detection_data, int num_sync_cameras)
+void detection3d_proc(SyncDisplay* sync_manager, CameraControl* camera_control, int num_sync_cameras)
 {
     // threads for 3d triangulations
     DetectionResults detection_results[num_sync_cameras];
@@ -39,12 +39,10 @@ void detection3d_proc(SyncDisplay* sync_manager, CameraControl* camera_control, 
     while(camera_control->subscribe) {
         std::cout << "wait for start tri" << std::endl; 
 
-        sync_manager.WaitForTriangulation();
+        sync_manager->WaitForTriangulation();
 
         std::cout << "tri done" << std::endl; 
         sync_manager->SignalTriangulationDone();
-
-
     }
 }
 

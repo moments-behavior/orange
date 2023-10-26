@@ -429,6 +429,8 @@ int main(int argc, char **args)
                     detection_data = (DetectionData *)malloc(sizeof(DetectionData));
                     allocate_detection_resources(detection_data, num_cameras, cameras_params);
 
+                    detection3d_thread = std::thread(&detection3d_proc, sync_display, camera_control, num_cameras);
+
                     for (int i = 0; i < num_cameras; i++)
                     {
                         detection_threads.push_back(std::thread(&detection_proc, sync_display, cameras_params, camera_control, tex[i].cuda_buffer, &detection_data->detection_per_cam[i], i));

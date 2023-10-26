@@ -31,19 +31,20 @@ void allocate_detection_resources(DetectionData* detection_data, int num_cams, C
     }
 }
 
-void detection3d_proc(CameraControl* camera_control, DetectionData* detection_data, int num_sync_cameras)
+void detection3d_proc(SyncDisplay* sync_manager, CameraControl* camera_control, DetectionData* detection_data, int num_sync_cameras)
 {
     // threads for 3d triangulations
     DetectionResults detection_results[num_sync_cameras];
 
     while(camera_control->subscribe) {
-        // for (u32 i = 0; i < num_sync_cameras; i++) {
-        //     detection_results[i] = detection_data->detection_queues[i].receive();
-        // }
+        std::cout << "wait for start tri" << std::endl; 
 
-        for (u32 i = 0; i < num_sync_cameras; i++) {
-            std::cout << detection_results[i].camera_id << std::endl;
-        }
+        sync_manager.WaitForTriangulation();
+
+        std::cout << "tri done" << std::endl; 
+        sync_manager->SignalTriangulationDone();
+
+
     }
 }
 
@@ -93,8 +94,6 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
         //     std::cout << markers[i].id << std::endl;
         // }
 
-        // detection_queue->send(detection_results);
-    
         // display
         ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
        

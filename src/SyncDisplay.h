@@ -22,7 +22,9 @@ struct CameraEntry{
     etype(SYNC_WAIT_FOR_FRAME), \
     etype(SYNC_SEND_FRAME), \
     etype(SYNC_DETECTION_STARTED), \
-    etype(SYNC_WAIT_FOR_DETECTION)
+    etype(SYNC_WAIT_FOR_DETECTION), \
+    etype(SYNC_START_TRIANGULATION), \
+    etype(SYNC_WAIT_FOR_TRIANGULATION)
 
 #define etype(x) F_##x
 typedef enum { SyncStates } SyncStateEnum;
@@ -42,6 +44,8 @@ public:
     void WaitForKick();	
     void SignalMoveSent(int nodeNum);
     void SignalDetectionDone(int nodeNum);
+    void WaitForTriangulation();
+    void SignalTriangulationDone();
     void Quit() {
         m_quitting = true;
     }
@@ -62,6 +66,10 @@ private:
     std::vector<bool> m_frames_ready;
     std::vector<bool> m_detection_ready;
     std::vector<bool> m_axisSentMove;
+
+    // triangulation 
+    bool m_triangulation_started;
+    bool m_triangulation_done;
 
     SyncStateEnum m_state;
     bool m_quitting;

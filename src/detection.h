@@ -40,6 +40,7 @@ void detection3d_proc(SyncDisplay* sync_manager, CameraControl* camera_control, 
         std::cout << "wait for start tri" << std::endl; 
 
         sync_manager->WaitForTriangulation();
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
 
         std::cout << "tri done" << std::endl; 
         sync_manager->SignalTriangulationDone();

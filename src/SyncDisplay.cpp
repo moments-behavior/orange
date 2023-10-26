@@ -86,7 +86,7 @@ void SyncDisplay::SyncMain()
         case F_SYNC_WAIT_FOR_DETECTION:
             WaitForCondition(m_nodesDone);
             ResetCondition(m_detection_ready, m_nodesDone);
-            m_state = F_SYNC_WAIT_FOR_FRAME;
+            m_state = F_SYNC_START_TRIANGULATION;
             break; 
         case F_SYNC_START_TRIANGULATION:
             SetCondition(m_triangulation_started);

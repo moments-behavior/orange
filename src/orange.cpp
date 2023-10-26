@@ -79,8 +79,11 @@ int main(int argc, char **args)
     // realtime processing
     SyncDisplay* sync_display;
     std::vector<std::thread> detection_threads;
-    
+    std::thread detection3d_thread;
+    DetectionData* detection_data;
 
+
+    // networking 
     flatbuffers::FlatBufferBuilder builder(1024);
 
     if (enet_initialize() != 0)
@@ -423,12 +426,14 @@ int main(int argc, char **args)
 
                     sync_display = new SyncDisplay(num_cameras);
                     sync_display->CreateThread();
+                    detection_data = (DetectionData *)malloc(sizeof(DetectionData));
+                    allocate_detection_resources(detection_data, num_cameras, cameras_params);
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        detection_threads.push_back(std::thread(&detection_proc, sync_display, cameras_params, camera_control, tex[i].cuda_buffer, i));
+                        detection_threads.push_back(std::thread(&detection_proc, sync_display, cameras_params, camera_control, tex[i].cuda_buffer, &detection_data->detection_per_cam[i], i));
                     }
-
+                
 
                     for (int i = 0; i < num_cameras; i++)
                     {

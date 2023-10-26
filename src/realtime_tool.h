@@ -8,6 +8,9 @@
 #include "types.h"
 #include "camera.h"
 
+#define PI 3.14159265
+
+
 struct CameraCalibResults
 {
     cv::Mat k;
@@ -67,9 +70,9 @@ cv::Mat triangulate_points(std::vector<cv::Point2f> image_points, std::vector<Ca
 }
 
 
-void aruco_detection(PictureBuffer* display_buffer, CameraParams *cameras_params, ArucoMarker2d* aruco_marker_2d) 
+void aruco_detection(unsigned char* display_buffer, CameraParams *cameras_params, ArucoMarker2d* aruco_marker_2d) 
 {    
-    cv::Mat view = cv::Mat(cameras_params->width * cameras_params->height * 3, 1, CV_8U, display_buffer->frame).reshape(3, cameras_params->height);
+    cv::Mat view = cv::Mat(cameras_params->width * cameras_params->height * 3, 1, CV_8U, display_buffer).reshape(3, cameras_params->height);
     aruconano::MarkerDetector MDetector;
     // detect 
     std::vector<aruconano::Marker> markers = MDetector.detect(view);
@@ -111,7 +114,7 @@ bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
     int num_detected_cams = aruco_marker_2d->detected_cameras.size();
     if (num_detected_cams >= 2) {
         // triangulate
-        vector<CameraCalibResults*> calib_results_all; 
+        std::vector<CameraCalibResults*> calib_results_all; 
         for (size_t i = 0; i < num_detected_cams; i++) {
             calib_results_all.push_back(calib_results + i);
         }
@@ -148,11 +151,11 @@ bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
 }
 
 
-std::map<unsigned int, cv::Point3f> get_3d_coordinates(vector<vector<cv::Rect>> bounding_boxes, vector<vector<int>> obj_ids, CameraCalibResults* CamParam)
+std::map<unsigned int, cv::Point3f> get_3d_coordinates(std::vector<std::vector<cv::Rect>> bounding_boxes, std::vector<std::vector<int>> obj_ids, CameraCalibResults* CamParam)
 {
     // points 
-    std::map<unsigned int, vector<cv::Point2f>> mapOfObjects;
-    std::map<unsigned int, vector<CameraCalibResults*>> mapOfCameras;
+    std::map<unsigned int, std::vector<cv::Point2f>> mapOfObjects;
+    std::map<unsigned int, std::vector<CameraCalibResults*>> mapOfCameras;
     
     // reformat detection data as dictionary 
     for (int cam_idx = 0; cam_idx < bounding_boxes.size(); cam_idx++){
@@ -168,8 +171,8 @@ std::map<unsigned int, cv::Point3f> get_3d_coordinates(vector<vector<cv::Rect>> 
             else{
                 float c_x =  float(bounding_boxes[cam_idx][box_id].x) + float(bounding_boxes[cam_idx][box_id].width)/2.0;
                 float c_y =  float(bounding_boxes[cam_idx][box_id].y) + float(bounding_boxes[cam_idx][box_id].height)/2.0;
-                vector<cv::Point2f> points_per_obj; 
-                vector<CameraCalibResults*> camera_per_obj;
+                std::vector<cv::Point2f> points_per_obj; 
+                std::vector<CameraCalibResults*> camera_per_obj;
                 points_per_obj.push_back(cv::Point2f(c_x, c_y));
                 camera_per_obj.push_back(CamParam + cam_idx);
                 mapOfObjects.insert({obj_ids[cam_idx][box_id], points_per_obj});

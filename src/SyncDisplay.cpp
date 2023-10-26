@@ -13,6 +13,7 @@ SyncDisplay::SyncDisplay(int num_sync_cameras): num_sync_cameras(num_sync_camera
     m_nodesDone = false;
     m_nodesMoved = false;
     m_triangulation_started = false;
+    m_triangulation_in_proc = false;
     m_triangulation_done = false;
     m_state = F_SYNC_WAIT_FOR_FRAME;
     m_quitting = false;
@@ -43,6 +44,11 @@ void SyncDisplay::SignalMoveSent(int nodeNum){
 
 void SyncDisplay::SignalTriangulationDone() {
     SetCondition(m_triangulation_done);
+}
+
+
+void SyncDisplay::SignalTriangulationInProc() {
+    SetCondition(m_triangulation_in_proc);
 }
 
 void SyncDisplay::SignalDetectionDone(int nodeNum){
@@ -90,13 +96,19 @@ void SyncDisplay::SyncMain()
             break; 
         case F_SYNC_START_TRIANGULATION:
             SetCondition(m_triangulation_started);
+            m_state = F_SYNC_TRIANGULATION_IN_PROC;
+            break;
+        case F_SYNC_TRIANGULATION_IN_PROC:
+            WaitForCondition(m_triangulation_in_proc);
+            ResetCondition(m_triangulation_started);
+            ResetCondition(m_triangulation_in_proc);
             m_state = F_SYNC_WAIT_FOR_TRIANGULATION;
             break;
         case F_SYNC_WAIT_FOR_TRIANGULATION:
             WaitForCondition(m_triangulation_done);
-            ResetCondition(m_triangulation_started);
             ResetCondition(m_triangulation_done);
             m_state = F_SYNC_WAIT_FOR_FRAME;
+            break;
         }
     }
 }

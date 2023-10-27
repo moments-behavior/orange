@@ -427,9 +427,18 @@ int main(int argc, char **args)
                     sync_display = new SyncDisplay(num_cameras);
                     sync_display->CreateThread();
                     detection_data = (DetectionData *)malloc(sizeof(DetectionData));
+                            std::cout << "here?" << std::endl;
+
                     allocate_detection_resources(detection_data, num_cameras, cameras_params);
 
-                    detection3d_thread = std::thread(&detection3d_proc, sync_display, camera_control, num_cameras);
+        std::cout << "there?" << std::endl;
+
+                    detection3d_thread = std::thread(&detection3d_proc, sync_display, detection_data, camera_control, num_cameras);
+
+                    for (int i = 0; i < num_cameras; i++) {
+                        detection_data->detection_per_cam[i].have_calibration_results = load_camera_calibration_results(&detection_data->camera_calib[i], &cameras_params[i]);
+                    }
+                   
 
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -681,6 +690,16 @@ int main(int argc, char **args)
                     {
                         ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
                         ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));                    
+                        
+                        if (detection_data->detection_per_cam[i].have_calibration_results) {
+                            gui_plot_world_coordinates(&detection_data->camera_calib[i], i);
+                        }
+
+                        if (detection_data->draw_marker) {
+                            draw_aruco_markers(detection_data->marker3d, i);
+                        }                      
+
+                        
                         ImPlot::EndPlot();
                     }
                     ImGui::End();

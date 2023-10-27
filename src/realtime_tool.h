@@ -29,12 +29,11 @@ struct ArucoMarker2d
     std::vector<std::vector<cv::Point2f>> detected_points;
 };
 
-
 struct ArucoMarker3d
 {
     int id;
-    std::vector<cv::Point3f> corners;
-    std::vector<std::vector<cv::Point2f>> proj_corners;
+    cv::Point3f* corners;
+    cv::Point2f** proj_corners;
     cv::Point3f t_vec;
     cv::Point3f normal; 
     f32 angle_x_axis;
@@ -104,7 +103,7 @@ void marker3d_to_pose(ArucoMarker3d* aruco_maker_3d)
 
     aruco_maker_3d->angle_x_axis = atan2(corner1to4.y, corner1to4.x);
     f32 result = aruco_maker_3d->angle_x_axis * 180 / PI;
-    printf("The marker is %f degrees from world x-axis. \n",  result);    
+    // printf("The marker is %f degrees from world x-axis. \n",  result);    
 
 }
 
@@ -126,7 +125,7 @@ bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
             }
             cv::Mat output3d = triangulate_points(image_points_all, calib_results_all); 
             cv::Point3f pts3d = cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
-            aruco_maker_3d->corners.push_back(pts3d);
+            aruco_maker_3d->corners[i] = pts3d;
 
             // reprojection
             for (size_t j = 0; j < num_cameras; j++) {
@@ -197,13 +196,14 @@ std::map<unsigned int, cv::Point3f> get_3d_coordinates(std::vector<std::vector<c
 
 
 
-void load_camera_calibration_results(CameraCalibResults* calib_results, CameraParams *cameras_params) 
+bool load_camera_calibration_results(CameraCalibResults* calib_results, CameraParams *cameras_params) 
 {
-    std::string calibration_file = "/home/user/Calibration/4_edge_cams/Cam" + std::to_string(cameras_params->camera_id) + ".yaml";
+    std::string calibration_file = "/home/user/Calibration/4_edge_cams_serial/Calib_" + cameras_params->camera_serial + ".yaml";
     cv::FileStorage fs(calibration_file, cv::FileStorage::READ);
     if (!fs.isOpened())
     {
         std::cout << "Could not open the calibration file: \"" << calibration_file << "\"" << std::endl;
+        return false;
     }
     fs["camera_matrix"] >> calib_results->k;
     fs["distortion_coefficients"] >> calib_results->dist_coeffs;
@@ -212,6 +212,7 @@ void load_camera_calibration_results(CameraCalibResults* calib_results, CameraPa
     fs.release();
     cv::Rodrigues(calib_results->r, calib_results->rvec);
     cv::sfm::projectionFromKRt(calib_results->k, calib_results->r, calib_results->tvec, calib_results->projection_mat);
+    return true;
 }
 
 
@@ -231,5 +232,60 @@ void world_coordinates_projection_points(CameraCalibResults* cvp, double* axis_x
         axis_y_values[i] = 2200 - img_pts.at(i).y;
     }
 }
+
+
+static void gui_plot_world_coordinates(CameraCalibResults* cvp, int cam_id)
+{
+    double axis_x_values[4]; double axis_y_values[4]; 
+    world_coordinates_projection_points(cvp, axis_x_values, axis_y_values, 50);
+    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, ImVec4(1.0, 1.0, 1.0,1.0));
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 1.0,1.0), 3.0);
+    std::string name = "World Origin";
+    
+    float one_axis_x[2];
+    float one_axis_y[2];
+
+    std::vector<triple_f> node_colors = {
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}};
+                
+    for (u32 edge=0; edge < 3; edge++)
+    {
+        double xs[2] {axis_x_values[0], axis_x_values[edge+1]};
+        double ys[2] {axis_y_values[0], axis_y_values[edge+1]};
+        
+        ImVec4 my_color; 
+        my_color.w = 1.0f; 
+        my_color.x = node_colors[edge+1].x;
+        my_color.y = node_colors[edge+1].y;
+        my_color.z = node_colors[edge+1].z;
+
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
+        ImPlot::SetNextLineStyle(my_color, 3.0);
+        ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
+    }
+    
+}
+
+static void draw_aruco_markers(ArucoMarker3d* aruco_marker, int camera_id)
+{
+    double x[5] = {(double)aruco_marker->proj_corners[camera_id][0].x, 
+        (double)aruco_marker->proj_corners[camera_id][1].x, 
+        (double)aruco_marker->proj_corners[camera_id][2].x, 
+        (double)aruco_marker->proj_corners[camera_id][3].x, 
+        (double)aruco_marker->proj_corners[camera_id][0].x};
+    
+    double y[5] = {(double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][1].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][2].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][3].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y};
+    
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 0.0, 1.0), 3.0);
+    ImPlot::PlotLine("##", &x[0], &y[0], 5); 
+}
+
 
 #endif

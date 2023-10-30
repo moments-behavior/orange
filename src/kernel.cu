@@ -1,5 +1,5 @@
+#include "kernel.cuh"
 #include <iostream>
-#include <cuda_runtime.h>
 
 /* Sensor process data:
     *Every group of 16 lines, change order to (0, 4, 8, 12), (1, 5, 9, 13), (2, 6, 10, 14), (3, 7, 11, 15).
@@ -112,11 +112,41 @@ __global__ void rgba2bgr_kernel(unsigned char* dest, unsigned char* src, int wid
     }
 }
 
-
-
 void rgba2bgr_convert(unsigned char* dest, unsigned char* src, int width, int height, cudaStream_t stream)
 {
     dim3 threads_per_block(32, 32);
     dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
     rgba2bgr_kernel << <num_blocks, threads_per_block, 0, stream>> > (dest, src, width, height);
+}
+
+
+__global__ void gpu_draw_cicles(unsigned char* dest, unsigned char* src, const int width, const int height, unsigned int* d_points, int num_points, const int radius)
+{
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if( (x < width) && (y < height) ) {
+        *(dest + ((y * width * 4) + (x * 4))) = *(src + ((y * width * 4) + (x * 4)));            
+        *(dest + ((y * width * 4) + (x * 4)) + 1) = *(src + ((y * width * 4) + (x * 4)) + 1);
+        *(dest + ((y * width * 4) + (x * 4)) + 2) = *(src + ((y * width * 4) + (x * 4)) + 2);
+        *(dest + ((y * width * 4) + (x * 4)) + 3) = *(src + ((y * width * 4) + (x * 4)) + 3);
+
+        for (int i= 0; i < num_points; i++) {
+            if (((x - d_points[i*2])*(x - d_points[i*2]) + (y - d_points[i*2+1])*(y - d_points[i*2+1])) < (radius * radius))
+            {
+                *(dest + ((y * width * 4) + (x * 4)))  = 255;
+                *(dest + ((y * width * 4) + (x * 4)) + 1)  = 0;
+                *(dest + ((y * width * 4) + (x * 4)) + 2)  = 255;
+                *(dest + ((y * width * 4) + (x * 4)) + 3)  = 255;   
+            }
+        }
+    } 
+}
+
+
+void gpu_draw_cicles(unsigned char* dest, unsigned char* src, int width, int height, unsigned int* d_points, int num_points, cudaStream_t stream)
+{
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
+    gpu_draw_cicles <<<num_blocks, threads_per_block, 0, stream>>> (dest, src, width, height, d_points, num_points, 5);
 }

@@ -33,12 +33,13 @@ void allocate_detection_resources(DetectionData* detection_data, int num_cams, C
     }
 
     // proj corners
-    detection_data->marker3d->proj_corners = (cv::Point2f**) malloc(sizeof(cv::Point2f*) * num_cams);
+    detection_data->marker3d->proj_corners = (tuple_f**) malloc(sizeof(tuple_f*) * num_cams);
     for (u32 j = 0; j < num_cams; j++) {
-        detection_data->marker3d->proj_corners[j] = (cv::Point2f*) malloc(sizeof(cv::Point2f) * 4);
+        detection_data->marker3d->proj_corners[j] = (tuple_f*) malloc(sizeof(tuple_f) * 4);
     }
 
     detection_data->marker3d->corners = (cv::Point3f*) malloc(sizeof(cv::Point3f) * 4);
+    detection_data->marker3d->new_detection = false;
     detection_data->draw_marker = true;
 }
 
@@ -71,11 +72,8 @@ void detection3d_proc(SyncDisplay* sync_manager, DetectionData* detection_data, 
             }
         }
 
-        if(find_marker3d(&marker2d_all_cams, detection_data->marker3d, detection_data->camera_calib, num_sync_cameras)) {
-            // std::cout << "Marker tvec: " << detection_data->marker3d->t_vec << std::endl;
-        } 
-
-        
+        detection_data->marker3d->new_detection = find_marker3d(&marker2d_all_cams, detection_data->marker3d, detection_data->camera_calib, num_sync_cameras);
+        std::cout << detection_data->marker3d->new_detection << std::endl;
         // std::this_thread::sleep_for(std::chrono::milliseconds(16));
 
         // std::cout << "tri done" << std::endl; 
@@ -83,7 +81,7 @@ void detection3d_proc(SyncDisplay* sync_manager, DetectionData* detection_data, 
     }
 }
 
-void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, CameraControl* camera_control, unsigned char* display_buffer, DetectionPerCam* detection_per_cam, int idx)
+void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, CameraControl* camera_control, unsigned char* display_buffer, DetectionData* detection_data, int idx)
 {
 
     ck(cudaSetDevice(camera_params->gpu_id));
@@ -92,9 +90,15 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
     Debayer debayer;
 
     // for opencv processing 
-    unsigned char *d_rgb;
-    cudaMalloc((void **)&d_rgb, camera_params->width * camera_params->height * 3);
+    unsigned char *d_bgr;
+    cudaMalloc((void **)&d_bgr, camera_params->width * camera_params->height * 3);
 
+    unsigned char *d_draw;
+    cudaMalloc((void **)&d_draw, camera_params->width * camera_params->height * 4);
+
+    unsigned int *d_points;
+    cudaMalloc((void **)&d_points, sizeof(unsigned int) * 8);
+    
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
 
@@ -104,10 +108,10 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
 
     while(camera_control->subscribe) {        
         // wait for frame ready
-        // printf("wait for kick\n");
+        printf("wait for kick\n");
         sync_manager->WaitForKick();
         
-        // printf("detection\n");
+        printf("detection\n");
         sync_manager->SignalMoveSent(idx);
         
         // start of per process operations  
@@ -119,34 +123,43 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
         }
         // detection, aruco marker and yolo per thread goes here
         // need cuda kernel to convert to bgr, maybe can use another stream, since the default stream is used for gpu buffer
-        rgba2bgr_convert(d_rgb, debayer.d_debayer, camera_params->width, camera_params->height, (cudaStream_t) 0);
+        rgba2bgr_convert(d_bgr, debayer.d_debayer, camera_params->width, camera_params->height, 0);
         // copy back to cpu 
-        ck(cudaMemcpy2DAsync(detection_per_cam->cpu_frame, camera_params->width*3, d_rgb, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
+        ck(cudaMemcpy2D(detection_data->detection_per_cam[idx].cpu_frame, camera_params->width*3, d_bgr, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
         // aruco marker detection 
-        cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, detection_per_cam->cpu_frame).reshape(3, camera_params->height);
+        cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, detection_data->detection_per_cam[idx].cpu_frame).reshape(3, camera_params->height);
         
         std::vector<aruconano::Marker> markers = MDetector.detect(view);
-        detection_per_cam->find_marker = false;
+        detection_data->detection_per_cam[idx].find_marker = false;
         for (size_t i = 0; i < markers.size(); i++) {
             // std::cout << markers[i].id << std::endl;
             if (markers[i].id == 0) {
-                detection_per_cam->find_marker = true;
+                detection_data->detection_per_cam[idx].find_marker = true;
                 for (size_t j = 0; j < 4; j++) {
-                    detection_per_cam->marker_corners[j] = markers[i][j];
+                    detection_data->detection_per_cam[idx].marker_corners[j] = markers[i][j];
                 }
             }
         }
-        
-        // display
-        ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
-       
-        
-        
-        // std::this_thread::sleep_for(std::chrono::milliseconds(16));
-        // end of per process operations
 
-        // printf("detection done \n");
+        printf("detection done \n");
 		sync_manager->SignalDetectionDone(idx);
+
+        printf("waif for triangulation done \n");
+        sync_manager->WaitForTriangulationDone();
+        // display
+        // draw on gpu, need access to the detection_data 
+        unsigned int points[8];
+        points[0] = (unsigned int)detection_data->marker3d->proj_corners[idx][0].x;
+        points[1] = (unsigned int)detection_data->marker3d->proj_corners[idx][0].y;
+
+        points[2] = (unsigned int)detection_data->marker3d->proj_corners[idx][1].x;
+        points[3] = (unsigned int)detection_data->marker3d->proj_corners[idx][1].y;
+
+        ck(cudaMemcpy(d_points, points, sizeof(unsigned int) * 8, cudaMemcpyHostToDevice));
+        gpu_draw_cicles(d_draw, debayer.d_debayer, camera_params->width, camera_params->height, d_points, 4, 0);
+        ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, d_draw, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
+        printf("display done \n");
+        sync_manager->SignalDisplayDone(idx);
     }
 
     return;  

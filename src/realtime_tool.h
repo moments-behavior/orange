@@ -33,10 +33,11 @@ struct ArucoMarker3d
 {
     int id;
     cv::Point3f* corners;
-    cv::Point2f** proj_corners;
+    tuple_f** proj_corners;
     cv::Point3f t_vec;
     cv::Point3f normal; 
     f32 angle_x_axis;
+    bool new_detection;
 };
 
 void print_calibration_results(CameraCalibResults* calib_results) {
@@ -283,7 +284,7 @@ static void draw_aruco_markers(ArucoMarker3d* aruco_marker, int camera_id)
         (double)2200 - (double)aruco_marker->proj_corners[camera_id][3].y, 
         (double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y};
     
-    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 0.0, 1.0), 3.0);
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
     ImPlot::PlotLine("##", &x[0], &y[0], 5); 
 }
 

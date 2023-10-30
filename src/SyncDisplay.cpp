@@ -8,6 +8,7 @@ SyncDisplay::SyncDisplay(int num_sync_cameras): num_sync_cameras(num_sync_camera
         m_frames_ready.push_back(false);
         m_detection_ready.push_back(false);
         m_axisSentMove.push_back(false);
+        m_axis_display.push_back(false);
     }
     m_nodesKicked = false;
     m_nodesDone = false;
@@ -15,6 +16,7 @@ SyncDisplay::SyncDisplay(int num_sync_cameras): num_sync_cameras(num_sync_camera
     m_triangulation_started = false;
     m_triangulation_in_proc = false;
     m_triangulation_done = false;
+    m_nodesDisplay = false;
     m_state = F_SYNC_WAIT_FOR_FRAME;
     m_quitting = false;
 }
@@ -55,16 +57,24 @@ void SyncDisplay::SignalDetectionDone(int nodeNum){
     SignalPerNode(m_detection_ready, m_nodesDone, nodeNum);
 }
 
+void SyncDisplay::SignalDisplayDone(int nodeNum) {
+    SignalPerNode(m_axis_display, m_nodesDisplay, nodeNum);
+}
+
 void SyncDisplay::WaitForTriangulation() {
     WaitForCondition(m_triangulation_started);
+}
+
+void SyncDisplay::WaitForTriangulationDone() {
+    WaitForCondition(m_triangulation_done);
 }
 
 void SyncDisplay::SyncMain()
 {
 
     while(!m_quitting) {
-        // printf(str_sync_states[m_state]);
-        // printf("\n");
+        printf(str_sync_states[m_state]);
+        printf("\n");
 
         switch (m_state) {
         case F_SYNC_WAIT_FOR_FRAME:
@@ -103,11 +113,12 @@ void SyncDisplay::SyncMain()
             WaitForCondition(m_triangulation_in_proc);
             ResetCondition(m_triangulation_started);
             ResetCondition(m_triangulation_in_proc);
-            m_state = F_SYNC_WAIT_FOR_TRIANGULATION;
+            m_state = F_SYNC_WAIT_FOR_DISPLAY;
             break;
-        case F_SYNC_WAIT_FOR_TRIANGULATION:
-            WaitForCondition(m_triangulation_done);
+        case F_SYNC_WAIT_FOR_DISPLAY:
+            WaitForCondition(m_nodesDisplay);
             ResetCondition(m_triangulation_done);
+            ResetCondition(m_axis_display, m_nodesDisplay);
             m_state = F_SYNC_WAIT_FOR_FRAME;
             break;
         }

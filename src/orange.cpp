@@ -427,11 +427,8 @@ int main(int argc, char **args)
                     sync_display = new SyncDisplay(num_cameras);
                     sync_display->CreateThread();
                     detection_data = (DetectionData *)malloc(sizeof(DetectionData));
-                            std::cout << "here?" << std::endl;
 
                     allocate_detection_resources(detection_data, num_cameras, cameras_params);
-
-        std::cout << "there?" << std::endl;
 
                     detection3d_thread = std::thread(&detection3d_proc, sync_display, detection_data, camera_control, num_cameras);
 
@@ -442,7 +439,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        detection_threads.push_back(std::thread(&detection_proc, sync_display, cameras_params, camera_control, tex[i].cuda_buffer, &detection_data->detection_per_cam[i], i));
+                        detection_threads.push_back(std::thread(&detection_proc, sync_display, cameras_params, camera_control, tex[i].cuda_buffer, detection_data, i));
                     }
                 
 
@@ -695,11 +692,10 @@ int main(int argc, char **args)
                             gui_plot_world_coordinates(&detection_data->camera_calib[i], i);
                         }
 
-                        if (detection_data->draw_marker) {
-                            draw_aruco_markers(detection_data->marker3d, i);
-                        }                      
-
-                        
+                        // if (detection_data->draw_marker && detection_data->marker3d->new_detection) {
+                        //     draw_aruco_markers(detection_data->marker3d, i);
+                        // }                      
+                    
                         ImPlot::EndPlot();
                     }
                     ImGui::End();

@@ -73,8 +73,8 @@ void SyncDisplay::SyncMain()
 {
 
     while(!m_quitting) {
-        printf(str_sync_states[m_state]);
-        printf("\n");
+        // printf(str_sync_states[m_state]);
+        // printf("\n");
 
         switch (m_state) {
         case F_SYNC_WAIT_FOR_FRAME:

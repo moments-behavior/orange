@@ -33,7 +33,7 @@ struct ArucoMarker3d
 {
     int id;
     cv::Point3f* corners;
-    tuple_f** proj_corners;
+    cv::Point2f** proj_corners;
     cv::Point3f t_vec;
     cv::Point3f normal; 
     f32 angle_x_axis;

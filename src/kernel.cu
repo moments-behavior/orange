@@ -120,33 +120,74 @@ void rgba2bgr_convert(unsigned char* dest, unsigned char* src, int width, int he
 }
 
 
-__global__ void gpu_draw_cicles(unsigned char* dest, unsigned char* src, const int width, const int height, unsigned int* d_points, int num_points, const int radius)
+__global__ void gpu_draw_cicles(unsigned char* src, const int width, const int height, float* d_points, int num_points, const int radius)
 {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if( (x < width) && (y < height) ) {
-        *(dest + ((y * width * 4) + (x * 4))) = *(src + ((y * width * 4) + (x * 4)));            
-        *(dest + ((y * width * 4) + (x * 4)) + 1) = *(src + ((y * width * 4) + (x * 4)) + 1);
-        *(dest + ((y * width * 4) + (x * 4)) + 2) = *(src + ((y * width * 4) + (x * 4)) + 2);
-        *(dest + ((y * width * 4) + (x * 4)) + 3) = *(src + ((y * width * 4) + (x * 4)) + 3);
-
         for (int i= 0; i < num_points; i++) {
-            if (((x - d_points[i*2])*(x - d_points[i*2]) + (y - d_points[i*2+1])*(y - d_points[i*2+1])) < (radius * radius))
+            if ((powf(x - d_points[i*2], 2) + powf(y - d_points[i*2+1], 2)) < (radius * radius))
             {
-                *(dest + ((y * width * 4) + (x * 4)))  = 255;
-                *(dest + ((y * width * 4) + (x * 4)) + 1)  = 0;
-                *(dest + ((y * width * 4) + (x * 4)) + 2)  = 255;
-                *(dest + ((y * width * 4) + (x * 4)) + 3)  = 255;   
+                *(src + ((y * width * 4) + (x * 4)))  = 255;
+                *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;
+                *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
+                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;   
             }
         }
     } 
 }
 
 
-void gpu_draw_cicles(unsigned char* dest, unsigned char* src, int width, int height, unsigned int* d_points, int num_points, cudaStream_t stream)
+void gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points, int num_points, cudaStream_t stream)
 {
     dim3 threads_per_block(32, 32);
     dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
-    gpu_draw_cicles <<<num_blocks, threads_per_block, 0, stream>>> (dest, src, width, height, d_points, num_points, 5);
+    gpu_draw_cicles <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, num_points, 5);
+}
+
+
+
+__global__ void gpu_draw_box(unsigned char* src, const int width, const int height, float* d_points)
+{
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if( (x < width) && (y < height) ) {
+        for (int i= 0; i < 4; i++) {
+
+            // float AB = sqrtf(powf(d_points[i*2+2]-d_points[i*2], 2) + powf(d_points[i*2+3]-d_points[i*2+1], 2));
+            // float AP = sqrtf(powf(x-d_points[i*2], 2) + powf(y-d_points[i*2+1], 2));        
+            // float PB = sqrtf(powf(x-d_points[i*2+2], 2) + powf(y-d_points[i*2+3], 2));
+            
+            // if (fabsf(AB - (AP + PB)) <= 0.2f) {
+            //     *(src + ((y * width * 4) + (x * 4)))  = 255;
+            //     *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;
+            //     *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
+            //     *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;   
+            // }
+
+            float lengh_squared = powf(d_points[i*2+2]-d_points[i*2], 2) + powf(d_points[i*2+3]-d_points[i*2+1], 2);
+            float dot_product = (x - d_points[i*2]) * (d_points[i*2+2] - d_points[i*2]) + (y-d_points[i*2+1]) * (d_points[i*2+3]-d_points[i*2+1]);
+            float t = fmaxf(0.0f, fminf(1.0f, dot_product/lengh_squared));
+            float proj_x = d_points[i*2] + t * (d_points[i*2+2] - d_points[i*2]);
+            float proj_y = d_points[i*2+1] + t * (d_points[i*2+3]-d_points[i*2+1]);
+            float distance_squared = powf(x - proj_x, 2) + powf(y - proj_y, 2);
+            if (distance_squared < 3.5f) {
+                *(src + ((y * width * 4) + (x * 4)))  = 255;
+                *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;
+                *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
+                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;                   
+            }
+
+        }
+    } 
+}
+
+
+void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, cudaStream_t stream)
+{
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
+    gpu_draw_box <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points);
 }

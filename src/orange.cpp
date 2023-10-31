@@ -113,8 +113,9 @@ int main(int argc, char **args)
                 {
                     printf("\t Client %d says: %s\n", evnt.peer->incomingPeerID, evnt.packet->data);
                     uint8_t* buffer_pointer = evnt.packet->data;
-                    auto server_control = FetchGame::GetServer(buffer_pointer);
-                    auto server_signal = server_control->ptp_global_time();
+                    auto enet_scene = FetchGame::GetScene(buffer_pointer);
+                    auto server = enet_scene->server();
+                    auto server_signal = server->ptp_global_time();
                     std::cout << server_signal << std::endl;
                     enet_packet_destroy(evnt.packet);
                 }
@@ -131,6 +132,7 @@ int main(int argc, char **args)
 
         if (ImGui::Begin("Networking")) 
         {
+            // maybe need update since fetch_generated has changed 
             if(ImGui::Button("Clients start camera threads")) {
                 ptp_params->network_sync = true;
                 // broadcast data
@@ -692,9 +694,10 @@ int main(int argc, char **args)
                             gui_plot_world_coordinates(&detection_data->camera_calib[i], i);
                         }
 
-                        // if (detection_data->draw_marker && detection_data->marker3d->new_detection) {
-                        //     draw_aruco_markers(detection_data->marker3d, i);
-                        // }                      
+                        if (detection_data->draw_marker && detection_data->marker3d->new_detection) {
+                            // maybe there is a better place for this? 
+                            send_serial_data(&server, builder, detection_data->marker3d);
+                        }                      
                     
                         ImPlot::EndPlot();
                     }

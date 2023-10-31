@@ -1,3 +1,6 @@
+#ifndef ORANGE_DETECTION
+#define ORANGE_DETECTION
+
 #include "SyncDisplay.h"
 #include "image_processing.h"
 #include <cuda_runtime_api.h>
@@ -171,3 +174,5 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
 
     return;  
 }
+
+#endif

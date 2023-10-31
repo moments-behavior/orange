@@ -3,6 +3,7 @@
 #include "gx_helper.h"
 #include "camera.h"
 #include <math.h>
+#include "realtime_tool.h"
 
 struct GL_Texture {
     GLuint texture;
@@ -134,5 +135,60 @@ struct RollingBuffer {
         Data.push_back(ImVec2(xmod, y));
     }
 };
+
+
+static void gui_plot_world_coordinates(CameraCalibResults* cvp, int cam_id)
+{
+    double axis_x_values[4]; double axis_y_values[4]; 
+    world_coordinates_projection_points(cvp, axis_x_values, axis_y_values, 50);
+    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, ImVec4(1.0, 1.0, 1.0,1.0));
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 1.0,1.0), 3.0);
+    std::string name = "World Origin";
+    
+    float one_axis_x[2];
+    float one_axis_y[2];
+
+    std::vector<triple_f> node_colors = {
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}};
+                
+    for (u32 edge=0; edge < 3; edge++)
+    {
+        double xs[2] {axis_x_values[0], axis_x_values[edge+1]};
+        double ys[2] {axis_y_values[0], axis_y_values[edge+1]};
+        
+        ImVec4 my_color; 
+        my_color.w = 1.0f; 
+        my_color.x = node_colors[edge+1].x;
+        my_color.y = node_colors[edge+1].y;
+        my_color.z = node_colors[edge+1].z;
+
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
+        ImPlot::SetNextLineStyle(my_color, 3.0);
+        ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
+    }
+    
+}
+
+static void draw_aruco_markers(ArucoMarker3d* aruco_marker, int camera_id)
+{
+    double x[5] = {(double)aruco_marker->proj_corners[camera_id][0].x, 
+        (double)aruco_marker->proj_corners[camera_id][1].x, 
+        (double)aruco_marker->proj_corners[camera_id][2].x, 
+        (double)aruco_marker->proj_corners[camera_id][3].x, 
+        (double)aruco_marker->proj_corners[camera_id][0].x};
+    
+    double y[5] = {(double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][1].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][2].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][3].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[camera_id][0].y};
+    
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
+    ImPlot::PlotLine("##", &x[0], &y[0], 5); 
+}
+
 
 #endif

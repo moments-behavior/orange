@@ -8,9 +8,25 @@ enum ServerControl : byte {
     QUIT = 4
 }
 
+struct Vec3 {
+  x:float;
+  y:float;
+  z:float;
+}
+
+table Ramp {
+    position:Vec3;
+    orientation:float;
+}
+
 table Server {
     control:ServerControl = IDEL;
     ptp_global_time:ulong;
 }
 
-root_type Server;
+table Scene {
+    ramp:Ramp;
+    server:Server;
+}
+
+root_type Scene;

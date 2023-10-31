@@ -1,5 +1,6 @@
 #include "network_base.h"
 
+
 bool enet_initialize(EnetContext* enet_context, uint16_t external_port_number, size_t max_peers)
 {
     ENetAddress address;
@@ -123,4 +124,32 @@ void service_network(EnetContext* enet_context, float dt, std::function<void(con
     {
         printf("Unable to service network: Network not initialized!");
     }
+}
+
+
+void send_serial_data(EnetContext *enet_context, flatbuffers::FlatBufferBuilder& builder, ArucoMarker3d* marker3d)
+{              
+    // build the buffer
+    builder.Clear();
+    auto position_ramp = FetchGame::Vec3(marker3d->t_vec.x, marker3d->t_vec.y, marker3d->t_vec.z);
+    float orientation_ramp = marker3d->angle_x_axis;
+    auto ramp_fb = CreateRamp(builder, &position_ramp, orientation_ramp);
+
+    FetchGame::SceneBuilder scene_builder(builder);
+    scene_builder.add_ramp(ramp_fb);
+    auto scene = scene_builder.Finish();
+    builder.Finish(scene);
+    uint8_t *buf = builder.GetBufferPointer();
+    int size = builder.GetSize();
+
+    ENetPacket *packet = enet_packet_create(buf,
+                                            size,
+                                            ENET_PACKET_FLAG_RELIABLE);
+    /* Send the packet to the peer over channel id 0. */
+    /* One could also broadcast the packet by         */
+    enet_host_broadcast(enet_context->m_pNetwork, 0, packet);
+    // enet_peer_send(peer, 0, packet);
+
+    // Receive some events
+    // enet_host_service(client, &event, 0);
 }

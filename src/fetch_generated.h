@@ -15,8 +15,16 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
 
 namespace FetchGame {
 
+struct Vec3;
+
+struct Ramp;
+struct RampBuilder;
+
 struct Server;
 struct ServerBuilder;
+
+struct Scene;
+struct SceneBuilder;
 
 enum ServerControl : int8_t {
   ServerControl_IDEL = 0,
@@ -55,6 +63,86 @@ inline const char *EnumNameServerControl(ServerControl e) {
   if (::flatbuffers::IsOutRange(e, ServerControl_IDEL, ServerControl_QUIT)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesServerControl()[index];
+}
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec3 FLATBUFFERS_FINAL_CLASS {
+ private:
+  float x_;
+  float y_;
+  float z_;
+
+ public:
+  Vec3()
+      : x_(0),
+        y_(0),
+        z_(0) {
+  }
+  Vec3(float _x, float _y, float _z)
+      : x_(::flatbuffers::EndianScalar(_x)),
+        y_(::flatbuffers::EndianScalar(_y)),
+        z_(::flatbuffers::EndianScalar(_z)) {
+  }
+  float x() const {
+    return ::flatbuffers::EndianScalar(x_);
+  }
+  float y() const {
+    return ::flatbuffers::EndianScalar(y_);
+  }
+  float z() const {
+    return ::flatbuffers::EndianScalar(z_);
+  }
+};
+FLATBUFFERS_STRUCT_END(Vec3, 12);
+
+struct Ramp FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef RampBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_POSITION = 4,
+    VT_ORIENTATION = 6
+  };
+  const FetchGame::Vec3 *position() const {
+    return GetStruct<const FetchGame::Vec3 *>(VT_POSITION);
+  }
+  float orientation() const {
+    return GetField<float>(VT_ORIENTATION, 0.0f);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<FetchGame::Vec3>(verifier, VT_POSITION, 4) &&
+           VerifyField<float>(verifier, VT_ORIENTATION, 4) &&
+           verifier.EndTable();
+  }
+};
+
+struct RampBuilder {
+  typedef Ramp Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_position(const FetchGame::Vec3 *position) {
+    fbb_.AddStruct(Ramp::VT_POSITION, position);
+  }
+  void add_orientation(float orientation) {
+    fbb_.AddElement<float>(Ramp::VT_ORIENTATION, orientation, 0.0f);
+  }
+  explicit RampBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<Ramp> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<Ramp>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<Ramp> CreateRamp(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const FetchGame::Vec3 *position = nullptr,
+    float orientation = 0.0f) {
+  RampBuilder builder_(_fbb);
+  builder_.add_orientation(orientation);
+  builder_.add_position(position);
+  return builder_.Finish();
 }
 
 struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -108,33 +196,86 @@ inline ::flatbuffers::Offset<Server> CreateServer(
   return builder_.Finish();
 }
 
-inline const FetchGame::Server *GetServer(const void *buf) {
-  return ::flatbuffers::GetRoot<FetchGame::Server>(buf);
+struct Scene FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SceneBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_RAMP = 4,
+    VT_SERVER = 6
+  };
+  const FetchGame::Ramp *ramp() const {
+    return GetPointer<const FetchGame::Ramp *>(VT_RAMP);
+  }
+  const FetchGame::Server *server() const {
+    return GetPointer<const FetchGame::Server *>(VT_SERVER);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_RAMP) &&
+           verifier.VerifyTable(ramp()) &&
+           VerifyOffset(verifier, VT_SERVER) &&
+           verifier.VerifyTable(server()) &&
+           verifier.EndTable();
+  }
+};
+
+struct SceneBuilder {
+  typedef Scene Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_ramp(::flatbuffers::Offset<FetchGame::Ramp> ramp) {
+    fbb_.AddOffset(Scene::VT_RAMP, ramp);
+  }
+  void add_server(::flatbuffers::Offset<FetchGame::Server> server) {
+    fbb_.AddOffset(Scene::VT_SERVER, server);
+  }
+  explicit SceneBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<Scene> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<Scene>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<Scene> CreateScene(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<FetchGame::Ramp> ramp = 0,
+    ::flatbuffers::Offset<FetchGame::Server> server = 0) {
+  SceneBuilder builder_(_fbb);
+  builder_.add_server(server);
+  builder_.add_ramp(ramp);
+  return builder_.Finish();
 }
 
-inline const FetchGame::Server *GetSizePrefixedServer(const void *buf) {
-  return ::flatbuffers::GetSizePrefixedRoot<FetchGame::Server>(buf);
+inline const FetchGame::Scene *GetScene(const void *buf) {
+  return ::flatbuffers::GetRoot<FetchGame::Scene>(buf);
 }
 
-inline bool VerifyServerBuffer(
+inline const FetchGame::Scene *GetSizePrefixedScene(const void *buf) {
+  return ::flatbuffers::GetSizePrefixedRoot<FetchGame::Scene>(buf);
+}
+
+inline bool VerifySceneBuffer(
     ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<FetchGame::Server>(nullptr);
+  return verifier.VerifyBuffer<FetchGame::Scene>(nullptr);
 }
 
-inline bool VerifySizePrefixedServerBuffer(
+inline bool VerifySizePrefixedSceneBuffer(
     ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<FetchGame::Server>(nullptr);
+  return verifier.VerifySizePrefixedBuffer<FetchGame::Scene>(nullptr);
 }
 
-inline void FinishServerBuffer(
+inline void FinishSceneBuffer(
     ::flatbuffers::FlatBufferBuilder &fbb,
-    ::flatbuffers::Offset<FetchGame::Server> root) {
+    ::flatbuffers::Offset<FetchGame::Scene> root) {
   fbb.Finish(root);
 }
 
-inline void FinishSizePrefixedServerBuffer(
+inline void FinishSizePrefixedSceneBuffer(
     ::flatbuffers::FlatBufferBuilder &fbb,
-    ::flatbuffers::Offset<FetchGame::Server> root) {
+    ::flatbuffers::Offset<FetchGame::Scene> root) {
   fbb.FinishSizePrefixed(root);
 }
 

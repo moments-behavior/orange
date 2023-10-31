@@ -156,17 +156,6 @@ __global__ void gpu_draw_box(unsigned char* src, const int width, const int heig
     if( (x < width) && (y < height) ) {
         for (int i= 0; i < 4; i++) {
 
-            // float AB = sqrtf(powf(d_points[i*2+2]-d_points[i*2], 2) + powf(d_points[i*2+3]-d_points[i*2+1], 2));
-            // float AP = sqrtf(powf(x-d_points[i*2], 2) + powf(y-d_points[i*2+1], 2));        
-            // float PB = sqrtf(powf(x-d_points[i*2+2], 2) + powf(y-d_points[i*2+3], 2));
-            
-            // if (fabsf(AB - (AP + PB)) <= 0.2f) {
-            //     *(src + ((y * width * 4) + (x * 4)))  = 255;
-            //     *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;
-            //     *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
-            //     *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;   
-            // }
-
             float lengh_squared = powf(d_points[i*2+2]-d_points[i*2], 2) + powf(d_points[i*2+3]-d_points[i*2+1], 2);
             float dot_product = (x - d_points[i*2]) * (d_points[i*2+2] - d_points[i*2]) + (y-d_points[i*2+1]) * (d_points[i*2+3]-d_points[i*2+1]);
             float t = fmaxf(0.0f, fminf(1.0f, dot_product/lengh_squared));

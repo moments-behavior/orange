@@ -76,7 +76,7 @@ bool find_marker3d(ArucoMarker2d* aruco_marker_2d, ArucoMarker3d* aruco_maker_3d
         // triangulate
         std::vector<CameraCalibResults*> calib_results_all; 
         for (size_t i = 0; i < num_detected_cams; i++) {
-            calib_results_all.push_back(calib_results + i);
+            calib_results_all.push_back(calib_results + aruco_marker_2d->detected_cameras[i]);
         }
  
         for (size_t i = 0; i < 4; i++) {

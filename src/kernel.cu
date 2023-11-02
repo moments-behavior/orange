@@ -163,7 +163,7 @@ __global__ void gpu_draw_box(unsigned char* src, const int width, const int heig
             float proj_y = d_points[i*2+1] + t * (d_points[i*2+3]-d_points[i*2+1]);
             float distance_squared = powf(x - proj_x, 2) + powf(y - proj_y, 2);
             double multiplier = 0.5 * (sin(current_time * 0.00000001) + 1.0);
-            if (distance_squared < 5.0f) {
+            if (distance_squared < 8.0f) {
                 *(src + ((y * width * 4) + (x * 4)))  = 200 + (unsigned char) 55 * multiplier;
                 *(src + ((y * width * 4) + (x * 4)) + 1)  = (unsigned char) 250 * multiplier;
                 *(src + ((y * width * 4) + (x * 4)) + 2)  = (unsigned char) 255 * multiplier;

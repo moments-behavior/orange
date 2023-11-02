@@ -165,9 +165,11 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
         points[8] = detection_data->marker3d->proj_corners[idx][0].x;
         points[9] = detection_data->marker3d->proj_corners[idx][0].y;
 
-        ck(cudaMemcpy(d_points, points, sizeof(float) * 10, cudaMemcpyHostToDevice));
-        gpu_draw_box(debayer.d_debayer, camera_params->width, camera_params->height, d_points, 0);
-        ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
+        if (idx == 2) {
+            ck(cudaMemcpy(d_points, points, sizeof(float) * 10, cudaMemcpyHostToDevice));
+            gpu_draw_box(debayer.d_debayer, camera_params->width, camera_params->height, d_points, 0);
+            ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));            
+        }
         // printf("display done \n");
         sync_manager->SignalDisplayDone(idx);
     }

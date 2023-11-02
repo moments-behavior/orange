@@ -103,7 +103,7 @@ void gx_imgui_init(gx_context *context)
     ImGui_ImplOpenGL3_Init(context->glsl_version);
 
     // Load a nice font
-    io.Fonts->AddFontFromFileTTF("fonts/Roboto-Regular.ttf", 15.0f);
+    io.Fonts->AddFontFromFileTTF("fonts/Roboto-Regular.ttf", 20.0f);
     // merge in icons from Font Awesome
     static const ImWchar icons_ranges[] = {ICON_MIN_FK, ICON_MAX_16_FK, 0};
     ImFontConfig icons_config;

@@ -84,7 +84,7 @@ void detection3d_proc(SyncDisplay* sync_manager, DetectionData* detection_data, 
     }
 }
 
-void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, CameraControl* camera_control, unsigned char* display_buffer, DetectionData* detection_data, int idx)
+void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, CameraControl* camera_control, CameraEachSelect* camera_select, unsigned char* display_buffer, DetectionData* detection_data, int idx)
 {
 
     ck(cudaSetDevice(camera_params->gpu_id));
@@ -165,7 +165,7 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
         points[8] = detection_data->marker3d->proj_corners[idx][0].x;
         points[9] = detection_data->marker3d->proj_corners[idx][0].y;
 
-        if (idx == 2) {
+        if (camera_select->stream_on) {
             ck(cudaMemcpy(d_points, points, sizeof(float) * 10, cudaMemcpyHostToDevice));
             gpu_draw_box(debayer.d_debayer, camera_params->width, camera_params->height, d_points, 0);
             ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));            

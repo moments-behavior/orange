@@ -64,16 +64,14 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
                 camera_state->frame_count);
         }
         
-        if (camera_select->stream_on) {
-            sync_display->PushToDisplay(ecam->frame_recv.imagePtr, 
-                ecam->frame_recv.bufferSize, 
-                ecam->frame_recv.size_x, 
-                ecam->frame_recv.size_y, 
-                ecam->frame_recv.pixel_type, 
-                ecam->frame_recv.timestamp,
-                camera_state->frame_count,
-                camera_params->sync_id);
-        }
+        sync_display->PushToDisplay(ecam->frame_recv.imagePtr, 
+            ecam->frame_recv.bufferSize, 
+            ecam->frame_recv.size_x, 
+            ecam->frame_recv.size_y, 
+            ecam->frame_recv.pixel_type, 
+            ecam->frame_recv.timestamp,
+            camera_state->frame_count,
+            camera_params->sync_id);
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
         if (camera_state->camera_return)

@@ -147,7 +147,6 @@ void gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points,
 }
 
 
-
 __global__ void gpu_draw_box(unsigned char* src, const int width, const int height, float* d_points, double current_time)
 {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -156,12 +155,12 @@ __global__ void gpu_draw_box(unsigned char* src, const int width, const int heig
     if( (x < width) && (y < height) ) {
         for (int i= 0; i < 4; i++) {
 
-            float lengh_squared = powf(d_points[i*2+2]-d_points[i*2], 2) + powf(d_points[i*2+3]-d_points[i*2+1], 2);
+            float lengh_squared = (d_points[i*2+2]-d_points[i*2]) * (d_points[i*2+2]-d_points[i*2]) + (d_points[i*2+3]-d_points[i*2+1]) * (d_points[i*2+3]-d_points[i*2+1]);
             float dot_product = (x - d_points[i*2]) * (d_points[i*2+2] - d_points[i*2]) + (y-d_points[i*2+1]) * (d_points[i*2+3]-d_points[i*2+1]);
             float t = fmaxf(0.0f, fminf(1.0f, dot_product/lengh_squared));
             float proj_x = d_points[i*2] + t * (d_points[i*2+2] - d_points[i*2]);
             float proj_y = d_points[i*2+1] + t * (d_points[i*2+3]-d_points[i*2+1]);
-            float distance_squared = powf(x - proj_x, 2) + powf(y - proj_y, 2);
+            float distance_squared = (x - proj_x) * (x - proj_x) + (y - proj_y) * (y - proj_y);
             double multiplier = 0.5 * (sin(current_time * 0.00000001) + 1.0);
             if (distance_squared < 8.0f) {
                 *(src + ((y * width * 4) + (x * 4)))  = 200 + (unsigned char) 55 * multiplier;

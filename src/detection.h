@@ -10,6 +10,7 @@
 struct DetectionPerCam {
     bool have_calibration_results;
     unsigned char* cpu_frame;
+    unsigned char* cpu_frame_gray;
     int frame_number;
     bool find_marker;
     cv::Point2f* marker_corners;
@@ -32,6 +33,7 @@ void allocate_detection_resources(DetectionData* detection_data, int num_cams, C
         u32 size_pic = camera_params[j].width * camera_params[j].height * 3 * sizeof(unsigned char);
         detection_data->detection_per_cam[j].have_calibration_results = false;
         detection_data->detection_per_cam[j].cpu_frame = (unsigned char *)malloc(size_pic);
+        detection_data->detection_per_cam[j].cpu_frame_gray = (unsigned char *)malloc(camera_params[j].width * camera_params[j].height);
         detection_data->detection_per_cam[j].marker_corners = (cv::Point2f*)malloc(sizeof(cv::Point2f) * 4);
     }
 
@@ -96,6 +98,14 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
     unsigned char *d_bgr;
     cudaMalloc((void **)&d_bgr, camera_params->width * camera_params->height * 3);
 
+    unsigned char *d_gray;
+    cudaMalloc((void **)&d_gray, camera_params->width * camera_params->height);
+
+    NppiSize d_gray_size;
+    d_gray_size.width = camera_params->width;
+    d_gray_size.height = camera_params->height;
+
+
     float *d_points;
     cudaMalloc((void **)&d_points, sizeof(float) * 10);
     float points[10];
@@ -123,17 +133,24 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
             duplicate_channel_gpu(camera_params, &frame_original, &debayer);
         }
         // detection, aruco marker and yolo per thread goes here
-        // need cuda kernel to convert to bgr, maybe can use another stream, since the default stream is used for gpu buffer
         rgba2bgr_convert(d_bgr, debayer.d_debayer, camera_params->width, camera_params->height, 0);
-        // copy back to cpu 
         ck(cudaMemcpy2D(detection_data->detection_per_cam[idx].cpu_frame, camera_params->width*3, d_bgr, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
-        // aruco marker detection 
         cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, detection_data->detection_per_cam[idx].cpu_frame).reshape(3, camera_params->height);
-        
+
+        // convert rgba to grayscale, need to compare opencv marker detection and the package used, which is better, https://sourceforge.net/projects/aruco/ 
+        // const NppStatus npp_result = nppiRGBToGray_8u_AC4C1R(debayer.d_debayer, camera_params->width*4, d_gray, camera_params->width, d_gray_size);
+        // if (npp_result != 0)
+        // {
+        // std::cout << "\nNPP error %d \n"
+        //           << npp_result << std::endl;
+        // }
+        // ck(cudaMemcpy2D(detection_data->detection_per_cam[idx].cpu_frame_gray, camera_params->width, d_gray, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyDeviceToHost));
+        // cv::Mat view = cv::Mat(camera_params->width * camera_params->height, 1, CV_8U, detection_data->detection_per_cam[idx].cpu_frame).reshape(1, camera_params->height);
+
         std::vector<aruconano::Marker> markers = MDetector.detect(view);
         detection_data->detection_per_cam[idx].find_marker = false;
         for (size_t i = 0; i < markers.size(); i++) {
-            // std::cout << markers[i].id << std::endl;
+            std::cout << markers[i].id << std::endl;
             if (markers[i].id == 0) {
                 detection_data->detection_per_cam[idx].find_marker = true;
                 for (size_t j = 0; j < 4; j++) {

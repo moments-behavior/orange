@@ -78,7 +78,7 @@ void detection3d_proc(SyncDisplay* sync_manager, DetectionData* detection_data, 
         }
 
         detection_data->marker3d->new_detection = find_marker3d(&marker2d_all_cams, detection_data->marker3d, detection_data->camera_calib, num_sync_cameras);
-        // std::cout << detection_data->marker3d->new_detection << std::endl;
+        std::cout << detection_data->marker3d->new_detection << std::endl;
         // std::this_thread::sleep_for(std::chrono::milliseconds(16));
 
         // std::cout << "tri done" << std::endl; 
@@ -150,8 +150,8 @@ void detection_proc(SyncDisplay* sync_manager, CameraParams* camera_params, Came
         std::vector<aruconano::Marker> markers = MDetector.detect(view);
         detection_data->detection_per_cam[idx].find_marker = false;
         for (size_t i = 0; i < markers.size(); i++) {
-            std::cout << markers[i].id << std::endl;
-            if (markers[i].id == 0) {
+            // std::cout << markers[i].id << std::endl;
+            if (markers[i].id == 21) {
                 detection_data->detection_per_cam[idx].find_marker = true;
                 for (size_t j = 0; j < 4; j++) {
                     detection_data->detection_per_cam[idx].marker_corners[j] = markers[i][j];

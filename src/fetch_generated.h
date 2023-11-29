@@ -63,18 +63,19 @@ inline const char *EnumNameServerControl(ServerControl e) {
 struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef bring_up_messageBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SERVER_ID = 4,
+    VT_SERVER_NAME = 4,
     VT_NUM_CAMERAS = 6
   };
-  int16_t server_id() const {
-    return GetField<int16_t>(VT_SERVER_ID, 0);
+  const ::flatbuffers::String *server_name() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_SERVER_NAME);
   }
   int16_t num_cameras() const {
     return GetField<int16_t>(VT_NUM_CAMERAS, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<int16_t>(verifier, VT_SERVER_ID, 2) &&
+           VerifyOffset(verifier, VT_SERVER_NAME) &&
+           verifier.VerifyString(server_name()) &&
            VerifyField<int16_t>(verifier, VT_NUM_CAMERAS, 2) &&
            verifier.EndTable();
   }
@@ -84,8 +85,8 @@ struct bring_up_messageBuilder {
   typedef bring_up_message Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_server_id(int16_t server_id) {
-    fbb_.AddElement<int16_t>(bring_up_message::VT_SERVER_ID, server_id, 0);
+  void add_server_name(::flatbuffers::Offset<::flatbuffers::String> server_name) {
+    fbb_.AddOffset(bring_up_message::VT_SERVER_NAME, server_name);
   }
   void add_num_cameras(int16_t num_cameras) {
     fbb_.AddElement<int16_t>(bring_up_message::VT_NUM_CAMERAS, num_cameras, 0);
@@ -103,12 +104,23 @@ struct bring_up_messageBuilder {
 
 inline ::flatbuffers::Offset<bring_up_message> Createbring_up_message(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    int16_t server_id = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> server_name = 0,
     int16_t num_cameras = 0) {
   bring_up_messageBuilder builder_(_fbb);
+  builder_.add_server_name(server_name);
   builder_.add_num_cameras(num_cameras);
-  builder_.add_server_id(server_id);
   return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<bring_up_message> Createbring_up_messageDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *server_name = nullptr,
+    int16_t num_cameras = 0) {
+  auto server_name__ = server_name ? _fbb.CreateString(server_name) : 0;
+  return FetchGame::Createbring_up_message(
+      _fbb,
+      server_name__,
+      num_cameras);
 }
 
 struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

@@ -15,6 +15,9 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
 
 namespace FetchGame {
 
+struct bring_up_message;
+struct bring_up_messageBuilder;
+
 struct Server;
 struct ServerBuilder;
 
@@ -57,14 +60,69 @@ inline const char *EnumNameServerControl(ServerControl e) {
   return EnumNamesServerControl()[index];
 }
 
+struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef bring_up_messageBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SERVER_ID = 4,
+    VT_NUM_CAMERAS = 6
+  };
+  int16_t server_id() const {
+    return GetField<int16_t>(VT_SERVER_ID, 0);
+  }
+  int16_t num_cameras() const {
+    return GetField<int16_t>(VT_NUM_CAMERAS, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<int16_t>(verifier, VT_SERVER_ID, 2) &&
+           VerifyField<int16_t>(verifier, VT_NUM_CAMERAS, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct bring_up_messageBuilder {
+  typedef bring_up_message Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_server_id(int16_t server_id) {
+    fbb_.AddElement<int16_t>(bring_up_message::VT_SERVER_ID, server_id, 0);
+  }
+  void add_num_cameras(int16_t num_cameras) {
+    fbb_.AddElement<int16_t>(bring_up_message::VT_NUM_CAMERAS, num_cameras, 0);
+  }
+  explicit bring_up_messageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<bring_up_message> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<bring_up_message>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<bring_up_message> Createbring_up_message(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    int16_t server_id = 0,
+    int16_t num_cameras = 0) {
+  bring_up_messageBuilder builder_(_fbb);
+  builder_.add_num_cameras(num_cameras);
+  builder_.add_server_id(server_id);
+  return builder_.Finish();
+}
+
 struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ServerBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_CONTROL = 4,
-    VT_PTP_GLOBAL_TIME = 6
+    VT_SERVER_MESG = 6,
+    VT_PTP_GLOBAL_TIME = 8
   };
   FetchGame::ServerControl control() const {
     return static_cast<FetchGame::ServerControl>(GetField<int8_t>(VT_CONTROL, 0));
+  }
+  const FetchGame::bring_up_message *server_mesg() const {
+    return GetPointer<const FetchGame::bring_up_message *>(VT_SERVER_MESG);
   }
   uint64_t ptp_global_time() const {
     return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
@@ -72,6 +130,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_CONTROL, 1) &&
+           VerifyOffset(verifier, VT_SERVER_MESG) &&
+           verifier.VerifyTable(server_mesg()) &&
            VerifyField<uint64_t>(verifier, VT_PTP_GLOBAL_TIME, 8) &&
            verifier.EndTable();
   }
@@ -83,6 +143,9 @@ struct ServerBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_control(FetchGame::ServerControl control) {
     fbb_.AddElement<int8_t>(Server::VT_CONTROL, static_cast<int8_t>(control), 0);
+  }
+  void add_server_mesg(::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg) {
+    fbb_.AddOffset(Server::VT_SERVER_MESG, server_mesg);
   }
   void add_ptp_global_time(uint64_t ptp_global_time) {
     fbb_.AddElement<uint64_t>(Server::VT_PTP_GLOBAL_TIME, ptp_global_time, 0);
@@ -101,9 +164,11 @@ struct ServerBuilder {
 inline ::flatbuffers::Offset<Server> CreateServer(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
+    ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     uint64_t ptp_global_time = 0) {
   ServerBuilder builder_(_fbb);
   builder_.add_ptp_global_time(ptp_global_time);
+  builder_.add_server_mesg(server_mesg);
   builder_.add_control(control);
   return builder_.Finish();
 }

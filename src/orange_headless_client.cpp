@@ -167,12 +167,12 @@ int main(int argc, char *argv[])
     // send the available no of cameras and which workstation it is 
     {
         builder.Clear();
-        FetchGame::bring_up_messageBuilder message_builder(builder);
         auto server_name = builder.CreateString(hostname);
-        message_builder.add_num_cameras(cam_count);
-        message_builder.add_server_name(server_name); 
-        auto my_server = message_builder.Finish();
-        builder.Finish(my_server);
+        auto message_fb = FetchGame::Createbring_up_message(builder, server_name, cam_count);
+        FetchGame::ServerBuilder server_builder(builder);
+        server_builder.add_server_mesg(message_fb);
+        auto server_fb = server_builder.Finish();
+        builder.Finish(server_fb);
         uint8_t *server_buffer = builder.GetBufferPointer();
         int server_buf_size = builder.GetSize();
         ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);

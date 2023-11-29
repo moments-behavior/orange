@@ -151,24 +151,6 @@ int main(int argc, char *argv[])
     std::cout << "available no of cameras: " << cam_count << std::endl;
 
 
-    char hostname[80];
-    gethostname(hostname, 80);
-    // send the available no of cameras and which workstation it is 
-    {
-        builder.Clear();
-        FetchGame::bring_up_messageBuilder message_builder(builder);
-        auto server_name = message_builder.CreateString(hostname);
-        message_builder.add_num_cameras(cam_cout);
-        message_builder.add_server_name(server_name); 
-        auto my_server = server_builder.Finish();
-        builder.Finish(my_server);
-        uint8_t *server_buffer = builder.GetBufferPointer();
-        int server_buf_size = builder.GetSize();
-        ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-        enet_peer_send(server_connection, 0, enet_packet);
-    }
-
-
     CameraParams *cameras_params;
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
@@ -179,6 +161,25 @@ int main(int argc, char *argv[])
     PTPParams *ptp_params = new PTPParams{0, 0};
     ptp_params->network_sync = true;
     flatbuffers::FlatBufferBuilder builder(1024);
+
+    char hostname[80];
+    gethostname(hostname, 80);
+    // send the available no of cameras and which workstation it is 
+    {
+        builder.Clear();
+        FetchGame::bring_up_messageBuilder message_builder(builder);
+        auto server_name = builder.CreateString(hostname);
+        message_builder.add_num_cameras(cam_count);
+        message_builder.add_server_name(server_name); 
+        auto my_server = message_builder.Finish();
+        builder.Finish(my_server);
+        uint8_t *server_buffer = builder.GetBufferPointer();
+        int server_buf_size = builder.GetSize();
+        ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+        enet_peer_send(server_connection, 0, enet_packet);
+    }
+
+
 
 
     bool has_sent_ptp_time = false;

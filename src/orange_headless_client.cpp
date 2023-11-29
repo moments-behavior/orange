@@ -177,6 +177,7 @@ int main(int argc, char *argv[])
         int server_buf_size = builder.GetSize();
         ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
         enet_peer_send(server_connection, 0, enet_packet);
+        printf("sent message\n");
     }
 
 

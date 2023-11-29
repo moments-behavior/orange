@@ -75,16 +75,10 @@ int main(int argc, char **args)
     
     flatbuffers::FlatBufferBuilder builder(1024);
 
-    if (enet_initialize() != 0)
-    {
-        fprintf(stderr, "An error occurred while initializing ENet.\n");
-        return EXIT_FAILURE;
-    }
-
     EnetContext server;
     if (enet_initialize(&server, 3333, 5)) {
         printf("Server Initiated\n");
-    }
+    } 
 
     while (!glfwWindowShouldClose(window->render_target))
     {

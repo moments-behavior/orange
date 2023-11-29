@@ -183,18 +183,7 @@ int main(int argc, char *argv[])
                         if (evnt.peer == server_connection)
                         {
                             printf("Network: Successfully connected to server! \n");
-                            builder.Clear();
-                            auto server_name = builder.CreateString(hostname);
-                            auto message_fb = FetchGame::Createbring_up_message(builder, server_name, cam_count);
-                            FetchGame::ServerBuilder server_builder(builder);
-                            server_builder.add_server_mesg(message_fb);
-                            auto server_fb = server_builder.Finish();
-                            builder.Finish(server_fb);
-                            uint8_t *server_buffer = builder.GetBufferPointer();
-                            int server_buf_size = builder.GetSize();
-                            ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                            enet_peer_send(server_connection, 0, enet_packet);
-                            printf("sent bring up message\n");
+                            send_bringup_message(&client, &builder, server_connection, hostname, cam_count);
                         }
 
                     }

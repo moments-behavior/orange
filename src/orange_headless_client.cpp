@@ -153,20 +153,20 @@ int main(int argc, char *argv[])
 
     char hostname[80];
     gethostname(hostname, 80);
-    std::cout << hostname << std::endl;
-    // // send the available no of cameras and which workstation it is 
-    // {
-    //     builder.Clear();
-    //     FetchGame::ServerBuilder server_builder(builder);
-    //     server_builder.add_server_mesg()
-    //     server_builder.add_ptp_global_time(ptp_params->ptp_global_time);
-    //     auto my_server = server_builder.Finish();
-    //     builder.Finish(my_server);
-    //     uint8_t *server_buffer = builder.GetBufferPointer();
-    //     int server_buf_size = builder.GetSize();
-    //     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-    //     enet_peer_send(server_connection, 0, enet_packet);
-    // }
+    // send the available no of cameras and which workstation it is 
+    {
+        builder.Clear();
+        FetchGame::bring_up_messageBuilder message_builder(builder);
+        auto server_name = message_builder.CreateString(hostname);
+        message_builder.add_num_cameras(cam_cout);
+        message_builder.add_server_name(server_name); 
+        auto my_server = server_builder.Finish();
+        builder.Finish(my_server);
+        uint8_t *server_buffer = builder.GetBufferPointer();
+        int server_buf_size = builder.GetSize();
+        ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+        enet_peer_send(server_connection, 0, enet_packet);
+    }
 
 
     CameraParams *cameras_params;

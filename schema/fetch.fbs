@@ -9,7 +9,7 @@ enum ServerControl : byte {
 }
 
 table bring_up_message {
-    server_id:short;
+    server_name:string;
     num_cameras:short;
 }
 

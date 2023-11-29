@@ -504,8 +504,12 @@ int main(int argc, char **args)
                     camera_control->record_video = true;
                     std::string folder_string = current_date_time();
                     std::string folder_subfix(subfix_buf);
-                    folder_name = file_dialog.GetSelected().string() + "/" + folder_string + "_" + folder_subfix;
-
+                    if (folder_subfix.empty()) {
+                        folder_name = file_dialog.GetSelected().string() + "/" + folder_string;
+                    } else {
+                        folder_name = file_dialog.GetSelected().string() + "/" + folder_string + "_" + folder_subfix;
+                    }
+                    
                     if (mkdir(folder_name.c_str(), 0777) == -1)
                     {
                         std::cerr << "Error :  " << std::strerror(errno) << std::endl;

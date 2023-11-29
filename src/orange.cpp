@@ -100,11 +100,13 @@ int main(int argc, char **args)
 
             case ENET_EVENT_TYPE_RECEIVE:
                 {
-                    printf("\t Client %d says: %s\n", evnt.peer->incomingPeerID, evnt.packet->data);
+                    // put server into a data structure
+                    printf("\t Client %d says: \n", evnt.peer->incomingPeerID);
                     uint8_t* buffer_pointer = evnt.packet->data;
                     auto server_control = FetchGame::GetServer(buffer_pointer);
-                    auto server_name =  server_control->server_mesg()->server_name();
-                    std::cout << server_name << std::endl;
+                    auto server_name = server_control->server_mesg()->server_name()->c_str();
+                    auto server_num_cameras = server_control->server_mesg()->num_cameras();
+                    std::cout <<  server_name << ", number of cameras: " << server_num_cameras << std::endl;
                     // auto server_signal = server_control->ptp_global_time();
                     // std::cout << server_signal << std::endl;
                     enet_packet_destroy(evnt.packet);

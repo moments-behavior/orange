@@ -8,8 +8,14 @@ enum ServerControl : byte {
     QUIT = 4
 }
 
+table bring_up_message {
+    server_id:short;
+    num_cameras:short;
+}
+
 table Server {
     control:ServerControl = IDEL;
+    server_mesg:bring_up_message;
     ptp_global_time:ulong;
 }
 

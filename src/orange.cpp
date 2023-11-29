@@ -17,7 +17,6 @@ simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger(
 
 int main(int argc, char **args)
 {
-
     gx_context *window = (gx_context *)malloc(sizeof(gx_context));
     *window = (gx_context){
         .swap_interval = 1, // use vsync
@@ -28,7 +27,7 @@ int main(int argc, char **args)
 
     render_initialize_target(window);
 
-    int max_cameras = 16;
+    int max_cameras = 20;
     int cam_count;
     GigEVisionDeviceInfo unsorted_device_info[max_cameras];
     cam_count = scan_cameras(max_cameras, unsorted_device_info);
@@ -453,8 +452,8 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
-            static char prefix_buf[64] = ""; 
-            ImGui::InputText("prefix", prefix_buf, 64);
+            static char subfix_buf[64] = ""; 
+            ImGui::InputText("subfix", subfix_buf, 64);
 
             if (ImGui::Button("Save to"))
             {
@@ -500,8 +499,8 @@ int main(int argc, char **args)
                 {
                     camera_control->record_video = true;
                     std::string folder_string = current_date_time();
-                    std::string folder_prefix(prefix_buf);
-                    folder_name = file_dialog.GetSelected().string() + "/" + folder_prefix + folder_string;
+                    std::string folder_subfix(subfix_buf);
+                    folder_name = file_dialog.GetSelected().string() + "/" + folder_string + "_" + folder_subfix;
 
                     if (mkdir(folder_name.c_str(), 0777) == -1)
                     {
@@ -537,13 +536,13 @@ int main(int argc, char **args)
                         }
                     }
 
-                    // if (num_cameras > 1){
+                    if (num_cameras > 1){
                         for (int i = 0; i < num_cameras; i++)
                         {
                             ptp_camera_sync(&ecams[i].camera);
                         }
                         camera_control->sync_camera = true;
-                    // }
+                    }
 
                     for (int i = 0; i < num_cameras; i++)
                     {

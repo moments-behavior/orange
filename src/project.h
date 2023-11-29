@@ -22,6 +22,24 @@ std::vector<std::string> string_split(std::string s, std::string delimiter) {
     return res;
 }
 
+
+std::vector<std::string> string_split_char(char* string_c, std::string delimiter) {
+    std::string s = std::string(string_c);
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (s.substr (pos_start));
+    return res;
+}
+
+
 void load_camera_json_config_files(std::string file_name, CameraParams* camera_params, int camera_id, int num_cameras) {
     
     std::ifstream f(file_name);
@@ -45,16 +63,37 @@ void load_camera_json_config_files(std::string file_name, CameraParams* camera_p
     camera_params->focus = camera_config["focus"];
 }
 
-
-
-// Get current date/time, format is YYYY-MM-DD.HH:mm:ss
+// Get current date/time, format is YYYY_MM_DD_HH_mm_ss
 const std::string current_date_time() {
     time_t     now = time(0);
     struct tm  tstruct;
     char       buf[80];
     tstruct = *localtime(&now);
-    strftime(buf, sizeof(buf), "%Y_%m_%d_%X", &tstruct);
-    return buf;
+    strftime(buf, sizeof(buf), "%Y:%m:%d:%X", &tstruct);
+    
+    std::string delimiter = ":";
+
+    std::string s(buf);
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (s.substr (pos_start));
+    std::string final_string;
+
+    for (int i = 0; i < res.size(); i++) {
+        if (i!=0) {
+            final_string += "_";
+        }
+        final_string += res[i];
+    }
+    return final_string.c_str();
 }
 
 void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure) 

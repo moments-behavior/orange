@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
                         if (evnt.peer == server_connection)
                         {
                             printf("Network: Successfully connected to server! \n");
-                            send_bringup_message(&client, &builder, server_connection, hostname, cam_count);
+                            send_bringup_message(&client, builder, server_connection, hostname, cam_count);
                         }
 
                     }

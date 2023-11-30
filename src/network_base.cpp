@@ -132,6 +132,7 @@ void send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuil
     auto server_name = builder.CreateString(hostname);
     auto message_fb = FetchGame::Createbring_up_message(builder, server_name, cam_count);
     FetchGame::ServerBuilder server_builder(builder);
+    server_builder.add_signal_type(FetchGame::SignalType_ClientBringup);
     server_builder.add_server_mesg(message_fb);
     auto server_fb = server_builder.Finish();
     builder.Finish(server_fb);

@@ -60,6 +60,39 @@ inline const char *EnumNameServerControl(ServerControl e) {
   return EnumNamesServerControl()[index];
 }
 
+enum SignalType : int8_t {
+  SignalType_HostControl = 0,
+  SignalType_ClientBringup = 1,
+  SignalType_PTPTime = 2,
+  SignalType_MIN = SignalType_HostControl,
+  SignalType_MAX = SignalType_PTPTime
+};
+
+inline const SignalType (&EnumValuesSignalType())[3] {
+  static const SignalType values[] = {
+    SignalType_HostControl,
+    SignalType_ClientBringup,
+    SignalType_PTPTime
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesSignalType() {
+  static const char * const names[4] = {
+    "HostControl",
+    "ClientBringup",
+    "PTPTime",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameSignalType(SignalType e) {
+  if (::flatbuffers::IsOutRange(e, SignalType_HostControl, SignalType_PTPTime)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesSignalType()[index];
+}
+
 struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef bring_up_messageBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -126,10 +159,14 @@ inline ::flatbuffers::Offset<bring_up_message> Createbring_up_messageDirect(
 struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ServerBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_CONTROL = 4,
-    VT_SERVER_MESG = 6,
-    VT_PTP_GLOBAL_TIME = 8
+    VT_SIGNAL_TYPE = 4,
+    VT_CONTROL = 6,
+    VT_SERVER_MESG = 8,
+    VT_PTP_GLOBAL_TIME = 10
   };
+  FetchGame::SignalType signal_type() const {
+    return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 1));
+  }
   FetchGame::ServerControl control() const {
     return static_cast<FetchGame::ServerControl>(GetField<int8_t>(VT_CONTROL, 0));
   }
@@ -141,6 +178,7 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<int8_t>(verifier, VT_SIGNAL_TYPE, 1) &&
            VerifyField<int8_t>(verifier, VT_CONTROL, 1) &&
            VerifyOffset(verifier, VT_SERVER_MESG) &&
            verifier.VerifyTable(server_mesg()) &&
@@ -153,6 +191,9 @@ struct ServerBuilder {
   typedef Server Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
+  void add_signal_type(FetchGame::SignalType signal_type) {
+    fbb_.AddElement<int8_t>(Server::VT_SIGNAL_TYPE, static_cast<int8_t>(signal_type), 1);
+  }
   void add_control(FetchGame::ServerControl control) {
     fbb_.AddElement<int8_t>(Server::VT_CONTROL, static_cast<int8_t>(control), 0);
   }
@@ -175,6 +216,7 @@ struct ServerBuilder {
 
 inline ::flatbuffers::Offset<Server> CreateServer(
     ::flatbuffers::FlatBufferBuilder &_fbb,
+    FetchGame::SignalType signal_type = FetchGame::SignalType_ClientBringup,
     FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     uint64_t ptp_global_time = 0) {
@@ -182,6 +224,7 @@ inline ::flatbuffers::Offset<Server> CreateServer(
   builder_.add_ptp_global_time(ptp_global_time);
   builder_.add_server_mesg(server_mesg);
   builder_.add_control(control);
+  builder_.add_signal_type(signal_type);
   return builder_.Finish();
 }
 

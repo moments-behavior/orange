@@ -78,7 +78,9 @@ int main(int argc, char **args)
     EnetContext server;
     if (enet_initialize(&server, 3333, 5)) {
         printf("Server Initiated\n");
-    } 
+    }
+
+    std::vector<ConnectedServer*> connected_servers;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -98,9 +100,17 @@ int main(int argc, char **args)
                     printf("\t Client %d says: \n", evnt.peer->incomingPeerID);
                     uint8_t* buffer_pointer = evnt.packet->data;
                     auto server_control = FetchGame::GetServer(buffer_pointer);
-                    auto server_name = server_control->server_mesg()->server_name()->c_str();
-                    auto server_num_cameras = server_control->server_mesg()->num_cameras();
-                    std::cout <<  server_name << ", number of cameras: " << server_num_cameras << std::endl;
+                    
+                    if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
+                        auto server_name = server_control->server_mesg()->server_name()->c_str();
+                        auto server_num_cameras = server_control->server_mesg()->num_cameras();
+                        ConnectedServer* new_server = new ConnectedServer();
+                        strcpy(new_server->name, server_name); 
+                        new_server->num_cameras = server_num_cameras;
+                        new_server->peer_id = evnt.peer->incomingPeerID;
+                        connected_servers.push_back(new_server);
+                    }
+
                     // auto server_signal = server_control->ptp_global_time();
                     // std::cout << server_signal << std::endl;
                     enet_packet_destroy(evnt.packet);
@@ -118,6 +128,25 @@ int main(int argc, char **args)
 
         if (ImGui::Begin("Networking")) 
         {
+
+            
+            if (ImGui::BeginTable("Servers", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+            {
+
+                for (int i = 0; i < connected_servers.size(); i++)
+                {
+                    char label[32];
+                    sprintf(label, "##servers%d", i);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text(connected_servers[i]->name);
+                    ImGui::TableNextColumn();
+                    ImGui::Text(std::to_string(connected_servers[i]->num_cameras).c_str());
+                }
+                ImGui::EndTable();
+            }
+            
+
             if(ImGui::Button("Clients start camera threads")) {
                 ptp_params->network_sync = true;
                 // broadcast data

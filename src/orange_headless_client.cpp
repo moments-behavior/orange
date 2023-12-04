@@ -28,72 +28,39 @@ void quit_process(bool error = false, const std::string &reason = "")
     }
 }
 
-bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params)
+bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string config_folder)
 {
-    std::filesystem::path cwd = std::filesystem::current_path();
-    std::string delimiter = "/";
-    std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
 
     std::vector<std::string> camera_config_files;
-    std::vector<std::string> camera_config_names;
+    update_camera_configs(camera_config_files, config_folder);
 
     printf("Start camera thread \n");
     cameras_params = new CameraParams[num_cameras];
     cameras_select = new CameraEachSelect[num_cameras];
 
-    // load camera configs
-    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp/animal";
-    std::string camera_config_dir = start_folder_name + "/";
+    // for (int i = 0; i < num_cameras; i++)
+    // {
+    //     open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+    // }
 
-    for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
-    {
-        camera_config_files.push_back(entry.path().string());
-	std::cout << entry.path().string() << std::endl;
-    }
-    std::sort(camera_config_files.begin(), camera_config_files.end());
-    for (auto &camera_serial : camera_config_files)
-    {
-        // get the serial number
-        std::string delimiter = "/";
-        std::vector<std::string> tokenized_path = string_split(camera_serial, delimiter);
-        camera_config_names.push_back(tokenized_path.back());
-    }
+    // for (int i = 0; i < num_cameras; i++)
+    // {
+    //     camera_open_stream(&ecams[i].camera);
+    //     ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+    //     allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        cameras_params[i].camera_serial.append(device_info[i].serialNumber);
-        auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
-        if (it != camera_config_names.end())
-        {
-            auto config_idx = std::distance(camera_config_names.begin(), it);
-            std::cout << "Load camera json file: " << camera_config_files[config_idx] << std::endl;
-            load_camera_json_config_files(camera_config_files[config_idx], &cameras_params[i], i, num_cameras);
-        }
-    }
-
-    for (int i = 0; i < num_cameras; i++)
-    {
-        open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
-    }
-
-    for (int i = 0; i < num_cameras; i++)
-    {
-        camera_open_stream(&ecams[i].camera);
-        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
-        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
-
-        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
-        {
-            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
-        }
-    }
+    //     if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
+    //     {
+    //         allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+    //     }
+    // }
 
     camera_control->record_video = true;
     camera_control->subscribe = true;
     camera_control->sync_camera = true;
     std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
     std::string folder_string = current_date_time();
-    std::string folder_name = "/home/" + tokenized_path[2] + "/Videos/" + folder_string;
+    std::string folder_name = config_folder + "/" + folder_string;
 
     // Creating a directory to save recorded video;
     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -106,20 +73,20 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
         std::cout << "Recorded video saves to : " << folder_name << std::endl;
     }
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        ptp_camera_sync(&ecams[i].camera);
-    }
+    // for (int i = 0; i < num_cameras; i++)
+    // {
+    //     ptp_camera_sync(&ecams[i].camera);
+    // }
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        cameras_select->stream_on = false;
-    }
+    // for (int i = 0; i < num_cameras; i++)
+    // {
+    //     cameras_select->stream_on = false;
+    // }
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_setup, folder_name, ptp_params));
-    }
+    // for (int i = 0; i < num_cameras; i++)
+    // {
+    //     camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_setup, folder_name, ptp_params));
+    // }
 
     return true;
 }
@@ -205,10 +172,10 @@ int main(int argc, char *argv[])
                         {
                             auto config_name = server_control->config_folder()->c_str();
                             strcpy(config_folder_name, config_name); 
-                            std::cout << config_folder_name << std::endl;
-                            // if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
-                            //     printf("Camera threads started...\n");
-                            // };
+                            std::string config_folder = config_folder_name;
+                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, config_folder)) {
+                                printf("Camera threads started...\n");
+                            };
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
                             quit_server = true;
@@ -249,7 +216,6 @@ int main(int argc, char *argv[])
                             // }
 
                         }
-
                         enet_packet_destroy(evnt.packet);
                     }
                     break;

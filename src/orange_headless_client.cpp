@@ -163,9 +163,9 @@ int main(int argc, char *argv[])
     ptp_params->network_sync = true;
     flatbuffers::FlatBufferBuilder builder(1024);
 
-    char hostname[80];
-    gethostname(hostname, 80);
-    // send the available no of cameras and which workstation it is 
+    char hostname[100];
+    gethostname(hostname, 100);
+    char config_folder_name[100];
 
 
     bool has_sent_ptp_time = false;
@@ -203,9 +203,12 @@ int main(int argc, char *argv[])
 
                         if (server_signal == FetchGame::ServerControl_START)
                         {
-                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
-                                printf("Camera threads started...\n");
-                            };
+                            auto config_name = server_control->config_folder()->c_str();
+                            strcpy(config_folder_name, config_name); 
+                            std::cout << config_folder_name << std::endl;
+                            // if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params)) {
+                            //     printf("Camera threads started...\n");
+                            // };
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
                             quit_server = true;

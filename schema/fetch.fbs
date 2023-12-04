@@ -23,6 +23,7 @@ table Server {
     signal_type:SignalType = ClientBringup;
     control:ServerControl = IDEL;
     server_mesg:bring_up_message;
+    config_folder:string;
     ptp_global_time:ulong;
 }
 

@@ -34,9 +34,9 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
     std::vector<std::string> camera_config_files;
     update_camera_configs(camera_config_files, config_folder);
 
-    printf("Start camera thread \n");
-    cameras_params = new CameraParams[num_cameras];
-    cameras_select = new CameraEachSelect[num_cameras];
+    // printf("Start camera thread \n");
+    // cameras_params = new CameraParams[num_cameras];
+    // cameras_select = new CameraEachSelect[num_cameras];
 
     // for (int i = 0; i < num_cameras; i++)
     // {
@@ -55,23 +55,23 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
     //     }
     // }
 
-    camera_control->record_video = true;
-    camera_control->subscribe = true;
-    camera_control->sync_camera = true;
-    std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
-    std::string folder_string = current_date_time();
-    std::string folder_name = config_folder + "/" + folder_string;
+    // camera_control->record_video = true;
+    // camera_control->subscribe = true;
+    // camera_control->sync_camera = true;
+    // std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
+    // std::string folder_string = current_date_time();
+    // std::string folder_name = config_folder + "/" + folder_string;
 
-    // Creating a directory to save recorded video;
-    if (mkdir(folder_name.c_str(), 0777) == -1)
-    {
-        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
-        return false;
-    }
-    else
-    {
-        std::cout << "Recorded video saves to : " << folder_name << std::endl;
-    }
+    // // Creating a directory to save recorded video;
+    // if (mkdir(folder_name.c_str(), 0777) == -1)
+    // {
+    //     std::cerr << "Error :  " << std::strerror(errno) << std::endl;
+    //     return false;
+    // }
+    // else
+    // {
+    //     std::cout << "Recorded video saves to : " << folder_name << std::endl;
+    // }
 
     // for (int i = 0; i < num_cameras; i++)
     // {
@@ -130,11 +130,6 @@ int main(int argc, char *argv[])
     ptp_params->network_sync = true;
     flatbuffers::FlatBufferBuilder builder(1024);
 
-    char hostname[100];
-    gethostname(hostname, 100);
-    char config_folder_name[100];
-
-
     bool has_sent_ptp_time = false;
     bool quit_server = false;
     while (!quit_server)
@@ -151,7 +146,7 @@ int main(int argc, char *argv[])
                         if (evnt.peer == server_connection)
                         {
                             printf("Network: Successfully connected to server! \n");
-                            send_bringup_message(&client, builder, server_connection, hostname, cam_count);
+                            send_bringup_message(&client, builder, server_connection, cam_count);
                         }
                     }
                     break;
@@ -171,8 +166,7 @@ int main(int argc, char *argv[])
                         if (server_signal == FetchGame::ServerControl_START)
                         {
                             auto config_name = server_control->config_folder()->c_str();
-                            strcpy(config_folder_name, config_name); 
-                            std::string config_folder = config_folder_name;
+                            std::string config_folder = config_name;
                             if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, config_folder)) {
                                 printf("Camera threads started...\n");
                             };

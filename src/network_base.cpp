@@ -126,8 +126,10 @@ void service_network(EnetContext* enet_context, float dt, std::function<void(con
 }
 
 
-void send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection, const char* hostname, int cam_count)
+void send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection, int cam_count)
 {
+    char hostname[100];
+    gethostname(hostname, 100);
     builder.Clear();
     auto server_name = builder.CreateString(hostname);
     auto message_fb = FetchGame::Createbring_up_message(builder, server_name, cam_count);

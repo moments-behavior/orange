@@ -39,6 +39,7 @@ int main(int argc, char **args)
     std::string delimiter = "/";
     std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
     std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
+    std::string network_start_folder_name = "/home/" + tokenized_path[2] + "/multiservers";
     file_dialog.SetPwd(start_folder_name);
     file_dialog.SetTitle("Select working directory");
 
@@ -67,7 +68,6 @@ int main(int argc, char **args)
 
     bool load_camera_config = false;
     std::vector<std::string> camera_config_files;
-    std::vector<std::string> camera_config_names;
 
     ScrollingBuffer* realtime_plot_data;
     bool show_realtime_plot = false;
@@ -81,6 +81,11 @@ int main(int argc, char **args)
     }
 
     std::vector<ConnectedServer*> connected_servers;
+    std::vector<std::string> network_config_folders;
+    for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
+        network_config_folders.push_back(entry.path().string());
+    }
+    int network_config_select = 0;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -128,7 +133,6 @@ int main(int argc, char **args)
 
         if (ImGui::Begin("Networking")) 
         {
-
             
             if (ImGui::BeginTable("Servers", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -147,11 +151,27 @@ int main(int argc, char **args)
             }
             
 
+            if (ImGui::TreeNode("Camera configs"))
+            {
+                for (int n = 0; n < network_config_folders.size(); n++)
+                {
+                    char buf[100];
+                    sprintf(buf, network_config_folders[n].c_str());
+                    if (ImGui::Selectable(buf, network_config_select == n)) {
+                        network_config_select = n;
+                    }
+                }
+                ImGui::TreePop();
+            }
+
+
             if(ImGui::Button("Clients start camera threads")) {
                 ptp_params->network_sync = true;
                 // broadcast data
                 builder.Clear();
+                auto config_message = builder.CreateString(network_config_folders[network_config_select]);
                 FetchGame::ServerBuilder server_builder(builder);
+                server_builder.add_config_folder(config_message);
                 server_builder.add_control(FetchGame::ServerControl_START);
                 auto my_server = server_builder.Finish();
                 builder.Finish(my_server);
@@ -264,10 +284,11 @@ int main(int argc, char **args)
                 for (int i = 0; i < cam_count; i++)
                 {
                     char label[32];
-                    sprintf(label, "##checkbox%d", i);
+                    sprintf(label, "%d", i);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::Checkbox(label, &check[i]);
+                    // ImGui::Checkbox(label, &check[i]);
+                    ImGui::Selectable(label, &check[i], ImGuiSelectableFlags_SpanAllColumns);
                     ImGui::TableNextColumn();
                     ImGui::Text(device_info[i].serialNumber);
                     ImGui::TableNextColumn();
@@ -285,7 +306,7 @@ int main(int argc, char **args)
 
             if (ImGui::Button("Load camera config")) {
                 load_camera_config = true;          
-                file_dialog.Open();  
+                file_dialog.Open();
             }
 
         
@@ -304,7 +325,6 @@ int main(int argc, char **args)
                     if (num_cameras > 0) {
                         cameras_params = new CameraParams[num_cameras];
                         cameras_select = new CameraEachSelect[num_cameras];
-                        
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++)
                         {
@@ -312,44 +332,15 @@ int main(int argc, char **args)
                                 selected_cameras.push_back(i);
                             }
                         }
-
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            // first checkt to see if it is in the config files 
-                            cameras_params[i].camera_serial.append(device_info[selected_cameras[i]].serialNumber);
-                            cameras_params[i].camera_name = cameras_params[i].camera_serial;
-
-                            auto it = std::find(camera_config_names.begin(), camera_config_names.end(), cameras_params[i].camera_serial + ".json");
-                            if (it == camera_config_names.end())
-                            {
-                                if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GM")==0) {
-                                    int gpu_id = 0;
-                                    init_65MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 1000, gpu_id, 400); //458 
-                                } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SC")==0) {
-                                    int gpu_id = 0;
-                                    init_7MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
-                                } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-65000GC")==0) {
-                                    int gpu_id = 0;
-                                    init_65MP_camera_params_color(&cameras_params[i], selected_cameras[i], num_cameras, 2000, 28000, gpu_id, 10); 
-                                } else if (strcmp(device_info[selected_cameras[i]].modelName, "HB-7000SM")==0) {
-                                    int gpu_id = 0;
-                                    init_7MP_camera_params_mono(&cameras_params[i], selected_cameras[i], num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
-                                } else {
-                                    printf("Camera not supported...Exit");
-                                    return 1;
-                                }
-                            } else {
-                                auto config_idx = std::distance(camera_config_names.begin(), it);
-                                std::cout << "Load camera json file: " << camera_config_files[config_idx] << std::endl;
-                                load_camera_json_config_files(camera_config_files[config_idx], &cameras_params[i], selected_cameras[i], num_cameras); 
-                            }
+                            set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
                         }
                         ecams = new CameraEmergent[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
                             open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
                         }
-
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
 
@@ -528,9 +519,9 @@ int main(int argc, char **args)
                     std::string folder_string = current_date_time();
                     std::string folder_subfix(subfix_buf);
                     if (folder_subfix.empty()) {
-                        folder_name = file_dialog.GetSelected().string() + "/" + folder_string;
+                        folder_name = input_folder + "/" + folder_string;
                     } else {
-                        folder_name = file_dialog.GetSelected().string() + "/" + folder_string + "_" + folder_subfix;
+                        folder_name = input_folder + "/" + folder_string + "_" + folder_subfix;
                     }
                     
                     if (mkdir(folder_name.c_str(), 0777) == -1)
@@ -620,34 +611,18 @@ int main(int argc, char **args)
             ImGui::PopStyleColor(1);
         }
         ImGui::End();
-        file_dialog.Display();
 
+        file_dialog.Display();
         if (file_dialog.HasSelected())
         {
-
             if (load_camera_config)
             {
                 std::string camera_config_dir = file_dialog.GetSelected().string();
-
-                camera_config_files.clear();
-                // load camera_config
-                for (const auto &entry : std::filesystem::directory_iterator(camera_config_dir))
-                {
-                    camera_config_files.push_back(entry.path().string());
-                }
-                std::sort(camera_config_files.begin(), camera_config_files.end());
-
-                for (auto &camera_serial : camera_config_files) {
-                    // get the serial number
-                    std::string delimiter = "/";
-                    std::vector<std::string> tokenized_path = string_split(camera_serial, delimiter);
-                    camera_config_names.push_back(tokenized_path.back());
-                }
+                update_camera_configs(camera_config_files, file_dialog.GetSelected().string());
                 file_dialog.ClearSelected();
-
-            } 
+                load_camera_config = false;
+            }
             input_folder = file_dialog.GetSelected().string();
-            std::cout << input_folder << std::endl;
             file_dialog.ClearSelected();
         }
 

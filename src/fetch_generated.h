@@ -162,7 +162,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_SIGNAL_TYPE = 4,
     VT_CONTROL = 6,
     VT_SERVER_MESG = 8,
-    VT_PTP_GLOBAL_TIME = 10
+    VT_CONFIG_FOLDER = 10,
+    VT_PTP_GLOBAL_TIME = 12
   };
   FetchGame::SignalType signal_type() const {
     return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 1));
@@ -173,6 +174,9 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const FetchGame::bring_up_message *server_mesg() const {
     return GetPointer<const FetchGame::bring_up_message *>(VT_SERVER_MESG);
   }
+  const ::flatbuffers::String *config_folder() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CONFIG_FOLDER);
+  }
   uint64_t ptp_global_time() const {
     return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
   }
@@ -182,6 +186,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<int8_t>(verifier, VT_CONTROL, 1) &&
            VerifyOffset(verifier, VT_SERVER_MESG) &&
            verifier.VerifyTable(server_mesg()) &&
+           VerifyOffset(verifier, VT_CONFIG_FOLDER) &&
+           verifier.VerifyString(config_folder()) &&
            VerifyField<uint64_t>(verifier, VT_PTP_GLOBAL_TIME, 8) &&
            verifier.EndTable();
   }
@@ -199,6 +205,9 @@ struct ServerBuilder {
   }
   void add_server_mesg(::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg) {
     fbb_.AddOffset(Server::VT_SERVER_MESG, server_mesg);
+  }
+  void add_config_folder(::flatbuffers::Offset<::flatbuffers::String> config_folder) {
+    fbb_.AddOffset(Server::VT_CONFIG_FOLDER, config_folder);
   }
   void add_ptp_global_time(uint64_t ptp_global_time) {
     fbb_.AddElement<uint64_t>(Server::VT_PTP_GLOBAL_TIME, ptp_global_time, 0);
@@ -219,13 +228,32 @@ inline ::flatbuffers::Offset<Server> CreateServer(
     FetchGame::SignalType signal_type = FetchGame::SignalType_ClientBringup,
     FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> config_folder = 0,
     uint64_t ptp_global_time = 0) {
   ServerBuilder builder_(_fbb);
   builder_.add_ptp_global_time(ptp_global_time);
+  builder_.add_config_folder(config_folder);
   builder_.add_server_mesg(server_mesg);
   builder_.add_control(control);
   builder_.add_signal_type(signal_type);
   return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<Server> CreateServerDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    FetchGame::SignalType signal_type = FetchGame::SignalType_ClientBringup,
+    FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
+    ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
+    const char *config_folder = nullptr,
+    uint64_t ptp_global_time = 0) {
+  auto config_folder__ = config_folder ? _fbb.CreateString(config_folder) : 0;
+  return FetchGame::CreateServer(
+      _fbb,
+      signal_type,
+      control,
+      server_mesg,
+      config_folder__,
+      ptp_global_time);
 }
 
 inline const FetchGame::Server *GetServer(const void *buf) {

@@ -175,7 +175,6 @@ int main(int argc, char **args)
                 ImGui::TreePop();
             }
 
-
             if(ImGui::Button("Clients start camera threads")) {
                 input_folder = network_config_folders[network_config_select];
                 std::string folder_string = current_date_time();

@@ -64,31 +64,35 @@ enum SignalType : int8_t {
   SignalType_ClientBringup = 0,
   SignalType_ClientThreadStarted = 1,
   SignalType_ClientStartRecording = 2,
+  SignalType_ClientRecordDone = 4,
   SignalType_MIN = SignalType_ClientBringup,
-  SignalType_MAX = SignalType_ClientStartRecording
+  SignalType_MAX = SignalType_ClientRecordDone
 };
 
-inline const SignalType (&EnumValuesSignalType())[3] {
+inline const SignalType (&EnumValuesSignalType())[4] {
   static const SignalType values[] = {
     SignalType_ClientBringup,
     SignalType_ClientThreadStarted,
-    SignalType_ClientStartRecording
+    SignalType_ClientStartRecording,
+    SignalType_ClientRecordDone
   };
   return values;
 }
 
 inline const char * const *EnumNamesSignalType() {
-  static const char * const names[4] = {
+  static const char * const names[6] = {
     "ClientBringup",
     "ClientThreadStarted",
     "ClientStartRecording",
+    "",
+    "ClientRecordDone",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameSignalType(SignalType e) {
-  if (::flatbuffers::IsOutRange(e, SignalType_ClientBringup, SignalType_ClientStartRecording)) return "";
+  if (::flatbuffers::IsOutRange(e, SignalType_ClientBringup, SignalType_ClientRecordDone)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesSignalType()[index];
 }

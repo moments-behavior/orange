@@ -129,7 +129,6 @@ static inline void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, Ca
     {
         ptp_state->ptp_time = get_current_PTP_time(&ecam->camera);
         ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_state->ptp_time;
-        ptp_params->this_server_ready = true;
     }
     uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
     printf("%lu\n", ptp_counter);
@@ -224,10 +223,19 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
         get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
-        if (ptp_params->ptp_stop_signal) {
-            // TODO: add count down 
-            if (ptp_state.ptp_time >= ptp_params->ptp_stop_time)
+        if (ptp_params->network_sync) {
+            if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {
+                uint64_t ptp_stop_conuter = sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
+                printf("%lu\n", ptp_stop_conuter);
+                while (ptp_params->ptp_stop_counter != camera_params->num_cameras)
+                {
+                    printf(".");
+                    fflush(stdout);
+                }
+                ptp_params->ptp_stop_reached = true;
+                camera_control->subscribe = false;
                 break;
+            }
         }
         // if (offset == 200) {
         //     phase = -1;
@@ -240,7 +248,6 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
         // } else { offset++; }
     }
 
-    camera_control->subscribe = false;
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
     double time_diff = w.Stop();
 

@@ -2,6 +2,7 @@
 #define ORANGE_PROJECT
 
 #include <unistd.h>
+#include <sys/stat.h>
 #include <iostream>
 #include "camera.h"
 #include "json.hpp"
@@ -12,10 +13,11 @@ using json = nlohmann::json;
 enum ServerState {
     SERVER_UP = 0,
     SERVER_THREAD_READY = 1,
-    SERVER_RECORDING = 2
+    SERVER_RECORDING = 2,
+    SERVER_DONE = 3
 };
 
-static const char * ServerStateStrings[] = { "SERVER_UP", "SERVER_THREAD_READY", "SERVER_RECORDING"};
+static const char * ServerStateStrings[] = { "SERVER_UP", "SERVER_THREAD_READY", "SERVER_RECORDING", "SERVER_DONE"};
 
 struct ConnectedServer {
     char name[80];
@@ -339,9 +341,21 @@ void client_send_ptp_set_message(EnetContext* enet_context, flatbuffers::FlatBuf
     enet_peer_send(server_connection, 0, enet_packet);
 }
 
-void host_broadcast_start_threads(PTPParams* ptp_params, flatbuffers::FlatBufferBuilder& builder, EnetContext* server, std::string config_file_name, std::string record_folder_name)
+void client_send_record_done_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection)
 {
-    ptp_params->network_sync = true;
+    builder.Clear();
+    FetchGame::ServerBuilder server_builder(builder);
+    server_builder.add_signal_type(FetchGame::SignalType_ClientRecordDone);
+    auto server_fb = server_builder.Finish();
+    builder.Finish(server_fb);
+    uint8_t *server_buffer = builder.GetBufferPointer();
+    int server_buf_size = builder.GetSize();
+    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_peer_send(server_connection, 0, enet_packet);
+}
+
+void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder& builder, EnetContext* server, std::string config_file_name, std::string record_folder_name)
+{
     builder.Clear();
     auto config_message = builder.CreateString(config_file_name);
     auto record_folder_message = builder.CreateString(record_folder_name);
@@ -357,7 +371,7 @@ void host_broadcast_start_threads(PTPParams* ptp_params, flatbuffers::FlatBuffer
     enet_host_broadcast(server->m_pNetwork, 0, enet_packet);    
 }
 
-void host_broadcast_set_start_ptp(PTPParams* ptp_params, flatbuffers::FlatBufferBuilder& builder, EnetContext* server, unsigned long long ptp_global_time)
+void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder& builder, EnetContext* server, unsigned long long ptp_global_time)
 {
     //send the global time to servers
     builder.Clear();

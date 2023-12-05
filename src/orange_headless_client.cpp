@@ -34,57 +34,45 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
     std::vector<std::string> camera_config_files;
     update_camera_configs(camera_config_files, config_folder);
 
-    // printf("Start camera thread \n");
-    // cameras_params = new CameraParams[num_cameras];
-    // cameras_select = new CameraEachSelect[num_cameras];
+    printf("Start camera thread \n");
+    cameras_params = new CameraParams[num_cameras];
+    cameras_select = new CameraEachSelect[num_cameras];
 
-    // for (int i = 0; i < num_cameras; i++)
-    // {
-    //     open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
-    // }
+    for (int i = 0; i < num_cameras; i++)
+    {
+        open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+    }
+    allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
+    camera_control->record_video = true;
+    camera_control->subscribe = true;
+    camera_control->sync_camera = true;
+    std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
 
-    // for (int i = 0; i < num_cameras; i++)
-    // {
-    //     camera_open_stream(&ecams[i].camera);
-    //     ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
-    //     allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
+    // Creating a directory to save recorded video;
+    if (mkdir(record_folder.c_str(), 0777) == -1)
+    {
+        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
+        return false;
+    }
+    else
+    {
+        std::cout << "Recorded video saves to : " << record_folder << std::endl;
+    }
 
-    //     if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
-    //     {
-    //         allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
-    //     }
-    // }
+    for (int i = 0; i < num_cameras; i++)
+    {
+        ptp_camera_sync(&ecams[i].camera);
+    }
 
-    // camera_control->record_video = true;
-    // camera_control->subscribe = true;
-    // camera_control->sync_camera = true;
-    // std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
+    for (int i = 0; i < num_cameras; i++)
+    {
+        cameras_select->stream_on = false;
+    }
 
-    // // Creating a directory to save recorded video;
-    // if (mkdir(record_folder.c_str(), 0777) == -1)
-    // {
-    //     std::cerr << "Error :  " << std::strerror(errno) << std::endl;
-    //     return false;
-    // }
-    // else
-    // {
-    //     std::cout << "Recorded video saves to : " << record_folder << std::endl;
-    // }
-
-    // for (int i = 0; i < num_cameras; i++)
-    // {
-    //     ptp_camera_sync(&ecams[i].camera);
-    // }
-
-    // for (int i = 0; i < num_cameras; i++)
-    // {
-    //     cameras_select->stream_on = false;
-    // }
-
-    // for (int i = 0; i < num_cameras; i++)
-    // {
-    //     camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_setup, record_folder, ptp_params));
-    // }
+    for (int i = 0; i < num_cameras; i++)
+    {
+        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_setup, record_folder, ptp_params));
+    }
 
     return true;
 }
@@ -116,7 +104,6 @@ int main(int argc, char *argv[])
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
     std::cout << "available no of cameras: " << cam_count << std::endl;
 
-
     CameraParams *cameras_params;
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
@@ -124,11 +111,13 @@ int main(int argc, char *argv[])
 
     ecams = new CameraEmergent[cam_count];
     CameraControl *camera_control = new CameraControl;
-    PTPParams *ptp_params = new PTPParams{0, 0};
-    ptp_params->network_sync = true;
+    PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false};
+    
     flatbuffers::FlatBufferBuilder builder(1024);
 
+    bool state_set_stop_ptp = false;
     bool quit_server = false;
+
     while (!quit_server)
     {
         current_time = tick();
@@ -180,33 +169,8 @@ int main(int argc, char *argv[])
                             // stop recording
                             std::cout << server_control->ptp_global_time() << std::endl;
                             ptp_params->ptp_stop_time = server_control->ptp_global_time();
-                            ptp_params->ptp_stop_signal = true;
                             std::cout << ptp_params->ptp_stop_time << std::endl;
-
-                            // // wait for the video capture done 
-                            // for (auto &t : camera_threads)
-                            //     t.join();
-
-                            // for (int i = 0; i < cam_count; i++)
-                            // {
-                            //     ptp_sync_off(&ecams[i].camera);
-                            // }
-                            // ptp_params->ptp_counter = 0;
-                            // ptp_params->ptp_global_time = 0;
-                            // ptp_params->ptp_stop_signal = false;
-                            // ptp_params->ptp_stop_time = 0;
-                            // ptp_params->this_server_ready = false;
-                            // ptp_params->servers_ready = false;
-                            // camera_control->sync_camera = false;
-
-                            // for (int i = 0; i < cam_count; i++)
-                            // {
-                            //     destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-                            //     delete[] ecams[i].evt_frame;
-                            //     check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                            //     close_camera(&ecams[i].camera);
-                            // }
-
+                            state_set_stop_ptp = true;
                         }
                         enet_packet_destroy(evnt.packet);
                     }
@@ -219,6 +183,36 @@ int main(int argc, char *argv[])
                     }
                     break;
                 } });
+
+        if (state_set_stop_ptp && ptp_params->ptp_stop_reached) {
+            state_set_stop_ptp = false;
+            for (auto &t : camera_threads)
+                t.join();
+
+            for (int i = 0; i < cam_count; i++)
+            {
+                ptp_sync_off(&ecams[i].camera);
+            }
+            ptp_params->ptp_global_time = 0;
+            ptp_params->ptp_stop_time = 0;
+            ptp_params->ptp_counter = 0;
+            ptp_params->ptp_stop_counter = 0;
+            ptp_params->network_sync = true;
+            ptp_params->servers_ready = false;
+            ptp_params->ptp_stop_reached = false;
+            
+            camera_control->sync_camera = false;
+
+            for (int i = 0; i < cam_count; i++)
+            {
+                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                delete[] ecams[i].evt_frame;
+                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
+                close_camera(&ecams[i].camera);
+            }
+            // send signal the thread is idle
+            client_send_record_done_message(&client, builder, server_connection);
+        }
 
         usleep(10000); // sleep for 10ms
         last_time = current_time;

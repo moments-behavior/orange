@@ -28,7 +28,7 @@ void quit_process(bool error = false, const std::string &reason = "")
     }
 }
 
-bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string config_folder)
+bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string config_folder, std::string record_folder)
 {
 
     std::vector<std::string> camera_config_files;
@@ -59,18 +59,16 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
     // camera_control->subscribe = true;
     // camera_control->sync_camera = true;
     // std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
-    // std::string folder_string = current_date_time();
-    // std::string folder_name = config_folder + "/" + folder_string;
 
     // // Creating a directory to save recorded video;
-    // if (mkdir(folder_name.c_str(), 0777) == -1)
+    // if (mkdir(record_folder.c_str(), 0777) == -1)
     // {
     //     std::cerr << "Error :  " << std::strerror(errno) << std::endl;
     //     return false;
     // }
     // else
     // {
-    //     std::cout << "Recorded video saves to : " << folder_name << std::endl;
+    //     std::cout << "Recorded video saves to : " << record_folder << std::endl;
     // }
 
     // for (int i = 0; i < num_cameras; i++)
@@ -85,7 +83,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
 
     // for (int i = 0; i < num_cameras; i++)
     // {
-    //     camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_setup, folder_name, ptp_params));
+    //     camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_setup, record_folder, ptp_params));
     // }
 
     return true;
@@ -130,7 +128,6 @@ int main(int argc, char *argv[])
     ptp_params->network_sync = true;
     flatbuffers::FlatBufferBuilder builder(1024);
 
-    bool has_sent_ptp_time = false;
     bool quit_server = false;
     while (!quit_server)
     {
@@ -146,7 +143,7 @@ int main(int argc, char *argv[])
                         if (evnt.peer == server_connection)
                         {
                             printf("Network: Successfully connected to server! \n");
-                            send_bringup_message(&client, builder, server_connection, cam_count);
+                            client_send_bringup_message(&client, builder, server_connection, cam_count);
                         }
                     }
                     break;
@@ -165,10 +162,11 @@ int main(int argc, char *argv[])
 
                         if (server_signal == FetchGame::ServerControl_START)
                         {
-                            auto config_name = server_control->config_folder()->c_str();
-                            std::string config_folder = config_name;
-                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, config_folder)) {
-                                printf("Camera threads started...\n");
+                            std::string config_folder = server_control->config_folder()->c_str();
+                            std::string record_folder = server_control->record_folder()->c_str();
+                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, config_folder, record_folder)) 
+                            {
+                                client_send_thread_start_message(&client, builder, server_connection);
                             };
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
@@ -199,7 +197,6 @@ int main(int argc, char *argv[])
                             // ptp_params->this_server_ready = false;
                             // ptp_params->servers_ready = false;
                             // camera_control->sync_camera = false;
-                            // has_sent_ptp_time = false;
 
                             // for (int i = 0; i < cam_count; i++)
                             // {
@@ -221,21 +218,6 @@ int main(int argc, char *argv[])
                     }
                     break;
                 } });
-
-        if (ptp_params->this_server_ready == true && !has_sent_ptp_time)
-        {
-            // send the ptp_global_time 
-            builder.Clear();
-            FetchGame::ServerBuilder server_builder(builder);
-            server_builder.add_ptp_global_time(ptp_params->ptp_global_time);
-            auto my_server = server_builder.Finish();
-            builder.Finish(my_server);
-            uint8_t *server_buffer = builder.GetBufferPointer();
-            int server_buf_size = builder.GetSize();
-            ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-            enet_peer_send(server_connection, 0, enet_packet);
-            has_sent_ptp_time = true;
-        }
 
         usleep(10000); // sleep for 10ms
         last_time = current_time;

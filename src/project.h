@@ -11,10 +11,11 @@ using json = nlohmann::json;
 
 enum ServerState {
     SERVER_UP = 0,
-    SERVER_THREAD_READY = 1
+    SERVER_THREAD_READY = 1,
+    SERVER_RECORDING = 2
 };
 
-static const char * ServerStateStrings[] = { "SERVER_UP", "SERVER_THREAD_READY"};
+static const char * ServerStateStrings[] = { "SERVER_UP", "SERVER_THREAD_READY", "SERVER_RECORDING"};
 
 struct ConnectedServer {
     char name[80];
@@ -206,6 +207,26 @@ void init_7MP_camera_params_mono(CameraParams* camera_params, int camera_id, int
     camera_params->color = false;
 }
 
+bool make_folder_for_recording(std::string& folder_name, std::string input_folder, const char* subfix_buf)
+{
+    std::string folder_string = current_date_time();
+    std::string folder_subfix(subfix_buf);
+    if (folder_subfix.empty()) {
+        folder_name = input_folder + "/" + folder_string;
+    } else {
+        folder_name = input_folder + "/" + folder_string + "_" + folder_subfix;
+    }
+    if (mkdir(folder_name.c_str(), 0777) == -1)
+    {
+        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
+        return false;
+    }
+    else
+    {
+        std::cout << "Recorded video saves to : " << folder_name << std::endl;
+    }
+    return true;
+}
 
 void update_camera_configs(std::vector<std::string>& camera_config_files, std::string input_folder)
 {   
@@ -258,6 +279,20 @@ bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device
     return true;
 }
 
+void allocate_camera_frame_buffers(CameraEmergent* ecams, CameraParams* cameras_params, int evt_buffer_size, int num_cameras)
+{
+    for (int i = 0; i < num_cameras; i++)
+    {               
+        camera_open_stream(&ecams[i].camera);
+        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
+        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
+        {
+            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+        }
+    }
+}
+
 
 void client_send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection, int cam_count)
 {
@@ -291,6 +326,19 @@ void client_send_thread_start_message(EnetContext* enet_context, flatbuffers::Fl
     enet_peer_send(server_connection, 0, enet_packet);
 }
 
+void client_send_ptp_set_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection)
+{
+    builder.Clear();
+    FetchGame::ServerBuilder server_builder(builder);
+    server_builder.add_signal_type(FetchGame::SignalType_ClientStartRecording);
+    auto server_fb = server_builder.Finish();
+    builder.Finish(server_fb);
+    uint8_t *server_buffer = builder.GetBufferPointer();
+    int server_buf_size = builder.GetSize();
+    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_peer_send(server_connection, 0, enet_packet);
+}
+
 void host_broadcast_start_threads(PTPParams* ptp_params, flatbuffers::FlatBufferBuilder& builder, EnetContext* server, std::string config_file_name, std::string record_folder_name)
 {
     ptp_params->network_sync = true;
@@ -307,6 +355,21 @@ void host_broadcast_start_threads(PTPParams* ptp_params, flatbuffers::FlatBuffer
     int server_buf_size = builder.GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_host_broadcast(server->m_pNetwork, 0, enet_packet);    
+}
+
+void host_broadcast_set_start_ptp(PTPParams* ptp_params, flatbuffers::FlatBufferBuilder& builder, EnetContext* server, unsigned long long ptp_global_time)
+{
+    //send the global time to servers
+    builder.Clear();
+    FetchGame::ServerBuilder server_builder(builder);
+    server_builder.add_control(FetchGame::ServerControl_SETPTP);
+    server_builder.add_ptp_global_time(ptp_global_time);
+    auto my_server = server_builder.Finish();
+    builder.Finish(my_server);
+    uint8_t *server_buffer = builder.GetBufferPointer();
+    int server_buf_size = builder.GetSize();
+    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_host_broadcast(server->m_pNetwork, 0, enet_packet);
 }
 
 #endif

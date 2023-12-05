@@ -175,6 +175,7 @@ int main(int argc, char *argv[])
                             ptp_params->ptp_global_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_global_time << std::endl;
                             ptp_params->servers_ready = true;
+                            client_send_ptp_set_message(&client, builder, server_connection);
                         } else if (server_signal == FetchGame::ServerControl_STOP) {
                             // stop recording
                             std::cout << server_control->ptp_global_time() << std::endl;

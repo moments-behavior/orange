@@ -124,23 +124,3 @@ void service_network(EnetContext* enet_context, float dt, std::function<void(con
         printf("Unable to service network: Network not initialized!");
     }
 }
-
-
-void send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection, int cam_count)
-{
-    char hostname[100];
-    gethostname(hostname, 100);
-    builder.Clear();
-    auto server_name = builder.CreateString(hostname);
-    auto message_fb = FetchGame::Createbring_up_message(builder, server_name, cam_count);
-    FetchGame::ServerBuilder server_builder(builder);
-    server_builder.add_signal_type(FetchGame::SignalType_ClientBringup);
-    server_builder.add_server_mesg(message_fb);
-    auto server_fb = server_builder.Finish();
-    builder.Finish(server_fb);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
-    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-    enet_peer_send(server_connection, 0, enet_packet);
-}
-

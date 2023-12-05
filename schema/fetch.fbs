@@ -9,9 +9,8 @@ enum ServerControl : byte {
 }
 
 enum SignalType: byte {
-    HostControl = 0,
-    ClientBringup = 1,
-    PTPTime = 2
+    ClientBringup = 0,
+    ClientThreadStarted = 1
 }
 
 table bring_up_message {
@@ -24,6 +23,7 @@ table Server {
     control:ServerControl = IDEL;
     server_mesg:bring_up_message;
     config_folder:string;
+    record_folder:string;
     ptp_global_time:ulong;
 }
 

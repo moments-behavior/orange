@@ -61,34 +61,31 @@ inline const char *EnumNameServerControl(ServerControl e) {
 }
 
 enum SignalType : int8_t {
-  SignalType_HostControl = 0,
-  SignalType_ClientBringup = 1,
-  SignalType_PTPTime = 2,
-  SignalType_MIN = SignalType_HostControl,
-  SignalType_MAX = SignalType_PTPTime
+  SignalType_ClientBringup = 0,
+  SignalType_ClientThreadStarted = 1,
+  SignalType_MIN = SignalType_ClientBringup,
+  SignalType_MAX = SignalType_ClientThreadStarted
 };
 
-inline const SignalType (&EnumValuesSignalType())[3] {
+inline const SignalType (&EnumValuesSignalType())[2] {
   static const SignalType values[] = {
-    SignalType_HostControl,
     SignalType_ClientBringup,
-    SignalType_PTPTime
+    SignalType_ClientThreadStarted
   };
   return values;
 }
 
 inline const char * const *EnumNamesSignalType() {
-  static const char * const names[4] = {
-    "HostControl",
+  static const char * const names[3] = {
     "ClientBringup",
-    "PTPTime",
+    "ClientThreadStarted",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameSignalType(SignalType e) {
-  if (::flatbuffers::IsOutRange(e, SignalType_HostControl, SignalType_PTPTime)) return "";
+  if (::flatbuffers::IsOutRange(e, SignalType_ClientBringup, SignalType_ClientThreadStarted)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesSignalType()[index];
 }
@@ -163,10 +160,11 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CONTROL = 6,
     VT_SERVER_MESG = 8,
     VT_CONFIG_FOLDER = 10,
-    VT_PTP_GLOBAL_TIME = 12
+    VT_RECORD_FOLDER = 12,
+    VT_PTP_GLOBAL_TIME = 14
   };
   FetchGame::SignalType signal_type() const {
-    return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 1));
+    return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 0));
   }
   FetchGame::ServerControl control() const {
     return static_cast<FetchGame::ServerControl>(GetField<int8_t>(VT_CONTROL, 0));
@@ -176,6 +174,9 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   const ::flatbuffers::String *config_folder() const {
     return GetPointer<const ::flatbuffers::String *>(VT_CONFIG_FOLDER);
+  }
+  const ::flatbuffers::String *record_folder() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_RECORD_FOLDER);
   }
   uint64_t ptp_global_time() const {
     return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
@@ -188,6 +189,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(server_mesg()) &&
            VerifyOffset(verifier, VT_CONFIG_FOLDER) &&
            verifier.VerifyString(config_folder()) &&
+           VerifyOffset(verifier, VT_RECORD_FOLDER) &&
+           verifier.VerifyString(record_folder()) &&
            VerifyField<uint64_t>(verifier, VT_PTP_GLOBAL_TIME, 8) &&
            verifier.EndTable();
   }
@@ -198,7 +201,7 @@ struct ServerBuilder {
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_signal_type(FetchGame::SignalType signal_type) {
-    fbb_.AddElement<int8_t>(Server::VT_SIGNAL_TYPE, static_cast<int8_t>(signal_type), 1);
+    fbb_.AddElement<int8_t>(Server::VT_SIGNAL_TYPE, static_cast<int8_t>(signal_type), 0);
   }
   void add_control(FetchGame::ServerControl control) {
     fbb_.AddElement<int8_t>(Server::VT_CONTROL, static_cast<int8_t>(control), 0);
@@ -208,6 +211,9 @@ struct ServerBuilder {
   }
   void add_config_folder(::flatbuffers::Offset<::flatbuffers::String> config_folder) {
     fbb_.AddOffset(Server::VT_CONFIG_FOLDER, config_folder);
+  }
+  void add_record_folder(::flatbuffers::Offset<::flatbuffers::String> record_folder) {
+    fbb_.AddOffset(Server::VT_RECORD_FOLDER, record_folder);
   }
   void add_ptp_global_time(uint64_t ptp_global_time) {
     fbb_.AddElement<uint64_t>(Server::VT_PTP_GLOBAL_TIME, ptp_global_time, 0);
@@ -229,9 +235,11 @@ inline ::flatbuffers::Offset<Server> CreateServer(
     FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     ::flatbuffers::Offset<::flatbuffers::String> config_folder = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> record_folder = 0,
     uint64_t ptp_global_time = 0) {
   ServerBuilder builder_(_fbb);
   builder_.add_ptp_global_time(ptp_global_time);
+  builder_.add_record_folder(record_folder);
   builder_.add_config_folder(config_folder);
   builder_.add_server_mesg(server_mesg);
   builder_.add_control(control);
@@ -245,14 +253,17 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
     FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     const char *config_folder = nullptr,
+    const char *record_folder = nullptr,
     uint64_t ptp_global_time = 0) {
   auto config_folder__ = config_folder ? _fbb.CreateString(config_folder) : 0;
+  auto record_folder__ = record_folder ? _fbb.CreateString(record_folder) : 0;
   return FetchGame::CreateServer(
       _fbb,
       signal_type,
       control,
       server_mesg,
       config_folder__,
+      record_folder__,
       ptp_global_time);
 }
 

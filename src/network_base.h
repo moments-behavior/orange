@@ -18,13 +18,6 @@ enum PacketTransportType
     PACKET_TRANSPORT_RELIABLE = ENET_PACKET_FLAG_RELIABLE
 };
 
-
-struct ConnectedServer {
-    char name[80];
-    enet_uint16 peer_id;
-    int num_cameras;
-};
-
 struct EnetContext {
     ENetHost* m_pNetwork = NULL;
     float m_IncomingKb = 0.0f;	///Usually refered to as Rx	(Recieve rate)
@@ -37,5 +30,4 @@ void enet_release(EnetContext* enet_context);
 ENetPeer* connect_peer(EnetContext* enet_context, uint8_t ip_part1, uint8_t ip_part2, uint8_t ip_part3, uint8_t ip_part4, uint16_t port_number);
 void enqueue_packet(EnetContext* enet_context, ENetPeer* peer, PacketTransportType transport_type, void* packet_data, size_t data_length);
 void service_network(EnetContext* enet_context, float dt, std::function<void(const ENetEvent&)> callback);
-void send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection, int cam_count);
 #endif

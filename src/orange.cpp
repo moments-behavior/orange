@@ -80,12 +80,13 @@ int main(int argc, char **args)
         printf("Server Initiated\n");
     }
 
-    std::vector<ConnectedServer*> connected_servers;
+    std::vector<ConnectedServer> my_servers;
     std::vector<std::string> network_config_folders;
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
         network_config_folders.push_back(entry.path().string());
     }
     int network_config_select = 0;
+    char subfix_buf[64] = ""; 
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -109,21 +110,30 @@ int main(int argc, char **args)
                     if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
                         auto server_name = server_control->server_mesg()->server_name()->c_str();
                         auto server_num_cameras = server_control->server_mesg()->num_cameras();
-                        ConnectedServer* new_server = new ConnectedServer();
-                        strcpy(new_server->name, server_name); 
-                        new_server->num_cameras = server_num_cameras;
-                        new_server->peer_id = evnt.peer->incomingPeerID;
-                        connected_servers.push_back(new_server);
+                        ConnectedServer new_server;
+                        strcpy(new_server.name, server_name); 
+                        new_server.num_cameras = server_num_cameras;
+                        new_server.peer_id = evnt.peer->incomingPeerID;
+                        new_server.server_state = SERVER_UP;
+                        my_servers.push_back(new_server);
+                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientThreadStarted) {
+                        for (int i = 0; i < my_servers.size(); i++) {
+                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                                my_servers[i].server_state = SERVER_THREAD_READY;
+                            }
+                        }
                     }
-
-                    // auto server_signal = server_control->ptp_global_time();
-                    // std::cout << server_signal << std::endl;
                     enet_packet_destroy(evnt.packet);
                 }
                 break;
 
             case ENET_EVENT_TYPE_DISCONNECT:
                 printf("- Client %d has disconnected.\n", evnt.peer->incomingPeerID);
+                for (int i = 0; i < my_servers.size(); i++) {
+                    if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                        my_servers.erase(my_servers.begin() + i);
+                    }
+                }
                 break;
             }
         });
@@ -134,18 +144,19 @@ int main(int argc, char **args)
         if (ImGui::Begin("Networking")) 
         {
             
-            if (ImGui::BeginTable("Servers", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+            if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
-
-                for (int i = 0; i < connected_servers.size(); i++)
+                for (int i = 0; i < my_servers.size(); i++)
                 {
                     char label[32];
                     sprintf(label, "##servers%d", i);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::Text(connected_servers[i]->name);
+                    ImGui::Text(my_servers[i].name);
                     ImGui::TableNextColumn();
-                    ImGui::Text(std::to_string(connected_servers[i]->num_cameras).c_str());
+                    ImGui::Text(std::to_string(my_servers[i].num_cameras).c_str());
+                    ImGui::TableNextColumn();
+                    ImGui::Text(ServerStateStrings[my_servers[i].server_state]);
                 }
                 ImGui::EndTable();
             }
@@ -166,19 +177,24 @@ int main(int argc, char **args)
 
 
             if(ImGui::Button("Clients start camera threads")) {
-                ptp_params->network_sync = true;
-                // broadcast data
-                builder.Clear();
-                auto config_message = builder.CreateString(network_config_folders[network_config_select]);
-                FetchGame::ServerBuilder server_builder(builder);
-                server_builder.add_config_folder(config_message);
-                server_builder.add_control(FetchGame::ServerControl_START);
-                auto my_server = server_builder.Finish();
-                builder.Finish(my_server);
-                uint8_t *server_buffer = builder.GetBufferPointer();
-                int server_buf_size = builder.GetSize();
-                ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                input_folder = network_config_folders[network_config_select];
+                std::string folder_string = current_date_time();
+                std::string folder_subfix(subfix_buf);
+                if (folder_subfix.empty()) {
+                    folder_name = input_folder + "/" + folder_string;
+                } else {
+                    folder_name = input_folder + "/" + folder_string + "_" + folder_subfix;
+                }
+                if (mkdir(folder_name.c_str(), 0777) == -1)
+                {
+                    std::cerr << "Error :  " << std::strerror(errno) << std::endl;
+                    return 0;
+                }
+                else
+                {
+                    std::cout << "Recorded video saves to : " << folder_name << std::endl;
+                }
+                host_broadcast_start_threads(ptp_params, builder, &server, network_config_folders[network_config_select], folder_name);
             }
 
             if (ImGui::Button("Start recording")) {
@@ -470,7 +486,6 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
-            static char subfix_buf[64] = ""; 
             ImGui::InputText("subfix", subfix_buf, 64);
 
             if (ImGui::Button("Save to"))

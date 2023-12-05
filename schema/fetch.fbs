@@ -10,7 +10,8 @@ enum ServerControl : byte {
 
 enum SignalType: byte {
     ClientBringup = 0,
-    ClientThreadStarted = 1
+    ClientThreadStarted = 1,
+    ClientStartRecording = 2
 }
 
 table bring_up_message {

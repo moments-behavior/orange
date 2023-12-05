@@ -177,44 +177,37 @@ int main(int argc, char **args)
 
             if(ImGui::Button("Clients start camera threads")) {
                 input_folder = network_config_folders[network_config_select];
-                std::string folder_string = current_date_time();
-                std::string folder_subfix(subfix_buf);
-                if (folder_subfix.empty()) {
-                    folder_name = input_folder + "/" + folder_string;
-                } else {
-                    folder_name = input_folder + "/" + folder_string + "_" + folder_subfix;
-                }
-                if (mkdir(folder_name.c_str(), 0777) == -1)
-                {
-                    std::cerr << "Error :  " << std::strerror(errno) << std::endl;
-                    return 0;
-                }
-                else
-                {
-                    std::cout << "Recorded video saves to : " << folder_name << std::endl;
-                }
+                make_folder_for_recording(folder_name, input_folder, subfix_buf);
                 host_broadcast_start_threads(ptp_params, builder, &server, network_config_folders[network_config_select], folder_name);
+
+                // start local recording threads
+                allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
+                allocate_display_resources(tex, cameras_params, cameras_select, num_cameras);
+    
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    ptp_camera_sync(&ecams[i].camera);
+                }
+                camera_control->sync_camera = true;
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
+                    camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                }
+                camera_control->subscribe = true;
             }
 
-            if (ImGui::Button("Start recording")) {
+            if (ImGui::Button("Start Recording")) {
+                // get the host ready, and then set global ptp time to start recording  
                 unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                 int delay_in_second = 10;
                 ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                //send the global time to servers
-                builder.Clear();
-                FetchGame::ServerBuilder server_builder(builder);
-                server_builder.add_control(FetchGame::ServerControl_SETPTP);
-                server_builder.add_ptp_global_time(ptp_params->ptp_global_time);
-                auto my_server = server_builder.Finish();
-                builder.Finish(my_server);
-                uint8_t *server_buffer = builder.GetBufferPointer();
-                int server_buf_size = builder.GetSize();
-                ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                host_broadcast_set_start_ptp(ptp_params, builder, &server, ptp_params->ptp_global_time);
                 ptp_params->servers_ready = true;
             }
 
-            if (ImGui::Button("Stop recording")) {
+            if (ImGui::Button("Stop Recording")) {
                 unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                 int delay_in_second = 10;
                 ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
@@ -530,24 +523,8 @@ int main(int argc, char **args)
                 if (camera_control->stop_record)
                 {
                     camera_control->record_video = true;
-                    std::string folder_string = current_date_time();
-                    std::string folder_subfix(subfix_buf);
-                    if (folder_subfix.empty()) {
-                        folder_name = input_folder + "/" + folder_string;
-                    } else {
-                        folder_name = input_folder + "/" + folder_string + "_" + folder_subfix;
-                    }
-                    
-                    if (mkdir(folder_name.c_str(), 0777) == -1)
-                    {
-                        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
-                        return 0;
-                    }
-                    else
-                    {
-                        std::cout << "Recorded video saves to : " << folder_name << std::endl;
-                    }
-                    
+                    make_folder_for_recording(folder_name, input_folder, subfix_buf);
+
                     for (int i = 0; i < num_cameras; i++)
                     {               
                         camera_open_stream(&ecams[i].camera);

@@ -59,7 +59,7 @@ int main(int argc, char **args)
     CameraControl *camera_control = new CameraControl;
 
     int evt_buffer_size {100};
-    PTPParams* ptp_params = new PTPParams{0, 0, 0, 0, false, false, false};
+    PTPParams* ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
     std::string encoder_setup;
     std::string encoder_basic_setup = "-codec h264 -preset p1 -fps ";
     std::string encoder_codec = "h264"; 
@@ -199,8 +199,22 @@ int main(int argc, char **args)
 
                 // start local recording threads
                 allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
-                allocate_display_resources(tex, cameras_params, cameras_select, num_cameras);
+                // allocate_display_resources(tex, cameras_params, cameras_select, num_cameras);
     
+                tex = new GL_Texture[num_cameras];
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    if (cameras_select[i].stream_on) {
+                        cudaStreamCreate(&tex[i].streams);
+                        create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                        register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
+                        map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
+                        cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                        create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                    }
+                }
+
+
                 for (int i = 0; i < num_cameras; i++)
                 {
                     ptp_camera_sync(&ecams[i].camera);
@@ -240,8 +254,7 @@ int main(int argc, char **args)
                 int server_buf_size = builder.GetSize();
                 ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                 enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
-
-                network_set_stop_ptp = true;
+                ptp_params->network_set_stop_ptp = true;
             }
 
             if(ImGui::Button("Clients close")) {
@@ -261,9 +274,9 @@ int main(int argc, char **args)
         ImGui::End();
 
 
-        if (network_set_stop_ptp && ptp_params->ptp_stop_reached) {
+        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
             
-            network_set_stop_ptp = false;
+            ptp_params->network_set_stop_ptp = false;
 
             for (auto &t : camera_threads)
                 t.join();

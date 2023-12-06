@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
                         if (server_signal == FetchGame::ServerControl_OPEN) {
                             std::string config_folder = server_control->config_folder()->c_str();
                             if (open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, config_folder)) {
-                                
+                                client_send_camera_open_message(&client, builder, server_connection);
                             }
                         }
                         else if (server_signal == FetchGame::ServerControl_START)

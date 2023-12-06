@@ -241,9 +241,9 @@ void update_camera_configs(std::vector<std::string>& camera_config_files, std::s
             camera_config_files.push_back(entry_str);
     }
     std::sort(camera_config_files.begin(), camera_config_files.end());
-    for (int i=0; i < camera_config_files.size(); i++) {
-        std::cout << camera_config_files[i] << std::endl;
-    }
+    // for (int i=0; i < camera_config_files.size(); i++) {
+    //     std::cout << camera_config_files[i] << std::endl;
+    // }
 }
 
 bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device_info, std::vector<std::string>& camera_config_files, int camera_idx, int num_cameras)

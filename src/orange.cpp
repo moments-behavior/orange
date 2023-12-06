@@ -90,6 +90,8 @@ int main(int argc, char **args)
     char subfix_buf[64] = "";
     bool network_set_stop_ptp = false;
 
+    bool select_all_cameras = false;
+
     while (!glfwWindowShouldClose(window->render_target))
     {
 
@@ -327,11 +329,20 @@ int main(int argc, char **args)
                 ImGui::EndTable();
             }
 
-            if (ImGui::Button("Select all")) {
-                for (int i = 0; i < cam_count; i++)
-                {
-                    check[i] = true;
+            if (ImGui::Button(select_all_cameras ? "Clear all": "Select all")) {
+                select_all_cameras  = !select_all_cameras;
+                if (select_all_cameras) {
+                    for (int i = 0; i < cam_count; i++)
+                    {
+                        check[i] = true;
+                    }
+                } else {
+                    for (int i = 0; i < cam_count; i++)
+                    {
+                        check[i] = false;
+                    }
                 }
+                
             }
 
             if (ImGui::Button("Load camera config")) {

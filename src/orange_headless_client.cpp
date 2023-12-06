@@ -112,11 +112,10 @@ int main(int argc, char *argv[])
 
     ecams = new CameraEmergent[cam_count];
     CameraControl *camera_control = new CameraControl;
-    PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false};
+    PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false, false};
     
     flatbuffers::FlatBufferBuilder builder(1024);
 
-    bool state_set_stop_ptp = false;
     bool quit_server = false;
 
     while (!quit_server)
@@ -171,7 +170,7 @@ int main(int argc, char *argv[])
                             std::cout << server_control->ptp_global_time() << std::endl;
                             ptp_params->ptp_stop_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_stop_time << std::endl;
-                            state_set_stop_ptp = true;
+                            ptp_params->network_set_stop_ptp = true;
                         }
                         enet_packet_destroy(evnt.packet);
                     }
@@ -185,8 +184,8 @@ int main(int argc, char *argv[])
                     break;
                 } });
 
-        if (state_set_stop_ptp && ptp_params->ptp_stop_reached) {
-            state_set_stop_ptp = false;
+        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
+            ptp_params->network_set_stop_ptp = false;
             for (auto &t : camera_threads)
                 t.join();
 

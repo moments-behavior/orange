@@ -118,6 +118,12 @@ int main(int argc, char **args)
                         new_server.peer_id = evnt.peer->incomingPeerID;
                         new_server.server_state = SERVER_UP;
                         my_servers.push_back(new_server);
+                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientCameraOpened) {
+                        for (int i = 0; i < my_servers.size(); i++) {
+                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                                my_servers[i].server_state = SERVER_OPEN_CAMERA;
+                            }
+                        }
                     } else if (server_control->signal_type() == FetchGame::SignalType_ClientThreadStarted) {
                         for (int i = 0; i < my_servers.size(); i++) {
                             if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
@@ -162,8 +168,11 @@ int main(int argc, char **args)
                 if (my_servers[0].server_state == my_servers[1].server_state) {
                     all_server_state = my_servers[0].server_state;
                 }
+            } else {
+                all_server_state = SERVER_DISCONNECTED;
             }
             
+
             if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
                 for (int i = 0; i < my_servers.size(); i++)
@@ -181,8 +190,6 @@ int main(int argc, char **args)
                 ImGui::EndTable();
             }
             
-
-
             for (int i = 0; i < network_config_folders.size(); i++)
             {
                 char buf[100];
@@ -194,10 +201,9 @@ int main(int argc, char **args)
             }
 
             if (all_server_state == SERVER_UP || all_server_state == SERVER_DONE) {
-                if(ImGui::Button("Clients start camera threads")) {
-                    
+                if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
-
+                    host_broadcast_open_cameras(builder, &server, network_config_folders[network_config_select]);
                     // open cameras
                     num_cameras = 0;
                     for (int i = 0; i < cam_count; i++)
@@ -230,11 +236,17 @@ int main(int argc, char **args)
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
                     camera_control->open = true;
+                }
+            }
 
+
+
+                if(ImGui::Button("Clients start camera threads")) {
+                    
                     input_folder = network_config_folders[network_config_select];
                     make_folder_for_recording(folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(builder, &server, network_config_folders[network_config_select], folder_name);
+                    host_broadcast_start_threads(builder, &server, folder_name);
 
                     // start local recording threads
                     allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
@@ -267,7 +279,6 @@ int main(int argc, char **args)
                     camera_control->subscribe = true;
                 }                
 
-            }
 
             
             if (all_server_state == SERVER_THREAD_READY) {

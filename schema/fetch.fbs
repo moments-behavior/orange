@@ -2,16 +2,18 @@ namespace FetchGame;
 
 enum ServerControl : byte {
     IDEL = 0,
-    START = 1,
-    SETPTP = 2,
-    STOP = 3,
-    QUIT = 4
+    OPEN = 1,
+    START = 2,
+    SETPTP = 3,
+    STOP = 4,
+    QUIT = 5
 }
 
 enum SignalType: byte {
     ClientBringup = 0,
-    ClientThreadStarted = 1,
-    ClientStartRecording = 2,
+    ClientCameraOpened = 1,
+    ClientThreadStarted = 2,
+    ClientStartRecording = 3,
     ClientRecordDone = 4
 }
 

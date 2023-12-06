@@ -28,9 +28,8 @@ void quit_process(bool error = false, const std::string &reason = "")
     }
 }
 
-bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string config_folder, std::string record_folder)
+bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, std::string config_folder)
 {
-
     std::vector<std::string> camera_config_files;
     update_camera_configs(camera_config_files, config_folder);
 
@@ -43,6 +42,13 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
         set_camera_params(&cameras_params[i], &device_info[i], camera_config_files, i, num_cameras);
         open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
     }
+    return true;
+}
+
+
+bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string record_folder)
+{
+
     allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
     camera_control->record_video = true;
     camera_control->subscribe = true;
@@ -149,11 +155,16 @@ int main(int argc, char *argv[])
                         auto server_control = FetchGame::GetServer(buffer_pointer);
                         auto server_signal = server_control->control();
 
-                        if (server_signal == FetchGame::ServerControl_START)
-                        {
+                        if (server_signal == FetchGame::ServerControl_OPEN) {
                             std::string config_folder = server_control->config_folder()->c_str();
+                            if (open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, config_folder)) {
+                                
+                            }
+                        }
+                        else if (server_signal == FetchGame::ServerControl_START)
+                        {
                             std::string record_folder = server_control->record_folder()->c_str();
-                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, config_folder, record_folder)) 
+                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, record_folder)) 
                             {
                                 client_send_thread_start_message(&client, builder, server_connection);
                             };

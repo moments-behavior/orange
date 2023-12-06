@@ -23,17 +23,19 @@ struct ServerBuilder;
 
 enum ServerControl : int8_t {
   ServerControl_IDEL = 0,
-  ServerControl_START = 1,
-  ServerControl_SETPTP = 2,
-  ServerControl_STOP = 3,
-  ServerControl_QUIT = 4,
+  ServerControl_OPEN = 1,
+  ServerControl_START = 2,
+  ServerControl_SETPTP = 3,
+  ServerControl_STOP = 4,
+  ServerControl_QUIT = 5,
   ServerControl_MIN = ServerControl_IDEL,
   ServerControl_MAX = ServerControl_QUIT
 };
 
-inline const ServerControl (&EnumValuesServerControl())[5] {
+inline const ServerControl (&EnumValuesServerControl())[6] {
   static const ServerControl values[] = {
     ServerControl_IDEL,
+    ServerControl_OPEN,
     ServerControl_START,
     ServerControl_SETPTP,
     ServerControl_STOP,
@@ -43,8 +45,9 @@ inline const ServerControl (&EnumValuesServerControl())[5] {
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[6] = {
+  static const char * const names[7] = {
     "IDEL",
+    "OPEN",
     "START",
     "SETPTP",
     "STOP",
@@ -62,16 +65,18 @@ inline const char *EnumNameServerControl(ServerControl e) {
 
 enum SignalType : int8_t {
   SignalType_ClientBringup = 0,
-  SignalType_ClientThreadStarted = 1,
-  SignalType_ClientStartRecording = 2,
+  SignalType_ClientCameraOpened = 1,
+  SignalType_ClientThreadStarted = 2,
+  SignalType_ClientStartRecording = 3,
   SignalType_ClientRecordDone = 4,
   SignalType_MIN = SignalType_ClientBringup,
   SignalType_MAX = SignalType_ClientRecordDone
 };
 
-inline const SignalType (&EnumValuesSignalType())[4] {
+inline const SignalType (&EnumValuesSignalType())[5] {
   static const SignalType values[] = {
     SignalType_ClientBringup,
+    SignalType_ClientCameraOpened,
     SignalType_ClientThreadStarted,
     SignalType_ClientStartRecording,
     SignalType_ClientRecordDone
@@ -82,9 +87,9 @@ inline const SignalType (&EnumValuesSignalType())[4] {
 inline const char * const *EnumNamesSignalType() {
   static const char * const names[6] = {
     "ClientBringup",
+    "ClientCameraOpened",
     "ClientThreadStarted",
     "ClientStartRecording",
-    "",
     "ClientRecordDone",
     nullptr
   };

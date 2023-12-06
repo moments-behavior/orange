@@ -161,7 +161,7 @@ int main(int argc, char **args)
         create_new_frame();
 
 
-        if (ImGui::Begin("Networking")) 
+        if (ImGui::Begin("Network")) 
         {
 
             if (my_servers.size() == num_servers) {
@@ -217,7 +217,7 @@ int main(int argc, char **args)
                     if (num_cameras > 0) {
                         cameras_params = new CameraParams[num_cameras];
                         cameras_select = new CameraEachSelect[num_cameras];
-
+                        
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++)
                         {
@@ -229,11 +229,20 @@ int main(int argc, char **args)
                         {
                             set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
                         }
+
+                        for (int i =0; i < num_cameras; i++) {
+                            cameras_select[i].stream_on = false;
+                            if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
+                                cameras_select[i].stream_on = true;
+                            }
+                        }
+
                         ecams = new CameraEmergent[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
                             open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
                         }
+
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
                     camera_control->open = true;
@@ -333,7 +342,8 @@ int main(int argc, char **args)
         ImGui::End();
 
 
-        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
+        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) 
+        {
             
             ptp_params->network_set_stop_ptp = false;
 
@@ -377,6 +387,8 @@ int main(int argc, char **args)
             {
                 close_camera(&ecams[i].camera);
             }
+
+            camera_control->open = false;
         }
 
 
@@ -420,6 +432,47 @@ int main(int argc, char **args)
                 }
                 
             }
+
+            ImGui::InputText("subfix", subfix_buf, 64);
+
+            if (ImGui::Button("Save to"))
+            {
+                file_dialog.Open();
+            }
+            ImGui::SameLine();
+            ImGui::Text(input_folder.c_str());
+
+            if (camera_control->open) {
+                set_camera_properties(ecams, cameras_params, num_cameras);
+                
+                if (ImGui::BeginTable("Camera Control Setting", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+                {
+                    
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("name"); 
+                    ImGui::TableNextColumn();
+                    ImGui::Text("stream");
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        char label[32];
+                        sprintf(label, "##checkbox_control%d", i);
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::Text(cameras_params[i].camera_name.c_str());
+                        ImGui::TableNextColumn();
+                        ImGui::Checkbox(label, &cameras_select[i].stream_on);
+                    }
+                    ImGui::EndTable();
+                }
+
+            }
+        }
+        ImGui::End();
+
+
+        if (ImGui::Begin("Local"))
+        {
 
             if (ImGui::Button("Load camera config")) {
                 load_camera_config = true;          
@@ -472,35 +525,9 @@ int main(int argc, char **args)
                 }
             }
 
-            if (camera_control->open) {
-                set_camera_properties(ecams, cameras_params, num_cameras);
-                
-                if (ImGui::BeginTable("Camera Control Setting", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
-                {
-                    
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::Text("name"); 
-                    ImGui::TableNextColumn();
-                    ImGui::Text("stream");
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        char label[32];
-                        sprintf(label, "##checkbox_control%d", i);
-                        ImGui::TableNextRow();
-                        ImGui::TableNextColumn();
-                        ImGui::Text(cameras_params[i].camera_name.c_str());
-                        ImGui::TableNextColumn();
-                        ImGui::Checkbox(label, &cameras_select[i].stream_on);
-                    }
-                    ImGui::EndTable();
-                }
-
-            }
-
             ImGui::Separator();
             ImGui::Spacing();
-            
+
             if (ImGui::Button(ptp_stream_sync ? "PTP off": "PTP on")) {
                 ptp_stream_sync = !ptp_stream_sync;
             }
@@ -587,15 +614,6 @@ int main(int argc, char **args)
 
             ImGui::Separator();
             ImGui::Spacing();
-
-            ImGui::InputText("subfix", subfix_buf, 64);
-
-            if (ImGui::Button("Save to"))
-            {
-                file_dialog.Open();
-            }
-            ImGui::SameLine();
-            ImGui::Text(input_folder.c_str());
 
             {
                 const char* items[] = { "h264", "hevc"};

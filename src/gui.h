@@ -92,23 +92,6 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
 
 }
 
-void allocate_display_resources(GL_Texture *tex, CameraParams* cameras_params, CameraEachSelect *cameras_select, int num_cameras)
-{
-    tex = new GL_Texture[num_cameras];
-    for (int i = 0; i < num_cameras; i++)
-    {
-        if (cameras_select[i].stream_on) {
-            cudaStreamCreate(&tex[i].streams);
-            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-            register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
-        }
-    }
-}
-
-
 // utility structure for realtime plot
 struct ScrollingBuffer {
     int MaxSize;

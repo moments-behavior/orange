@@ -88,14 +88,12 @@ int main(int argc, char **args)
     
     int network_config_select = 0;
     char subfix_buf[64] = "";
-    bool network_set_stop_ptp = false;
-
     bool select_all_cameras = false;
+    ServerState all_server_state = SERVER_DISCONNECTED;
+    int num_servers = 2;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
-
-        //Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
         service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
         {
             switch (evnt.type)
@@ -159,6 +157,12 @@ int main(int argc, char **args)
 
         if (ImGui::Begin("Networking")) 
         {
+
+            if (my_servers.size() == num_servers) {
+                if (my_servers[0].server_state == my_servers[1].server_state) {
+                    all_server_state = my_servers[0].server_state;
+                }
+            }
             
             if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -189,106 +193,116 @@ int main(int argc, char **args)
                     ImGui::SameLine();
             }
 
+            if (all_server_state == SERVER_UP || all_server_state == SERVER_DONE) {
+                if(ImGui::Button("Clients start camera threads")) {
+                    
+                    update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
 
-            if(ImGui::Button("Clients start camera threads")) {
-                
-                update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
-
-                // open cameras
-                num_cameras = 0;
-                for (int i = 0; i < cam_count; i++)
-                {
-                    if (check[i])
-                    {
-                        num_cameras++;
-                    }
-                }
-                if (num_cameras > 0) {
-                    cameras_params = new CameraParams[num_cameras];
-                    cameras_select = new CameraEachSelect[num_cameras];
-
-                    std::vector<int> selected_cameras;
+                    // open cameras
+                    num_cameras = 0;
                     for (int i = 0; i < cam_count; i++)
                     {
-                        if (check[i]) {
-                            selected_cameras.push_back(i);
+                        if (check[i])
+                        {
+                            num_cameras++;
                         }
                     }
+                    if (num_cameras > 0) {
+                        cameras_params = new CameraParams[num_cameras];
+                        cameras_select = new CameraEachSelect[num_cameras];
+
+                        std::vector<int> selected_cameras;
+                        for (int i = 0; i < cam_count; i++)
+                        {
+                            if (check[i]) {
+                                selected_cameras.push_back(i);
+                            }
+                        }
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
+                        }
+                        ecams = new CameraEmergent[num_cameras];
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+                        }
+                        realtime_plot_data = new ScrollingBuffer[num_cameras];
+                    }
+                    camera_control->open = true;
+
+                    input_folder = network_config_folders[network_config_select];
+                    make_folder_for_recording(folder_name, input_folder, subfix_buf);
+                    ptp_params->network_sync = true;
+                    host_broadcast_start_threads(builder, &server, network_config_folders[network_config_select], folder_name);
+
+                    // start local recording threads
+                    allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
+        
+                    tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
+                        if (cameras_select[i].stream_on) {
+                            cudaStreamCreate(&tex[i].streams);
+                            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                            register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
+                            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
+                            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
+                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                        }
                     }
-                    ecams = new CameraEmergent[num_cameras];
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+                        ptp_camera_sync(&ecams[i].camera);
                     }
-                    realtime_plot_data = new ScrollingBuffer[num_cameras];
-                }
-                camera_control->open = true;
+                    camera_control->sync_camera = true;
+                    camera_control->record_video = true;
 
-                input_folder = network_config_folders[network_config_select];
-                make_folder_for_recording(folder_name, input_folder, subfix_buf);
-                ptp_params->network_sync = true;
-                host_broadcast_start_threads(builder, &server, network_config_folders[network_config_select], folder_name);
-
-                // start local recording threads
-                allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
-    
-                tex = new GL_Texture[num_cameras];
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    if (cameras_select[i].stream_on) {
-                        cudaStreamCreate(&tex[i].streams);
-                        create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                        register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                        map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                        cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                        create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
-                }
+                    camera_control->subscribe = true;
+                }                
 
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    ptp_camera_sync(&ecams[i].camera);
-                }
-                camera_control->sync_camera = true;
-                camera_control->record_video = true;
-
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                    camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
-                }
-                camera_control->subscribe = true;
             }
 
-            if (ImGui::Button("Start Recording")) {
-                // get the host ready, and then set global ptp time to start recording  
-                unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                int delay_in_second = 10;
-                ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                host_broadcast_set_start_ptp(builder, &server, ptp_params->ptp_global_time);
-                ptp_params->servers_ready = true;
+            
+            if (all_server_state == SERVER_THREAD_READY) {
+                if (ImGui::Button("Start Recording")) {
+                    // get the host ready, and then set global ptp time to start recording  
+                    unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
+                    int delay_in_second = 10;
+                    ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+                    host_broadcast_set_start_ptp(builder, &server, ptp_params->ptp_global_time);
+                    ptp_params->servers_ready = true;
+                }
             }
 
-            if (ImGui::Button("Stop Recording")) {
-                unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                int delay_in_second = 10;
-                ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                std::cout << ptp_params->ptp_stop_time << std::endl;
-                builder.Clear();
-                FetchGame::ServerBuilder server_builder(builder);
-                server_builder.add_control(FetchGame::ServerControl_STOP);
-                server_builder.add_ptp_global_time(ptp_params->ptp_stop_time);
-                auto my_server = server_builder.Finish();
-                builder.Finish(my_server);
-                uint8_t *server_buffer = builder.GetBufferPointer();
-                int server_buf_size = builder.GetSize();
-                ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
-                ptp_params->network_set_stop_ptp = true;
+
+            if (all_server_state == SERVER_RECORDING) {
+                if (ImGui::Button("Stop Recording")) {
+                    unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
+                    int delay_in_second = 10;
+                    ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+                    std::cout << ptp_params->ptp_stop_time << std::endl;
+                    builder.Clear();
+                    FetchGame::ServerBuilder server_builder(builder);
+                    server_builder.add_control(FetchGame::ServerControl_STOP);
+                    server_builder.add_ptp_global_time(ptp_params->ptp_stop_time);
+                    auto my_server = server_builder.Finish();
+                    builder.Finish(my_server);
+                    uint8_t *server_buffer = builder.GetBufferPointer();
+                    int server_buf_size = builder.GetSize();
+                    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+                    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                    ptp_params->network_set_stop_ptp = true;
+                }
             }
+
+
 
             if(ImGui::Button("Clients close")) {
                 // broadcast data

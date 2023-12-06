@@ -14,7 +14,8 @@ enum ServerState {
     SERVER_UP = 0,
     SERVER_THREAD_READY = 1,
     SERVER_RECORDING = 2,
-    SERVER_DONE = 3
+    SERVER_DONE = 3,
+    SERVER_DISCONNECTED = 4
 };
 
 static const char * ServerStateStrings[] = { "SERVER_UP", "SERVER_THREAD_READY", "SERVER_RECORDING", "SERVER_DONE"};
@@ -25,6 +26,7 @@ struct ConnectedServer {
     int num_cameras;
     ServerState server_state;
 };
+
 
 std::vector<std::string> string_split(std::string s, std::string delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();
@@ -385,5 +387,6 @@ void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder& builder, EnetC
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_host_broadcast(server->m_pNetwork, 0, enet_packet);
 }
+
 
 #endif

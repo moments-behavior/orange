@@ -178,20 +178,52 @@ int main(int argc, char **args)
             }
             
 
-            if (ImGui::TreeNode("Camera configs"))
+            for (int n = 0; n < network_config_folders.size(); n++)
             {
-                for (int n = 0; n < network_config_folders.size(); n++)
-                {
-                    char buf[100];
-                    sprintf(buf, network_config_folders[n].c_str());
-                    if (ImGui::Selectable(buf, network_config_select == n)) {
-                        network_config_select = n;
-                    }
+                char buf[100];
+                sprintf(buf, network_config_folders[n].c_str());
+                if (ImGui::Selectable(buf, network_config_select == n)) {
+                    network_config_select = n;
                 }
-                ImGui::TreePop();
             }
 
+
             if(ImGui::Button("Clients start camera threads")) {
+                
+                update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
+
+                // open cameras
+                num_cameras = 0;
+                for (int i = 0; i < cam_count; i++)
+                {
+                    if (check[i])
+                    {
+                        num_cameras++;
+                    }
+                }
+                if (num_cameras > 0) {
+                    cameras_params = new CameraParams[num_cameras];
+                    cameras_select = new CameraEachSelect[num_cameras];
+
+                    std::vector<int> selected_cameras;
+                    for (int i = 0; i < cam_count; i++)
+                    {
+                        if (check[i]) {
+                            selected_cameras.push_back(i);
+                        }
+                    }
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
+                    }
+                    ecams = new CameraEmergent[num_cameras];
+                    for (int i = 0; i < num_cameras; i++)
+                    {
+                        open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+                    }
+                    realtime_plot_data = new ScrollingBuffer[num_cameras];
+                }
+
                 input_folder = network_config_folders[network_config_select];
                 make_folder_for_recording(folder_name, input_folder, subfix_buf);
                 ptp_params->network_sync = true;
@@ -199,7 +231,6 @@ int main(int argc, char **args)
 
                 // start local recording threads
                 allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
-                // allocate_display_resources(tex, cameras_params, cameras_select, num_cameras);
     
                 tex = new GL_Texture[num_cameras];
                 for (int i = 0; i < num_cameras; i++)
@@ -213,7 +244,6 @@ int main(int argc, char **args)
                         create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                     }
                 }
-
 
                 for (int i = 0; i < num_cameras; i++)
                 {

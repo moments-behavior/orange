@@ -40,6 +40,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
 
     for (int i = 0; i < num_cameras; i++)
     {
+        set_camera_params(&cameras_params[i], &device_info[i], camera_config_files, i, num_cameras);
         open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
     }
     allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);

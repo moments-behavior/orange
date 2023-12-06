@@ -203,6 +203,7 @@ int main(int argc, char **args)
             if (all_server_state == SERVER_UP || all_server_state == SERVER_DONE) {
                 if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
+                    input_folder = network_config_folders[network_config_select];
                     host_broadcast_open_cameras(builder, &server, network_config_folders[network_config_select]);
                     // open cameras
                     num_cameras = 0;
@@ -239,11 +240,11 @@ int main(int argc, char **args)
                 }
             }
 
+            if (all_server_state == SERVER_OPEN_CAMERA) {
 
 
                 if(ImGui::Button("Clients start camera threads")) {
                     
-                    input_folder = network_config_folders[network_config_select];
                     make_folder_for_recording(folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
                     host_broadcast_start_threads(builder, &server, folder_name);
@@ -278,7 +279,7 @@ int main(int argc, char **args)
                     }
                     camera_control->subscribe = true;
                 }                
-
+            }
 
             
             if (all_server_state == SERVER_THREAD_READY) {

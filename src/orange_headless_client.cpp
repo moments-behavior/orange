@@ -33,9 +33,6 @@ bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams, CameraEac
     std::vector<std::string> camera_config_files;
     update_camera_configs(camera_config_files, config_folder);
 
-    cameras_params = new CameraParams[num_cameras];
-    cameras_select = new CameraEachSelect[num_cameras];
-
     for (int i = 0; i < num_cameras; i++)
     {
         set_camera_params(&cameras_params[i], &device_info[i], camera_config_files, i, num_cameras);
@@ -157,6 +154,8 @@ int main(int argc, char *argv[])
                         if (server_signal == FetchGame::ServerControl_OPEN) {
                             std::string config_folder = server_control->config_folder()->c_str();
                             if (open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, config_folder)) {
+                                cameras_params = new CameraParams[cam_count];
+                                cameras_select = new CameraEachSelect[cam_count];
                                 client_send_camera_open_message(&client, builder, server_connection);
                             }
                         }

@@ -188,6 +188,12 @@ int main(int argc, char *argv[])
             ptp_params->network_set_stop_ptp = false;
             for (auto &t : camera_threads)
                 t.join();
+            
+            for (int i = 0; i < cam_count; i++)
+            {
+                camera_threads.pop_back();
+            }
+
 
             for (int i = 0; i < cam_count; i++)
             {

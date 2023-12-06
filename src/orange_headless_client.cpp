@@ -33,7 +33,6 @@ bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams, CameraEac
     std::vector<std::string> camera_config_files;
     update_camera_configs(camera_config_files, config_folder);
 
-    printf("Start camera thread \n");
     cameras_params = new CameraParams[num_cameras];
     cameras_select = new CameraEachSelect[num_cameras];
 
@@ -48,7 +47,7 @@ bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams, CameraEac
 
 bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string record_folder)
 {
-
+    std::cout << "start camera sthread..." << std::endl;
     allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
     camera_control->record_video = true;
     camera_control->subscribe = true;

@@ -89,8 +89,8 @@ int main(int argc, char *argv[])
     if (enet_initialize(&client, 0, 1))
     {
         printf("Network Initialized!\n");
-        // server_connection = connect_peer(&client, 192, 168, 20, 10, 3333);
-        server_connection = connect_peer(&client, 127, 0, 0, 1, 3333);
+        server_connection = connect_peer(&client, 192, 168, 20, 10, 3333);
+        // server_connection = connect_peer(&client, 127, 0, 0, 1, 3333);
     }
 
     f32 last_time = tick();

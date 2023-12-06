@@ -178,13 +178,15 @@ int main(int argc, char **args)
             }
             
 
-            for (int n = 0; n < network_config_folders.size(); n++)
+
+            for (int i = 0; i < network_config_folders.size(); i++)
             {
                 char buf[100];
-                sprintf(buf, network_config_folders[n].c_str());
-                if (ImGui::Selectable(buf, network_config_select == n)) {
-                    network_config_select = n;
-                }
+                std::vector<std::string> folder_token = string_split(network_config_folders[i].c_str(), "/");
+                sprintf(buf, folder_token.back().c_str());
+                ImGui::RadioButton(buf, &network_config_select, i); 
+                if (i != network_config_folders.size()-1)
+                    ImGui::SameLine();
             }
 
 
@@ -223,6 +225,7 @@ int main(int argc, char **args)
                     }
                     realtime_plot_data = new ScrollingBuffer[num_cameras];
                 }
+                camera_control->open = true;
 
                 input_folder = network_config_folders[network_config_select];
                 make_folder_for_recording(folder_name, input_folder, subfix_buf);
@@ -344,6 +347,10 @@ int main(int argc, char **args)
             ptp_params->servers_ready = false;
             ptp_params->ptp_stop_reached = false;
 
+            for (int i = 0; i < num_cameras; i++)
+            {
+                close_camera(&ecams[i].camera);
+            }
         }
 
 

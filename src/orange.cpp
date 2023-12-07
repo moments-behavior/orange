@@ -143,6 +143,13 @@ int main(int argc, char **args)
                             }
                         }   
                     }
+
+                    if (my_servers.size() == num_servers) {
+                        if (my_servers[0].server_state == my_servers[1].server_state) {
+                            all_server_state = my_servers[0].server_state;
+                        }
+                    }
+                    
                     enet_packet_destroy(evnt.packet);
                 }
                 break;
@@ -153,6 +160,9 @@ int main(int argc, char **args)
                     if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                         my_servers.erase(my_servers.begin() + i);
                     }
+                } 
+                if (my_servers.size() == 0) {
+                    all_server_state = SERVER_DISCONNECTED;
                 }
                 break;
             }
@@ -163,15 +173,6 @@ int main(int argc, char **args)
 
         if (ImGui::Begin("Network")) 
         {
-
-            if (my_servers.size() == num_servers) {
-                if (my_servers[0].server_state == my_servers[1].server_state) {
-                    all_server_state = my_servers[0].server_state;
-                }
-            } else {
-                all_server_state = SERVER_DISCONNECTED;
-            }
-            
 
             if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -298,7 +299,7 @@ int main(int argc, char **args)
                     int delay_in_second = 10;
                     ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
                     host_broadcast_set_start_ptp(builder, &server, ptp_params->ptp_global_time);
-                    ptp_params->servers_ready = true;
+                    ptp_params->network_set_start_ptp = true;
                 }
             }
 
@@ -324,19 +325,22 @@ int main(int argc, char **args)
             }
 
 
+            if (my_servers.size() > 0) {
+                if(ImGui::Button("Clients close")) {
+                    // broadcast data
+                    builder.Clear();
+                    FetchGame::ServerBuilder server_builder(builder);
+                    server_builder.add_control(FetchGame::ServerControl_QUIT);
+                    auto my_server = server_builder.Finish();
+                    builder.Finish(my_server);
+                    uint8_t *server_buffer = builder.GetBufferPointer();
+                    int server_buf_size = builder.GetSize();
+                    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+                    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                }
+            } 
 
-            if(ImGui::Button("Clients close")) {
-                // broadcast data
-                builder.Clear();
-                FetchGame::ServerBuilder server_builder(builder);
-                server_builder.add_control(FetchGame::ServerControl_QUIT);
-                auto my_server = server_builder.Finish();
-                builder.Finish(my_server);
-                uint8_t *server_buffer = builder.GetBufferPointer();
-                int server_buf_size = builder.GetSize();
-                ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
-            }
+
 
         }
         ImGui::End();
@@ -380,7 +384,7 @@ int main(int argc, char **args)
             ptp_params->ptp_counter = 0;
             ptp_params->ptp_stop_counter = 0;
             ptp_params->network_sync = false;
-            ptp_params->servers_ready = false;
+            ptp_params->network_set_start_ptp = false;
             ptp_params->ptp_stop_reached = false;
 
             for (int i = 0; i < num_cameras; i++)

@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
                         } else if (server_signal == FetchGame::ServerControl_SETPTP) {
                             ptp_params->ptp_global_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_global_time << std::endl;
-                            ptp_params->servers_ready = true;
+                            ptp_params->network_set_start_ptp = true;
                             client_send_ptp_set_message(&client, builder, server_connection);
                         } else if (server_signal == FetchGame::ServerControl_STOP) {
                             // stop recording
@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
             ptp_params->ptp_counter = 0;
             ptp_params->ptp_stop_counter = 0;
             ptp_params->network_sync = true;
-            ptp_params->servers_ready = false;
+            ptp_params->network_set_start_ptp = false;
             ptp_params->ptp_stop_reached = false;
             
             camera_control->sync_camera = false;

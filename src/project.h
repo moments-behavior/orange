@@ -389,12 +389,14 @@ void host_broadcast_open_cameras(flatbuffers::FlatBufferBuilder& builder, EnetCo
 
 
 
-void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder& builder, EnetContext* server, std::string record_folder_name)
+void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder& builder, EnetContext* server, std::string record_folder_name, std::string encoder_basic_setup)
 {
     builder.Clear();
     auto record_folder_message = builder.CreateString(record_folder_name);
+    auto encoder_setup_message = builder.CreateString(encoder_basic_setup);
     FetchGame::ServerBuilder server_builder(builder);
     server_builder.add_record_folder(record_folder_message);
+    server_builder.add_encoder_setup(encoder_setup_message);
     server_builder.add_control(FetchGame::ServerControl_START);
     auto my_server = server_builder.Finish();
     builder.Finish(my_server);

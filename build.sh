@@ -39,6 +39,10 @@ g++ -Ofast -ffast-math -std=c++17 targets/*.o \
     -lGLEW -lGL \
     -I$HOME/nvidia/ffmpeg/build/include/ \
     -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I/usr/local/include/opencv4 \
+    -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d -lopencv_dnn -lopencv_features2d \
+    -I/home/user/build/TensorRT-8.6.1.6/include \
+    -L/home/user/build/TensorRT-8.6.1.6/lib -lnvinfer -lnvinfer_plugin \
     `pkg-config --static --libs glfw3`
 
 sudo ./targets/orange

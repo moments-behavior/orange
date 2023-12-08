@@ -17,6 +17,7 @@ struct CameraControl
 struct CameraEachSelect
 {
     bool stream_on = true;
+    bool yolo = false;
 };
 
 struct CameraState

@@ -48,7 +48,7 @@ public:
             funcInit = *pfuncInit;
         }
 
-        std::transform(strParam.begin(), strParam.end(), strParam.begin(), tolower);
+        std::transform(strParam.begin(), strParam.end(), strParam.begin(), ::tolower);
         std::istringstream ss(strParam);
         tokens = std::vector<std::string> {
             std::istream_iterator<std::string>(ss),

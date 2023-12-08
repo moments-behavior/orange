@@ -1,0 +1,34 @@
+namespace FetchGame;
+
+enum ServerControl : byte {
+    IDEL = 0,
+    OPEN = 1,
+    START = 2,
+    SETPTP = 3,
+    STOP = 4,
+    QUIT = 5
+}
+
+enum SignalType: byte {
+    ClientBringup = 0,
+    ClientCameraOpened = 1,
+    ClientThreadStarted = 2,
+    ClientStartRecording = 3,
+    ClientRecordDone = 4
+}
+
+table bring_up_message {
+    server_name:string;
+    num_cameras:short;
+}
+
+table Server {
+    signal_type:SignalType = ClientBringup;
+    control:ServerControl = IDEL;
+    server_mesg:bring_up_message;
+    config_folder:string;
+    record_folder:string;
+    ptp_global_time:ulong;
+}
+
+root_type Server;

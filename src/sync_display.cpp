@@ -1,0 +1,91 @@
+#if defined(__GNUC__)
+#include <unistd.h>
+#endif
+#include <stdio.h>
+#include <string.h>
+#include "kernel.cuh"
+#include "sync_display.h"
+#include <cuda_runtime_api.h>
+
+SyncDisplay::SyncDisplay(const char *name, CameraParams *camera_params, unsigned char *display_buffer)
+    : CThreadWorker(name), camera_params(camera_params), display_buffer(display_buffer)
+{
+    memset(workerEntries, 0, sizeof(workerEntries));
+    workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
+    for (int i = 0; i < workerEntriesFreeQueueCount; i++)
+    {
+        workerEntriesFreeQueue[i] = &workerEntries[i];
+    }
+}
+
+SyncDisplay::~SyncDisplay()
+{
+}
+
+void SyncDisplay::ThreadRunning()
+{
+    ck(cudaSetDevice(camera_params->gpu_id));
+    // innitialization
+    initalize_gpu_frame(&frame_original, camera_params);
+    initialize_gpu_debayer(&debayer, camera_params);
+
+    while(IsMachineOn())
+    {
+        void* f = GetObjectFromQueueIn();
+        if(f) {
+            WORKER_ENTRY entry = *(WORKER_ENTRY*)f;
+            PutObjectToQueueOut(f);
+            
+            // copy frame from cpu to gpu
+            ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+
+            if (camera_params->color){
+                debayer_frame_gpu(camera_params, &frame_original, &debayer);
+            } else {
+                duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+            }
+
+            // probably reduandant copy
+            ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
+
+        }
+        usleep(16000); // sleep for 16ms 
+    }
+    cudaFree(frame_original.d_orig);
+    cudaFree(debayer.d_debayer);
+}
+
+
+bool SyncDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id)
+{
+    WORKER_ENTRY *entriesOut[WORK_ENTRIES_MAX]; // entris got out from saver thread, their frames should be returned to driver queue.
+    int entriesOutCount = WORK_ENTRIES_MAX;
+    GetObjectsFromQueueOut((void **)entriesOut, &entriesOutCount);
+    if (entriesOutCount)
+    { // return the frames to driver, and put entries back to frameSaveEntriesFreeQueue
+        // printf("++++++++++++++++++++++++ %s %s %d get WORKER_ENTRY from out entriesOutCount: %d\n", __FILE__, __FUNCTION__, __LINE__, entriesOutCount);
+        for (int j = 0; j < entriesOutCount; j++)
+        {
+            workerEntriesFreeQueue[workerEntriesFreeQueueCount] = entriesOut[j];
+            workerEntriesFreeQueueCount++;
+        }
+    }
+
+    // get the free entry if there is one and put in to QueueIn, otherwise EVT_CameraQueueFrame.
+    if (workerEntriesFreeQueueCount)
+    {
+        // printf("++++++++++++++++++++++++ %s %s %d put WORKER_ENTRY to in workerEntriesFreeQueueCount: %d\n", __FILE__, __FUNCTION__, __LINE__, workerEntriesFreeQueueCount);
+        WORKER_ENTRY *entry = workerEntriesFreeQueue[workerEntriesFreeQueueCount - 1];
+        workerEntriesFreeQueueCount--;
+        entry->imagePtr = imagePtr;
+        entry->bufferSize = bufferSize;
+        entry->width = width;
+        entry->height = height;
+        entry->pixelFormat = pixelFormat;
+        entry->timestamp = timestamp;
+        entry->frame_id = frame_id;
+        PutObjectToQueueIn(entry);
+        return true;
+    }
+    return false;
+}

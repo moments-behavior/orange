@@ -23,6 +23,7 @@ struct CameraParams{
     int gpu_id;
     int camera_id;
     std::string camera_name;
+    std::string camera_serial;
     int num_cameras;
     bool gpu_direct;
     bool need_reorder;
@@ -51,6 +52,9 @@ struct CameraParams{
     unsigned int focus_min;
     unsigned int focus_inc;
     bool color;
+    int sens_temp;
+    int sens_temp_max; 
+    int sens_temp_min;
 }; 
 
 struct CameraEmergent{
@@ -62,7 +66,13 @@ struct CameraEmergent{
 
 struct PTPParams{
     unsigned long long ptp_global_time; 
+    unsigned long long ptp_stop_time;
     uint64_t ptp_counter;
+    uint64_t ptp_stop_counter;
+    bool network_sync = false;
+    bool ptp_stop_reached = false;
+    bool network_set_stop_ptp = false;
+    bool network_set_start_ptp = false;
 };
 
 
@@ -73,6 +83,7 @@ void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergen
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
 void ptp_camera_sync(Emergent::CEmergentCamera* camera);
+void ptp_sync_off(Emergent::CEmergentCamera *camera);
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
 unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera);
 void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera);
@@ -89,4 +100,5 @@ int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
 void allocate_frame_reorder_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_reorder, CameraParams* camera_params);
 void camera_open_stream(Emergent::CEmergentCamera* camera);
 void sort_cameras_ip(GigEVisionDeviceInfo *device_info, GigEVisionDeviceInfo *sorted_device_info, int cam_count);
+void get_senstemp_value(Emergent::CEmergentCamera *camera, CameraParams *camera_params);
 #endif

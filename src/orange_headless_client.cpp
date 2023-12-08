@@ -42,14 +42,13 @@ bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams, CameraEac
 }
 
 
-bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string record_folder)
+bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string record_folder, std::string encoder_basic_setup)
 {
     std::cout << "start camera sthread..." << std::endl;
     allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
     camera_control->record_video = true;
     camera_control->subscribe = true;
     camera_control->sync_camera = true;
-    std::string encoder_setup = "-codec h264 -preset p1 -fps " + std::to_string(cameras_params[0].frame_rate);
 
     // Creating a directory to save recorded video;
     if (mkdir(record_folder.c_str(), 0777) == -1)
@@ -74,6 +73,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
 
     for (int i = 0; i < num_cameras; i++)
     {
+        std::string encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
         camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_setup, record_folder, ptp_params));
     }
 
@@ -162,7 +162,8 @@ int main(int argc, char *argv[])
                         else if (server_signal == FetchGame::ServerControl_START)
                         {
                             std::string record_folder = server_control->record_folder()->c_str();
-                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, record_folder)) 
+                            std::string encoder_basic_setup = server_control->encoder_setup()->c_str();
+                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, record_folder, encoder_basic_setup)) 
                             {
                                 client_send_thread_start_message(&client, builder, server_connection);
                             };

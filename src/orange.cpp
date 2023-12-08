@@ -256,9 +256,10 @@ int main(int argc, char **args)
             if (all_server_state == SERVER_OPEN_CAMERA) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Clients start camera threads")) {
+                    encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
                     make_folder_for_recording(folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(builder, &server, folder_name);
+                    host_broadcast_start_threads(builder, &server, folder_name, encoder_basic_setup);
 
                     // start local recording threads
                     allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
@@ -520,6 +521,14 @@ int main(int argc, char **args)
                         {
                             set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
                         }
+
+                        for (int i =0; i < num_cameras; i++) {
+                            cameras_select[i].stream_on = false;
+                            if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
+                                cameras_select[i].stream_on = true;
+                            }
+                        }
+                        
                         ecams = new CameraEmergent[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
@@ -642,12 +651,6 @@ int main(int argc, char **args)
                 encoder_preset = items[item_current];
             }
 
-            if (ImGui::Button("Update Encoding Params"))
-            {
-                encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
-                std::cout << encoder_basic_setup << std::endl;
-            }
-
 
             if (camera_control->stop_record)
             {
@@ -663,6 +666,7 @@ int main(int argc, char **args)
                 (camera_control->stop_record) = !(camera_control->stop_record);
                 if (camera_control->stop_record)
                 {
+                    encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
                     camera_control->record_video = true;
                     make_folder_for_recording(folder_name, input_folder, subfix_buf);
 

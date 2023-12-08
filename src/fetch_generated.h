@@ -173,7 +173,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_SERVER_MESG = 8,
     VT_CONFIG_FOLDER = 10,
     VT_RECORD_FOLDER = 12,
-    VT_PTP_GLOBAL_TIME = 14
+    VT_ENCODER_SETUP = 14,
+    VT_PTP_GLOBAL_TIME = 16
   };
   FetchGame::SignalType signal_type() const {
     return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 0));
@@ -190,6 +191,9 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *record_folder() const {
     return GetPointer<const ::flatbuffers::String *>(VT_RECORD_FOLDER);
   }
+  const ::flatbuffers::String *encoder_setup() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_ENCODER_SETUP);
+  }
   uint64_t ptp_global_time() const {
     return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
   }
@@ -203,6 +207,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyString(config_folder()) &&
            VerifyOffset(verifier, VT_RECORD_FOLDER) &&
            verifier.VerifyString(record_folder()) &&
+           VerifyOffset(verifier, VT_ENCODER_SETUP) &&
+           verifier.VerifyString(encoder_setup()) &&
            VerifyField<uint64_t>(verifier, VT_PTP_GLOBAL_TIME, 8) &&
            verifier.EndTable();
   }
@@ -227,6 +233,9 @@ struct ServerBuilder {
   void add_record_folder(::flatbuffers::Offset<::flatbuffers::String> record_folder) {
     fbb_.AddOffset(Server::VT_RECORD_FOLDER, record_folder);
   }
+  void add_encoder_setup(::flatbuffers::Offset<::flatbuffers::String> encoder_setup) {
+    fbb_.AddOffset(Server::VT_ENCODER_SETUP, encoder_setup);
+  }
   void add_ptp_global_time(uint64_t ptp_global_time) {
     fbb_.AddElement<uint64_t>(Server::VT_PTP_GLOBAL_TIME, ptp_global_time, 0);
   }
@@ -248,9 +257,11 @@ inline ::flatbuffers::Offset<Server> CreateServer(
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     ::flatbuffers::Offset<::flatbuffers::String> config_folder = 0,
     ::flatbuffers::Offset<::flatbuffers::String> record_folder = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> encoder_setup = 0,
     uint64_t ptp_global_time = 0) {
   ServerBuilder builder_(_fbb);
   builder_.add_ptp_global_time(ptp_global_time);
+  builder_.add_encoder_setup(encoder_setup);
   builder_.add_record_folder(record_folder);
   builder_.add_config_folder(config_folder);
   builder_.add_server_mesg(server_mesg);
@@ -266,9 +277,11 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     const char *config_folder = nullptr,
     const char *record_folder = nullptr,
+    const char *encoder_setup = nullptr,
     uint64_t ptp_global_time = 0) {
   auto config_folder__ = config_folder ? _fbb.CreateString(config_folder) : 0;
   auto record_folder__ = record_folder ? _fbb.CreateString(record_folder) : 0;
+  auto encoder_setup__ = encoder_setup ? _fbb.CreateString(encoder_setup) : 0;
   return FetchGame::CreateServer(
       _fbb,
       signal_type,
@@ -276,6 +289,7 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
       server_mesg,
       config_folder__,
       record_folder__,
+      encoder_setup__,
       ptp_global_time);
 }
 

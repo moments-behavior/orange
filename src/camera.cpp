@@ -45,6 +45,21 @@ void configure_factory_defaults(Emergent::CEmergentCamera *camera)
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false));
 }
 
+void get_senstemp_range(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
+{
+    EVT_CameraGetInt32ParamMax(camera, "SensTemp", &camera_params->sens_temp_max);
+    EVT_CameraGetInt32ParamMin(camera, "SensTemp", &camera_params->sens_temp_min);
+}
+
+void get_senstemp_value(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
+{
+    int return_value = EVT_CameraGetInt32Param(camera, "SensTemp", &camera_params->sens_temp);
+    if(return_value != 0)
+    {
+        printf("get_senstemp_value: Error\n");
+    }
+}
+
 void update_gain_value(Emergent::CEmergentCamera *camera, int gain_val, CameraParams *camera_params)
 {
     EVT_CameraGetUInt32ParamMax(camera, "Gain", &camera_params->gain_max);

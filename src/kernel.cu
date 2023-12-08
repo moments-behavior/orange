@@ -57,3 +57,24 @@ void GSPRINT4521_Convert(unsigned char* dest, const unsigned char* src, int widt
     cudaError_t err = cudaDeviceSynchronize();
     if(err != cudaSuccess) printf("GSPRINT4521_ConvertKernel failed: %s\n", cudaGetErrorString(err));
 }
+
+
+__global__ void Mono8ToRGBMonoKernel(unsigned char* dest, const unsigned char* src, int width, int height)
+{
+    int y = blockIdx.x;  // y is the line
+    int offsetMono = y * width;
+    src += offsetMono;
+    dest += offsetMono * 3;
+    for (int i = 0; i < width; i++) {
+        unsigned char c = src[i];
+        *dest++ = c; *dest++ = c; *dest++ = c; // set the G to RGB
+    }
+}
+
+void Mono8ToRGBMono(unsigned char* dest, const unsigned char* src, int width, int height)
+{
+    dim3 threadPerBlock(1, 1);  // 1 thread per line
+    Mono8ToRGBMonoKernel << <height, threadPerBlock >> > (dest, src, width, height);  // this opens height blocks, 1 thread per block
+    cudaError_t err = cudaDeviceSynchronize();
+    if(err != cudaSuccess) printf("Mono8ToRGBMonoKernel failed: %s\n", cudaGetErrorString(err));
+}

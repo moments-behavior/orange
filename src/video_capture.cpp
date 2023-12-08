@@ -191,7 +191,7 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
     
     COpenGLDisplay* openGLDisplay;
     if (camera_select->stream_on) {
-        openGLDisplay = new COpenGLDisplay("", camera_params, display_buffer);
+        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer);
         openGLDisplay->StartThread();
     }
 

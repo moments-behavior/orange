@@ -7,8 +7,8 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 
-COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, unsigned char *display_buffer)
-    : CThreadWorker(name), camera_params(camera_params), display_buffer(display_buffer)
+COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer)
+    : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
@@ -29,6 +29,13 @@ void COpenGLDisplay::ThreadRunning()
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
 
+    if (camera_select->yolo) {
+        cudaMalloc((void **)&d_rgb, camera_params->width * camera_params->height * 3); 
+        const std::string engine_file_path{"/home/user/detect/rat_pose.engine"};
+        yolov8_pose = new YOLOv8_pose(engine_file_path);
+        yolov8_pose->make_pipe(true);
+    }
+
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();
@@ -48,11 +55,21 @@ void COpenGLDisplay::ThreadRunning()
             // probably reduandant copy
             ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
 
+            if (camera_select->yolo) {
+                // yolo code goes here
+                rgba2rgb_convert(d_rgb, debayer.d_debayer, camera_params->width, camera_params->height, 0);
+
+            }
+
+
         }
         usleep(16000); // sleep for 16ms 
     }
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
+    if (camera_select->yolo) {
+        delete yolov8_pose;
+    }
 }
 
 

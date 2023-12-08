@@ -456,6 +456,22 @@ int main(int argc, char **args)
             ImGui::SameLine();
             ImGui::Text(input_folder.c_str());
 
+
+            {
+                const char* items[] = { "h264", "hevc"};
+                static int item_current = 0;
+                ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
+                encoder_codec = items[item_current];
+            }
+
+            {
+                const char* items[] = { "p1", "p3", "p5", "p7"};
+                static int item_current = 0;
+                ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
+                encoder_preset = items[item_current];
+            }
+
+
             if (camera_control->open) {
                 set_camera_properties(ecams, cameras_params, num_cameras);
                 
@@ -476,6 +492,8 @@ int main(int argc, char **args)
                         ImGui::Text(cameras_params[i].camera_name.c_str());
                         ImGui::TableNextColumn();
                         ImGui::Checkbox(label, &cameras_select[i].stream_on);
+                        ImGui::TableNextColumn();
+                        ImGui::Checkbox(label, &cameras_select[i].yolo);
                     }
                     ImGui::EndTable();
                 }
@@ -636,20 +654,6 @@ int main(int argc, char **args)
 
             ImGui::Separator();
             ImGui::Spacing();
-
-            {
-                const char* items[] = { "h264", "hevc"};
-                static int item_current = 0;
-                ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_codec = items[item_current];
-            }
-
-            {
-                const char* items[] = { "p1", "p3", "p5", "p7"};
-                static int item_current = 0;
-                ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_preset = items[item_current];
-            }
 
 
             if (camera_control->stop_record)

@@ -202,6 +202,7 @@ int main(int argc, char **args)
             }
 
             if (all_server_state == SERVER_UP || all_server_state == SERVER_DONE) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
                     input_folder = network_config_folders[network_config_select];
@@ -247,14 +248,14 @@ int main(int argc, char **args)
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
                     camera_control->open = true;
+                    all_server_state = SERVER_WAIT;
                 }
+                ImGui::PopStyleColor(1);
             }
 
             if (all_server_state == SERVER_OPEN_CAMERA) {
-
-
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Clients start camera threads")) {
-                    
                     make_folder_for_recording(folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
                     host_broadcast_start_threads(builder, &server, folder_name);
@@ -288,11 +289,14 @@ int main(int argc, char **args)
                         camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
                     }
                     camera_control->subscribe = true;
-                }                
+                    all_server_state = SERVER_WAIT;
+                }
+                ImGui::PopStyleColor(1);
             }
 
             
             if (all_server_state == SERVER_THREAD_READY) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Start Recording")) {
                     // get the host ready, and then set global ptp time to start recording  
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
@@ -300,11 +304,14 @@ int main(int argc, char **args)
                     ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
                     host_broadcast_set_start_ptp(builder, &server, ptp_params->ptp_global_time);
                     ptp_params->network_set_start_ptp = true;
+                    all_server_state = SERVER_WAIT;
                 }
+                ImGui::PopStyleColor(1);
             }
 
 
             if (all_server_state == SERVER_RECORDING) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                     int delay_in_second = 10;
@@ -321,7 +328,9 @@ int main(int argc, char **args)
                     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
+                    all_server_state = SERVER_WAIT;
                 }
+                ImGui::PopStyleColor(1);
             }
 
 

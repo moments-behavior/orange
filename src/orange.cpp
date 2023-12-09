@@ -475,7 +475,7 @@ int main(int argc, char **args)
             if (camera_control->open) {
                 set_camera_properties(ecams, cameras_params, num_cameras);
                 
-                if (ImGui::BeginTable("Camera Control Setting", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+                if (ImGui::BeginTable("Camera Control Setting", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
                 {
                     
                     ImGui::TableNextRow();
@@ -483,17 +483,21 @@ int main(int argc, char **args)
                     ImGui::Text("name"); 
                     ImGui::TableNextColumn();
                     ImGui::Text("stream");
+                    ImGui::TableNextColumn();
+                    ImGui::Text("yolo");
                     for (int i = 0; i < num_cameras; i++)
                     {
                         char label[32];
                         sprintf(label, "##checkbox_control%d", i);
+                        char label_yolo[32];
+                        sprintf(label_yolo, "##checkbox_yolo%d", i);
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
                         ImGui::Text(cameras_params[i].camera_name.c_str());
                         ImGui::TableNextColumn();
                         ImGui::Checkbox(label, &cameras_select[i].stream_on);
                         ImGui::TableNextColumn();
-                        ImGui::Checkbox(label, &cameras_select[i].yolo);
+                        ImGui::Checkbox(label_yolo, &cameras_select[i].yolo);
                     }
                     ImGui::EndTable();
                 }

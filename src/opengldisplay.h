@@ -21,8 +21,10 @@ public:
 	Debayer debayer;
 	
 	//for real time: refactor this
-	unsigned char *d_rgb;
+	unsigned char *d_convert;
     YOLOv8_pose* yolov8_pose;
+	FrameCPU frame_cpu;
+
 private: 
 	virtual void ThreadRunning(); // overides of COffThreadMachine for worker thread
 private:	

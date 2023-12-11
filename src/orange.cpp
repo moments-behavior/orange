@@ -92,6 +92,10 @@ int main(int argc, char **args)
     ServerState all_server_state = SERVER_DISCONNECTED;
     int num_servers = 2;
 
+    // realtime tools
+    std::vector<int> image_save_index;
+    bool *selected_images_to_save;
+
     while (!glfwWindowShouldClose(window->render_target))
     {
         service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -653,6 +657,16 @@ int main(int argc, char **args)
                         ptp_params->ptp_global_time = 0;
                         camera_control->sync_camera = false;
                     }
+                }
+            }
+
+            // need to check state
+            if (ImGui::Button("Save images all"))
+            {
+                folder_name = file_dialog.GetSelected().string();
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    cameras_select->frame_save_state = State_Write_New_Frame;
                 }
             }
 

@@ -5,6 +5,11 @@
 #include <iostream>
 #include <fstream>
 
+enum PictureSaveState {
+    State_Frame_Idle = 0, 
+    State_Write_New_Frame = 1
+};
+
 struct CameraControl
 {
     bool open = false;
@@ -12,12 +17,15 @@ struct CameraControl
     bool stop_record = false;
     bool record_video = false;
     bool sync_camera = false;
+    bool selected_images_to_save = false;
 };
 
 struct CameraEachSelect
 {
     bool stream_on = true;
     bool yolo = false;
+    PictureSaveState frame_save_state = State_Frame_Idle;
+    int frame_save_idx = 0; 
 };
 
 struct CameraState

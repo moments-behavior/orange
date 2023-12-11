@@ -15,9 +15,16 @@ typedef struct {
     unsigned long long frame_id;
 } WORKER_ENTRY;
 
+
 struct FrameGPU
 {
     unsigned char *d_orig;
+    int size_pic;
+};
+
+struct FrameCPU
+{
+    unsigned char *frame;
     int size_pic;
 };
 
@@ -30,12 +37,17 @@ struct Debayer
     NppiBayerGridPosition grid;
 };
 
+static inline void initialize_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
+{
+    int size_pic = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
+    cpu_buffer->frame = (unsigned char *)malloc(size_pic);
+}
+
 static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *camera_params)
 {
     frame_original->size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
     ck(cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic));
 }
-
 
 static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params)
 {

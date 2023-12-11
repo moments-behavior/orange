@@ -28,9 +28,11 @@ void COpenGLDisplay::ThreadRunning()
     // innitialization
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
+    initialize_cpu_frame(&frame_cpu, camera_params);
+
+    ck(cudaMalloc((void **)&d_convert, camera_params->width * camera_params->height * 3)); 
 
     if (camera_select->yolo) {
-        cudaMalloc((void **)&d_rgb, camera_params->width * camera_params->height * 3); 
         const std::string engine_file_path{"/home/user/detect/rat_pose.engine"};
         yolov8_pose = new YOLOv8_pose(engine_file_path);
         yolov8_pose->make_pipe(true);
@@ -55,13 +57,19 @@ void COpenGLDisplay::ThreadRunning()
             // probably reduandant copy
             ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
 
-            if (camera_select->yolo) {
+            if (camera_select->frame_save_state==State_Write_New_Frame) {
                 // yolo code goes here
-                rgba2rgb_convert(d_rgb, debayer.d_debayer, camera_params->width, camera_params->height, 0);
-
+                rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
+                
+                // copy frame back to cpu, and then save
+                cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
+                cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
+                
+                std::string image_name = "/home/user/Pictures/Orange/Cam" + camera_params->camera_serial + "_image" + std::to_string(camera_select->frame_save_idx) + ".tif";
+                cv::imwrite(image_name, view);
+                camera_select->frame_save_idx++;
+                camera_select->frame_save_state = State_Frame_Idle;
             }
-
-
         }
         usleep(16000); // sleep for 16ms 
     }

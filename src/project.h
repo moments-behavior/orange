@@ -299,7 +299,6 @@ void allocate_camera_frame_buffers(CameraEmergent* ecams, CameraParams* cameras_
     }
 }
 
-
 void client_send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection, int cam_count)
 {
     char hostname[100];

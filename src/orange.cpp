@@ -670,30 +670,25 @@ int main(int argc, char **args)
                     }
                 }
 
-                if (save_image_all_ready) {
-                    if (ImGui::Button("Save images all"))
-                    {
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            cameras_select[i].frame_save_state = State_Write_New_Frame;
-                        }
-                    }
+                ImGui::Text("Save image index:");
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    char label_save_input[32];
+
+                    sprintf(label_save_input, "save_image_index%d", i);
+                    ImGui::InputInt(label_save_input, &cameras_select[i].frame_save_idx);
+
                 }
 
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    ImGui::InputInt("Saving image index: ", &cameras_select[i].frame_save_idx);
-                }
-
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    std::string label_save = "s_" + cameras_params[i].camera_name;
-                    ImGui::Checkbox(label_save.c_str(), &cameras_select[i].selected_to_save);
+                    std::string label_save_input_checkbox;
+                    label_save_input_checkbox = "s_" + cameras_params[i].camera_name;
+                    ImGui::Checkbox(label_save_input_checkbox.c_str(), &cameras_select[i].selected_to_save);
                     ImGui::SameLine();
                 }
-
+                
                 if (save_image_all_ready) {
-
                     if (ImGui::Button("Save selected"))
                     {
                         for (int i = 0; i < num_cameras; i++)
@@ -702,6 +697,14 @@ int main(int argc, char **args)
                             {
                                 cameras_select[i].frame_save_state = State_Write_New_Frame;
                             }
+                        }
+                    }
+                    
+                    if (ImGui::Button("Save images all"))
+                    {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            cameras_select[i].frame_save_state = State_Write_New_Frame;
                         }
                     }
                 }

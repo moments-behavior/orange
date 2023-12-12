@@ -93,8 +93,7 @@ int main(int argc, char **args)
     int num_servers = 2;
 
     // realtime tools
-    std::vector<int> image_save_index;
-    bool *selected_images_to_save;
+    bool save_image_all_ready = true;
 
     while (!glfwWindowShouldClose(window->render_target))
     {
@@ -660,15 +659,55 @@ int main(int argc, char **args)
                 }
             }
 
-            // need to check state
-            if (ImGui::Button("Save images all"))
+            save_image_all_ready = true;
+            if (camera_control->subscribe == true)
             {
-                folder_name = file_dialog.GetSelected().string();
+                for (int i=0; i < num_cameras; i++)
+                {
+                    if (cameras_select[i].frame_save_state != State_Frame_Idle) {
+                        save_image_all_ready = false;
+                        break;
+                    }
+                }
+
+                if (save_image_all_ready) {
+                    if (ImGui::Button("Save images all"))
+                    {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            cameras_select[i].frame_save_state = State_Write_New_Frame;
+                        }
+                    }
+                }
+
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    cameras_select->frame_save_state = State_Write_New_Frame;
+                    ImGui::InputInt("Saving image index: ", &cameras_select[i].frame_save_idx);
+                }
+
+                for (int i = 0; i < num_cameras; i++)
+                {
+                    std::string label_save = "s_" + cameras_params[i].camera_name;
+                    ImGui::Checkbox(label_save.c_str(), &cameras_select[i].selected_to_save);
+                    ImGui::SameLine();
+                }
+
+                if (save_image_all_ready) {
+
+                    if (ImGui::Button("Save selected"))
+                    {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            if (cameras_select[i].selected_to_save)
+                            {
+                                cameras_select[i].frame_save_state = State_Write_New_Frame;
+                            }
+                        }
+                    }
                 }
             }
+
+
 
             ImGui::Separator();
             ImGui::Spacing();

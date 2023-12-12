@@ -17,7 +17,6 @@ struct CameraControl
     bool stop_record = false;
     bool record_video = false;
     bool sync_camera = false;
-    bool selected_images_to_save = false;
 };
 
 struct CameraEachSelect
@@ -26,6 +25,7 @@ struct CameraEachSelect
     bool yolo = false;
     PictureSaveState frame_save_state = State_Frame_Idle;
     int frame_save_idx = 0; 
+    bool selected_to_save = false;
 };
 
 struct CameraState

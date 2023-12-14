@@ -72,7 +72,6 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8_pose->preprocess_gpu(d_convert);
                 yolov8_pose->infer();
                 yolov8_pose->postprocess(objs, score_thres, iou_thres, topk);
-                std::cout << objs.size() << std::endl;
                 yolov8_pose->copy_keypoints_gpu(d_points, objs);
                 gpu_draw_rat_pose(debayer.d_debayer, 3208, 2200, d_points, d_skeleton, yolov8_pose->stream);
             }

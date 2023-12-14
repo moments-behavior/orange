@@ -199,10 +199,10 @@ __global__ void gpu_draw_rat_pose(unsigned char* src, const int width, const int
             float proj_y = d_points[pt0_idx*2+1] + t * (d_points[pt1_idx*2+1]-d_points[pt0_idx*2+1]);
             float distance_squared = (x - proj_x) * (x - proj_x) + (y - proj_y) * (y - proj_y);
             if (distance_squared < 8.0f) {
-                // rgb here instead of rgba
-                *(src + ((y * width * 3) + (x * 3)))  = 51;
-                *(src + ((y * width * 3) + (x * 3)) + 1)  = 153;
-                *(src + ((y * width * 3) + (x * 3)) + 2)  = 255;
+                *(src + ((y * width * 4) + (x * 4)))  = 51;
+                *(src + ((y * width * 4) + (x * 4)) + 1)  = 153;
+                *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
+                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;                   
             }
         }
     }

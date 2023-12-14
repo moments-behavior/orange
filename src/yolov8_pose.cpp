@@ -16,7 +16,6 @@ YOLOv8_pose::YOLOv8_pose(const std::string& engine_file_path)
     assert(this->runtime != nullptr);
 
     this->engine = this->runtime->deserializeCudaEngine(trtModelStream, size);
-        std::cout << this->engine << std::endl;
 
     assert(this->engine != nullptr);
     delete[] trtModelStream;
@@ -25,7 +24,6 @@ YOLOv8_pose::YOLOv8_pose(const std::string& engine_file_path)
     assert(this->context != nullptr);
     cudaStreamCreate(&this->stream);
     this->num_bindings = this->engine->getNbBindings();
-    std::cout << this->engine->getNbBindings() << std::endl;
     for (int i = 0; i < this->num_bindings; ++i) {
         Binding            binding;
         nvinfer1::Dims     dims;
@@ -71,6 +69,11 @@ YOLOv8_pose::~YOLOv8_pose()
 
 void YOLOv8_pose::make_pipe(bool warmup)
 {
+    // allocate device resources for initialization
+    cudaMalloc((void **)&d_temp, 640*439*3);
+    cudaMalloc((void **)&d_boarder, 640*640*3);
+    cudaMalloc((void **)&d_float, sizeof(float) * 640 * 640 *3);
+    cudaMalloc((void **)&d_planar, sizeof(float) * 640 * 640 *3);
 
     for (auto& bindings : this->input_bindings) {
         void* d_ptr;
@@ -102,12 +105,12 @@ void YOLOv8_pose::make_pipe(bool warmup)
     }
 }
 
-void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb, unsigned char* temp, unsigned char* boarder_image, float* float_image, float* float_planar, cv::Size& image_size, cv::Size& size)
+void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb)
 {
-    const float inp_h  = size.height;
-    const float inp_w  = size.width;
-    float       height = image_size.height;
-    float       width  = image_size.width;
+    const float inp_h  = 640;
+    const float inp_w  = 640;
+    float       height = 3208;
+    float       width  = 2200;
 
     float r    = std::min(inp_h / height, inp_w / width);
     int   padw = std::round(width * r);
@@ -134,7 +137,7 @@ void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb, unsigned char* temp, unsi
     output_roi.height = 439;
 
 
-    const NppStatus npp_result = nppiResize_8u_C3R(d_rgb, 3208 * sizeof(uchar3), img_size, roi, temp, 640 * sizeof(uchar3), output_resize_size, output_roi, NPPI_INTER_SUPER);
+    const NppStatus npp_result = nppiResize_8u_C3R(d_rgb, 3208 * sizeof(uchar3), img_size, roi, d_temp, 640 * sizeof(uchar3), output_resize_size, output_roi, NPPI_INTER_SUPER);
     if (npp_result != NPP_SUCCESS) {
         std::cerr << "Error executing Resize -- code: " << npp_result << std::endl;
     }
@@ -145,7 +148,7 @@ void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb, unsigned char* temp, unsi
     boarder_size.height = 640;
 
     Npp8u boarder_color[3] = {114, 114, 114};
-    const NppStatus npp_result2 = nppiCopyConstBorder_8u_C3R(temp, 640 * sizeof(uchar3), output_resize_size, boarder_image, 640 * sizeof(uchar3), boarder_size, 100, 0, boarder_color);
+    const NppStatus npp_result2 = nppiCopyConstBorder_8u_C3R(d_temp, 640 * sizeof(uchar3), output_resize_size, d_boarder, 640 * sizeof(uchar3), boarder_size, 100, 0, boarder_color);
     if (npp_result2 != NPP_SUCCESS) {
         std::cerr << "Error executing CopyConstBoarder -- code: " << npp_result2 << std::endl;
     }
@@ -158,20 +161,20 @@ void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb, unsigned char* temp, unsi
 
 
     // blobImageNPP: 1. convert to float: nppiConvert_8u32f_C3R; 2. normalize, nppiDivC_32f_C3IR; 3. transpose: nppiCopy_32f_C3P3R
-    const NppStatus npp_result3 = nppiConvert_8u32f_C3R(boarder_image, 640 * sizeof(uchar3), float_image, 640 * sizeof(float3), boarder_size);
+    const NppStatus npp_result3 = nppiConvert_8u32f_C3R(d_boarder, 640 * sizeof(uchar3), d_float, 640 * sizeof(float3), boarder_size);
     if (npp_result3 != NPP_SUCCESS) {
         std::cerr << "Error executing Convert to float -- code: " << npp_result3 << std::endl;
     }
     
     Npp32f scale_factor[3] = {255.0f, 255.0f, 255.0f};
 
-    const NppStatus npp_result4 = nppiDivC_32f_C3IR(scale_factor, float_image, 640 * sizeof(float3), boarder_size);
+    const NppStatus npp_result4 = nppiDivC_32f_C3IR(scale_factor, d_float, 640 * sizeof(float3), boarder_size);
     if (npp_result4 != NPP_SUCCESS) {
         std::cerr << "Error executing Convert to float -- code: " << npp_result4 << std::endl;
     }
 
-     float * const inputArr[3] {float_planar, float_planar + 640 * 640, float_planar + (640 * 640 * 2)};
-     const NppStatus npp_result5 = nppiCopy_32f_C3P3R(float_image, 640 * sizeof(float3), inputArr, 640 * sizeof(float), boarder_size);
+     float * const inputArr[3] {d_planar, d_planar + 640 * 640, d_planar + (640 * 640 * 2)};
+     const NppStatus npp_result5 = nppiCopy_32f_C3P3R(d_float, 640 * sizeof(float3), inputArr, 640 * sizeof(float), boarder_size);
      if (npp_result5 != NPP_SUCCESS) {
          std::cerr << "Error executing convert to plannar -- code: " << npp_result5 << std::endl;
      }
@@ -182,8 +185,8 @@ void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb, unsigned char* temp, unsi
     this->pparam.height = height;
     this->pparam.width  = width;
 
-    this->context->setBindingDimensions(0, nvinfer1::Dims{4, {1, 3, size.height, size.width}});
-    CHECK(cudaMemcpyAsync(this->device_ptrs[0], float_planar, 640*640*sizeof(float3), cudaMemcpyDeviceToDevice, this->stream));
+    this->context->setBindingDimensions(0, nvinfer1::Dims{4, {1, 3, 640, 640}});
+    CHECK(cudaMemcpyAsync(this->device_ptrs[0], d_planar, 640*640*sizeof(float3), cudaMemcpyDeviceToDevice, this->stream));
 }
 
 

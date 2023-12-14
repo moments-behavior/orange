@@ -25,6 +25,9 @@ public:
     YOLOv8_pose* yolov8_pose;
 	FrameCPU frame_cpu;
 
+	float *d_points;
+    unsigned int *d_skeleton;
+
 private: 
 	virtual void ThreadRunning(); // overides of COffThreadMachine for worker thread
 private:	

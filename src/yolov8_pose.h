@@ -23,7 +23,7 @@ public:
 
     void copy_from_Mat(const cv::Mat& image, cv::Size& size);
 
-    void preprocess_gpu(unsigned char* d_rgb, unsigned char* temp, unsigned char* boarder_image, float* float_image, float* float_planenar, cv::Size& image_size, cv::Size& size);
+    void preprocess_gpu(unsigned char* d_rgb);
 
     void letterbox(const cv::Mat& image, cv::Mat& out, cv::Size& size);
 
@@ -52,6 +52,12 @@ public:
     cudaStream_t                 stream  = nullptr;
 
 private:
+    // device pointer for gpu preprocessing
+    unsigned char* d_temp;
+    unsigned char* d_boarder;
+    float* d_float;
+    float* d_planar;
+
     nvinfer1::ICudaEngine*       engine  = nullptr;
     nvinfer1::IRuntime*          runtime = nullptr;
     nvinfer1::IExecutionContext* context = nullptr;

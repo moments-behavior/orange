@@ -31,12 +31,25 @@ void COpenGLDisplay::ThreadRunning()
     initialize_cpu_frame(&frame_cpu, camera_params);
 
     ck(cudaMalloc((void **)&d_convert, camera_params->width * camera_params->height * 3)); 
-
+    
+    unsigned int skeleton[8] = {0, 2, 1, 2, 2, 3};
     if (camera_select->yolo) {
+        printf("YOLO initialization...\n");
+
         const std::string engine_file_path{"/home/user/detect/rat_pose.engine"};
         yolov8_pose = new YOLOv8_pose(engine_file_path);
         yolov8_pose->make_pipe(true);
+
+        cudaMalloc((void **)&d_points, sizeof(float) * 8);
+        cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
+        CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8, cudaMemcpyHostToDevice));
     }
+
+    std::vector<Object> objs;
+    float    score_thres = 0.3f;
+    float    iou_thres   = 0.5f;
+    int      topk        = 1;
+
 
     while(IsMachineOn())
     {
@@ -54,6 +67,16 @@ void COpenGLDisplay::ThreadRunning()
                 duplicate_channel_gpu(camera_params, &frame_original, &debayer);
             }
 
+            if (camera_select->yolo) {
+                rgba2rgb_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
+                yolov8_pose->preprocess_gpu(d_convert);
+                yolov8_pose->infer();
+                yolov8_pose->postprocess(objs, score_thres, iou_thres, topk);
+                std::cout << objs.size() << std::endl;
+                yolov8_pose->copy_keypoints_gpu(d_points, objs);
+                gpu_draw_rat_pose(debayer.d_debayer, 3208, 2200, d_points, d_skeleton, yolov8_pose->stream);
+            }
+
             // probably reduandant copy
             ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
 
@@ -69,7 +92,8 @@ void COpenGLDisplay::ThreadRunning()
                 cv::imwrite(image_name, view);
                 camera_select->frame_save_idx++;
                 camera_select->frame_save_state = State_Frame_Idle;
-            }
+            }          
+
         }
         usleep(16000); // sleep for 16ms 
     }

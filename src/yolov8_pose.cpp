@@ -109,8 +109,8 @@ void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb)
 {
     const float inp_h  = 640;
     const float inp_w  = 640;
-    float       height = 3208;
-    float       width  = 2200;
+    float       width  = 3208;
+    float       height = 2200;
 
     float r    = std::min(inp_h / height, inp_w / width);
     int   padw = std::round(width * r);

@@ -1,6 +1,6 @@
-#include "yolov8_pose.h"
+#include "yolov8_det.h"
 
-YOLOv8_pose::YOLOv8_pose(const std::string& engine_file_path)
+YOLOv8::YOLOv8(const std::string& engine_file_path)
 {
     std::ifstream file(engine_file_path, std::ios::binary);
     assert(file.good());
@@ -16,7 +16,6 @@ YOLOv8_pose::YOLOv8_pose(const std::string& engine_file_path)
     assert(this->runtime != nullptr);
 
     this->engine = this->runtime->deserializeCudaEngine(trtModelStream, size);
-
     assert(this->engine != nullptr);
     delete[] trtModelStream;
     this->context = this->engine->createExecutionContext();
@@ -24,6 +23,7 @@ YOLOv8_pose::YOLOv8_pose(const std::string& engine_file_path)
     assert(this->context != nullptr);
     cudaStreamCreate(&this->stream);
     this->num_bindings = this->engine->getNbBindings();
+
     for (int i = 0; i < this->num_bindings; ++i) {
         Binding            binding;
         nvinfer1::Dims     dims;
@@ -52,7 +52,7 @@ YOLOv8_pose::YOLOv8_pose(const std::string& engine_file_path)
     }
 }
 
-YOLOv8_pose::~YOLOv8_pose()
+YOLOv8::~YOLOv8()
 {
     this->context->destroy();
     this->engine->destroy();
@@ -66,8 +66,7 @@ YOLOv8_pose::~YOLOv8_pose()
         CHECK(cudaFreeHost(ptr));
     }
 }
-
-void YOLOv8_pose::make_pipe(bool warmup)
+void YOLOv8::make_pipe(bool warmup)
 {
     // allocate device resources for initialization
     cudaMalloc((void **)&d_temp, 640*439*3);
@@ -105,7 +104,7 @@ void YOLOv8_pose::make_pipe(bool warmup)
     }
 }
 
-void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb)
+void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
 {
     const float inp_h  = 640;
     const float inp_w  = 640;
@@ -190,7 +189,7 @@ void YOLOv8_pose::preprocess_gpu(unsigned char* d_rgb)
 }
 
 
-void YOLOv8_pose::letterbox(const cv::Mat& image, cv::Mat& out, cv::Size& size)
+void YOLOv8::letterbox(const cv::Mat& image, cv::Mat& out, cv::Size& size)
 {
     const float inp_h  = size.height;
     const float inp_w  = size.width;
@@ -227,9 +226,10 @@ void YOLOv8_pose::letterbox(const cv::Mat& image, cv::Mat& out, cv::Size& size)
     this->pparam.dh     = dh;
     this->pparam.height = height;
     this->pparam.width  = width;
+    ;
 }
 
-void YOLOv8_pose::copy_from_Mat(const cv::Mat& image)
+void YOLOv8::copy_from_Mat(const cv::Mat& image)
 {
     cv::Mat  nchw;
     auto&    in_binding = this->input_bindings[0];
@@ -244,7 +244,7 @@ void YOLOv8_pose::copy_from_Mat(const cv::Mat& image)
         this->device_ptrs[0], nchw.ptr<float>(), nchw.total() * nchw.elemSize(), cudaMemcpyHostToDevice, this->stream));
 }
 
-void YOLOv8_pose::copy_from_Mat(const cv::Mat& image, cv::Size& size)
+void YOLOv8::copy_from_Mat(const cv::Mat& image, cv::Size& size)
 {
     cv::Mat nchw;
     this->letterbox(image, nchw, size);
@@ -252,8 +252,8 @@ void YOLOv8_pose::copy_from_Mat(const cv::Mat& image, cv::Size& size)
     CHECK(cudaMemcpyAsync(
         this->device_ptrs[0], nchw.ptr<float>(), nchw.total() * nchw.elemSize(), cudaMemcpyHostToDevice, this->stream));
 }
- 
-void YOLOv8_pose::infer()
+
+void YOLOv8::infer()
 {
 
     this->context->enqueueV2(this->device_ptrs.data(), this->stream, nullptr);
@@ -265,169 +265,59 @@ void YOLOv8_pose::infer()
     cudaStreamSynchronize(this->stream);
 }
 
-void YOLOv8_pose::postprocess(std::vector<Object>& objs, float score_thres, float iou_thres, int topk)
+void YOLOv8::postprocess(std::vector<Object>& objs)
 {
     objs.clear();
-    auto num_channels = this->output_bindings[0].dims.d[1];
-    auto num_anchors  = this->output_bindings[0].dims.d[2];
+    int*  num_dets = static_cast<int*>(this->host_ptrs[0]);
+    auto* boxes    = static_cast<float*>(this->host_ptrs[1]);
+    auto* scores   = static_cast<float*>(this->host_ptrs[2]);
+    int*  labels   = static_cast<int*>(this->host_ptrs[3]);
+    auto& dw       = this->pparam.dw;
+    auto& dh       = this->pparam.dh;
+    auto& width    = this->pparam.width;
+    auto& height   = this->pparam.height;
+    auto& ratio    = this->pparam.ratio;
+    for (int i = 0; i < num_dets[0]; i++) {
+        float* ptr = boxes + i * 4;
 
-    auto& dw     = this->pparam.dw;
-    auto& dh     = this->pparam.dh;
-    auto& width  = this->pparam.width;
-    auto& height = this->pparam.height;
-    auto& ratio  = this->pparam.ratio;
+        float x0 = *ptr++ - dw;
+        float y0 = *ptr++ - dh;
+        float x1 = *ptr++ - dw;
+        float y1 = *ptr - dh;
 
-    std::vector<cv::Rect>           bboxes;
-    std::vector<float>              scores;
-    std::vector<int>                labels;
-    std::vector<int>                indices;
-    std::vector<std::vector<float>> kpss;
-
-    cv::Mat output = cv::Mat(num_channels, num_anchors, CV_32F, static_cast<float*>(this->host_ptrs[0]));
-    output         = output.t();
-    for (int i = 0; i < num_anchors; i++) {
-        auto row_ptr    = output.row(i).ptr<float>();
-        auto bboxes_ptr = row_ptr;
-        auto scores_ptr = row_ptr + 4;
-        auto kps_ptr    = row_ptr + 5;
-
-        float score = *scores_ptr;
-        if (score > score_thres) {
-            float x = *bboxes_ptr++ - dw;
-            float y = *bboxes_ptr++ - dh;
-            float w = *bboxes_ptr++;
-            float h = *bboxes_ptr;
-
-            float x0 = clamp((x - 0.5f * w) * ratio, 0.f, width);
-            float y0 = clamp((y - 0.5f * h) * ratio, 0.f, height);
-            float x1 = clamp((x + 0.5f * w) * ratio, 0.f, width);
-            float y1 = clamp((y + 0.5f * h) * ratio, 0.f, height);
-
-            cv::Rect_<float> bbox;
-            bbox.x      = x0;
-            bbox.y      = y0;
-            bbox.width  = x1 - x0;
-            bbox.height = y1 - y0;
-            std::vector<float> kps;
-            for (int k = 0; k < 4; k++) {
-                float kps_x = (*(kps_ptr + 2 * k) - dw) * ratio;
-                float kps_y = (*(kps_ptr + 2 * k + 1) - dh) * ratio;
-                // float kps_s = *(kps_ptr + 3 * k + 2);
-                kps_x       = clamp(kps_x, 0.f, width);
-                kps_y       = clamp(kps_y, 0.f, height);
-                kps.push_back(kps_x);
-                kps.push_back(kps_y);
-                // kps.push_back(kps_s);
-            }
-
-            bboxes.push_back(bbox);
-            labels.push_back(0);
-            scores.push_back(score);
-            kpss.push_back(kps);
-        }
-    }
-
-#ifdef BATCHED_NMS
-    cv::dnn::NMSBoxesBatched(bboxes, scores, labels, score_thres, iou_thres, indices);
-#else
-    cv::dnn::NMSBoxes(bboxes, scores, score_thres, iou_thres, indices);
-#endif
-
-    int cnt = 0;
-    for (auto& i : indices) {
-        if (cnt >= topk) {
-            break;
-        }
+        x0 = clamp(x0 * ratio, 0.f, width);
+        y0 = clamp(y0 * ratio, 0.f, height);
+        x1 = clamp(x1 * ratio, 0.f, width);
+        y1 = clamp(y1 * ratio, 0.f, height);
         Object obj;
-        obj.rect  = bboxes[i];
-        obj.prob  = scores[i];
-        obj.label = labels[i];
-        obj.kps   = kpss[i];
+        obj.rect.x      = x0;
+        obj.rect.y      = y0;
+        obj.rect.width  = x1 - x0;
+        obj.rect.height = y1 - y0;
+        obj.prob        = *(scores + i);
+        obj.label       = *(labels + i);
         objs.push_back(obj);
-        cnt += 1;
     }
 }
 
-void YOLOv8_pose::copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs)
+
+void YOLOv8::copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs)
 {
     const int num_point = 4;
-    float points[8];
+    float points[8] = {0};
     // TODO: draw both the bbox and the keypoints 
     for (auto& obj : objs) {
-        auto& kps = obj.kps;
-        for (int k = 0; k < num_point ; k++) {
-            points[k*2] = kps[k * 2];
-            points[k*2+1] = kps[k * 2 +1];
-        }
+        points[0] = obj.rect.x;
+        points[1] = obj.rect.y;
+
+        points[2] = obj.rect.x;
+        points[3] = obj.rect.y + obj.rect.height;
+        
+        points[4] = obj.rect.x + obj.rect.width;
+        points[5] = obj.rect.y + obj.rect.height;
+
+        points[6] = obj.rect.x + obj.rect.width;
+        points[7] = obj.rect.y;
     }
     CHECK(cudaMemcpy(d_points, points, sizeof(float) * 8, cudaMemcpyHostToDevice));
 }
-
-void YOLOv8_pose::draw_objects(const cv::Mat&                                image,
-                               cv::Mat&                                      res,
-                               const std::vector<Object>&                    objs,
-                               const std::vector<std::vector<unsigned int>>& SKELETON,
-                               const std::vector<std::vector<unsigned int>>& KPS_COLORS,
-                               const std::vector<std::vector<unsigned int>>& LIMB_COLORS)
-{
-    res                 = image.clone();
-    const int num_point = 4;
-    for (auto& obj : objs) {
-        cv::rectangle(res, obj.rect, {0, 0, 255}, 2);
-
-        char text[256];
-        sprintf(text, "rat %.1f%%", obj.prob * 100);
-
-        int      baseLine   = 0;
-        cv::Size label_size = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 0.4, 1, &baseLine);
-
-        int x = (int)obj.rect.x;
-        int y = (int)obj.rect.y + 1;
-
-        if (y > res.rows)
-            y = res.rows;
-
-        cv::rectangle(res, cv::Rect(x, y, label_size.width, label_size.height + baseLine), {0, 0, 255}, -1);
-
-        cv::putText(res, text, cv::Point(x, y + label_size.height), cv::FONT_HERSHEY_SIMPLEX, 0.4, {255, 255, 255}, 1);
-
-        auto& kps = obj.kps;
-
-        for (int k = 0; k < num_point ; k++) {
-                int   kps_x = std::round(kps[k * 2]);
-                int   kps_y = std::round(kps[k * 2 + 1]);
-                // float kps_s = kps[k * 3 + 2];
-                // if (kps_s > 0.5f) {
-                    cv::Scalar kps_color = cv::Scalar(KPS_COLORS[k][0], KPS_COLORS[k][1], KPS_COLORS[k][2]);
-                    cv::circle(res, {kps_x, kps_y}, 5, kps_color, -1);
-                // }
-        }
-
-        for (int k = 0; k < num_point - 1; k++) {
-            if (k < num_point) {
-                int   kps_x = std::round(kps[k * 2]);
-                int   kps_y = std::round(kps[k * 2 + 1]);
-                // float kps_s = kps[k * 3 + 2];
-                // if (kps_s > 0.5f) {
-                    cv::Scalar kps_color = cv::Scalar(KPS_COLORS[k][0], KPS_COLORS[k][1], KPS_COLORS[k][2]);
-                    cv::circle(res, {kps_x, kps_y}, 5, kps_color, -1);
-                // }
-            }
-            auto& ske    = SKELETON[k];
-            int   pos1_x = std::round(kps[(ske[0] - 1) * 2]);
-            int   pos1_y = std::round(kps[(ske[0] - 1) * 2 + 1]);
-
-            int pos2_x = std::round(kps[(ske[1] - 1) * 2]);
-            int pos2_y = std::round(kps[(ske[1] - 1) * 2 + 1]);
-
-            // float pos1_s = kps[(ske[0] - 1) * 3 + 2];
-            // float pos2_s = kps[(ske[1] - 1) * 3 + 2];
-
-            // if (pos1_s > 0.5f && pos2_s > 0.5f) {
-                cv::Scalar limb_color = cv::Scalar(LIMB_COLORS[k][0], LIMB_COLORS[k][1], LIMB_COLORS[k][2]);
-                cv::line(res, {pos1_x, pos1_y}, {pos2_x, pos2_y}, limb_color, 2);
-            // }
-        }
-    }
-}
-

@@ -32,13 +32,13 @@ void COpenGLDisplay::ThreadRunning()
 
     ck(cudaMalloc((void **)&d_convert, camera_params->width * camera_params->height * 3)); 
     
-    unsigned int skeleton[8] = {0, 2, 1, 2, 2, 3};
+    unsigned int skeleton[8] = {0, 1, 1, 2, 2, 3, 3, 0}; // box
     if (camera_select->yolo) {
         printf("YOLO initialization...\n");
 
-        const std::string engine_file_path{"/home/user/detect/rat_pose.engine"};
-        yolov8_pose = new YOLOv8_pose(engine_file_path);
-        yolov8_pose->make_pipe(true);
+        const std::string engine_file_path{"/home/user/detect/rat_bbox.engine"};
+        yolov8 = new YOLOv8(engine_file_path);
+        yolov8->make_pipe(true);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 8);
         cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
@@ -46,11 +46,6 @@ void COpenGLDisplay::ThreadRunning()
     }
 
     std::vector<Object> objs;
-    float    score_thres = 0.3f;
-    float    iou_thres   = 0.5f;
-    int      topk        = 1;
-
-
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();
@@ -69,11 +64,11 @@ void COpenGLDisplay::ThreadRunning()
 
             if (camera_select->yolo) {
                 rgba2rgb_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
-                yolov8_pose->preprocess_gpu(d_convert);
-                yolov8_pose->infer();
-                yolov8_pose->postprocess(objs, score_thres, iou_thres, topk);
-                yolov8_pose->copy_keypoints_gpu(d_points, objs);
-                gpu_draw_rat_pose(debayer.d_debayer, 3208, 2200, d_points, d_skeleton, yolov8_pose->stream);
+                yolov8->preprocess_gpu(d_convert);
+                yolov8->infer();
+                yolov8->postprocess(objs);
+                yolov8->copy_keypoints_gpu(d_points, objs);
+                gpu_draw_rat_pose(debayer.d_debayer, 3208, 2200, d_points, d_skeleton, yolov8->stream);
             }
 
             // probably reduandant copy
@@ -99,7 +94,7 @@ void COpenGLDisplay::ThreadRunning()
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
     if (camera_select->yolo) {
-        delete yolov8_pose;
+        delete yolov8;
     }
 }
 

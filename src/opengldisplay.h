@@ -1,7 +1,7 @@
 #pragma once
 #include "threadworker.h"
 #include "image_processing.h"
-#include "yolov8_pose.h"
+#include "yolov8_det.h"
 
 #define WORK_ENTRIES_MAX 2
 
@@ -22,7 +22,7 @@ public:
 	
 	//for real time: refactor this
 	unsigned char *d_convert;
-    YOLOv8_pose* yolov8_pose;
+    YOLOv8* yolov8;
 	FrameCPU frame_cpu;
 
 	float *d_points;

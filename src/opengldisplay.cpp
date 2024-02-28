@@ -46,6 +46,8 @@ void COpenGLDisplay::ThreadRunning()
     }
 
     std::vector<Object> objs;
+    std::vector<Object> objs_last_frame; // think about better way that scales with frame
+ 
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();
@@ -68,6 +70,18 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->infer();
                 yolov8->postprocess(objs);
                 yolov8->copy_keypoints_gpu(d_points, objs);
+
+                if (objs.size() > 0 && objs_last_frame.size() > 0) {
+                    // std::cout << objs[0].rect.x  << ", " << objs[0].rect.y << std::endl;
+                    if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
+                        // send a trigger signal to cbot
+                        std::cout << "send trigger signal" << std::endl;
+                    }
+                    objs_last_frame.push_back(objs[0]);
+                } else {
+                    objs_last_frame.clear();
+                }
+                    
                 gpu_draw_rat_pose(debayer.d_debayer, 3208, 2200, d_points, d_skeleton, yolov8->stream);
             }
 

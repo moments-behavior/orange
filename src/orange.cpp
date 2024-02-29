@@ -81,6 +81,10 @@ int main(int argc, char **args)
     }
 
     std::vector<ConnectedServer> my_servers;
+    CBOTSignalBuilder cbot_signal_builder;
+    cbot_signal_builder.builder = &builder;
+    cbot_signal_builder.server = &server;
+
     std::vector<std::string> network_config_folders;
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
         network_config_folders.push_back(entry.path().string());
@@ -102,7 +106,7 @@ int main(int argc, char **args)
             switch (evnt.type)
             {
             case ENET_EVENT_TYPE_CONNECT:
-                printf("- New Client Connected\n");
+                printf ("A new client connected from %x:%u.\n", evnt.peer -> address.host, evnt.peer -> address.port);
                 break;
 
             case ENET_EVENT_TYPE_RECEIVE:
@@ -145,6 +149,9 @@ int main(int argc, char **args)
                                 my_servers[i].server_state = SERVER_DONE;
                             }
                         }   
+                    } else if (server_control->signal_type() == FetchGame::SignalType_CBOT) {
+                        cbot_signal_builder.cbot_connection = evnt.peer;
+                        std::cout << "cbot connected" << std::endl;
                     }
 
                     if (my_servers.size() == num_servers) {
@@ -152,7 +159,6 @@ int main(int argc, char **args)
                             all_server_state = my_servers[0].server_state;
                         }
                     }
-                    
                     enet_packet_destroy(evnt.packet);
                 }
                 break;
@@ -176,6 +182,9 @@ int main(int argc, char **args)
 
         if (ImGui::Begin("Network")) 
         {
+            if (ImGui::Button("Test Cbot Trigger")) {
+                send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
+            }
 
             if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -290,7 +299,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
                     }
                     camera_control->subscribe = true;
                     all_server_state = SERVER_WAIT;
@@ -621,7 +630,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
                     }
 
                 } else {
@@ -769,7 +778,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params));
+                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
                     }
                     camera_control->subscribe = true;                    
                 } else {

@@ -4,6 +4,7 @@
 #include "camera.h"
 #include <iostream>
 #include <fstream>
+#include "network_base.h"
 
 enum PictureSaveState {
     State_Frame_Idle = 0, 
@@ -61,5 +62,5 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl* camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params);
+void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl* camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, CBOTSignalBuilder* cbot_signal_builder);
 #endif

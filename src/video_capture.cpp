@@ -183,7 +183,7 @@ static inline void grab_frames_after_countdown(PTPState *ptp_state, CameraEmerge
     printf("\n");
 }
 
-void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params)
+void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, CBOTSignalBuilder* cbot_signal_builder)
 {
 
     CameraState camera_state;
@@ -191,7 +191,7 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
     
     COpenGLDisplay* openGLDisplay;
     if (camera_select->stream_on) {
-        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer);
+        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, cbot_signal_builder);
         openGLDisplay->StartThread();
     }
 

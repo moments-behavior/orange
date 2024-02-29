@@ -7,8 +7,8 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 
-COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer)
-    : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer)
+COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, CBOTSignalBuilder* cbot_signal_builder)
+    : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), cbot_signal_builder(cbot_signal_builder)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
@@ -72,10 +72,10 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->copy_keypoints_gpu(d_points, objs);
 
                 if (objs.size() > 0 && objs_last_frame.size() > 0) {
-                    // std::cout << objs[0].rect.x  << ", " << objs[0].rect.y << std::endl;
+                    std::cout << objs[0].rect.x  << ", " << objs[0].rect.y << std::endl;
                     if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
                         // send a trigger signal to cbot
-                        std::cout << "send trigger signal" << std::endl;
+                        send_cbot_ball_drop_trigger_signal(cbot_signal_builder->server, cbot_signal_builder->builder, cbot_signal_builder->cbot_connection);
                     }
                     objs_last_frame.push_back(objs[0]);
                 } else {

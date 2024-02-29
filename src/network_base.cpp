@@ -124,3 +124,16 @@ void service_network(EnetContext* enet_context, float dt, std::function<void(con
         printf("Unable to service network: Network not initialized!");
     }
 }
+
+void send_cbot_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection)
+{
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
+    server_builder.add_signal_type(FetchGame::SignalType_CBOT_TRIAL_TRIGGER);
+    auto server_fb = server_builder.Finish();
+    builder->Finish(server_fb);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
+    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_peer_send(cbot_connection, 0, enet_packet);
+}

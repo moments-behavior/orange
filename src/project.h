@@ -9,7 +9,6 @@
 #include "network_base.h"
 using json = nlohmann::json;
 
-
 enum ServerState {
     SERVER_UP = 0,
     SERVER_OPEN_CAMERA = 1,
@@ -28,7 +27,6 @@ struct ConnectedServer {
     int num_cameras;
     ServerState server_state;
 };
-
 
 std::vector<std::string> string_split(std::string s, std::string delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();

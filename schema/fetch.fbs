@@ -14,7 +14,9 @@ enum SignalType: byte {
     ClientCameraOpened = 1,
     ClientThreadStarted = 2,
     ClientStartRecording = 3,
-    ClientRecordDone = 4
+    ClientRecordDone = 4,
+    CBOT = 5,
+    CBOT_TRIAL_TRIGGER = 6
 }
 
 table bring_up_message {

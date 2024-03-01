@@ -71,10 +71,14 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->postprocess(objs);
                 yolov8->copy_keypoints_gpu(d_points, objs);
 
-                if (objs.size() > 0 && objs_last_frame.size() > 0) {
-                    std::cout << objs[0].rect.x  << ", " << objs[0].rect.y << std::endl;
-                    if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
+                if (objs.size() > 0) {
+                    // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
+                    f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
+                    // std::cout << bbox_center_x << std::endl;
+                    // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
+                    if (bbox_center_x < 2350.0) {
                         // send a trigger signal to cbot
+                        std::cout << "trigger ball drop" << std::endl;
                         send_cbot_ball_drop_trigger_signal(cbot_signal_builder->server, cbot_signal_builder->builder, cbot_signal_builder->cbot_connection);
                     }
                     objs_last_frame.push_back(objs[0]);

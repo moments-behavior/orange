@@ -182,9 +182,31 @@ int main(int argc, char **args)
 
         if (ImGui::Begin("Network")) 
         {
-            if (ImGui::Button("Test Cbot Trigger")) {
-                send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
+            // if (ImGui::Button("Test Cbot Trigger")) {
+            //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
+            // }
+
+            if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("App");
+                ImGui::TableNextColumn();
+                ImGui::Text("Cbot");
+                ImGui::TableNextColumn();
+
+                char cbot_connection_label[16];
+                sprintf(cbot_connection_label, "Not connected");
+
+                if (cbot_signal_builder.cbot_connection != nullptr) {
+                    if (cbot_signal_builder.cbot_connection->state == ENET_PEER_STATE_CONNECTED) {
+                        sprintf(cbot_connection_label, "connected");
+                    } 
+                }
+                ImGui::Text(cbot_connection_label);
+                ImGui::EndTable();
             }
+
 
             if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {

@@ -200,7 +200,7 @@ int main(int argc, char **args)
 
                 if (cbot_signal_builder.cbot_connection != nullptr) {
                     if (cbot_signal_builder.cbot_connection->state == ENET_PEER_STATE_CONNECTED) {
-                        sprintf(cbot_connection_label, "connected");
+                        sprintf(cbot_connection_label, "Connected");
                     } 
                 }
                 ImGui::Text(cbot_connection_label);

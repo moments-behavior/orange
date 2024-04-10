@@ -171,9 +171,9 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
     // TODO: open camera using xml file after explored on camera settings
     // EVT_CameraOpen(&camera, &deviceInfo[camera_index], XML_FILE);
 
-    // if(camera_params->gpu_direct){
-    //     camera->gpuDirectDeviceId = camera_params->gpu_id;
-    // }
+    if(camera_params->gpu_direct){
+        camera->gpuDirectDeviceId = camera_params->gpu_id;
+    }
 
     check_camera_errors(EVT_CameraOpen(camera, device_info));
 

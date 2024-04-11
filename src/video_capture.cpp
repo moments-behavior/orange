@@ -53,16 +53,16 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
         else
             camera_state->id_prev = ecam->frame_recv.frame_id;
 
-        // push the image data to encode, or display
-        if (camera_control->record_video) {
-            gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, 
-                ecam->frame_recv.bufferSize, 
-                ecam->frame_recv.size_x, 
-                ecam->frame_recv.size_y, 
-                ecam->frame_recv.pixel_type, 
-                ecam->frame_recv.timestamp,
-                camera_state->frame_count);
-        }
+        // // push the image data to encode, or display
+        // if (camera_control->record_video) {
+        //     gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, 
+        //         ecam->frame_recv.bufferSize, 
+        //         ecam->frame_recv.size_x, 
+        //         ecam->frame_recv.size_y, 
+        //         ecam->frame_recv.pixel_type, 
+        //         ecam->frame_recv.timestamp,
+        //         camera_state->frame_count);
+        // }
         
         if (camera_select->stream_on) {
             openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, 

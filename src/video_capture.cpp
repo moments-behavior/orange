@@ -202,11 +202,11 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
         gpu_encoder->StartThread();
     }
 
-    if (camera_control->sync_camera)
-    {
-        show_ptp_offset(&ptp_state, ecam);
-        start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
-    }
+    // if (camera_control->sync_camera)
+    // {
+    //     show_ptp_offset(&ptp_state, ecam);
+    //     start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
+    // }
 
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
 

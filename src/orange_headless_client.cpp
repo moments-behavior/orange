@@ -181,6 +181,10 @@ int main(int argc, char *argv[])
                             ptp_params->ptp_stop_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_stop_time << std::endl;
                             ptp_params->network_set_stop_ptp = true;
+                                                
+                                                
+                                                ptp_params->ptp_stop_reached = true;
+
                         }
                         enet_packet_destroy(evnt.packet);
                     }

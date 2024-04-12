@@ -227,21 +227,21 @@ void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEach
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
         get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
-        if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
-            if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {                
-                uint64_t ptp_stop_conuter = sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
-                printf("%lu\n", ptp_stop_conuter);
-                while (ptp_params->ptp_stop_counter != camera_params->num_cameras)
-                {
-                    // printf(".");
-                    // fflush(stdout);
-                    usleep(10);
-                }
-                ptp_params->ptp_stop_reached = true;
-                camera_control->subscribe = false;
-                break;
-            }
-        }
+        // if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
+        //     if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {                
+        //         uint64_t ptp_stop_conuter = sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
+        //         printf("%lu\n", ptp_stop_conuter);
+        //         while (ptp_params->ptp_stop_counter != camera_params->num_cameras)
+        //         {
+        //             // printf(".");
+        //             // fflush(stdout);
+        //             usleep(10);
+        //         }
+        //         ptp_params->ptp_stop_reached = true;
+        //         camera_control->subscribe = false;
+        //         break;
+        //     }
+        // }
         // if (offset == 200) {
         //     phase = -1;
         // }

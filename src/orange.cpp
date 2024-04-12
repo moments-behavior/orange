@@ -363,6 +363,9 @@ int main(int argc, char **args)
                     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
+
+                    ptp_params->ptp_stop_reached = true;
+
                     all_server_state = SERVER_WAIT;
                 }
                 ImGui::PopStyleColor(1);

@@ -61,10 +61,10 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
         std::cout << "Recorded video saves to : " << record_folder << std::endl;
     }
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        ptp_camera_sync(&ecams[i].camera);
-    }
+    // for (int i = 0; i < num_cameras; i++)
+    // {
+    //     ptp_camera_sync(&ecams[i].camera);
+    // }
 
     for (int i = 0; i < num_cameras; i++)
     {

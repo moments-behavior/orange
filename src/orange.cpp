@@ -348,20 +348,21 @@ int main(int argc, char **args)
             if (all_server_state == SERVER_RECORDING) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {
-                    unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                    int delay_in_second = 10;
-                    ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                    std::cout << ptp_params->ptp_stop_time << std::endl;
-                    builder.Clear();
-                    FetchGame::ServerBuilder server_builder(builder);
-                    server_builder.add_control(FetchGame::ServerControl_STOP);
-                    server_builder.add_ptp_global_time(ptp_params->ptp_stop_time);
-                    auto my_server = server_builder.Finish();
-                    builder.Finish(my_server);
-                    uint8_t *server_buffer = builder.GetBufferPointer();
-                    int server_buf_size = builder.GetSize();
-                    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                    // unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
+                    // int delay_in_second = 10;
+                    // ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+                    // std::cout << ptp_params->ptp_stop_time << std::endl;
+                    // builder.Clear();
+                    // FetchGame::ServerBuilder server_builder(builder);
+                    // server_builder.add_control(FetchGame::ServerControl_STOP);
+                    // server_builder.add_ptp_global_time(ptp_params->ptp_stop_time);
+                    // auto my_server = server_builder.Finish();
+                    // builder.Finish(my_server);
+                    // uint8_t *server_buffer = builder.GetBufferPointer();
+                    // int server_buf_size = builder.GetSize();
+                    // ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+                    // enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                    camera_control->subscribe = false;
                     ptp_params->network_set_stop_ptp = true;
 
                     ptp_params->ptp_stop_reached = true;

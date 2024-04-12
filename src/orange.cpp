@@ -311,10 +311,10 @@ int main(int argc, char **args)
                         }
                     }
 
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        ptp_camera_sync(&ecams[i].camera);
-                    }
+                    // for (int i = 0; i < num_cameras; i++)
+                    // {
+                    //     ptp_camera_sync(&ecams[i].camera);
+                    // }
                     camera_control->sync_camera = true;
                     camera_control->record_video = true;
 

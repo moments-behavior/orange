@@ -80,11 +80,18 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
 
         if (camera_state->frame_count % 500 == 99)
         {
-            printf(".");
+            printf("\n");
             fflush(stdout);
         }
-        if (camera_state->frame_count % 20000 == 9999)
-            printf("\n");
+
+        if (camera_state->frame_count % 1000 == 99)
+        {
+            // printf(".");
+            // fflush(stdout);
+            std::cout << camera_params->camera_name << std::endl;
+        }
+        // if (camera_state->frame_count % 20000 == 9999)
+            // printf("\n");
     }
     else
     {

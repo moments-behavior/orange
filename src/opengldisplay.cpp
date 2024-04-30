@@ -76,7 +76,8 @@ void COpenGLDisplay::ThreadRunning()
                     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
                     // std::cout << bbox_center_x << std::endl;
                     // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
-                    if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
+                    // if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
+                    if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
                         // send a trigger signal to cbot
                         std::cout << "trigger ball drop" << std::endl;
                         send_cbot_ball_drop_trigger_signal(cbot_signal_builder->server, cbot_signal_builder->builder, cbot_signal_builder->cbot_connection);

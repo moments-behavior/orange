@@ -1,29 +1,5 @@
 #include "video_capture.h"
 
-void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
-{
-
-    EVT_CameraExecuteCommand(&ecam->camera, "GevTimestampControlLatch");
-    EVT_CameraGetUInt32Param(&ecam->camera, "GevTimestampValueHigh", &ptp_state->ptp_time_high);
-    EVT_CameraGetUInt32Param(&ecam->camera, "GevTimestampValueLow", &ptp_state->ptp_time_low);
-
-    ptp_state->ptp_time = (((unsigned long long)(ptp_state->ptp_time_high)) << 32) | ((unsigned long long)(ptp_state->ptp_time_low));
-    ptp_state->frame_ts = ecam->frame_recv.timestamp;
-    // printf("camera %d, framecount %d, timestamp %f ms \n", camera_params.camera_id, frame_count, frame_ts * 1e-6);
-
-    if (camera_state->frame_count != 0)
-    {
-        ptp_state->ptp_time_delta = ptp_state->ptp_time - ptp_state->ptp_time_prev;
-        ptp_state->ptp_time_delta_sum += ptp_state->ptp_time_delta;
-
-        ptp_state->frame_ts_delta = ptp_state->frame_ts - ptp_state->frame_ts_prev;
-        ptp_state->frame_ts_delta_sum += ptp_state->frame_ts_delta;
-    }
-
-    ptp_state->ptp_time_prev = ptp_state->ptp_time;
-    ptp_state->frame_ts_prev = ptp_state->frame_ts;
-}
-
 void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff)
 {
     std::string print_out;

@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
+#include "acquire_frames.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -321,7 +322,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
                     }
                     camera_control->subscribe = true;
                     all_server_state = SERVER_WAIT;
@@ -652,7 +653,7 @@ int main(int argc, char **args)
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
                     }
 
                 } else {
@@ -800,7 +801,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&aquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
                     }
                     camera_control->subscribe = true;                    
                 } else {

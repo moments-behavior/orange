@@ -1,0 +1,123 @@
+#include "NvEncoder/NvCodecUtils.h"
+#include "gpu_video_encoder.h"
+#include "acquire_frames_headless.h"
+
+static inline void get_one_frame_headless(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, GPUVideoEncoder* gpu_encoder)
+{
+    camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
+    if (camera_control->sync_camera)
+    {
+        PTP_timestamp_checking(ptp_state, ecam, camera_state);
+    }
+
+    if (!camera_state->camera_return)
+    {
+        // Counting dropped frames through frame_id as redundant check.
+        if (((ecam->frame_recv.frame_id) != camera_state->id_prev + 1) && (camera_state->frame_count != 0))
+            camera_state->dropped_frames++;
+        else
+        {
+            camera_state->frames_recd++;
+        }
+
+        camera_state->frame_count++;
+
+        // In GVSP there is no id 0 so when 16 bit id counter in camera is max then the next id is 1 so set prev id to 0 for math above.
+        if (ecam->frame_recv.frame_id == 65535)
+            camera_state->id_prev = 0;
+        else
+            camera_state->id_prev = ecam->frame_recv.frame_id;
+
+        // push the image data to encode, or display
+        if (camera_control->record_video) {
+            gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, 
+                ecam->frame_recv.bufferSize, 
+                ecam->frame_recv.size_x, 
+                ecam->frame_recv.size_y, 
+                ecam->frame_recv.pixel_type, 
+                ecam->frame_recv.timestamp,
+                camera_state->frame_count);
+        }
+        
+        camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
+        if (camera_state->camera_return)
+            std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
+
+        if (camera_state->frame_count % 500 == 99)
+        {
+            printf("\n");
+            fflush(stdout);
+        }
+
+        if (camera_state->frame_count % 1000 == 99)
+        {
+            // printf(".");
+            // fflush(stdout);
+            std::cout << camera_params->camera_name << std::endl;
+        }
+        // if (camera_state->frame_count % 20000 == 9999)
+            // printf("\n");
+    }
+    else
+    {
+        camera_state->dropped_frames++;
+        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
+    }
+}
+
+
+void acquire_frames_headless(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params)
+{
+
+    CameraState camera_state;
+    PTPState ptp_state;
+
+    GPUVideoEncoder* gpu_encoder;
+    
+    if (camera_control->record_video) {
+        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name);
+        gpu_encoder->StartThread();
+    }
+
+    if (camera_control->sync_camera)
+    {
+        show_ptp_offset(&ptp_state, ecam);
+        start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
+    }
+
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
+
+    if (camera_control->sync_camera)
+    {
+        grab_frames_after_countdown(&ptp_state, ecam);
+    }
+
+    StopWatch w;
+    w.Start();
+
+    while (camera_control->subscribe)
+    {
+        get_one_frame_headless(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, gpu_encoder);
+        if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
+            if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {                
+                uint64_t ptp_stop_conuter = sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
+                printf("%lu\n", ptp_stop_conuter);
+                while (ptp_params->ptp_stop_counter != camera_params->num_cameras)
+                {
+                    usleep(10);
+                }
+                ptp_params->ptp_stop_reached = true;
+                camera_control->subscribe = false;
+                break;
+            }
+        }
+    }
+
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
+    double time_diff = w.Stop();
+
+    if (camera_control->record_video) {
+        gpu_encoder->StopThread();
+    }
+    report_statistics(camera_params, &camera_state, time_diff);
+}

@@ -62,5 +62,9 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-void aquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl* camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, CBOTSignalBuilder* cbot_signal_builder);
+void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state);
+void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff);
+void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam);
+void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, CameraParams *camera_params, CameraEmergent *ecam, unsigned int delay_in_second);
+void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam);
 #endif

@@ -297,123 +297,122 @@ void allocate_camera_frame_buffers(CameraEmergent* ecams, CameraParams* cameras_
     }
 }
 
-void client_send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection, int cam_count)
+void client_send_bringup_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *server_connection, int cam_count)
 {
     char hostname[100];
     gethostname(hostname, 100);
-    builder.Clear();
-    auto server_name = builder.CreateString(hostname);
-    auto message_fb = FetchGame::Createbring_up_message(builder, server_name, cam_count);
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    auto server_name = builder->CreateString(hostname);
+    auto message_fb = FetchGame::Createbring_up_message(*builder, server_name, cam_count);
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_signal_type(FetchGame::SignalType_ClientBringup);
     server_builder.add_server_mesg(message_fb);
     auto server_fb = server_builder.Finish();
-    builder.Finish(server_fb);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(server_fb);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(server_connection, 0, enet_packet);
 }
 
-void client_send_camera_open_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection)
+void client_send_camera_open_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *server_connection)
 {
-    builder.Clear();
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_signal_type(FetchGame::SignalType_ClientCameraOpened);
     auto server_fb = server_builder.Finish();
-    builder.Finish(server_fb);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(server_fb);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(server_connection, 0, enet_packet);
 }
 
 
-void client_send_thread_start_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection)
+void client_send_thread_start_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *server_connection)
 {
-    builder.Clear();
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_signal_type(FetchGame::SignalType_ClientThreadStarted);
     auto server_fb = server_builder.Finish();
-    builder.Finish(server_fb);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(server_fb);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(server_connection, 0, enet_packet);
 }
 
-void client_send_ptp_set_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection)
+void client_send_ptp_set_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *server_connection)
 {
-    builder.Clear();
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_signal_type(FetchGame::SignalType_ClientStartRecording);
     auto server_fb = server_builder.Finish();
-    builder.Finish(server_fb);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(server_fb);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(server_connection, 0, enet_packet);
 }
 
-void client_send_record_done_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder& builder, ENetPeer *server_connection)
+void client_send_record_done_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *server_connection)
 {
-    builder.Clear();
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_signal_type(FetchGame::SignalType_ClientRecordDone);
     auto server_fb = server_builder.Finish();
-    builder.Finish(server_fb);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(server_fb);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(server_connection, 0, enet_packet);
 }
 
 
-void host_broadcast_open_cameras(flatbuffers::FlatBufferBuilder& builder, EnetContext* server, std::string config_file_name)
+void host_broadcast_open_cameras(flatbuffers::FlatBufferBuilder* builder, EnetContext* server, std::string config_file_name)
 {
-    builder.Clear();
-    auto config_message = builder.CreateString(config_file_name);
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    auto config_message = builder->CreateString(config_file_name);
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_config_folder(config_message);
     server_builder.add_control(FetchGame::ServerControl_OPEN);
     auto my_server = server_builder.Finish();
-    builder.Finish(my_server);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(my_server);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_host_broadcast(server->m_pNetwork, 0, enet_packet);    
 }
 
 
-
-void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder& builder, EnetContext* server, std::string record_folder_name, std::string encoder_basic_setup)
+void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder* builder, EnetContext* server, std::string record_folder_name, std::string encoder_basic_setup)
 {
-    builder.Clear();
-    auto record_folder_message = builder.CreateString(record_folder_name);
-    auto encoder_setup_message = builder.CreateString(encoder_basic_setup);
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    auto record_folder_message = builder->CreateString(record_folder_name);
+    auto encoder_setup_message = builder->CreateString(encoder_basic_setup);
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_record_folder(record_folder_message);
     server_builder.add_encoder_setup(encoder_setup_message);
     server_builder.add_control(FetchGame::ServerControl_START);
     auto my_server = server_builder.Finish();
-    builder.Finish(my_server);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(my_server);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_host_broadcast(server->m_pNetwork, 0, enet_packet);    
 }
 
-void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder& builder, EnetContext* server, unsigned long long ptp_global_time)
+void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder* builder, EnetContext* server, unsigned long long ptp_global_time)
 {
     //send the global time to servers
-    builder.Clear();
-    FetchGame::ServerBuilder server_builder(builder);
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_control(FetchGame::ServerControl_SETPTP);
     server_builder.add_ptp_global_time(ptp_global_time);
     auto my_server = server_builder.Finish();
-    builder.Finish(my_server);
-    uint8_t *server_buffer = builder.GetBufferPointer();
-    int server_buf_size = builder.GetSize();
+    builder->Finish(my_server);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_host_broadcast(server->m_pNetwork, 0, enet_packet);
 }

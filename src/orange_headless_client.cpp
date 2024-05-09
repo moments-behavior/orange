@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
     CameraControl *camera_control = new CameraControl;
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false, false};
     
-    flatbuffers::FlatBufferBuilder builder(1024);
+    flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
 
     bool quit_server = false;
 
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
                         if (evnt.peer == server_connection)
                         {
                             printf("Network: Successfully connected to server! \n");
-                            client_send_bringup_message(&client, builder, server_connection, cam_count);
+                            client_send_bringup_message(&client, fb_builder, server_connection, cam_count);
                         }
                     }
                     break;
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
                             cameras_params = new CameraParams[cam_count];
                             cameras_select = new CameraEachSelect[cam_count];
                             if (open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, config_folder)) {
-                                client_send_camera_open_message(&client, builder, server_connection);
+                                client_send_camera_open_message(&client, fb_builder, server_connection);
                             }
                         }
                         else if (server_signal == FetchGame::ServerControl_START)
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
                             std::string encoder_basic_setup = server_control->encoder_setup()->c_str();
                             if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, record_folder, encoder_basic_setup)) 
                             {
-                                client_send_thread_start_message(&client, builder, server_connection);
+                                client_send_thread_start_message(&client, fb_builder, server_connection);
                             };
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
                             ptp_params->ptp_global_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_global_time << std::endl;
                             ptp_params->network_set_start_ptp = true;
-                            client_send_ptp_set_message(&client, builder, server_connection);
+                            client_send_ptp_set_message(&client, fb_builder, server_connection);
                         } else if (server_signal == FetchGame::ServerControl_STOP) {
                             // stop recording
                             std::cout << server_control->ptp_global_time() << std::endl;
@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
                 close_camera(&ecams[i].camera);
             }
             // send signal the thread is idle
-            client_send_record_done_message(&client, builder, server_connection);
+            client_send_record_done_message(&client, fb_builder, server_connection);
         }
 
         usleep(10000); // sleep for 10ms

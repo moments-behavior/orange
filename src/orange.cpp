@@ -74,7 +74,7 @@ int main(int argc, char **args)
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
     
-    flatbuffers::FlatBufferBuilder builder(1024);
+    flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
 
     EnetContext server;
     if (enet_initialize(&server, 3333, 5)) {
@@ -83,7 +83,7 @@ int main(int argc, char **args)
 
     std::vector<ConnectedServer> my_servers;
     CBOTSignalBuilder cbot_signal_builder;
-    cbot_signal_builder.builder = &builder;
+    cbot_signal_builder.builder = fb_builder;
     cbot_signal_builder.server = &server;
 
     std::vector<std::string> network_config_folders;
@@ -99,7 +99,6 @@ int main(int argc, char **args)
 
     // realtime tools
     bool save_image_all_ready = true;
-
     while (!glfwWindowShouldClose(window->render_target))
     {
         service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -241,7 +240,7 @@ int main(int argc, char **args)
                 if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
                     input_folder = network_config_folders[network_config_select];
-                    host_broadcast_open_cameras(builder, &server, network_config_folders[network_config_select]);
+                    host_broadcast_open_cameras(fb_builder, &server, network_config_folders[network_config_select]);
                     // open cameras
                     num_cameras = 0;
                     for (int i = 0; i < cam_count; i++)
@@ -294,7 +293,7 @@ int main(int argc, char **args)
                     encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
                     make_folder_for_recording(folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(builder, &server, folder_name, encoder_basic_setup);
+                    host_broadcast_start_threads(fb_builder, &server, folder_name, encoder_basic_setup);
 
                     // start local recording threads
                     allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
@@ -338,7 +337,7 @@ int main(int argc, char **args)
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                     int delay_in_second = 10;
                     ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                    host_broadcast_set_start_ptp(builder, &server, ptp_params->ptp_global_time);
+                    host_broadcast_set_start_ptp(fb_builder, &server, ptp_params->ptp_global_time);
                     ptp_params->network_set_start_ptp = true;
                     all_server_state = SERVER_WAIT;
                 }
@@ -353,14 +352,14 @@ int main(int argc, char **args)
                     int delay_in_second = 10;
                     ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
                     std::cout << ptp_params->ptp_stop_time << std::endl;
-                    builder.Clear();
-                    FetchGame::ServerBuilder server_builder(builder);
+                    fb_builder->Clear();
+                    FetchGame::ServerBuilder server_builder(*fb_builder);
                     server_builder.add_control(FetchGame::ServerControl_STOP);
                     server_builder.add_ptp_global_time(ptp_params->ptp_stop_time);
                     auto my_server = server_builder.Finish();
-                    builder.Finish(my_server);
-                    uint8_t *server_buffer = builder.GetBufferPointer();
-                    int server_buf_size = builder.GetSize();
+                    fb_builder->Finish(my_server);
+                    uint8_t *server_buffer = fb_builder->GetBufferPointer();
+                    int server_buf_size = fb_builder->GetSize();
                     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
@@ -373,13 +372,13 @@ int main(int argc, char **args)
             if (my_servers.size() > 0) {
                 if(ImGui::Button("Clients close")) {
                     // broadcast data
-                    builder.Clear();
-                    FetchGame::ServerBuilder server_builder(builder);
+                    fb_builder->Clear();
+                    FetchGame::ServerBuilder server_builder(*fb_builder);
                     server_builder.add_control(FetchGame::ServerControl_QUIT);
                     auto my_server = server_builder.Finish();
-                    builder.Finish(my_server);
-                    uint8_t *server_buffer = builder.GetBufferPointer();
-                    int server_buf_size = builder.GetSize();
+                    fb_builder->Finish(my_server);
+                    uint8_t *server_buffer = fb_builder->GetBufferPointer();
+                    int server_buf_size = fb_builder->GetSize();
                     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                 }

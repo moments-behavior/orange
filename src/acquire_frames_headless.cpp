@@ -30,6 +30,12 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
 static inline void get_one_frame_headless(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, GPUVideoEncoder* gpu_encoder)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
+    
+    // get the system clock
+    struct timespec ts_rt1;
+    clock_gettime(CLOCK_REALTIME, &ts_rt1);
+    uint64_t real_time = (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
+    
     if (camera_control->sync_camera)
     {
         PTP_timestamp_checking(ptp_state, ecam, camera_state);
@@ -61,7 +67,8 @@ static inline void get_one_frame_headless(CameraState *camera_state, CameraEachS
                 ecam->frame_recv.size_y, 
                 ecam->frame_recv.pixel_type, 
                 ecam->frame_recv.timestamp,
-                camera_state->frame_count);
+                camera_state->frame_count,
+                real_time);
         }
         
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.

@@ -13,6 +13,7 @@ typedef struct {
 	int pixelFormat;
     unsigned long long timestamp;
     unsigned long long frame_id;
+    uint64_t timestamp_sys;
 } WORKER_ENTRY;
 
 

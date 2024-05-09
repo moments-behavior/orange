@@ -35,7 +35,7 @@ public:
     GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name); // name is the thread name
     ~GPUVideoEncoder ();
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id);
+	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id, uint64_t timestamp_sys);
 	void ProcessOneFrame(void *f);
 
 	//open gl dimensions:

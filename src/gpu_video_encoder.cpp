@@ -41,12 +41,12 @@ static inline void open_metadata_file(std::ofstream *frame_metadata, std::string
         std::cout << "File did not open!";
         return;
     }
-    *frame_metadata << "frame_id,timestamp\n";
+    *frame_metadata << "frame_id,timestamp,timestamp_sys\n";
 }
 
-static inline void write_meatadata(std::ofstream *metadata, unsigned long long frame_id, unsigned long long timestamp)
+static inline void write_meatadata(std::ofstream *metadata, unsigned long long frame_id, unsigned long long timestamp, uint64_t timestamp_sys)
 {
-    *metadata << frame_id << "," << timestamp << std::endl;
+    *metadata << frame_id << "," << timestamp << "," << timestamp_sys << std::endl;
 }
 
 
@@ -140,7 +140,7 @@ void GPUVideoEncoder::ProcessOneFrame(void* f)
     }
 
     encode_frame(&encoder, writer.video, &debayer);
-    write_meatadata(writer.metadata, entry.frame_id, entry.timestamp);
+    write_meatadata(writer.metadata, entry.frame_id, entry.timestamp, entry.timestamp_sys);
 }
 
 void GPUVideoEncoder::ThreadRunning()
@@ -190,7 +190,7 @@ void GPUVideoEncoder::ThreadRunning()
 }
 
 
-bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id)
+bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id, uint64_t timestamp_sys)
 {
     WORKER_ENTRY *entriesOut[ENCODER_ENTRIES_MAX]; // entris got out from saver thread, their frames should be returned to driver queue.
     int entriesOutCount = ENCODER_ENTRIES_MAX;
@@ -218,6 +218,7 @@ bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width
         entry->pixelFormat = pixelFormat;
         entry->timestamp = timestamp;
         entry->frame_id = frame_id;
+        entry->timestamp_sys = timestamp_sys;
         PutObjectToQueueIn(entry);
         return true;
     }

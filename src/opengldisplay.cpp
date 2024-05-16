@@ -36,15 +36,16 @@ void COpenGLDisplay::ThreadRunning()
     if (camera_select->yolo) {
         printf("YOLO initialization...\n");
 
-        const std::string engine_file_path{"/home/user/detect/rat_bbox.engine"};
+        const std::string engine_file_path{"/home/ratan/detect/shape_0.engine"};
         yolov8 = new YOLOv8(engine_file_path);
         yolov8->make_pipe(true);
 
-        cudaMalloc((void **)&d_points, sizeof(float) * 8);
+        cudaMalloc((void **)&d_points, sizeof(float) * 10);
         cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
         CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8, cudaMemcpyHostToDevice));
     }
 
+        
     std::vector<Object> objs;
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
  
@@ -69,9 +70,21 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->preprocess_gpu(d_convert);
                 yolov8->infer();
                 yolov8->postprocess(objs);
-                yolov8->copy_keypoints_gpu(d_points, objs);
+                
+
+                for (auto obj : objs) {
+                    std::vector<Object> tmp_obj ;
+                    tmp_obj.push_back(obj);
+                    yolov8->copy_keypoints_gpu(d_points, tmp_obj);
+                    gpu_draw_cicles(debayer.d_debayer, 3208, 2200, d_points, 5, yolov8->stream);
+                }
+
+                // gpu_draw_box(debayer.d_debayer, 3208, 2200 , d_points, yolov8->stream);
+
 
                 if (objs.size() > 0) {
+                    
+                    
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
                     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
                     // std::cout << bbox_center_x << std::endl;
@@ -80,14 +93,16 @@ void COpenGLDisplay::ThreadRunning()
                     if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
                         // send a trigger signal to cbot
                         std::cout << "trigger ball drop" << std::endl;
-                        send_cbot_ball_drop_trigger_signal(cbot_signal_builder->server, cbot_signal_builder->builder, cbot_signal_builder->cbot_connection);
+                        // send_cbot_ball_drop_trigger_signal(cbot_signal_builder->server, cbot_signal_builder->builder, cbot_signal_builder->cbot_connection);
                     }
                     objs_last_frame.push_back(objs[0]);
                 } else {
                     objs_last_frame.clear();
                 }
                     
-                gpu_draw_rat_pose(debayer.d_debayer, 3208, 2200, d_points, d_skeleton, yolov8->stream);
+                // gpu_draw_rat_pose(debayer.d_debayer, 3208, 2200, d_points, d_skeleton, yolov8->stream);
+               
+
             }
 
             // probably reduandant copy

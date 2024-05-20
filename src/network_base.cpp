@@ -137,3 +137,8 @@ void send_cbot_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers::
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(cbot_connection, 0, enet_packet);
 }
+
+void send_cbot_obj_pos2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection)
+{
+    
+}

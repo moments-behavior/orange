@@ -1,0 +1,14 @@
+namespace ObjPose;
+
+table pose2d {
+  x:float;
+  y:float;
+  theta:float;
+}
+
+table obj_pose_msg {
+    obj_a:pose2d;
+    obj_b:pose2d;
+}
+
+root_type obj_pose_msg;

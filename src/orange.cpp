@@ -75,6 +75,7 @@ int main(int argc, char **args)
     bool ptp_stream_sync = false;
     
     flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
+    flatbuffers::FlatBufferBuilder* fb_builder_obj_pose = new flatbuffers::FlatBufferBuilder(1024);
 
     EnetContext server;
     if (enet_initialize(&server, 3333, 5)) {
@@ -83,8 +84,9 @@ int main(int argc, char **args)
 
     std::vector<ConnectedServer> my_servers;
     CBOTSignalBuilder cbot_signal_builder;
-    cbot_signal_builder.builder = fb_builder;
+    cbot_signal_builder.builder = fb_builder_obj_pose;
     cbot_signal_builder.server = &server;
+    initialize_obj_pose_message(cbot_signal_builder.builder);
 
     std::vector<std::string> network_config_folders;
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
@@ -708,7 +710,6 @@ int main(int argc, char **args)
 
                     sprintf(label_save_input, "save_image_index%d", i);
                     ImGui::InputInt(label_save_input, &cameras_select[i].frame_save_idx);
-
                 }
 
                 for (int i = 0; i < num_cameras; i++)

@@ -140,14 +140,17 @@ void send_cbot_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers::
 
 void send_cbot_obj_pos2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection)
 {
-    builder->Clear();
-    ObjPose2D::pose2dBuilder pose2d_builder(*builder);
-    auto obj_a = Createpose2d(*builder, 0.0f, 0.0f, 0.0f);
-    auto obj_b = Createpose2d(*builder, 0.0f, 0.0f, 0.0f);
-    auto obj_pose_msg = Createpose2dMsg(*builder, obj_a, obj_b);
-    builder->Finish(obj_pose_msg);
-    uint8_t *obj_msg_buffer = builder->GetBufferPointer();
-    int obj_msg_buf_size = builder->GetSize();
-    ENetPacket* enet_packet = enet_packet_create(obj_msg_buffer, obj_msg_buf_size, 0);
+    uint8_t *pose_msg_buffer = builder->GetBufferPointer();
+    int pose_msg_buf_size = builder->GetSize();
+    ENetPacket* enet_packet = enet_packet_create(pose_msg_buffer, pose_msg_buf_size, 0);
     enet_peer_send(cbot_connection, 0, enet_packet);
+     
+}
+
+void initialize_obj_pose_message(flatbuffers::FlatBufferBuilder* builder)
+{
+    auto obj_a = ObjPose::Createpose2d(*builder, 0.0f, 0.0f, 0.0f);
+    auto obj_b = ObjPose::Createpose2d(*builder, 0.0f, 0.0f, 0.0f);
+    auto obj_pose_msg = ObjPose::Createobj_pose_msg(*builder, obj_a, obj_b);
+    builder->Finish(obj_pose_msg);    
 }

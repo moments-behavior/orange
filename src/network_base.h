@@ -4,6 +4,7 @@
 #include <functional>
 #include <enet/enet.h>
 #include "fetch_generated.h"
+#include "obj_pose_2d_generated.h"
 
 enum PacketTransportType
 {
@@ -26,11 +27,14 @@ struct EnetContext {
 };
 
 
-struct CBOTSignalBuilder {
-    flatbuffers::FlatBufferBuilder* builder;
+struct CBOTSignalBuilder {    
+    flatbuffers::FlatBufferBuilder* builder;    
     EnetContext* server;
-    ENetPeer* cbot_connection;
+    ENetPeer* cbot_connection;    
 };
+
+
+
 
 bool enet_initialize(EnetContext* enet_context, uint16_t external_port_number, size_t max_peers);
 void enet_release(EnetContext* enet_context);
@@ -38,4 +42,8 @@ ENetPeer* connect_peer(EnetContext* enet_context, uint8_t ip_part1, uint8_t ip_p
 void enqueue_packet(EnetContext* enet_context, ENetPeer* peer, PacketTransportType transport_type, void* packet_data, size_t data_length);
 void service_network(EnetContext* enet_context, float dt, std::function<void(const ENetEvent&)> callback);
 void send_cbot_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection);
+
+void initialize_obj_pose_message(flatbuffers::FlatBufferBuilder* builder);
+void send_cbot_obj_pos2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection);
+
 #endif

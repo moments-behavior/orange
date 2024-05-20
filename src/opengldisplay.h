@@ -26,6 +26,7 @@ public:
 	FrameCPU frame_cpu;
 
 	float *d_points;
+	float *d_centroids;
     unsigned int *d_skeleton;
 
 private: 

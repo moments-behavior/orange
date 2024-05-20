@@ -41,6 +41,8 @@ void COpenGLDisplay::ThreadRunning()
         yolov8->make_pipe(true);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 10);
+        cudaMalloc((void **)&d_centroids, sizeof(float) *2);
+        
         cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
         CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8, cudaMemcpyHostToDevice));
     }
@@ -74,9 +76,16 @@ void COpenGLDisplay::ThreadRunning()
 
                 for (auto obj : objs) {
                     std::vector<Object> tmp_obj ;
+                    
+                    //push bounding box points
                     tmp_obj.push_back(obj);
                     yolov8->copy_keypoints_gpu(d_points, tmp_obj);
-                    gpu_draw_cicles(debayer.d_debayer, 3208, 2200, d_points, 5, yolov8->stream);
+                    gpu_draw_box(debayer.d_debayer, 3208, 2200 , d_points, yolov8->stream);
+
+                    // push centroid points
+                    yolov8->copy_centroid_gpu(d_centroids, tmp_obj);
+                    gpu_draw_cicles(debayer.d_debayer, 3208, 2200, d_centroids, 1, yolov8->stream);
+                    
                 }
 
                 // gpu_draw_box(debayer.d_debayer, 3208, 2200 , d_points, yolov8->stream);
@@ -116,7 +125,7 @@ void COpenGLDisplay::ThreadRunning()
                 cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
                 cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
                 
-                std::string image_name = "/home/user/Pictures/Orange/Cam" + camera_params->camera_serial + "_image" + std::to_string(camera_select->frame_save_idx) + ".tif";
+                std::string image_name = "/home/ratan/Pictures/Orange/Cam" + camera_params->camera_serial + "_image" + std::to_string(camera_select->frame_save_idx) + ".tif";
                 cv::imwrite(image_name, view);
                 camera_select->frame_save_idx++;
                 camera_select->frame_save_state = State_Frame_Idle;

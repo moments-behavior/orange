@@ -151,7 +151,9 @@ __global__ void gpu_draw_box(unsigned char* src, const int width, const int heig
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
 
+    // if within image boundaries
     if( (x < width) && (y < height) ) {
+        // loop over the four points of the bbox
         for (int i= 0; i < 4; i++) {
 
             float lengh_squared = (d_points[i*2+2]-d_points[i*2]) * (d_points[i*2+2]-d_points[i*2]) + (d_points[i*2+3]-d_points[i*2+1]) * (d_points[i*2+3]-d_points[i*2+1]);

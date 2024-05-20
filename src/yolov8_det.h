@@ -21,7 +21,9 @@ public:
     void infer();
     void postprocess(std::vector<Object> &objs);
     void copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs);
+    void copy_centroid_gpu(float* d_centroid, const std::vector<Object>& objs);
     
+
     int num_bindings;
     int num_inputs = 0;
     int num_outputs = 0;

@@ -36,6 +36,7 @@ void COpenGLDisplay::ThreadRunning()
     if (camera_select->yolo) {
         printf("YOLO initialization...\n");
 
+        //BESPOKE
         const std::string engine_file_path{"/home/ratan/detect/shape_0.engine"};
         yolov8 = new YOLOv8(engine_file_path);
         yolov8->make_pipe(true);
@@ -50,7 +51,9 @@ void COpenGLDisplay::ThreadRunning()
         
     std::vector<Object> objs;
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
- 
+    
+
+
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();
@@ -73,7 +76,7 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->infer();
                 yolov8->postprocess(objs);
                 
-
+                
                 for (auto obj : objs) {
                     std::vector<Object> tmp_obj ;
                     
@@ -85,13 +88,48 @@ void COpenGLDisplay::ThreadRunning()
                     // push centroid points
                     yolov8->copy_centroid_gpu(d_centroids, tmp_obj);
                     gpu_draw_cicles(debayer.d_debayer, 3208, 2200, d_centroids, 1, yolov8->stream);
-                    
+
                 }
 
-                // gpu_draw_box(debayer.d_debayer, 3208, 2200 , d_points, yolov8->stream);
+                int n_obj = 0;
+                float x_center,y_center,theta;
+                
+                // you want to copy the values of the bounding boxes here
+                uint8_t *buffer_pointer = cbot_signal_builder->builder->GetBufferPointer();
+                auto pose_msg_mutable = ObjPose::GetMutableobj_pose_msg(buffer_pointer);
+                    
+                for (auto obj : objs) {    
+                   
+                    n_obj++;
+                    
+                    if(obj.prob>0.6) {
+                        x_center = obj.rect.x + obj.rect.width/2;
+                        y_center = obj.rect.y + obj.rect.height/2;
+                        theta = 0.0;
+                    }
+                    else{
+                        x_center = 0.0;
+                        y_center = 0.0;
+                        theta = 0.0;
+                    }
+                    
+                    if(n_obj>0) {
+                        pose_msg_mutable->mutable_obj_a()->mutate_x(x_center);                    
+                        pose_msg_mutable->mutable_obj_a()->mutate_y(y_center);                    
+                    }
+                    else    {   
+                        pose_msg_mutable->mutable_obj_b()->mutate_x(x_center);                    
+                        pose_msg_mutable->mutable_obj_b()->mutate_y(y_center);                                          
+                    }
+                    
+
+                }
+                // publish message
+                send_cbot_obj_pos2d(cbot_signal_builder->server, cbot_signal_builder->builder, cbot_signal_builder->cbot_connection);
 
 
-                if (objs.size() > 0) {
+                // if upto two objects are detected
+                if (objs.size() > 0 && objs.size()<2) {
                     
                     
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;

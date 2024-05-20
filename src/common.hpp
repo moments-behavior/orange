@@ -138,5 +138,18 @@ struct PreParam {
     float height = 0;
     float width  = 0;
 };
+
+struct Pose2d {
+    float x_center = 0.0f;
+    float y_center = 0.0f;
+    float theta = 0.0f;
+};
+
+struct BoundingBox{
+    std::vector<float>x;
+    std::vector<float>y;
+    float conf;
+};
+
 }  // namespace pose
 #endif  // POSE_NORMAL_COMMON_HPP

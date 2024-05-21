@@ -86,7 +86,10 @@ int main(int argc, char **args)
     CBOTSignalBuilder cbot_signal_builder;
     cbot_signal_builder.builder = fb_builder_obj_pose;
     cbot_signal_builder.server = &server;
-    initialize_obj_pose_message(cbot_signal_builder.builder);
+    initialize_obj_pose_message(cbot_signal_builder.builder); 
+    uint8_t *pose_msg_buffer = cbot_signal_builder.builder->GetBufferPointer();   
+    auto pose_msg_copy = ObjPose::Getobj_pose_msg(pose_msg_buffer);
+                
 
     std::vector<std::string> network_config_folders;
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
@@ -841,6 +844,22 @@ int main(int argc, char **args)
                 }
             }
             ImGui::PopStyleColor(1);
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("Debug"))
+        {
+
+            // Remove the line below
+            auto ax = pose_msg_copy->obj_a()->x();
+            auto ay = pose_msg_copy->obj_a()->y();
+            auto ath= pose_msg_copy->obj_a()->theta();
+            auto bx = pose_msg_copy->obj_b()->x();
+            auto by = pose_msg_copy->obj_b()->y();
+            auto bth= pose_msg_copy->obj_b()->theta();
+            ImGui::Text("Obj A at  (%4.3f,%4.3f), angle=%3.3f", ax,ay,ath);
+            ImGui::Text("Obj B at  (%4.3f,%4.3f), angle=%3.3f", bx,by,bth);
+            // ImGui::Text();
         }
         ImGui::End();
 

@@ -277,7 +277,7 @@ void YOLOv8::postprocess(std::vector<Object>& objs)
     auto& width    = this->pparam.width;
     auto& height   = this->pparam.height;
     auto& ratio    = this->pparam.ratio;
-    std::cout << "number of detections = " << num_dets[0] << std::endl;
+    //std::cout << "number of detections = " << num_dets[0] << std::endl;
     Object obj;
         
     for (int i = 0; i < num_dets[0]; i++) {
@@ -307,7 +307,7 @@ void YOLOv8::copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs
     const int num_point = 4;
     float points[10] = {0};
     // TODO: draw both the bbox and the keypoints 
-    std::cout << "Number of elements in objs: " << objs.size() << std::endl;
+    //std::cout << "Number of elements in objs: " << objs.size() << std::endl;
 
     for (auto& obj : objs) {
         points[0] = obj.rect.x;

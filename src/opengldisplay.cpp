@@ -101,26 +101,27 @@ void COpenGLDisplay::ThreadRunning()
                 for (auto obj : objs) {    
                    
                     n_obj++;
+                    // std::cout <<"obj #" <<n_obj << " at (" << obj.rect.x + obj.rect.width/2 <<
+                    //                                     ","<< obj.rect.y + obj.rect.height/2 << 
+                    //                         ") with prob: "<<obj.prob << "\n";
+                    x_center = 0.0;
+                    y_center = 0.0;
+                    theta = 0.0;
                     
-                    if(obj.prob>0.6) {
-                        x_center = obj.rect.x + obj.rect.width/2;
-                        y_center = obj.rect.y + obj.rect.height/2;
-                        theta = 0.0;
-                    }
-                    else{
-                        x_center = 0.0;
-                        y_center = 0.0;
-                        theta = 0.0;
-                    }
-                    
-                    if(n_obj>0) {
-                        pose_msg_mutable->mutable_obj_a()->mutate_x(x_center);                    
-                        pose_msg_mutable->mutable_obj_a()->mutate_y(y_center);                    
+                    if(n_obj==1) {
+                        pose_msg_mutable->mutable_obj_a()->mutate_x(float(obj.rect.x + obj.rect.width/2));                    
+                        pose_msg_mutable->mutable_obj_a()->mutate_y(float(obj.rect.y + obj.rect.height/2));
+                        pose_msg_mutable->mutable_obj_a()->mutate_theta(float(theta));                    
                     }
                     else    {   
-                        pose_msg_mutable->mutable_obj_b()->mutate_x(x_center);                    
-                        pose_msg_mutable->mutable_obj_b()->mutate_y(y_center);                                          
+                        pose_msg_mutable->mutable_obj_b()->mutate_x(float(obj.rect.x + obj.rect.width/2));                    
+                        pose_msg_mutable->mutable_obj_b()->mutate_y(float(obj.rect.y + obj.rect.height/2));
+                        pose_msg_mutable->mutable_obj_b()->mutate_theta(float(theta));                                          
                     }
+
+                    // std::cout <<"obj #" << n_obj << 
+                    //             ",   x_center: " << pose_msg_mutable->obj_a()->x() <<
+                    //             ",   y_center: " << pose_msg_mutable->obj_b()->y() << std::endl;
                     
 
                 }

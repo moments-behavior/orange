@@ -76,7 +76,7 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->infer();
                 yolov8->postprocess(objs);
                 
-                
+                // display detected bounding boxes
                 for (auto obj : objs) {
                     std::vector<Object> tmp_obj ;
                     
@@ -91,6 +91,7 @@ void COpenGLDisplay::ThreadRunning()
 
                 }
 
+                // publish pose message
                 int n_obj = 0;
                 float x_center,y_center,theta;
                 
@@ -100,22 +101,34 @@ void COpenGLDisplay::ThreadRunning()
                     
                 for (auto obj : objs) {    
                    
-                    n_obj++;
-                    // std::cout <<"obj #" <<n_obj << " at (" << obj.rect.x + obj.rect.width/2 <<
-                    //                                     ","<< obj.rect.y + obj.rect.height/2 << 
-                    //                         ") with prob: "<<obj.prob << "\n";
-                    x_center = 0.0;
-                    y_center = 0.0;
+                    n_obj++;                  
+                    
+                    // bespoke-threshold
+                    // only apply the bbox level checks here -- spatial checks to be done in cbot
+                    float bbox_aspect_ratio = obj.rect.width/obj.rect.height;
+                    float max_bbox_size = 200;
+                    float bbox_size = max(obj.rect.width,obj.rect.height);
+
+                    if(obj.prob>0.75 && abs(bbox_aspect_ratio-1)<0.2 && bbox_size<max_bbox_size)
+                    {
+                        x_center = obj.rect.x + obj.rect.width/2;
+                        y_center = obj.rect.y + obj.rect.height/2;
+                    }
+                    else
+                    {
+                        x_center = -999.0;
+                        y_center = -999.0;
+                    }
                     theta = 0.0;
                     
                     if(n_obj==1) {
-                        pose_msg_mutable->mutable_obj_a()->mutate_x(float(obj.rect.x + obj.rect.width/2));                    
-                        pose_msg_mutable->mutable_obj_a()->mutate_y(float(obj.rect.y + obj.rect.height/2));
+                        pose_msg_mutable->mutable_obj_a()->mutate_x(float(x_center));                    
+                        pose_msg_mutable->mutable_obj_a()->mutate_y(float(y_center));
                         pose_msg_mutable->mutable_obj_a()->mutate_theta(float(theta));                    
                     }
                     else    {   
-                        pose_msg_mutable->mutable_obj_b()->mutate_x(float(obj.rect.x + obj.rect.width/2));                    
-                        pose_msg_mutable->mutable_obj_b()->mutate_y(float(obj.rect.y + obj.rect.height/2));
+                        pose_msg_mutable->mutable_obj_b()->mutate_x(float(x_center));                    
+                        pose_msg_mutable->mutable_obj_b()->mutate_y(float(y_center));
                         pose_msg_mutable->mutable_obj_b()->mutate_theta(float(theta));                                          
                     }
 

@@ -99,6 +99,7 @@ int main(int argc, char **args)
 
     // realtime tools
     bool save_image_all_ready = true;
+    std::cout << "before gui loop" << std::endl;
     while (!glfwWindowShouldClose(window->render_target))
     {
         service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -438,7 +439,6 @@ int main(int argc, char **args)
 
             camera_control->open = false;
         }
-
 
         if (ImGui::Begin("Orange Streaming", NULL, ImGuiWindowFlags_MenuBar))
         {

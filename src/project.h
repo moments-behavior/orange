@@ -157,8 +157,8 @@ void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, in
 
 void init_65MP_camera_params_color(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
 {
-    camera_params->width = 8192; // 9344;
-    camera_params->height = 7000; // 7000;
+    camera_params->width = 512; // 8192; // 9344;
+    camera_params->height = 512; // 7000; // 7000;
     camera_params->frame_rate = frame_rate;
     camera_params->gain = gain;
     camera_params->exposure = exposure;

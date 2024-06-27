@@ -82,6 +82,15 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
     return true;
 }
 
+bool quit_server = false;
+
+
+static void interruptHandler(const int signal)
+{
+    printf("\nQuit Orange.\n");
+    quit_server = true;
+}
+
 int main(int argc, char *argv[])
 {
     if (enet_initialize() != 0)
@@ -120,7 +129,6 @@ int main(int argc, char *argv[])
     
     flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
 
-    bool quit_server = false;
 
     while (!quit_server)
     {

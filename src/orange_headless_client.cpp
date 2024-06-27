@@ -12,6 +12,7 @@
 #include "video_capture.h"
 #include "fetch_generated.h"
 #include "acquire_frames_headless.h"
+#include <signal.h>
 
 #define evt_buffer_size 100
 
@@ -97,6 +98,8 @@ int main(int argc, char *argv[])
     {
         quit_process(true, "ENET failed to initialize!");
     }
+
+    signal(SIGINT, interruptHandler);
 
     ENetPeer *server_connection;
     EnetContext client;
@@ -271,6 +274,5 @@ int main(int argc, char *argv[])
     }
     enet_host_destroy(client.m_pNetwork);
     quit_process();
-    printf("Exit orange-client.\n");
     return 0;
 }

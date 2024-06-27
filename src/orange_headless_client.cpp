@@ -263,5 +263,6 @@ int main(int argc, char *argv[])
     }
     enet_host_destroy(client.m_pNetwork);
     quit_process();
+    printf("Exit orange-client.\n");
     return 0;
 }

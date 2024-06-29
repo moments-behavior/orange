@@ -83,8 +83,9 @@ int main(int argc, char **args)
 
     std::vector<ConnectedServer> my_servers;
     CBOTSignalBuilder cbot_signal_builder;
-    cbot_signal_builder.builder = fb_builder;
-    cbot_signal_builder.server = &server;
+    cbot_signal_builder = {.builder = fb_builder, 
+        .server = &server,
+        .cbot_connection = NULL};
 
     std::vector<std::string> network_config_folders;
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
@@ -92,14 +93,15 @@ int main(int argc, char **args)
     }
     
     int network_config_select = 0;
-    char subfix_buf[64] = "";
     bool select_all_cameras = false;
     ServerState all_server_state = SERVER_DISCONNECTED;
     int num_servers = 2;
-
-    // realtime tools
+    char* subfix_buf = (char*)malloc(64);
+    *subfix_buf = '\0';
+    char* temp_string = (char*)malloc(64);
+    *temp_string = '\0';
     bool save_image_all_ready = true;
-    std::cout << "before gui loop" << std::endl;
+
     while (!glfwWindowShouldClose(window->render_target))
     {
         service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -180,7 +182,6 @@ int main(int argc, char **args)
 
         create_new_frame();
 
-
         if (ImGui::Begin("Network")) 
         {
             // if (ImGui::Button("Test Cbot Trigger")) {
@@ -195,26 +196,21 @@ int main(int argc, char **args)
                 ImGui::TableNextColumn();
                 ImGui::Text("Cbot");
                 ImGui::TableNextColumn();
-
-                char cbot_connection_label[16];
-                sprintf(cbot_connection_label, "Not connected");
-
+                sprintf(temp_string, "Not connected");
                 if (cbot_signal_builder.cbot_connection != nullptr) {
                     if (cbot_signal_builder.cbot_connection->state == ENET_PEER_STATE_CONNECTED) {
-                        sprintf(cbot_connection_label, "Connected");
+                        sprintf(temp_string, "Connected");
                     } 
                 }
-                ImGui::Text(cbot_connection_label);
+                ImGui::Text(temp_string);
                 ImGui::EndTable();
             }
-
 
             if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
                 for (int i = 0; i < my_servers.size(); i++)
                 {
-                    char label[32];
-                    sprintf(label, "##servers%d", i);
+                    sprintf(temp_string, "##servers%d", i);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     ImGui::Text(my_servers[i].name);
@@ -228,10 +224,9 @@ int main(int argc, char **args)
             
             for (int i = 0; i < network_config_folders.size(); i++)
             {
-                char buf[100];
                 std::vector<std::string> folder_token = string_split(network_config_folders[i].c_str(), "/");
-                sprintf(buf, folder_token.back().c_str());
-                ImGui::RadioButton(buf, &network_config_select, i); 
+                sprintf(temp_string, folder_token.back().c_str());
+                ImGui::RadioButton(temp_string, &network_config_select, i); 
                 if (i != network_config_folders.size()-1)
                     ImGui::SameLine();
             }
@@ -269,8 +264,9 @@ int main(int argc, char **args)
 
                         for (int i =0; i < num_cameras; i++) {
                             cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
+                            if (cameras_params[i].camera_name.compare("Cam16") == 0) {
                                 cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo = true;
                             }
                         }
 
@@ -390,7 +386,6 @@ int main(int argc, char **args)
         }
         ImGui::End();
 
-
         if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) 
         {
             
@@ -451,12 +446,10 @@ int main(int argc, char **args)
 
                 for (int i = 0; i < cam_count; i++)
                 {
-                    char label[32];
-                    sprintf(label, "%d", i);
+                    sprintf(temp_string, "%d", i);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    // ImGui::Checkbox(label, &check[i]);
-                    ImGui::Selectable(label, &check[i], ImGuiSelectableFlags_SpanAllColumns);
+                    ImGui::Selectable(temp_string, &check[i], ImGuiSelectableFlags_SpanAllColumns);
                     ImGui::TableNextColumn();
                     ImGui::Text(device_info[i].serialNumber);
                     ImGui::TableNextColumn();
@@ -505,7 +498,6 @@ int main(int argc, char **args)
                 encoder_preset = items[item_current];
             }
 
-
             if (camera_control->open) {
                 set_camera_properties(ecams, cameras_params, num_cameras);
                 
@@ -518,20 +510,19 @@ int main(int argc, char **args)
                     ImGui::TableNextColumn();
                     ImGui::Text("stream");
                     ImGui::TableNextColumn();
-                    ImGui::Text("yolo");
+                    ImGui::Text("yolo"); 
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        char label[32];
-                        sprintf(label, "##checkbox_control%d", i);
-                        char label_yolo[32];
-                        sprintf(label_yolo, "##checkbox_yolo%d", i);
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
                         ImGui::Text(cameras_params[i].camera_name.c_str());
                         ImGui::TableNextColumn();
-                        ImGui::Checkbox(label, &cameras_select[i].stream_on);
+                        sprintf(temp_string, "##checkbox_control%d", i);
+                        ImGui::Checkbox(temp_string, &cameras_select[i].stream_on);
                         ImGui::TableNextColumn();
-                        ImGui::Checkbox(label_yolo, &cameras_select[i].yolo);
+                        sprintf(temp_string, "##checkbox_yolo%d", i);
+                        ImGui::Checkbox(temp_string, &cameras_select[i].yolo);
                     }
                     ImGui::EndTable();
                 }
@@ -539,7 +530,6 @@ int main(int argc, char **args)
             }
         }
         ImGui::End();
-
 
         if (ImGui::Begin("Local"))
         {
@@ -704,11 +694,8 @@ int main(int argc, char **args)
                 ImGui::Text("Save image index:");
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    char label_save_input[32];
-
-                    sprintf(label_save_input, "save_image_index%d", i);
-                    ImGui::InputInt(label_save_input, &cameras_select[i].frame_save_idx);
-
+                    sprintf(temp_string, "save_image_index%d", i);
+                    ImGui::InputInt(temp_string, &cameras_select[i].frame_save_idx);
                 }
 
                 for (int i = 0; i < num_cameras; i++)
@@ -894,7 +881,6 @@ int main(int argc, char **args)
 
             }
         }
-        
         
         if (camera_control->open && show_realtime_plot) { 
             ImGui::Begin("Realtime Plots"); {                              

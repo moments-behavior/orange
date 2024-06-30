@@ -195,7 +195,7 @@ static void unmap_cuda_resource(cudaGraphicsResource_t *cuda_resource)
 
 void render_initialize_target(gx_context *window)
 {
-    GLFWwindow *render_target = gx_glfw_init_render_target(3, 3, window->width, window->height, "Orange Streaming", window->glsl_version);
+    GLFWwindow *render_target = gx_glfw_init_render_target(3, 3, window->width, window->height, "Orange", window->glsl_version);
     gx_init(window, render_target);
     gx_imgui_init(window);
 }

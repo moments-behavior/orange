@@ -435,7 +435,7 @@ int main(int argc, char **args)
             camera_control->open = false;
         }
 
-        if (ImGui::Begin("Orange Streaming", NULL, ImGuiWindowFlags_MenuBar))
+        if (ImGui::Begin("Orange", NULL, ImGuiWindowFlags_MenuBar))
         {
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

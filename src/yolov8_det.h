@@ -10,7 +10,7 @@ using namespace pose;
 class YOLOv8
 {
 public:
-    explicit YOLOv8(const std::string &engine_file_path);
+    explicit YOLOv8(const std::string &engine_file_path, int width, int height);
     ~YOLOv8();
 
     void make_pipe(bool warmup = true);

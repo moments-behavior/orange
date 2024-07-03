@@ -114,7 +114,7 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
     float       width  = img_width;
     float       height = img_height;
 
-    float r    = std::min(inp_h / height, inp_w / );
+    float r    = std::min(inp_h / height, inp_w / width);
     int   padw = std::round(width * r);
     int   padh = std::round(height * r);
 

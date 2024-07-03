@@ -37,7 +37,7 @@ void COpenGLDisplay::ThreadRunning()
         printf("YOLO initialization...\n");
 
         const std::string engine_file_path{"/home/user/detect/rat_bbox.engine"};
-        yolov8 = new YOLOv8(engine_file_path);
+        yolov8 = new YOLOv8(engine_file_path, camera_params->width, camera_params->height);
         yolov8->make_pipe(true);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 8);

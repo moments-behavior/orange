@@ -1,7 +1,10 @@
 #include "yolov8_det.h"
 
-YOLOv8::YOLOv8(const std::string& engine_file_path)
+YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 {
+    img_width = width;
+    img_height = height;
+
     std::ifstream file(engine_file_path, std::ios::binary);
     assert(file.good());
     file.seekg(0, std::ios::end);
@@ -108,23 +111,23 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
 {
     const float inp_h  = 640;
     const float inp_w  = 640;
-    float       width  = 3208;
-    float       height = 2200;
+    float       width  = img_width;
+    float       height = img_height;
 
-    float r    = std::min(inp_h / height, inp_w / width);
+    float r    = std::min(inp_h / height, inp_w / );
     int   padw = std::round(width * r);
     int   padh = std::round(height * r);
 
 
     // npp resize, todo: check if resize needed
     NppiSize img_size;
-    img_size.width = 3208;
-    img_size.height = 2200;
+    img_size.width = img_width;
+    img_size.height = img_height;
     NppiRect roi;
     roi.x = 0;
     roi.y = 0;
-    roi.width = 3208;
-    roi.height = 2200;
+    roi.width = img_width;
+    roi.height = img_height;
 
     NppiSize output_resize_size;
     output_resize_size.width = 640;
@@ -136,7 +139,7 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
     output_roi.height = 439;
 
 
-    const NppStatus npp_result = nppiResize_8u_C3R(d_rgb, 3208 * sizeof(uchar3), img_size, roi, d_temp, 640 * sizeof(uchar3), output_resize_size, output_roi, NPPI_INTER_SUPER);
+    const NppStatus npp_result = nppiResize_8u_C3R(d_rgb, img_width * sizeof(uchar3), img_size, roi, d_temp, 640 * sizeof(uchar3), output_resize_size, output_roi, NPPI_INTER_SUPER);
     if (npp_result != NPP_SUCCESS) {
         std::cerr << "Error executing Resize -- code: " << npp_result << std::endl;
     }

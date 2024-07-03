@@ -39,6 +39,8 @@ private:
     unsigned char *d_boarder;
     float *d_float;
     float *d_planar;
+    int img_width;
+    int img_height;
 
     nvinfer1::ICudaEngine *engine = nullptr;
     nvinfer1::IRuntime *runtime = nullptr;

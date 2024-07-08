@@ -165,18 +165,29 @@ int main(int argc, char *argv[])
                         auto server_signal = server_control->control();
 
                         if (server_signal == FetchGame::ServerControl_OPEN) {
+                            StopWatch w;
+                            w.Start();
                             std::string config_folder = server_control->config_folder()->c_str();
                             cameras_params = new CameraParams[cam_count];
                             cameras_select = new CameraEachSelect[cam_count];
-                            if (open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, config_folder)) {
+                            bool camera_opened = open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, config_folder);
+                            double time_diff = w.Stop();
+                            std::cout << "Time to open cameras: " << time_diff << std::endl;
+                            if (camera_opened) {
                                 client_send_camera_open_message(&client, fb_builder, server_connection);
                             }
+
                         }
                         else if (server_signal == FetchGame::ServerControl_START)
                         {
+                            StopWatch w;
+                            w.Start();
                             std::string record_folder = server_control->record_folder()->c_str();
                             std::string encoder_basic_setup = server_control->encoder_setup()->c_str();
-                            if(start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, record_folder, encoder_basic_setup)) 
+                            bool recording_started = start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, record_folder, encoder_basic_setup);
+                            double time_diff = w.Stop();
+                            std::cout << "Time to start camera threads: " << time_diff << std::endl;
+                            if(recording_started) 
                             {
                                 client_send_thread_start_message(&client, fb_builder, server_connection);
                             };

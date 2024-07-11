@@ -84,6 +84,7 @@ void load_camera_json_config_files(std::string file_name, CameraParams* camera_p
     camera_params->gpu_direct = camera_config["gpu_direct"];
     camera_params->color = camera_config["color"];
     camera_params->focus = camera_config["focus"];
+    camera_params->iris = camera_config["iris"];
 }
 
 // Get current date/time, format is YYYY_MM_DD_HH_mm_ss

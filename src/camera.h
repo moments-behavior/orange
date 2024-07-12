@@ -17,6 +17,7 @@ struct CameraParams{
     unsigned int frame_rate;
     unsigned int gain;
     unsigned int exposure;
+    unsigned int iris;
     unsigned int focus;
     std::string pixel_format;
     std::string color_temp;
@@ -33,6 +34,9 @@ struct CameraParams{
     unsigned int exposure_max; 
     unsigned int exposure_min;
     unsigned int exposure_inc;
+    unsigned int iris_max; 
+    unsigned int iris_min;
+    unsigned int iris_inc;
     unsigned int frame_rate_max; 
     unsigned int frame_rate_min;
     unsigned int frame_rate_inc;
@@ -96,6 +100,7 @@ void update_height_value(Emergent::CEmergentCamera* camera, int height_val, Came
 void update_offsetX_value(Emergent::CEmergentCamera* camera, int OFFSET_X_VAL, CameraParams* camera_params);
 void update_offsetY_value(Emergent::CEmergentCamera* camera, int OFFSET_Y_VAL, CameraParams* camera_params);
 void update_focus_value(Emergent::CEmergentCamera* camera, int focus_value, CameraParams* camera_params);
+void update_iris_value(Emergent::CEmergentCamera* camera, int iris_value, CameraParams* camera_params);
 int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
 void allocate_frame_reorder_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* frame_reorder, CameraParams* camera_params);
 void camera_open_stream(Emergent::CEmergentCamera* camera);

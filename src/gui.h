@@ -19,13 +19,14 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
     if (ImGui::TreeNode("Camera Property"))
     {
         static int selected_camera = 0;
-        static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY, slider_focus;
+        static int slider_gain, slider_exposure, slider_frame_rate, slider_width, slider_height, OffsetX, OffsetY, slider_focus,slider_iris;
 
         for (int n = 0; n < num_cameras; n++)
         {
             if (ImGui::Selectable(cameras_params[n].camera_serial.c_str(), selected_camera == n))
                 selected_camera = n;
                 slider_gain = cameras_params[selected_camera].gain;
+                slider_iris = cameras_params[selected_camera].iris;
                 slider_focus = cameras_params[selected_camera].focus;
                 slider_width = cameras_params[selected_camera].width;
                 slider_height = cameras_params[selected_camera].height;
@@ -74,6 +75,10 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
             update_focus_value(&ecams[selected_camera].camera, slider_focus, &cameras_params[selected_camera]);
         }
 
+        if(ImGui::SliderInt("Iris", &slider_iris, cameras_params[selected_camera].iris_min, cameras_params[selected_camera].iris_max, "%d"))
+        {
+            update_iris_value(&ecams[selected_camera].camera, slider_iris, &cameras_params[selected_camera]);
+        }
 
         if(ImGui::SliderInt("Exposure", &slider_exposure, cameras_params[selected_camera].exposure_min, cameras_params[selected_camera].exposure_max, "%d"))
         {

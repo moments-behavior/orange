@@ -326,27 +326,28 @@ int main(int argc, char **args)
                 ImGui::PopStyleColor(1);
             }
 
-            
             if (all_server_state == SERVER_THREAD_READY) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if (ImGui::Button("Start Recording")) {
-                    // get the host ready, and then set global ptp time to start recording  
-                    unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                    int delay_in_second = 10;
-                    ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                    host_broadcast_set_start_ptp(fb_builder, &server, ptp_params->ptp_global_time);
-                    ptp_params->network_set_start_ptp = true;
-                    all_server_state = SERVER_WAIT;
+                // check network servers are ready as well as local computer
+                if (ptp_params->ptp_counter==num_cameras) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
+                    if (ImGui::Button("Start Recording")) {
+                        // get the host ready, and then set global ptp time to start recording  
+                        unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
+                        int delay_in_second = 3;
+                        ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+                        host_broadcast_set_start_ptp(fb_builder, &server, ptp_params->ptp_global_time);
+                        ptp_params->network_set_start_ptp = true;
+                        all_server_state = SERVER_WAIT;
+                    }
+                    ImGui::PopStyleColor(1);
                 }
-                ImGui::PopStyleColor(1);
             }
-
 
             if (all_server_state == SERVER_RECORDING) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                    int delay_in_second = 10;
+                    int delay_in_second = 3;
                     ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
                     std::cout << ptp_params->ptp_stop_time << std::endl;
                     fb_builder->Clear();

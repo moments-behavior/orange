@@ -80,6 +80,11 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
         camera_threads.push_back(std::thread(&acquire_frames_headless, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, encoder_setup, record_folder, ptp_params));
     }
 
+    // wait for all camera ready
+    while(ptp_params->ptp_counter!=num_cameras) {
+        usleep(10);
+    }
+
     return true;
 }
 
@@ -98,7 +103,7 @@ enum ManagerState
     MS_CAMERAOPENED,
     MS_ERROR,
     MS_STARTCAMTHREAD,
-    MS_THREADSTARTED,
+    MS_THREADREADY,
     MS_RECORDSTOPPED
 };
 
@@ -134,7 +139,7 @@ void camera_manager(int cam_count, ManagerContext* manager_context, GigEVisionDe
             case MS_STARTCAMTHREAD:
                 if (start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, recording_setup->record_folder, recording_setup->encoder_basic_setup))
                 {
-                    manager_context->state = MS_THREADSTARTED;
+                    manager_context->state = MS_THREADREADY;
                 } else {
                     manager_context->state = MS_ERROR;
                 }
@@ -286,7 +291,7 @@ int main(int argc, char *argv[])
 
         if (manager_context.state == MS_CAMERAOPENED) {
             client_send_camera_open_message(&client, fb_builder, server_connection);
-        } else if (manager_context.state == MS_THREADSTARTED)
+        } else if (manager_context.state == MS_THREADREADY)
         {
             client_send_thread_start_message(&client, fb_builder, server_connection);
         } else if (manager_context.state == MS_RECORDSTOPPED)

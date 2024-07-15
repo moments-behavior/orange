@@ -83,7 +83,9 @@ int main(int argc, char **args)
 
     ConnectedServer my_servers[2];
     my_servers[0].server_state = SERVER_DISCONNECTED;
+    my_servers[0].num_cameras = 0;
     my_servers[1].server_state = SERVER_DISCONNECTED;
+    my_servers[1].num_cameras = 0;
     strcpy(my_servers[0].name, "waffle-0");
     strcpy(my_servers[1].name, "waffle-1");
 
@@ -199,21 +201,21 @@ int main(int argc, char **args)
             //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
             // }
 
-            // bool w0_connected = false;
-            // if (my_servers[0].peer != nullptr) {
-            //     if (my_servers[0].peer->state == ENET_PEER_STATE_CONNECTED) {
-            //         w0_connected = true;
-            //     }
-            // }
+            bool w0_connected = false;
+            if (my_servers[0].peer != nullptr) {
+                if (my_servers[0].peer->state == ENET_PEER_STATE_CONNECTED) {
+                    w0_connected = true;
+                }
+            }
 
-            // if (ImGui::Button(w0_connected?"Disconnect waffle-0":"Connect to waffle-0"))
-            // {   
-            //     if (w0_connected) { 
-            //         enet_peer_disconnect(my_servers[0].peer, 0);
-            //     } else {
-            //         w0_connected = connect_peer(&server, 192, 168, 20, 60, 3333);
-            //     }
-            // }
+            if (ImGui::Button(w0_connected?"Disconnect waffle-0":"Connect to waffle-0"))
+            {   
+                if (w0_connected) { 
+                    enet_peer_disconnect(my_servers[0].peer, 0);
+                } else {
+                    my_servers[0].peer = connect_peer(&server, 192, 168, 20, 60, 3333);
+                }
+            }
 
             // if(ImGui::Button("Connect to waffle-1")) {
             //     my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);

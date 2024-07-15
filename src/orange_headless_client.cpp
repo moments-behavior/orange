@@ -187,6 +187,7 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
             delete[] ecams;
             manager_context->state = MS_RECORDSTOPPED;
         }
+        usleep(1000);
     }
 
 }
@@ -281,6 +282,7 @@ int main(int argc, char *argv[])
                             client_send_ptp_set_message(&client, fb_builder, server_connection);
                         } else if (server_signal == FetchGame::ServerControl_STOP) {
                             // stop recording
+                            printf("stop signal\n");
                             std::cout << server_control->ptp_global_time() << std::endl;
                             ptp_params->ptp_stop_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_stop_time << std::endl;
@@ -309,7 +311,7 @@ int main(int argc, char *argv[])
             manager_context.state = MS_WAITCOMMAND;
         }
     
-        usleep(1000); // sleep for 10ms
+        usleep(1000);
         last_time = current_time;
     }
 

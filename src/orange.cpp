@@ -120,6 +120,7 @@ int main(int argc, char **args)
                     auto server_control = FetchGame::GetServer(buffer_pointer);
                     
                     if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
+                        printf("\t Client bringup \n");
                         auto server_name = server_control->server_mesg()->server_name()->c_str();
                         auto server_num_cameras = server_control->server_mesg()->num_cameras();
                         ConnectedServer new_server;
@@ -129,24 +130,28 @@ int main(int argc, char **args)
                         new_server.server_state = SERVER_UP;
                         my_servers.push_back(new_server);
                     } else if (server_control->signal_type() == FetchGame::SignalType_ClientCameraOpened) {
+                        printf("\t Client camera opened \n");
                         for (int i = 0; i < my_servers.size(); i++) {
                             if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                                 my_servers[i].server_state = SERVER_OPEN_CAMERA;
                             }
                         }
                     } else if (server_control->signal_type() == FetchGame::SignalType_ClientThreadStarted) {
+                        printf("\t Client thread started \n");
                         for (int i = 0; i < my_servers.size(); i++) {
                             if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                                 my_servers[i].server_state = SERVER_THREAD_READY;
                             }
                         }
                     } else if (server_control->signal_type() == FetchGame::SignalType_ClientStartRecording) {
+                        printf("\t Client start recording \n");
                         for (int i = 0; i < my_servers.size(); i++) {
                             if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                                 my_servers[i].server_state = SERVER_RECORDING;
                             }
                         }
                     } else if (server_control->signal_type() == FetchGame::SignalType_ClientRecordDone) {
+                        printf("\t Client stop recording \n");
                         for (int i = 0; i < my_servers.size(); i++) {
                             if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                                 my_servers[i].server_state = SERVER_DONE;

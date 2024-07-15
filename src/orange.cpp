@@ -84,8 +84,10 @@ int main(int argc, char **args)
     ConnectedServer my_servers[2];
     my_servers[0].server_state = SERVER_DISCONNECTED;
     my_servers[0].num_cameras = 0;
+    my_servers[0].peer = nullptr;
     my_servers[1].server_state = SERVER_DISCONNECTED;
     my_servers[1].num_cameras = 0;
+    my_servers[1].peer = nullptr;
     strcpy(my_servers[0].name, "waffle-0");
     strcpy(my_servers[1].name, "waffle-1");
 
@@ -216,6 +218,23 @@ int main(int argc, char **args)
                     my_servers[0].peer = connect_peer(&server, 192, 168, 20, 60, 3333);
                 }
             }
+
+            bool w1_connected = false;
+            if (my_servers[1].peer != nullptr) {
+                if (my_servers[1].peer->state == ENET_PEER_STATE_CONNECTED) {
+                    w1_connected = true;
+                }
+            }
+
+            if (ImGui::Button(w1_connected?"Disconnect waffle-1":"Connect to waffle-1"))
+            {   
+                if (w1_connected) { 
+                    enet_peer_disconnect(my_servers[1].peer, 0);
+                } else {
+                    my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);
+                }
+            }
+
 
             // if(ImGui::Button("Connect to waffle-1")) {
             //     my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);

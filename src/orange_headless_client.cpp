@@ -99,13 +99,13 @@ static void interruptHandler(const int signal)
 
 enum ManagerState
 {
-    MS_IDLE,
     MS_OPENCAMERA,
     MS_CAMERAOPENED,
     MS_ERROR,
     MS_STARTCAMTHREAD,
     MS_THREADREADY,
-    MS_RECORDSTOPPED
+    MS_RECORDSTOPPED,
+    MS_WAITCOMMAND
 };
 
 struct ManagerContext
@@ -128,7 +128,7 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
     CameraEachSelect *cameras_select;
     CameraControl *camera_control = new CameraControl;
 
-    manager_context->state = MS_IDLE;
+    manager_context->state = MS_WAITCOMMAND;
     while(!manager_context->quit) {
         switch (manager_context->state) {
             case MS_OPENCAMERA:
@@ -298,12 +298,15 @@ int main(int argc, char *argv[])
 
         if (manager_context.state == MS_CAMERAOPENED) {
             client_send_camera_open_message(&client, fb_builder, server_connection);
+            manager_context.state = MS_WAITCOMMAND;
         } else if (manager_context.state == MS_THREADREADY)
         {
             client_send_thread_start_message(&client, fb_builder, server_connection);
+            manager_context.state = MS_WAITCOMMAND;
         } else if (manager_context.state == MS_RECORDSTOPPED)
         {
             client_send_record_done_message(&client, fb_builder, server_connection);
+            manager_context.state = MS_WAITCOMMAND;
         }
     
         usleep(1000); // sleep for 10ms

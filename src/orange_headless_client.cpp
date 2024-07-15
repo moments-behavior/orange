@@ -99,6 +99,7 @@ static void interruptHandler(const int signal)
 
 enum ManagerState
 {
+    MS_IDLE,
     MS_OPENCAMERA,
     MS_CAMERAOPENED,
     MS_ERROR,
@@ -127,6 +128,7 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
     CameraEachSelect *cameras_select;
     CameraControl *camera_control = new CameraControl;
 
+    manager_context->state = MS_IDLE;
     while(!manager_context->quit) {
         switch (manager_context->state) {
             case MS_OPENCAMERA:

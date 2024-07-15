@@ -24,6 +24,7 @@ static const char * ServerStateStrings[] = { "SERVER_UP", "SERVER_OPEN_CAMERA", 
 struct ConnectedServer {
     char name[80];
     enet_uint16 peer_id;
+    ENetPeer* peer;
     int num_cameras;
     ServerState server_state;
 };

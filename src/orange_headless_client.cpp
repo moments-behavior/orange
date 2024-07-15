@@ -203,12 +203,12 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, interruptHandler);
 
-    ENetPeer *server_connection;
+    // ENetPeer *server_connection;
     EnetContext client;
-    if (enet_initialize(&client, 0, 1))
+    if (enet_initialize(&client, 3333, 1))
     {
         printf("Network Initialized!\n");
-        server_connection = connect_peer(&client, 192, 168, 20, 10, 3333);
+        // server_connection = connect_peer(&client, 192, 168, 20, 10, 3333);
         // server_connection = connect_peer(&client, 127, 0, 0, 1, 3333);
     }
 
@@ -243,11 +243,8 @@ int main(int argc, char *argv[])
                 //New connection request or an existing peer accepted our connection request
                 case ENET_EVENT_TYPE_CONNECT:
                     {
-                        if (evnt.peer == server_connection)
-                        {
-                            printf("Network: Successfully connected to server! \n");
-                            client_send_bringup_message(&client, fb_builder, server_connection, cam_count);
-                        }
+                        printf("Network: Successfully connected! \n");
+                        client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count);
                     }
                     break;
 
@@ -279,7 +276,7 @@ int main(int argc, char *argv[])
                             ptp_params->ptp_global_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_global_time << std::endl;
                             ptp_params->network_set_start_ptp = true;
-                            client_send_ptp_set_message(&client, fb_builder, server_connection);
+                            client_send_ptp_set_message(&client, fb_builder, evnt.peer);
                         } else if (server_signal == FetchGame::ServerControl_STOP) {
                             // stop recording
                             printf("stop signal\n");
@@ -299,15 +296,15 @@ int main(int argc, char *argv[])
             } });
 
         if (manager_context.state == MS_CAMERAOPENED) {
-            client_send_camera_open_message(&client, fb_builder, server_connection);
+            client_send_camera_open_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
             manager_context.state = MS_WAITCOMMAND;
         } else if (manager_context.state == MS_THREADREADY)
         {
-            client_send_thread_start_message(&client, fb_builder, server_connection);
+            client_send_thread_start_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
             manager_context.state = MS_WAITCOMMAND;
         } else if (manager_context.state == MS_RECORDSTOPPED)
         {
-            client_send_record_done_message(&client, fb_builder, server_connection);
+            client_send_record_done_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
             manager_context.state = MS_WAITCOMMAND;
         }
     
@@ -319,7 +316,7 @@ int main(int argc, char *argv[])
     manager_thread->join();
 
     // Disconnect
-    enet_peer_disconnect(server_connection, 0);
+    enet_peer_disconnect(&client.m_pNetwork->peers[0], 0);
     uint8_t disconnected = false;
     /* Allow up to 3 seconds for the disconnect to succeed
      * and drop any packets received packets.
@@ -343,7 +340,7 @@ int main(int argc, char *argv[])
     // Drop connection, since disconnection didn't successed
     if (!disconnected)
     {
-        enet_peer_reset(server_connection);
+        enet_peer_reset(&client.m_pNetwork->peers[0]);
     }
     enet_host_destroy(client.m_pNetwork);
     enet_deinitialize();

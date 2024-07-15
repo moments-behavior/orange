@@ -193,6 +193,14 @@ int main(int argc, char **args)
             //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
             // }
 
+            if(ImGui::Button("Connect to waffle-0")) {
+                my_servers[0].peer = connect_peer(&server, 192, 168, 20, 60, 3333);
+            }
+
+            if(ImGui::Button("Connect to waffle-1")) {
+                my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);
+            }
+
             if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
                 ImGui::TableNextRow();

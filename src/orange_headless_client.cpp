@@ -244,7 +244,7 @@ int main(int argc, char *argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                     {
                         printf("Network: Successfully connected! \n");
-                        client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count);
+                        // client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count);
                     }
                     break;
 

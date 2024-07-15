@@ -81,7 +81,13 @@ int main(int argc, char **args)
         printf("Server Initiated\n");
     }
 
-    std::vector<ConnectedServer> my_servers;
+    ConnectedServer my_servers[2];
+    my_servers[0].server_state = SERVER_DISCONNECTED;
+    my_servers[1].server_state = SERVER_DISCONNECTED;
+    strcpy(my_servers[0].name, "waffle-0");
+    strcpy(my_servers[1].name, "waffle-1");
+
+
     CBOTSignalBuilder cbot_signal_builder;
     cbot_signal_builder = {.builder = fb_builder, 
         .server = &server,
@@ -114,73 +120,73 @@ int main(int argc, char **args)
 
             case ENET_EVENT_TYPE_RECEIVE:
                 {
-                    // put server into a data structure
-                    printf("\t Client %d says: \n", evnt.peer->incomingPeerID);
-                    uint8_t* buffer_pointer = evnt.packet->data;
-                    auto server_control = FetchGame::GetServer(buffer_pointer);
+                    // // put server into a data structure
+                    // printf("\t Client %d says: \n", evnt.peer->incomingPeerID);
+                    // uint8_t* buffer_pointer = evnt.packet->data;
+                    // auto server_control = FetchGame::GetServer(buffer_pointer);
                     
-                    if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
-                        printf("\t Client bringup \n");
-                        auto server_name = server_control->server_mesg()->server_name()->c_str();
-                        auto server_num_cameras = server_control->server_mesg()->num_cameras();
-                        ConnectedServer new_server;
-                        strcpy(new_server.name, server_name); 
-                        new_server.num_cameras = server_num_cameras;
-                        new_server.peer_id = evnt.peer->incomingPeerID;
-                        new_server.server_state = SERVER_UP;
-                        my_servers.push_back(new_server);
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientCameraOpened) {
-                        printf("\t Client camera opened \n");
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_OPEN_CAMERA;
-                            }
-                        }
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientThreadStarted) {
-                        printf("\t Client thread started \n");
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_THREAD_READY;
-                            }
-                        }
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientStartRecording) {
-                        printf("\t Client start recording \n");
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_RECORDING;
-                            }
-                        }
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientRecordDone) {
-                        printf("\t Client stop recording \n");
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_DONE;
-                            }
-                        }   
-                    } else if (server_control->signal_type() == FetchGame::SignalType_CBOT) {
-                        cbot_signal_builder.cbot_connection = evnt.peer;
-                        std::cout << "cbot connected" << std::endl;
-                    }
+                    // if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
+                    //     printf("\t Client bringup \n");
+                    //     auto server_name = server_control->server_mesg()->server_name()->c_str();
+                    //     auto server_num_cameras = server_control->server_mesg()->num_cameras();
+                    //     ConnectedServer new_server;
+                    //     strcpy(new_server.name, server_name); 
+                    //     new_server.num_cameras = server_num_cameras;
+                    //     new_server.peer_id = evnt.peer->incomingPeerID;
+                    //     new_server.server_state = SERVER_UP;
+                    //     // my_servers.push_back(new_server);
+                    // } else if (server_control->signal_type() == FetchGame::SignalType_ClientCameraOpened) {
+                    //     printf("\t Client camera opened \n");
+                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                    //             my_servers[i].server_state = SERVER_OPEN_CAMERA;
+                    //         }
+                    //     }
+                    // } else if (server_control->signal_type() == FetchGame::SignalType_ClientThreadStarted) {
+                    //     printf("\t Client thread started \n");
+                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                    //             my_servers[i].server_state = SERVER_THREAD_READY;
+                    //         }
+                    //     }
+                    // } else if (server_control->signal_type() == FetchGame::SignalType_ClientStartRecording) {
+                    //     printf("\t Client start recording \n");
+                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                    //             my_servers[i].server_state = SERVER_RECORDING;
+                    //         }
+                    //     }
+                    // } else if (server_control->signal_type() == FetchGame::SignalType_ClientRecordDone) {
+                    //     printf("\t Client stop recording \n");
+                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                    //             my_servers[i].server_state = SERVER_DONE;
+                    //         }
+                    //     }   
+                    // } else if (server_control->signal_type() == FetchGame::SignalType_CBOT) {
+                    //     cbot_signal_builder.cbot_connection = evnt.peer;
+                    //     std::cout << "cbot connected" << std::endl;
+                    // }
 
-                    if (my_servers.size() == num_servers) {
-                        if (my_servers[0].server_state == my_servers[1].server_state) {
-                            all_server_state = my_servers[0].server_state;
-                        }
-                    }
-                    enet_packet_destroy(evnt.packet);
+                    // if (my_servers.size() == num_servers) {
+                    //     if (my_servers[0].server_state == my_servers[1].server_state) {
+                    //         all_server_state = my_servers[0].server_state;
+                    //     }
+                    // }
+                    // enet_packet_destroy(evnt.packet);
                 }
                 break;
 
             case ENET_EVENT_TYPE_DISCONNECT:
                 printf("- Client %d has disconnected.\n", evnt.peer->incomingPeerID);
-                for (int i = 0; i < my_servers.size(); i++) {
-                    if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                        my_servers.erase(my_servers.begin() + i);
-                    }
-                } 
-                if (my_servers.size() == 0) {
-                    all_server_state = SERVER_DISCONNECTED;
-                }
+                // for (int i = 0; i < my_servers.size(); i++) {
+                //     if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
+                //         my_servers.erase(my_servers.begin() + i);
+                //     }
+                // } 
+                // if (my_servers.size() == 0) {
+                //     all_server_state = SERVER_DISCONNECTED;
+                // }
                 break;
             }
         });
@@ -193,13 +199,25 @@ int main(int argc, char **args)
             //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
             // }
 
-            if(ImGui::Button("Connect to waffle-0")) {
-                my_servers[0].peer = connect_peer(&server, 192, 168, 20, 60, 3333);
-            }
+            // bool w0_connected = false;
+            // if (my_servers[0].peer != nullptr) {
+            //     if (my_servers[0].peer->state == ENET_PEER_STATE_CONNECTED) {
+            //         w0_connected = true;
+            //     }
+            // }
 
-            if(ImGui::Button("Connect to waffle-1")) {
-                my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);
-            }
+            // if (ImGui::Button(w0_connected?"Disconnect waffle-0":"Connect to waffle-0"))
+            // {   
+            //     if (w0_connected) { 
+            //         enet_peer_disconnect(my_servers[0].peer, 0);
+            //     } else {
+            //         w0_connected = connect_peer(&server, 192, 168, 20, 60, 3333);
+            //     }
+            // }
+
+            // if(ImGui::Button("Connect to waffle-1")) {
+            //     my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);
+            // }
 
             if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -221,7 +239,7 @@ int main(int argc, char **args)
 
             if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
-                for (int i = 0; i < my_servers.size(); i++)
+                for (int i = 0; i < 2; i++)
                 {
                     sprintf(temp_string, "##servers%d", i);
                     ImGui::TableNextRow();
@@ -380,7 +398,7 @@ int main(int argc, char **args)
             }
 
 
-            if (my_servers.size() > 0) {
+            // if (my_servers.size() > 0) {
                 if(ImGui::Button("Clients close")) {
                     // broadcast data
                     fb_builder->Clear();
@@ -393,7 +411,7 @@ int main(int argc, char **args)
                     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                 }
-            } 
+            // } 
 
 
 

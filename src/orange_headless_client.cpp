@@ -113,8 +113,12 @@ struct ManagerContext
     bool quit;
 };
 
+struct RecordingContext {
+    std::string record_folder;
+    std::string encoder_basic_setup;
+};
 
-void camera_manager(int cam_count, ManagerContext* manager_context, GigEVisionDeviceInfo* device_info, std::string* config_folder, RecordingContext* recording_setup, PTPParams *ptp_params) 
+void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEVisionDeviceInfo* device_info, std::string* config_folder, RecordingContext* recording_setup, PTPParams *ptp_params) 
 {
     // TODO: selecting cameras 
     CameraEmergent *ecams;
@@ -178,16 +182,14 @@ void camera_manager(int cam_count, ManagerContext* manager_context, GigEVisionDe
                 check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
                 close_camera(&ecams[i].camera);
             }
+            delete[] ecams;
             manager_context->state = MS_RECORDSTOPPED;
         }
     }
 
 }
 
-struct RecordingContext {
-    std::string record_folder;
-    std::string encoder_basic_setup;
-};
+
 
 int main(int argc, char *argv[])
 {
@@ -210,7 +212,7 @@ int main(int argc, char *argv[])
     f32 last_time = tick();
     f32 current_time = tick();
 
-    int max_cameras = 20;
+    const int max_cameras = 20;
     int cam_count;
     GigEVisionDeviceInfo unsorted_device_info[max_cameras];
     cam_count = scan_cameras(max_cameras, unsorted_device_info);
@@ -223,6 +225,9 @@ int main(int argc, char *argv[])
     RecordingContext recording_setup;
     ManagerContext manager_context;
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false, false};
+
+    std::thread* manager_thread = new std::thread(&create_camera_manager, cam_count, &manager_context, device_info, &config_folder, &recording_setup, ptp_params);
+
 
     while (!quit_server)
     {
@@ -303,6 +308,9 @@ int main(int argc, char *argv[])
         last_time = current_time;
     }
 
+    manager_context.quit = true;
+    manager_thread->join();
+
     // Disconnect
     enet_peer_disconnect(server_connection, 0);
     uint8_t disconnected = false;
@@ -323,12 +331,14 @@ int main(int argc, char *argv[])
             break;
         }
     }
+    
+
     // Drop connection, since disconnection didn't successed
     if (!disconnected)
     {
         enet_peer_reset(server_connection);
     }
     enet_host_destroy(client.m_pNetwork);
-    quit_process();
+    enet_deinitialize();
     return 0;
 }

@@ -23,11 +23,37 @@ static const char * ServerStateStrings[] = { "SERVER_UP", "SERVER_OPEN_CAMERA", 
 
 struct ConnectedServer {
     char name[80];
-    enet_uint16 peer_id;
+    uint8_t ip_add[4];
+    uint16_t port;
     ENetPeer* peer;
     int num_cameras;
-    ServerState server_state;
+    FetchGame::ManagerState server_state;
 };
+
+
+void intialize_servers(ConnectedServer* my_servers)
+{
+    my_servers[0].server_state = FetchGame::ManagerState_WAITCOMMAND;
+    my_servers[0].num_cameras = 0;
+    my_servers[0].peer = nullptr;
+    my_servers[0].ip_add[0] = 192;
+    my_servers[0].ip_add[1] = 168;
+    my_servers[0].ip_add[2] = 20;
+    my_servers[0].ip_add[3] = 60;
+    my_servers[0].port = 3333;
+    strcpy(my_servers[0].name, "waffle-0");
+
+
+    my_servers[1].server_state = FetchGame::ManagerState_WAITCOMMAND;
+    my_servers[1].num_cameras = 0;
+    my_servers[1].peer = nullptr;
+    my_servers[1].ip_add[0] = 192;
+    my_servers[1].ip_add[1] = 168;
+    my_servers[1].ip_add[2] = 20;
+    my_servers[1].ip_add[3] = 61;
+    my_servers[1].port = 3333;
+    strcpy(my_servers[1].name, "waffle-1");
+}
 
 std::vector<std::string> string_split(std::string s, std::string delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();

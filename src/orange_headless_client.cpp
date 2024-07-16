@@ -97,20 +97,9 @@ static void interruptHandler(const int signal)
     quit_server = true;
 }
 
-enum ManagerState
-{
-    MS_OPENCAMERA,
-    MS_CAMERAOPENED,
-    MS_ERROR,
-    MS_STARTCAMTHREAD,
-    MS_THREADREADY,
-    MS_RECORDSTOPPED,
-    MS_WAITCOMMAND
-};
-
 struct ManagerContext
 {
-    ManagerState state;
+    FetchGame::ManagerState state;
     bool quit;
 };
 
@@ -128,26 +117,26 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
     CameraEachSelect *cameras_select;
     CameraControl *camera_control = new CameraControl;
 
-    manager_context->state = MS_WAITCOMMAND;
+    manager_context->state = FetchGame::ManagerState_WAITCOMMAND;
     while(!manager_context->quit) {
         switch (manager_context->state) {
-            case MS_OPENCAMERA:
+            case FetchGame::ManagerState_OPENCAMERA:
                 ecams = new CameraEmergent[cam_count];
                 cameras_params = new CameraParams[cam_count];
                 cameras_select = new CameraEachSelect[cam_count];
                 if (open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, *config_folder)) 
                 {
-                    manager_context->state = MS_CAMERAOPENED;
+                    manager_context->state = FetchGame::ManagerState_CAMERAOPENED;
                 } else {
-                    manager_context->state = MS_ERROR;
+                    manager_context->state = FetchGame::ManagerState_ERROR;
                 }
                 break;
-            case MS_STARTCAMTHREAD:
+            case FetchGame::ManagerState_STARTCAMTHREAD:
                 if (start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, recording_setup->record_folder, recording_setup->encoder_basic_setup))
                 {
-                    manager_context->state = MS_THREADREADY;
+                    manager_context->state = FetchGame::ManagerState_THREADREADY;
                 } else {
-                    manager_context->state = MS_ERROR;
+                    manager_context->state = FetchGame::ManagerState_ERROR;
                 }
                 break;                
         }
@@ -185,13 +174,12 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
                 close_camera(&ecams[i].camera);
             }
             delete[] ecams;
-            manager_context->state = MS_RECORDSTOPPED;
+            manager_context->state = FetchGame::ManagerState_RECORDSTOPPED;
         }
         usleep(1000);
     }
 
 }
-
 
 
 int main(int argc, char *argv[])
@@ -203,13 +191,10 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, interruptHandler);
 
-    // ENetPeer *server_connection;
     EnetContext client;
     if (enet_initialize(&client, 3333, 1))
     {
         printf("Network Initialized!\n");
-        // server_connection = connect_peer(&client, 192, 168, 20, 10, 3333);
-        // server_connection = connect_peer(&client, 127, 0, 0, 1, 3333);
     }
 
     f32 last_time = tick();
@@ -244,7 +229,7 @@ int main(int argc, char *argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                     {
                         printf("Network: Successfully connected! \n");
-                        // client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count);
+                        client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count);
                     }
                     break;
 
@@ -262,13 +247,13 @@ int main(int argc, char *argv[])
 
                         if (server_signal == FetchGame::ServerControl_OPEN) {
                             config_folder = server_control->config_folder()->c_str();
-                            manager_context.state = MS_OPENCAMERA;
+                            manager_context.state = FetchGame::ManagerState_OPENCAMERA;
                         }
                         else if (server_signal == FetchGame::ServerControl_START)
                         {
                             recording_setup.record_folder = server_control->record_folder()->c_str();
                             recording_setup.encoder_basic_setup = server_control->encoder_setup()->c_str();
-                            manager_context.state = MS_STARTCAMTHREAD;
+                            manager_context.state = FetchGame::ManagerState_STARTCAMTHREAD;
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
                             quit_server = true;
@@ -291,21 +276,21 @@ int main(int argc, char *argv[])
 
                 //Server has disconnected
                 case ENET_EVENT_TYPE_DISCONNECT:
-                    printf("Network: Server has disconnected!");
+                    printf("Network: Server has disconnected!\n");
                     break;
             } });
 
-        if (manager_context.state == MS_CAMERAOPENED) {
+        if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {
             client_send_camera_open_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
-            manager_context.state = MS_WAITCOMMAND;
-        } else if (manager_context.state == MS_THREADREADY)
+            manager_context.state = FetchGame::ManagerState_WAITCOMMAND;
+        } else if (manager_context.state == FetchGame::ManagerState_THREADREADY)
         {
             client_send_thread_start_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
-            manager_context.state = MS_WAITCOMMAND;
-        } else if (manager_context.state == MS_RECORDSTOPPED)
+            manager_context.state = FetchGame::ManagerState_WAITCOMMAND;
+        } else if (manager_context.state == FetchGame::ManagerState_RECORDSTOPPED)
         {
             client_send_record_done_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
-            manager_context.state = MS_WAITCOMMAND;
+            manager_context.state = FetchGame::ManagerState_WAITCOMMAND;
         }
     
         usleep(1000);

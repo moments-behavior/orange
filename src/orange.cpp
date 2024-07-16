@@ -287,7 +287,7 @@ int main(int argc, char **args)
                     if (ImGui::Button("Start Recording")) {
                         // get the host ready, and then set global ptp time to start recording  
                         unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                        int delay_in_second = 6;
+                        int delay_in_second = 3;
                         ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
                         host_broadcast_set_start_ptp(fb_builder, &server, ptp_params->ptp_global_time);
                         ptp_params->network_set_start_ptp = true;

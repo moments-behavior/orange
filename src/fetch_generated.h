@@ -108,6 +108,51 @@ inline const char *EnumNameSignalType(SignalType e) {
   return EnumNamesSignalType()[index];
 }
 
+enum ManagerState : int8_t {
+  ManagerState_OPENCAMERA = 0,
+  ManagerState_CAMERAOPENED = 1,
+  ManagerState_ERROR = 2,
+  ManagerState_STARTCAMTHREAD = 3,
+  ManagerState_THREADREADY = 4,
+  ManagerState_RECORDSTOPPED = 5,
+  ManagerState_WAITCOMMAND = 6,
+  ManagerState_MIN = ManagerState_OPENCAMERA,
+  ManagerState_MAX = ManagerState_WAITCOMMAND
+};
+
+inline const ManagerState (&EnumValuesManagerState())[7] {
+  static const ManagerState values[] = {
+    ManagerState_OPENCAMERA,
+    ManagerState_CAMERAOPENED,
+    ManagerState_ERROR,
+    ManagerState_STARTCAMTHREAD,
+    ManagerState_THREADREADY,
+    ManagerState_RECORDSTOPPED,
+    ManagerState_WAITCOMMAND
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesManagerState() {
+  static const char * const names[8] = {
+    "OPENCAMERA",
+    "CAMERAOPENED",
+    "ERROR",
+    "STARTCAMTHREAD",
+    "THREADREADY",
+    "RECORDSTOPPED",
+    "WAITCOMMAND",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameManagerState(ManagerState e) {
+  if (::flatbuffers::IsOutRange(e, ManagerState_OPENCAMERA, ManagerState_WAITCOMMAND)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesManagerState()[index];
+}
+
 struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef bring_up_messageBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -180,7 +225,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CONFIG_FOLDER = 10,
     VT_RECORD_FOLDER = 12,
     VT_ENCODER_SETUP = 14,
-    VT_PTP_GLOBAL_TIME = 16
+    VT_PTP_GLOBAL_TIME = 16,
+    VT_SERVER_STATE = 18
   };
   FetchGame::SignalType signal_type() const {
     return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 0));
@@ -203,6 +249,9 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   uint64_t ptp_global_time() const {
     return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
   }
+  FetchGame::ManagerState server_state() const {
+    return static_cast<FetchGame::ManagerState>(GetField<int8_t>(VT_SERVER_STATE, 6));
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_SIGNAL_TYPE, 1) &&
@@ -216,6 +265,7 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyOffset(verifier, VT_ENCODER_SETUP) &&
            verifier.VerifyString(encoder_setup()) &&
            VerifyField<uint64_t>(verifier, VT_PTP_GLOBAL_TIME, 8) &&
+           VerifyField<int8_t>(verifier, VT_SERVER_STATE, 1) &&
            verifier.EndTable();
   }
 };
@@ -245,6 +295,9 @@ struct ServerBuilder {
   void add_ptp_global_time(uint64_t ptp_global_time) {
     fbb_.AddElement<uint64_t>(Server::VT_PTP_GLOBAL_TIME, ptp_global_time, 0);
   }
+  void add_server_state(FetchGame::ManagerState server_state) {
+    fbb_.AddElement<int8_t>(Server::VT_SERVER_STATE, static_cast<int8_t>(server_state), 6);
+  }
   explicit ServerBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -264,13 +317,15 @@ inline ::flatbuffers::Offset<Server> CreateServer(
     ::flatbuffers::Offset<::flatbuffers::String> config_folder = 0,
     ::flatbuffers::Offset<::flatbuffers::String> record_folder = 0,
     ::flatbuffers::Offset<::flatbuffers::String> encoder_setup = 0,
-    uint64_t ptp_global_time = 0) {
+    uint64_t ptp_global_time = 0,
+    FetchGame::ManagerState server_state = FetchGame::ManagerState_WAITCOMMAND) {
   ServerBuilder builder_(_fbb);
   builder_.add_ptp_global_time(ptp_global_time);
   builder_.add_encoder_setup(encoder_setup);
   builder_.add_record_folder(record_folder);
   builder_.add_config_folder(config_folder);
   builder_.add_server_mesg(server_mesg);
+  builder_.add_server_state(server_state);
   builder_.add_control(control);
   builder_.add_signal_type(signal_type);
   return builder_.Finish();
@@ -284,7 +339,8 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
     const char *config_folder = nullptr,
     const char *record_folder = nullptr,
     const char *encoder_setup = nullptr,
-    uint64_t ptp_global_time = 0) {
+    uint64_t ptp_global_time = 0,
+    FetchGame::ManagerState server_state = FetchGame::ManagerState_WAITCOMMAND) {
   auto config_folder__ = config_folder ? _fbb.CreateString(config_folder) : 0;
   auto record_folder__ = record_folder ? _fbb.CreateString(record_folder) : 0;
   auto encoder_setup__ = encoder_setup ? _fbb.CreateString(encoder_setup) : 0;
@@ -296,7 +352,8 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
       config_folder__,
       record_folder__,
       encoder_setup__,
-      ptp_global_time);
+      ptp_global_time,
+      server_state);
 }
 
 inline const FetchGame::Server *GetServer(const void *buf) {

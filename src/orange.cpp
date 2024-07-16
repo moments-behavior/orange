@@ -81,16 +81,8 @@ int main(int argc, char **args)
         printf("Server Initiated\n");
     }
 
-    ConnectedServer my_servers[2];
-    my_servers[0].server_state = SERVER_DISCONNECTED;
-    my_servers[0].num_cameras = 0;
-    my_servers[0].peer = nullptr;
-    my_servers[1].server_state = SERVER_DISCONNECTED;
-    my_servers[1].num_cameras = 0;
-    my_servers[1].peer = nullptr;
-    strcpy(my_servers[0].name, "waffle-0");
-    strcpy(my_servers[1].name, "waffle-1");
-
+    ConnectedServer my_servers[2] ;
+    intialize_servers(my_servers);
 
     CBOTSignalBuilder cbot_signal_builder;
     cbot_signal_builder = {.builder = fb_builder, 
@@ -124,45 +116,44 @@ int main(int argc, char **args)
 
             case ENET_EVENT_TYPE_RECEIVE:
                 {
-                    // // put server into a data structure
-                    // printf("\t Client %d says: \n", evnt.peer->incomingPeerID);
-                    // uint8_t* buffer_pointer = evnt.packet->data;
-                    // auto server_control = FetchGame::GetServer(buffer_pointer);
+                    uint8_t* buffer_pointer = evnt.packet->data;
+                    auto server_control = FetchGame::GetServer(buffer_pointer);
                     
-                    // if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
-                    //     printf("\t Client bringup \n");
-                    //     auto server_name = server_control->server_mesg()->server_name()->c_str();
-                    //     auto server_num_cameras = server_control->server_mesg()->num_cameras();
-                    //     ConnectedServer new_server;
-                    //     strcpy(new_server.name, server_name); 
-                    //     new_server.num_cameras = server_num_cameras;
-                    //     new_server.peer_id = evnt.peer->incomingPeerID;
-                    //     new_server.server_state = SERVER_UP;
-                    //     // my_servers.push_back(new_server);
-                    // } else if (server_control->signal_type() == FetchGame::SignalType_ClientCameraOpened) {
+                    if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
+                        for (int i = 0; i < 2; i++) {
+                            if ( my_servers[i].peer ==evnt.peer) {
+                                auto server_name = server_control->server_mesg()->server_name()->c_str();
+                                auto server_num_cameras = server_control->server_mesg()->num_cameras();
+                                auto server_state = server_control->server_state();
+                                my_servers[i].num_cameras = server_num_cameras;
+                                my_servers[i].server_state = server_state;
+                            }                           
+                        }                        
+                    }
+                    // else if (server_control->signal_type() == FetchGame::SignalType_ClientCameraOpened) {
                     //     printf("\t Client camera opened \n");
-                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //     for (int i = 0; i < 2; i++) {
                     //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                     //             my_servers[i].server_state = SERVER_OPEN_CAMERA;
                     //         }
                     //     }
                     // } else if (server_control->signal_type() == FetchGame::SignalType_ClientThreadStarted) {
                     //     printf("\t Client thread started \n");
-                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //     for (int i = 0; i < 2; i++) {
                     //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                     //             my_servers[i].server_state = SERVER_THREAD_READY;
                     //         }
                     //     }
                     // } else if (server_control->signal_type() == FetchGame::SignalType_ClientStartRecording) {
                     //     printf("\t Client start recording \n");
-                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //     for (int i = 0; i < 2; i++) {
                     //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                     //             my_servers[i].server_state = SERVER_RECORDING;
                     //         }
                     //     }
                     // } else if (server_control->signal_type() == FetchGame::SignalType_ClientRecordDone) {
                     //     printf("\t Client stop recording \n");
-                    //     for (int i = 0; i < my_servers.size(); i++) {
+                    //     for (int i = 0; i < 2; i++) {
                     //         if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
                     //             my_servers[i].server_state = SERVER_DONE;
                     //         }
@@ -177,7 +168,7 @@ int main(int argc, char **args)
                     //         all_server_state = my_servers[0].server_state;
                     //     }
                     // }
-                    // enet_packet_destroy(evnt.packet);
+                    enet_packet_destroy(evnt.packet);
                 }
                 break;
 
@@ -203,39 +194,37 @@ int main(int argc, char **args)
             //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
             // }
 
-            bool w0_connected = false;
-            if (my_servers[0].peer != nullptr) {
-                if (my_servers[0].peer->state == ENET_PEER_STATE_CONNECTED) {
-                    w0_connected = true;
-                }
-            }
+            for (int i=0; i< 2; i++) {
 
-            if (ImGui::Button(w0_connected?"Disconnect waffle-0":"Connect to waffle-0"))
-            {   
-                if (w0_connected) { 
-                    enet_peer_disconnect(my_servers[0].peer, 0);
+                bool waffle_connected = false;
+                if (my_servers[i].peer != nullptr) {
+                    if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED) {
+                        waffle_connected = true;
+                    }
+                }
+
+                if (waffle_connected) {
+                    sprintf(temp_string, "Disconnect waffle-%d", i);
                 } else {
-                    my_servers[0].peer = connect_peer(&server, 192, 168, 20, 60, 3333);
+                    sprintf(temp_string, "Connect to waffle-%d", i);
                 }
-            }
 
-            bool w1_connected = false;
-            if (my_servers[1].peer != nullptr) {
-                if (my_servers[1].peer->state == ENET_PEER_STATE_CONNECTED) {
-                    w1_connected = true;
+                if (ImGui::Button(temp_string))
+                {   
+                    if (waffle_connected) { 
+                        enet_peer_disconnect(my_servers[i].peer, 0);
+                    } else {
+                        my_servers[0].peer = connect_peer(&server, 
+                            my_servers[i].ip_add[0], 
+                            my_servers[i].ip_add[1], 
+                            my_servers[i].ip_add[2], 
+                            my_servers[i].ip_add[3],
+                            my_servers[i].port);
+                    }
                 }
+
             }
-
-            if (ImGui::Button(w1_connected?"Disconnect waffle-1":"Connect to waffle-1"))
-            {   
-                if (w1_connected) { 
-                    enet_peer_disconnect(my_servers[1].peer, 0);
-                } else {
-                    my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);
-                }
-            }
-
-
+           
             // if(ImGui::Button("Connect to waffle-1")) {
             //     my_servers[1].peer = connect_peer(&server, 192, 168, 20, 61, 3333);
             // }
@@ -269,7 +258,7 @@ int main(int argc, char **args)
                     ImGui::TableNextColumn();
                     ImGui::Text(std::to_string(my_servers[i].num_cameras).c_str());
                     ImGui::TableNextColumn();
-                    ImGui::Text(ServerStateStrings[my_servers[i].server_state]);
+                    ImGui::Text(FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
                 }
                 ImGui::EndTable();
             }

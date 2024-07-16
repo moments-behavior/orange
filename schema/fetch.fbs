@@ -19,6 +19,16 @@ enum SignalType: byte {
     CBOT_TRIAL_TRIGGER = 6
 }
 
+enum ManagerState: byte {
+    OPENCAMERA,
+    CAMERAOPENED,
+    ERROR,
+    STARTCAMTHREAD,
+    THREADREADY,
+    RECORDSTOPPED,
+    WAITCOMMAND
+}
+
 table bring_up_message {
     server_name:string;
     num_cameras:short;
@@ -32,6 +42,7 @@ table Server {
     record_folder:string;
     encoder_setup:string;
     ptp_global_time:ulong;
+    server_state:ManagerState = WAITCOMMAND;
 }
 
 root_type Server;

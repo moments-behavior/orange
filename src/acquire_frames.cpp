@@ -124,8 +124,14 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     GPUVideoEncoder* gpu_encoder;
     
     if (camera_control->record_video) {
-        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name);
+        bool encoder_ready_signal = false;
+        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name, &encoder_ready_signal);
         gpu_encoder->StartThread();
+        
+        // wait till encoder is ready
+        while(!encoder_ready_signal) {
+            usleep(10);
+        }
     }
 
     if (camera_control->sync_camera)

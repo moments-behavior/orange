@@ -1,32 +1,32 @@
 namespace FetchGame;
 
 enum ServerControl : byte {
-    IDEL = 0,
-    OPEN = 1,
-    START = 2,
-    SETPTP = 3,
-    STOP = 4,
-    QUIT = 5
+    IDLE,
+    OPENCAMERA,
+    STARTTHREAD,
+    STARTRECORDING,
+    STOPRECORDING,
+    QUIT
 }
 
 enum SignalType: byte {
-    ClientBringup = 0,
-    ClientCameraOpened = 1,
-    ClientThreadStarted = 2,
-    ClientStartRecording = 3,
-    ClientRecordDone = 4,
-    CBOT = 5,
-    CBOT_TRIAL_TRIGGER = 6
+    ClientBringup,
+    ClientStateUpdate,
+    CBOT,
+    CBOT_TRIAL_TRIGGER
 }
 
 enum ManagerState: byte {
+    IDLE,
     OPENCAMERA,
     CAMERAOPENED,
     ERROR,
     STARTCAMTHREAD,
     THREADREADY,
     RECORDSTOPPED,
-    WAITCOMMAND
+    WAITTHREAD,
+    WAITSTART,
+    WAITSTOP
 }
 
 table bring_up_message {
@@ -36,13 +36,13 @@ table bring_up_message {
 
 table Server {
     signal_type:SignalType = ClientBringup;
-    control:ServerControl = IDEL;
+    control:ServerControl = IDLE;
     server_mesg:bring_up_message;
     config_folder:string;
     record_folder:string;
     encoder_setup:string;
     ptp_global_time:ulong;
-    server_state:ManagerState = WAITCOMMAND;
+    server_state:ManagerState = IDLE;
 }
 
 root_type Server;

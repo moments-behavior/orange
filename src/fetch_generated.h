@@ -22,23 +22,23 @@ struct Server;
 struct ServerBuilder;
 
 enum ServerControl : int8_t {
-  ServerControl_IDEL = 0,
-  ServerControl_OPEN = 1,
-  ServerControl_START = 2,
-  ServerControl_SETPTP = 3,
-  ServerControl_STOP = 4,
+  ServerControl_IDLE = 0,
+  ServerControl_OPENCAMERA = 1,
+  ServerControl_STARTTHREAD = 2,
+  ServerControl_STARTRECORDING = 3,
+  ServerControl_STOPRECORDING = 4,
   ServerControl_QUIT = 5,
-  ServerControl_MIN = ServerControl_IDEL,
+  ServerControl_MIN = ServerControl_IDLE,
   ServerControl_MAX = ServerControl_QUIT
 };
 
 inline const ServerControl (&EnumValuesServerControl())[6] {
   static const ServerControl values[] = {
-    ServerControl_IDEL,
-    ServerControl_OPEN,
-    ServerControl_START,
-    ServerControl_SETPTP,
-    ServerControl_STOP,
+    ServerControl_IDLE,
+    ServerControl_OPENCAMERA,
+    ServerControl_STARTTHREAD,
+    ServerControl_STARTRECORDING,
+    ServerControl_STOPRECORDING,
     ServerControl_QUIT
   };
   return values;
@@ -46,11 +46,11 @@ inline const ServerControl (&EnumValuesServerControl())[6] {
 
 inline const char * const *EnumNamesServerControl() {
   static const char * const names[7] = {
-    "IDEL",
-    "OPEN",
-    "START",
-    "SETPTP",
-    "STOP",
+    "IDLE",
+    "OPENCAMERA",
+    "STARTTHREAD",
+    "STARTRECORDING",
+    "STOPRECORDING",
     "QUIT",
     nullptr
   };
@@ -58,30 +58,24 @@ inline const char * const *EnumNamesServerControl() {
 }
 
 inline const char *EnumNameServerControl(ServerControl e) {
-  if (::flatbuffers::IsOutRange(e, ServerControl_IDEL, ServerControl_QUIT)) return "";
+  if (::flatbuffers::IsOutRange(e, ServerControl_IDLE, ServerControl_QUIT)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesServerControl()[index];
 }
 
 enum SignalType : int8_t {
   SignalType_ClientBringup = 0,
-  SignalType_ClientCameraOpened = 1,
-  SignalType_ClientThreadStarted = 2,
-  SignalType_ClientStartRecording = 3,
-  SignalType_ClientRecordDone = 4,
-  SignalType_CBOT = 5,
-  SignalType_CBOT_TRIAL_TRIGGER = 6,
+  SignalType_ClientStateUpdate = 1,
+  SignalType_CBOT = 2,
+  SignalType_CBOT_TRIAL_TRIGGER = 3,
   SignalType_MIN = SignalType_ClientBringup,
   SignalType_MAX = SignalType_CBOT_TRIAL_TRIGGER
 };
 
-inline const SignalType (&EnumValuesSignalType())[7] {
+inline const SignalType (&EnumValuesSignalType())[4] {
   static const SignalType values[] = {
     SignalType_ClientBringup,
-    SignalType_ClientCameraOpened,
-    SignalType_ClientThreadStarted,
-    SignalType_ClientStartRecording,
-    SignalType_ClientRecordDone,
+    SignalType_ClientStateUpdate,
     SignalType_CBOT,
     SignalType_CBOT_TRIAL_TRIGGER
   };
@@ -89,12 +83,9 @@ inline const SignalType (&EnumValuesSignalType())[7] {
 }
 
 inline const char * const *EnumNamesSignalType() {
-  static const char * const names[8] = {
+  static const char * const names[5] = {
     "ClientBringup",
-    "ClientCameraOpened",
-    "ClientThreadStarted",
-    "ClientStartRecording",
-    "ClientRecordDone",
+    "ClientStateUpdate",
     "CBOT",
     "CBOT_TRIAL_TRIGGER",
     nullptr
@@ -109,46 +100,55 @@ inline const char *EnumNameSignalType(SignalType e) {
 }
 
 enum ManagerState : int8_t {
-  ManagerState_OPENCAMERA = 0,
-  ManagerState_CAMERAOPENED = 1,
-  ManagerState_ERROR = 2,
-  ManagerState_STARTCAMTHREAD = 3,
-  ManagerState_THREADREADY = 4,
-  ManagerState_RECORDSTOPPED = 5,
-  ManagerState_WAITCOMMAND = 6,
-  ManagerState_MIN = ManagerState_OPENCAMERA,
-  ManagerState_MAX = ManagerState_WAITCOMMAND
+  ManagerState_IDLE = 0,
+  ManagerState_OPENCAMERA = 1,
+  ManagerState_CAMERAOPENED = 2,
+  ManagerState_ERROR = 3,
+  ManagerState_STARTCAMTHREAD = 4,
+  ManagerState_THREADREADY = 5,
+  ManagerState_RECORDSTOPPED = 6,
+  ManagerState_WAITTHREAD = 7,
+  ManagerState_WAITSTART = 8,
+  ManagerState_WAITSTOP = 9,
+  ManagerState_MIN = ManagerState_IDLE,
+  ManagerState_MAX = ManagerState_WAITSTOP
 };
 
-inline const ManagerState (&EnumValuesManagerState())[7] {
+inline const ManagerState (&EnumValuesManagerState())[10] {
   static const ManagerState values[] = {
+    ManagerState_IDLE,
     ManagerState_OPENCAMERA,
     ManagerState_CAMERAOPENED,
     ManagerState_ERROR,
     ManagerState_STARTCAMTHREAD,
     ManagerState_THREADREADY,
     ManagerState_RECORDSTOPPED,
-    ManagerState_WAITCOMMAND
+    ManagerState_WAITTHREAD,
+    ManagerState_WAITSTART,
+    ManagerState_WAITSTOP
   };
   return values;
 }
 
 inline const char * const *EnumNamesManagerState() {
-  static const char * const names[8] = {
+  static const char * const names[11] = {
+    "IDLE",
     "OPENCAMERA",
     "CAMERAOPENED",
     "ERROR",
     "STARTCAMTHREAD",
     "THREADREADY",
     "RECORDSTOPPED",
-    "WAITCOMMAND",
+    "WAITTHREAD",
+    "WAITSTART",
+    "WAITSTOP",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameManagerState(ManagerState e) {
-  if (::flatbuffers::IsOutRange(e, ManagerState_OPENCAMERA, ManagerState_WAITCOMMAND)) return "";
+  if (::flatbuffers::IsOutRange(e, ManagerState_IDLE, ManagerState_WAITSTOP)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesManagerState()[index];
 }
@@ -250,7 +250,7 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
   }
   FetchGame::ManagerState server_state() const {
-    return static_cast<FetchGame::ManagerState>(GetField<int8_t>(VT_SERVER_STATE, 6));
+    return static_cast<FetchGame::ManagerState>(GetField<int8_t>(VT_SERVER_STATE, 0));
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -296,7 +296,7 @@ struct ServerBuilder {
     fbb_.AddElement<uint64_t>(Server::VT_PTP_GLOBAL_TIME, ptp_global_time, 0);
   }
   void add_server_state(FetchGame::ManagerState server_state) {
-    fbb_.AddElement<int8_t>(Server::VT_SERVER_STATE, static_cast<int8_t>(server_state), 6);
+    fbb_.AddElement<int8_t>(Server::VT_SERVER_STATE, static_cast<int8_t>(server_state), 0);
   }
   explicit ServerBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -312,13 +312,13 @@ struct ServerBuilder {
 inline ::flatbuffers::Offset<Server> CreateServer(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     FetchGame::SignalType signal_type = FetchGame::SignalType_ClientBringup,
-    FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
+    FetchGame::ServerControl control = FetchGame::ServerControl_IDLE,
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     ::flatbuffers::Offset<::flatbuffers::String> config_folder = 0,
     ::flatbuffers::Offset<::flatbuffers::String> record_folder = 0,
     ::flatbuffers::Offset<::flatbuffers::String> encoder_setup = 0,
     uint64_t ptp_global_time = 0,
-    FetchGame::ManagerState server_state = FetchGame::ManagerState_WAITCOMMAND) {
+    FetchGame::ManagerState server_state = FetchGame::ManagerState_IDLE) {
   ServerBuilder builder_(_fbb);
   builder_.add_ptp_global_time(ptp_global_time);
   builder_.add_encoder_setup(encoder_setup);
@@ -334,13 +334,13 @@ inline ::flatbuffers::Offset<Server> CreateServer(
 inline ::flatbuffers::Offset<Server> CreateServerDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     FetchGame::SignalType signal_type = FetchGame::SignalType_ClientBringup,
-    FetchGame::ServerControl control = FetchGame::ServerControl_IDEL,
+    FetchGame::ServerControl control = FetchGame::ServerControl_IDLE,
     ::flatbuffers::Offset<FetchGame::bring_up_message> server_mesg = 0,
     const char *config_folder = nullptr,
     const char *record_folder = nullptr,
     const char *encoder_setup = nullptr,
     uint64_t ptp_global_time = 0,
-    FetchGame::ManagerState server_state = FetchGame::ManagerState_WAITCOMMAND) {
+    FetchGame::ManagerState server_state = FetchGame::ManagerState_IDLE) {
   auto config_folder__ = config_folder ? _fbb.CreateString(config_folder) : 0;
   auto record_folder__ = record_folder ? _fbb.CreateString(record_folder) : 0;
   auto encoder_setup__ = encoder_setup ? _fbb.CreateString(encoder_setup) : 0;

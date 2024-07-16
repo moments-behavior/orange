@@ -117,7 +117,7 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
     CameraEachSelect *cameras_select;
     CameraControl *camera_control = new CameraControl;
 
-    manager_context->state = FetchGame::ManagerState_WAITCOMMAND;
+    manager_context->state = FetchGame::ManagerState_IDLE;
     while(!manager_context->quit) {
         switch (manager_context->state) {
             case FetchGame::ManagerState_OPENCAMERA:
@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                     {
                         printf("Network: Successfully connected! \n");
-                        client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count);
+                        client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count, manager_context.state);
                     }
                     break;
 
@@ -245,11 +245,11 @@ int main(int argc, char *argv[])
                         auto server_control = FetchGame::GetServer(buffer_pointer);
                         auto server_signal = server_control->control();
 
-                        if (server_signal == FetchGame::ServerControl_OPEN) {
+                        if (server_signal == FetchGame::ServerControl_OPENCAMERA) {
                             config_folder = server_control->config_folder()->c_str();
                             manager_context.state = FetchGame::ManagerState_OPENCAMERA;
                         }
-                        else if (server_signal == FetchGame::ServerControl_START)
+                        else if (server_signal == FetchGame::ServerControl_STARTTHREAD)
                         {
                             recording_setup.record_folder = server_control->record_folder()->c_str();
                             recording_setup.encoder_basic_setup = server_control->encoder_setup()->c_str();
@@ -257,12 +257,13 @@ int main(int argc, char *argv[])
                         } else if (server_signal == FetchGame::ServerControl_QUIT) {
                             printf("Exit \n");
                             quit_server = true;
-                        } else if (server_signal == FetchGame::ServerControl_SETPTP) {
+                        } else if (server_signal == FetchGame::ServerControl_STARTRECORDING) {
                             ptp_params->ptp_global_time = server_control->ptp_global_time();
                             std::cout << ptp_params->ptp_global_time << std::endl;
                             ptp_params->network_set_start_ptp = true;
-                            client_send_ptp_set_message(&client, fb_builder, evnt.peer);
-                        } else if (server_signal == FetchGame::ServerControl_STOP) {
+                            manager_context.state = FetchGame::ManagerState_WAITSTOP;
+                            client_send_state_update_message(&client, fb_builder, evnt.peer, manager_context.state);
+                        } else if (server_signal == FetchGame::ServerControl_STOPRECORDING) {
                             // stop recording
                             printf("stop signal\n");
                             std::cout << server_control->ptp_global_time() << std::endl;
@@ -280,17 +281,18 @@ int main(int argc, char *argv[])
                     break;
             } });
 
+        // coordinate with other thread
         if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {
-            client_send_camera_open_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
-            manager_context.state = FetchGame::ManagerState_WAITCOMMAND;
+            manager_context.state = FetchGame::ManagerState_WAITTHREAD;
+            client_send_state_update_message(&client, fb_builder, &client.m_pNetwork->peers[0], manager_context.state);
         } else if (manager_context.state == FetchGame::ManagerState_THREADREADY)
         {
-            client_send_thread_start_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
-            manager_context.state = FetchGame::ManagerState_WAITCOMMAND;
+            manager_context.state = FetchGame::ManagerState_WAITSTART;
+            client_send_state_update_message(&client, fb_builder, &client.m_pNetwork->peers[0], manager_context.state);
         } else if (manager_context.state == FetchGame::ManagerState_RECORDSTOPPED)
         {
-            client_send_record_done_message(&client, fb_builder, &client.m_pNetwork->peers[0]);
-            manager_context.state = FetchGame::ManagerState_WAITCOMMAND;
+            manager_context.state = FetchGame::ManagerState_IDLE;
+            client_send_state_update_message(&client, fb_builder, &client.m_pNetwork->peers[0], manager_context.state);
         }
     
         usleep(1000);

@@ -13,6 +13,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "acquire_frames.h"
+#include "enet_thread.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -80,7 +81,6 @@ int main(int argc, char **args)
     if (enet_initialize(&server, 3333, 5)) {
         printf("Server Initiated\n");
     }
-
     ConnectedServer my_servers[2] ;
     intialize_servers(my_servers);
 
@@ -102,92 +102,18 @@ int main(int argc, char **args)
     char* temp_string = (char*)malloc(64);
     *temp_string = '\0';
     bool save_image_all_ready = true;
+    bool quite_enet = false;
+
+    std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &cbot_signal_builder, &quite_enet);
 
     while (!glfwWindowShouldClose(window->render_target))
     {
-        service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
-        {
-            switch (evnt.type)
-            {
-            case ENET_EVENT_TYPE_CONNECT:
-                printf ("A new client connected from %x:%u.\n", evnt.peer -> address.host, evnt.peer -> address.port);
-                break;
-
-            case ENET_EVENT_TYPE_RECEIVE:
-                {
-                    uint8_t* buffer_pointer = evnt.packet->data;
-                    auto server_control = FetchGame::GetServer(buffer_pointer);
-                    
-                    if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
-                        for (int i = 0; i < 2; i++) {
-                            if (my_servers[i].peer == evnt.peer) {
-                                auto server_name = server_control->server_mesg()->server_name()->c_str();
-                                auto server_num_cameras = server_control->server_mesg()->num_cameras();
-                                auto server_state = server_control->server_state();
-                                my_servers[i].num_cameras = server_num_cameras;
-                                my_servers[i].server_state = server_state;
-                            }                           
-                        }                        
-                    } else if (server_control->signal_type() == FetchGame::SignalType_CBOT) {
-                        cbot_signal_builder.cbot_connection = evnt.peer;
-                        std::cout << "cbot connected" << std::endl;
-                    } else {
-                        printf("\t Client camera opened \n");
-                        for (int i = 0; i < 2; i++) {
-                            if (my_servers[i].peer == evnt.peer) {
-                                auto server_state = server_control->server_state();
-                                my_servers[i].server_state = server_state;
-                            }
-                        }
-                    }
-                    enet_packet_destroy(evnt.packet);
-                }
-                break;
-
-            case ENET_EVENT_TYPE_DISCONNECT:
-                printf("- Client %d has disconnected.\n", evnt.peer->incomingPeerID);
-                break;
-            }
-        });
-
         create_new_frame();
-
         if (ImGui::Begin("Network")) 
         {
             // if (ImGui::Button("Test Cbot Trigger")) {
             //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
             // }
-
-            for (int i=0; i< 2; i++) {
-
-                bool waffle_connected = false;
-                if (my_servers[i].peer != nullptr) {
-                    if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED) {
-                        waffle_connected = true;
-                    }
-                }
-
-                if (waffle_connected) {
-                    sprintf(temp_string, "Disconnect waffle-%d", i);
-                } else {
-                    sprintf(temp_string, "Connect to waffle-%d", i);
-                }
-
-                if (ImGui::Button(temp_string))
-                {   
-                    if (waffle_connected) { 
-                        enet_peer_disconnect(my_servers[i].peer, 0);
-                    } else {
-                        my_servers[i].peer = connect_peer(&server, 
-                            my_servers[i].ip_add[0], 
-                            my_servers[i].ip_add[1], 
-                            my_servers[i].ip_add[2], 
-                            my_servers[i].ip_add[3],
-                            my_servers[i].port);
-                    }
-                }
-
-            }
 
             if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -207,7 +133,8 @@ int main(int argc, char **args)
                 ImGui::EndTable();
             }
 
-            if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+
+            if (ImGui::BeginTable("Servers", 4, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
                 for (int i = 0; i < 2; i++)
                 {
@@ -216,9 +143,36 @@ int main(int argc, char **args)
                     ImGui::TableNextColumn();
                     ImGui::Text(my_servers[i].name);
                     ImGui::TableNextColumn();
+
+                    bool waffle_connected = false;
+                    if (my_servers[i].peer != nullptr) {
+                        if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED) {
+                            waffle_connected = true;
+                        }
+                    }
+
+                    if (ImGui::Button(waffle_connected? "Disconnect":"Connect"))
+                    {   
+                        if (waffle_connected) { 
+                            enet_peer_disconnect(my_servers[i].peer, 0);
+                        } else {
+                            my_servers[i].peer = connect_peer(&server, 
+                                my_servers[i].ip_add[0], 
+                                my_servers[i].ip_add[1], 
+                                my_servers[i].ip_add[2], 
+                                my_servers[i].ip_add[3],
+                                my_servers[i].port);
+                        }
+                    }
+                    ImGui::TableNextColumn();
                     ImGui::Text(std::to_string(my_servers[i].num_cameras).c_str());
                     ImGui::TableNextColumn();
-                    ImGui::Text(FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
+
+                    if (waffle_connected) {
+                        ImGui::Text(FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
+                    } else {
+                        ImGui::Text("Not connected");
+                    }
                 }
                 ImGui::EndTable();
             }
@@ -909,7 +863,9 @@ int main(int argc, char **args)
 
         render_a_frame(window);
     }
-
+    
+    quite_enet = true;
+    enet_thread.join();
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();

@@ -15,6 +15,7 @@
 #include <signal.h>
 
 #define evt_buffer_size 100
+#define max_cameras 20
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -108,7 +109,7 @@ struct RecordingContext {
     std::string encoder_basic_setup;
 };
 
-void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEVisionDeviceInfo* device_info, std::string* config_folder, RecordingContext* recording_setup, PTPParams *ptp_params) 
+void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEVisionDeviceInfo* unsorted_device_info, GigEVisionDeviceInfo* device_info, std::string* config_folder, RecordingContext* recording_setup, PTPParams *ptp_params) 
 {
     // TODO: selecting cameras 
     CameraEmergent *ecams;
@@ -120,6 +121,13 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
     manager_context->state = FetchGame::ManagerState_IDLE;
     while(!manager_context->quit) {
         switch (manager_context->state) {
+            case FetchGame::ManagerState_CONNECT:
+                if (manager_context->state == FetchGame::ManagerState_IDLE) {
+                    cam_count = scan_cameras(max_cameras, unsorted_device_info);
+                    sort_cameras_ip(unsorted_device_info, device_info, cam_count);
+                    manager_context->state = FetchGame::ManagerState_CONNECTED;
+                }
+                break;
             case FetchGame::ManagerState_OPENCAMERA:
                 ecams = new CameraEmergent[cam_count];
                 cameras_params = new CameraParams[cam_count];
@@ -200,7 +208,6 @@ int main(int argc, char *argv[])
     f32 last_time = tick();
     f32 current_time = tick();
 
-    const int max_cameras = 20;
     int cam_count;
     GigEVisionDeviceInfo unsorted_device_info[max_cameras];
     cam_count = scan_cameras(max_cameras, unsorted_device_info);
@@ -214,9 +221,7 @@ int main(int argc, char *argv[])
     ManagerContext manager_context;
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false, false};
 
-    std::thread* manager_thread = new std::thread(&create_camera_manager, cam_count, &manager_context, device_info, &config_folder, &recording_setup, ptp_params);
-
-    StopWatch w;
+    std::thread* manager_thread = new std::thread(&create_camera_manager, cam_count, &manager_context, unsorted_device_info, device_info, &config_folder, &recording_setup, ptp_params);
     
     while (!quit_server)
     {
@@ -230,14 +235,7 @@ int main(int argc, char *argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                     {
                         printf("Network: Successfully connected! \n");
-                        if (manager_context.state == FetchGame::ManagerState_IDLE) {
-                            w.Start();
-                            cam_count = scan_cameras(max_cameras, unsorted_device_info);
-                            sort_cameras_ip(unsorted_device_info, device_info, cam_count);
-                            double time_diff = w.Stop();
-                            std::cout << time_diff << std::endl;
-                        }
-                        client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count, manager_context.state);
+                        manager_context.state = FetchGame::ManagerState_CONNECT;
                     }
                     break;
 
@@ -290,6 +288,11 @@ int main(int argc, char *argv[])
             } });
 
         // coordinate with other thread
+        if (manager_context.state == FetchGame::ManagerState_CONNECTED)
+        {
+            manager_context.state == FetchGame::ManagerState_IDLE;
+            client_send_bringup_message(&client, fb_builder, &client.m_pNetwork->peers[0], cam_count, manager_context.state);
+        }
         if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {
             manager_context.state = FetchGame::ManagerState_WAITTHREAD;
             client_send_state_update_message(&client, fb_builder, &client.m_pNetwork->peers[0], manager_context.state);

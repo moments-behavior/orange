@@ -18,6 +18,8 @@ enum SignalType: byte {
 
 enum ManagerState: byte {
     IDLE,
+    CONNECT,
+    CONNECTED,
     OPENCAMERA,
     CAMERAOPENED,
     ERROR,

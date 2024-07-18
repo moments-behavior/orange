@@ -294,7 +294,6 @@ int main(int argc, char *argv[])
         if (manager_context.state == FetchGame::ManagerState_CONNECTED)
         {
             manager_context.state = FetchGame::ManagerState_IDLE;
-            std::cout << FetchGame::EnumNamesManagerState()[manager_context.state] << std::endl;
             client_send_bringup_message(&client, fb_builder, &client.m_pNetwork->peers[0], cam_count, manager_context.state);
         }
         if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {

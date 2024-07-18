@@ -109,7 +109,7 @@ struct RecordingContext {
     std::string encoder_basic_setup;
 };
 
-void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEVisionDeviceInfo* unsorted_device_info, GigEVisionDeviceInfo* device_info, std::string* config_folder, RecordingContext* recording_setup, PTPParams *ptp_params) 
+void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigEVisionDeviceInfo* unsorted_device_info, GigEVisionDeviceInfo* device_info, std::string* config_folder, RecordingContext* recording_setup, PTPParams *ptp_params) 
 {
     // TODO: selecting cameras 
     CameraEmergent *ecams;
@@ -154,13 +154,13 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
             for (auto &t : camera_threads)
                 t.join();
             
-            for (int i = 0; i < cam_count; i++)
+            for (int i = 0; i < *cam_count; i++)
             {
                 camera_threads.pop_back();
             }
 
 
-            for (int i = 0; i < cam_count; i++)
+            for (int i = 0; i < *cam_count; i++)
             {
                 ptp_sync_off(&ecams[i].camera);
             }
@@ -174,7 +174,7 @@ void create_camera_manager(int cam_count, ManagerContext* manager_context, GigEV
             
             camera_control->sync_camera = false;
 
-            for (int i = 0; i < cam_count; i++)
+            for (int i = 0; i < *cam_count; i++)
             {
                 destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
                 delete[] ecams[i].evt_frame;
@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
     ManagerContext manager_context;
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false, false};
 
-    std::thread* manager_thread = new std::thread(&create_camera_manager, cam_count, &manager_context, unsorted_device_info, device_info, &config_folder, &recording_setup, ptp_params);
+    std::thread* manager_thread = new std::thread(&create_camera_manager, &cam_count, &manager_context, unsorted_device_info, device_info, &config_folder, &recording_setup, ptp_params);
     
     while (!quit_server)
     {

@@ -186,7 +186,7 @@ int main(int argc, char **args)
                 if (i != network_config_folders.size()-1)
                     ImGui::SameLine();
             }
-
+            
             if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Open Cameras")) {

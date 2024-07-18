@@ -123,16 +123,16 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
         switch (manager_context->state) {
             case FetchGame::ManagerState_CONNECT:
                 if (manager_context->state == FetchGame::ManagerState_IDLE) {
-                    cam_count = scan_cameras(max_cameras, unsorted_device_info);
-                    sort_cameras_ip(unsorted_device_info, device_info, cam_count);
+                    *cam_count = scan_cameras(max_cameras, unsorted_device_info);
+                    sort_cameras_ip(unsorted_device_info, device_info, *cam_count);
                     manager_context->state = FetchGame::ManagerState_CONNECTED;
                 }
                 break;
             case FetchGame::ManagerState_OPENCAMERA:
-                ecams = new CameraEmergent[cam_count];
-                cameras_params = new CameraParams[cam_count];
-                cameras_select = new CameraEachSelect[cam_count];
-                if (open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, *config_folder)) 
+                ecams = new CameraEmergent[*cam_count];
+                cameras_params = new CameraParams[*cam_count];
+                cameras_select = new CameraEachSelect[*cam_count];
+                if (open_cameras(cameras_params, ecams, cameras_select, device_info, *cam_count, *config_folder)) 
                 {
                     manager_context->state = FetchGame::ManagerState_CAMERAOPENED;
                 } else {
@@ -140,7 +140,7 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
                 }
                 break;
             case FetchGame::ManagerState_STARTCAMTHREAD:
-                if (start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, recording_setup->record_folder, recording_setup->encoder_basic_setup))
+                if (start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, *cam_count, ptp_params, recording_setup->record_folder, recording_setup->encoder_basic_setup))
                 {
                     manager_context->state = FetchGame::ManagerState_THREADREADY;
                 } else {

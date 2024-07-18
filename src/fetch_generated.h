@@ -101,22 +101,26 @@ inline const char *EnumNameSignalType(SignalType e) {
 
 enum ManagerState : int8_t {
   ManagerState_IDLE = 0,
-  ManagerState_OPENCAMERA = 1,
-  ManagerState_CAMERAOPENED = 2,
-  ManagerState_ERROR = 3,
-  ManagerState_STARTCAMTHREAD = 4,
-  ManagerState_THREADREADY = 5,
-  ManagerState_RECORDSTOPPED = 6,
-  ManagerState_WAITTHREAD = 7,
-  ManagerState_WAITSTART = 8,
-  ManagerState_WAITSTOP = 9,
+  ManagerState_CONNECT = 1,
+  ManagerState_CONNECTED = 2,
+  ManagerState_OPENCAMERA = 3,
+  ManagerState_CAMERAOPENED = 4,
+  ManagerState_ERROR = 5,
+  ManagerState_STARTCAMTHREAD = 6,
+  ManagerState_THREADREADY = 7,
+  ManagerState_RECORDSTOPPED = 8,
+  ManagerState_WAITTHREAD = 9,
+  ManagerState_WAITSTART = 10,
+  ManagerState_WAITSTOP = 11,
   ManagerState_MIN = ManagerState_IDLE,
   ManagerState_MAX = ManagerState_WAITSTOP
 };
 
-inline const ManagerState (&EnumValuesManagerState())[10] {
+inline const ManagerState (&EnumValuesManagerState())[12] {
   static const ManagerState values[] = {
     ManagerState_IDLE,
+    ManagerState_CONNECT,
+    ManagerState_CONNECTED,
     ManagerState_OPENCAMERA,
     ManagerState_CAMERAOPENED,
     ManagerState_ERROR,
@@ -131,8 +135,10 @@ inline const ManagerState (&EnumValuesManagerState())[10] {
 }
 
 inline const char * const *EnumNamesManagerState() {
-  static const char * const names[11] = {
+  static const char * const names[13] = {
     "IDLE",
+    "CONNECT",
+    "CONNECTED",
     "OPENCAMERA",
     "CAMERAOPENED",
     "ERROR",

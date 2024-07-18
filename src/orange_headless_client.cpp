@@ -216,7 +216,8 @@ int main(int argc, char *argv[])
 
     std::thread* manager_thread = new std::thread(&create_camera_manager, cam_count, &manager_context, device_info, &config_folder, &recording_setup, ptp_params);
 
-
+    StopWatch w;
+    
     while (!quit_server)
     {
         current_time = tick();
@@ -229,6 +230,13 @@ int main(int argc, char *argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                     {
                         printf("Network: Successfully connected! \n");
+                        if (manager_context.state == FetchGame::ManagerState_IDLE) {
+                            w.Start();
+                            cam_count = scan_cameras(max_cameras, unsorted_device_info);
+                            sort_cameras_ip(unsorted_device_info, device_info, cam_count);
+                            double time_diff = w.Stop();
+                            std::cout << time_diff << std::endl;
+                        }
                         client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count, manager_context.state);
                     }
                     break;

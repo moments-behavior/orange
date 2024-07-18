@@ -124,6 +124,7 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
             case FetchGame::ManagerState_CONNECT:
                 if (manager_context->state == FetchGame::ManagerState_IDLE) {
                     *cam_count = scan_cameras(max_cameras, unsorted_device_info);
+                    std::cout << *cam_count << std::endl;
                     sort_cameras_ip(unsorted_device_info, device_info, *cam_count);
                     manager_context->state = FetchGame::ManagerState_CONNECTED;
                 }

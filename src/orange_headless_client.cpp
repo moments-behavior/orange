@@ -122,12 +122,10 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
     while(!manager_context->quit) {
         switch (manager_context->state) {
             case FetchGame::ManagerState_CONNECT:
-                if (manager_context->state == FetchGame::ManagerState_IDLE) {
-                    *cam_count = scan_cameras(max_cameras, unsorted_device_info);
-                    std::cout << *cam_count << std::endl;
-                    sort_cameras_ip(unsorted_device_info, device_info, *cam_count);
-                    manager_context->state = FetchGame::ManagerState_CONNECTED;
-                }
+                *cam_count = scan_cameras(max_cameras, unsorted_device_info);
+                std::cout << *cam_count << std::endl;
+                sort_cameras_ip(unsorted_device_info, device_info, *cam_count);
+                manager_context->state = FetchGame::ManagerState_CONNECTED;
                 break;
             case FetchGame::ManagerState_OPENCAMERA:
                 ecams = new CameraEmergent[*cam_count];
@@ -236,10 +234,13 @@ int main(int argc, char *argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                     {
                         printf("Network: Successfully connected! \n");
-                        manager_context.state = FetchGame::ManagerState_CONNECT;
+                        if (manager_context.state == FetchGame::ManagerState_IDLE) {
+                            manager_context.state = FetchGame::ManagerState_CONNECT; // rescan number of cams
+                        } else {
+                            client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count, manager_context.state);
+                        }
                     }
                     break;
-
                 //Server has sent us a new packet
                 case ENET_EVENT_TYPE_RECEIVE:
                     {

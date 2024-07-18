@@ -233,11 +233,11 @@ int main(int argc, char *argv[])
                 //New connection request or an existing peer accepted our connection request
                 case ENET_EVENT_TYPE_CONNECT:
                     {
-                        printf("Network: Successfully connected! \n");
                         if (manager_context.state == FetchGame::ManagerState_IDLE) {
+                            printf("Network: Successfully connected! Rescaning cameras. \n");
                             manager_context.state = FetchGame::ManagerState_CONNECT; // rescan number of cams
                         } else {
-                            std::cout << "here" << std::endl;
+                            printf("Network: Successfully connected! \n");
                             client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count, manager_context.state);
                         }
                     }

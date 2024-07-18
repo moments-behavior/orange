@@ -237,6 +237,7 @@ int main(int argc, char *argv[])
                         if (manager_context.state == FetchGame::ManagerState_IDLE) {
                             manager_context.state = FetchGame::ManagerState_CONNECT; // rescan number of cams
                         } else {
+                            std::cout << "here" << std::endl;
                             client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count, manager_context.state);
                         }
                     }

@@ -191,6 +191,7 @@ int main(int argc, char **args)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
+                    select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
                     input_folder = network_config_folders[network_config_select];
                     host_broadcast_open_cameras(fb_builder, &server, network_config_folders[network_config_select]);
                     // open cameras
@@ -382,6 +383,10 @@ int main(int argc, char **args)
             }
 
             camera_control->open = false;
+
+            for (int i=0; i<cam_count; i++) {
+                    check[i] = 0;
+            }
         }
 
         if (ImGui::Begin("Orange", NULL, ImGuiWindowFlags_MenuBar))
@@ -786,6 +791,7 @@ int main(int argc, char **args)
             {
                 std::string camera_config_dir = file_dialog.GetSelected().string();
                 update_camera_configs(camera_config_files, file_dialog.GetSelected().string());
+                select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
                 file_dialog.ClearSelected();
                 load_camera_config = false;
             }

@@ -264,6 +264,20 @@ void update_camera_configs(std::vector<std::string>& camera_config_files, std::s
     // }
 }
 
+void select_cameras_have_configs(std::vector<std::string>& camera_config_files, GigEVisionDeviceInfo* device_info, bool* check, int cam_count)
+{
+    for (int i=0; i<cam_count; i++) {
+        std::string camera_serial = device_info[i].serialNumber;
+        std::string sub_str = camera_serial + ".json";
+        auto it = std::find_if(camera_config_files.begin(), camera_config_files.end(), [&](const std::string& str) {return str.find(sub_str) != std::string::npos;});
+        if (it != camera_config_files.end()) {
+            check[i] = true;
+        } else {
+            check[i] = false;
+        }
+    }
+}
+
 bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device_info, std::vector<std::string>& camera_config_files, int camera_idx, int num_cameras)
 {
     // first checkt to see if it is in the config files 

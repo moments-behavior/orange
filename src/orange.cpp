@@ -526,6 +526,7 @@ int main(int argc, char **args)
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
                                 cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo = true;
                             }
                         }
                         

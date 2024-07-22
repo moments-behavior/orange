@@ -2,7 +2,7 @@
 #include "network_base.h"
 #include "imgui.h"
 
-void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, CBOTSignalBuilder* cbot_signal_builder, bool* quite_enet)
+void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, bool* quite_enet)
 {
     while(!(*quite_enet)) {
         service_network(server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -28,9 +28,8 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, CBOTSi
                                 my_servers[i].server_state = server_state;
                             }                           
                         }                        
-                    } else if (server_control->signal_type() == FetchGame::SignalType_CBOT) {
-                        cbot_signal_builder->cbot_connection = evnt.peer;
-                        std::cout << "cbot connected" << std::endl;
+                    } else if (server_control->signal_type() == FetchGame::SignalType_INDIGO) {
+                        indigo_signal_builder->indigo_connection = evnt.peer;
                     } else {
                         for (int i = 0; i < 2; i++) {
                             if (my_servers[i].peer == evnt.peer) {

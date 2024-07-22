@@ -40,17 +40,13 @@ int main(int argc, char **args)
     std::filesystem::path cwd = std::filesystem::current_path();
     std::string delimiter = "/";
     std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
-    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
-    std::string network_start_folder_name = "/home/" + tokenized_path[2] + "/multiservers";
-    file_dialog.SetPwd(start_folder_name);
-    file_dialog.SetTitle("Select working directory");
 
-    file_dialog.SetPwd(start_folder_name);
-    std::string input_folder = file_dialog.GetPwd();
+    std::string home_directory = "/home/" + tokenized_path[2];
+    std::string input_folder = home_directory + "/exp/unsorted";
+    file_dialog.SetPwd(input_folder);
     file_dialog.SetTitle("My files");
 
     bool check[cam_count] {0};
-
     CameraParams *cameras_params;
     CameraEachSelect *cameras_select;
     CameraEmergent *ecams;
@@ -68,7 +64,6 @@ int main(int argc, char **args)
     std::string encoder_preset = "p1";
     std::string folder_name;
 
-    bool load_camera_config = false;
     std::vector<std::string> camera_config_files;
 
     ScrollingBuffer* realtime_plot_data;
@@ -84,37 +79,39 @@ int main(int argc, char **args)
     ConnectedServer my_servers[2] ;
     intialize_servers(my_servers);
 
-    CBOTSignalBuilder cbot_signal_builder;
-    cbot_signal_builder = {.builder = fb_builder, 
+    INDIGOSignalBuilder indigo_signal_builder;
+    indigo_signal_builder = {.builder = fb_builder, 
         .server = &server,
-        .cbot_connection = NULL};
+        .indigo_connection = NULL};
 
     std::vector<std::string> network_config_folders;
+    std::string network_start_folder_name = home_directory + "/config/network";
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
         network_config_folders.push_back(entry.path().string());
     }
-    
     int network_config_select = 0;
+
+    std::vector<std::string> local_config_folders;
+    std::string local_start_folder_name = home_directory + "/config/local";
+    for (const auto & entry : std::filesystem::directory_iterator(local_start_folder_name)) {
+        local_config_folders.push_back(entry.path().string());
+    }
+    int local_config_select = 0;
     bool select_all_cameras = false;
-    int num_servers = 2;
     char* subfix_buf = (char*)malloc(64);
     *subfix_buf = '\0';
     char* temp_string = (char*)malloc(64);
     *temp_string = '\0';
     bool save_image_all_ready = true;
     bool quite_enet = false;
-
-    std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &cbot_signal_builder, &quite_enet);
+    
+    std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder, &quite_enet);
 
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
         if (ImGui::Begin("Network")) 
         {
-            // if (ImGui::Button("Test Cbot Trigger")) {
-            //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
-            // }
-
             
             if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -122,11 +119,11 @@ int main(int argc, char **args)
                 ImGui::TableNextColumn();
                 ImGui::Text("App");
                 ImGui::TableNextColumn();
-                ImGui::Text("Cbot");
+                ImGui::Text("Indigo");
                 ImGui::TableNextColumn();
                 sprintf(temp_string, "Not connected");
-                if (cbot_signal_builder.cbot_connection != nullptr) {
-                    if (cbot_signal_builder.cbot_connection->state == ENET_PEER_STATE_CONNECTED) {
+                if (indigo_signal_builder.indigo_connection != nullptr) {
+                    if (indigo_signal_builder.indigo_connection->state == ENET_PEER_STATE_CONNECTED) {
                         sprintf(temp_string, "Connected");
                     } 
                 }
@@ -192,7 +189,6 @@ int main(int argc, char **args)
                 if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
                     select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
-                    input_folder = network_config_folders[network_config_select];
                     host_broadcast_open_cameras(fb_builder, &server, network_config_folders[network_config_select]);
                     // open cameras
                     num_cameras = 0;
@@ -274,7 +270,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
                     camera_control->subscribe = true;
                 }
@@ -488,16 +484,22 @@ int main(int argc, char **args)
         if (ImGui::Begin("Local"))
         {
 
-            if (ImGui::Button("Load camera config")) {
-                load_camera_config = true;          
-                file_dialog.Open();
+            for (int i = 0; i < local_config_folders.size(); i++)
+            {
+                std::vector<std::string> folder_token = string_split(local_config_folders[i].c_str(), "/");
+                sprintf(temp_string, folder_token.back().c_str());
+                ImGui::RadioButton(temp_string, &local_config_select, i);
+                if (i != local_config_folders.size()-1)
+                    ImGui::SameLine();
             }
-
         
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
                 (camera_control->open) = !(camera_control->open);
                 if (camera_control->open) 
                 {
+                    update_camera_configs(camera_config_files, local_config_folders[local_config_select]);
+                    select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
+
                     num_cameras = 0;
                     for (int i = 0; i < cam_count; i++)
                     {
@@ -551,10 +553,7 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (ImGui::Button(ptp_stream_sync ? "PTP off": "PTP on")) {
-                ptp_stream_sync = !ptp_stream_sync;
-            }
-
+            ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync); ImGui::SameLine();
             if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))
             {
                 (camera_control->subscribe) = !(camera_control->subscribe);
@@ -585,19 +584,17 @@ int main(int argc, char **args)
                         }
                     }
 
-                    if (ptp_stream_sync) {
-                        if (num_cameras > 1){
-                            for (int i = 0; i < num_cameras; i++)
-                            {
-                                ptp_camera_sync(&ecams[i].camera);
-                            }
-                            camera_control->sync_camera = true;
+                    if (ptp_stream_sync){
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            ptp_camera_sync(&ecams[i].camera);
                         }
+                        camera_control->sync_camera = true;
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
 
                 } else {
@@ -682,9 +679,6 @@ int main(int argc, char **args)
                     }
                 }
             }
-
-
-
             ImGui::Separator();
             ImGui::Spacing();
 
@@ -742,7 +736,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -788,14 +782,6 @@ int main(int argc, char **args)
         file_dialog.Display();
         if (file_dialog.HasSelected())
         {
-            if (load_camera_config)
-            {
-                std::string camera_config_dir = file_dialog.GetSelected().string();
-                update_camera_configs(camera_config_files, file_dialog.GetSelected().string());
-                select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
-                file_dialog.ClearSelected();
-                load_camera_config = false;
-            }
             input_folder = file_dialog.GetSelected().string();
             file_dialog.ClearSelected();
         }

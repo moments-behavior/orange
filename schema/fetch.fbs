@@ -12,8 +12,8 @@ enum ServerControl : byte {
 enum SignalType: byte {
     ClientBringup,
     ClientStateUpdate,
-    CBOT,
-    CBOT_TRIAL_TRIGGER
+    INDIGO,
+    INDIGO_TRIAL_TRIGGER
 }
 
 enum ManagerState: byte {

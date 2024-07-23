@@ -53,6 +53,20 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
             this->num_outputs += 1;
         }
     }
+
+    auto&    in_binding = this->input_bindings[0];
+
+    inp_h_int = in_binding.dims.d[2];
+    inp_w_int = in_binding.dims.d[3];
+
+    const float inp_h  = (float)inp_h_int;
+    const float inp_w  = (float)inp_w_int;
+    float       img_width_float  = img_width;
+    float       img_height_float = img_height;
+
+    float r    = std::min(inp_h / img_height_float, inp_w / img_width_float);
+    padw = std::round(img_width_float * r);
+    padh = std::round(img_height_float * r);
 }
 
 YOLOv8::~YOLOv8()
@@ -72,10 +86,10 @@ YOLOv8::~YOLOv8()
 void YOLOv8::make_pipe(bool warmup)
 {
     // allocate device resources for initialization
-    cudaMalloc((void **)&d_temp, 640*439*3);
-    cudaMalloc((void **)&d_boarder, 640*640*3);
-    cudaMalloc((void **)&d_float, sizeof(float) * 640 * 640 *3);
-    cudaMalloc((void **)&d_planar, sizeof(float) * 640 * 640 *3);
+    cudaMalloc((void **)&d_temp, padw*padh*3); // assuming width bigger than height
+    cudaMalloc((void **)&d_boarder, inp_w_int*inp_w_int*3);
+    cudaMalloc((void **)&d_float, sizeof(float) * inp_w_int * inp_w_int *3);
+    cudaMalloc((void **)&d_planar, sizeof(float) * inp_w_int * inp_w_int *3);
 
     for (auto& bindings : this->input_bindings) {
         void* d_ptr;
@@ -109,11 +123,6 @@ void YOLOv8::make_pipe(bool warmup)
 
 void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
 {
-    auto&    in_binding = this->input_bindings[0];
-
-    int inp_h_int = in_binding.dims.d[2];
-    int inp_w_int = in_binding.dims.d[3];
-
     const float inp_h  = (float)inp_h_int;
     const float inp_w  = (float)inp_w_int;
     float       width  = img_width;
@@ -144,15 +153,23 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
     output_roi.height = padh;
 
 
-    const NppStatus npp_result = nppiResize_8u_C3R(d_rgb, img_width * sizeof(uchar3), img_size, roi, d_temp, 640 * sizeof(uchar3), output_resize_size, output_roi, NPPI_INTER_SUPER);
+    const NppStatus npp_result = nppiResize_8u_C3R(d_rgb, 
+                                            img_width * sizeof(uchar3), 
+                                            img_size, 
+                                            roi, 
+                                            d_temp, 
+                                            inp_w_int * sizeof(uchar3), 
+                                            output_resize_size, 
+                                            output_roi, 
+                                            NPPI_INTER_SUPER);
     if (npp_result != NPP_SUCCESS) {
         std::cerr << "Error executing Resize -- code: " << npp_result << std::endl;
     }
 
     // make boarder
     NppiSize boarder_size;
-    boarder_size.width = in_binding.dims.d[3];
-    boarder_size.height = in_binding.dims.d[2];
+    boarder_size.width = inp_w_int;
+    boarder_size.height = inp_h_int;
 
     float dw = inp_w - padw;
     float dh = inp_h - padh;
@@ -209,69 +226,68 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
 }
 
 
-void YOLOv8::letterbox(const cv::Mat& image, cv::Mat& out, cv::Size& size)
-{
-    const float inp_h  = size.height;
-    const float inp_w  = size.width;
-    float       height = image.rows;
-    float       width  = image.cols;
+// void YOLOv8::letterbox(const cv::Mat& image, cv::Mat& out, cv::Size& size)
+// {
+//     const float inp_h  = size.height;
+//     const float inp_w  = size.width;
+//     float       height = image.rows;
+//     float       width  = image.cols;
 
-    float r    = std::min(inp_h / height, inp_w / width);
-    int   padw = std::round(width * r);
-    int   padh = std::round(height * r);
+//     float r    = std::min(inp_h / height, inp_w / width);
+//     int   padw = std::round(width * r);
+//     int   padh = std::round(height * r);
 
-    cv::Mat tmp;
-    if ((int)width != padw || (int)height != padh) {
-        cv::resize(image, tmp, cv::Size(padw, padh));
-    }
-    else {
-        tmp = image.clone();
-    }
+//     cv::Mat tmp;
+//     if ((int)width != padw || (int)height != padh) {
+//         cv::resize(image, tmp, cv::Size(padw, padh));
+//     }
+//     else {
+//         tmp = image.clone();
+//     }
 
-    float dw = inp_w - padw;
-    float dh = inp_h - padh;
+//     float dw = inp_w - padw;
+//     float dh = inp_h - padh;
 
-    dw /= 2.0f;
-    dh /= 2.0f;
-    int top    = int(std::round(dh - 0.1f));
-    int bottom = int(std::round(dh + 0.1f));
-    int left   = int(std::round(dw - 0.1f));
-    int right  = int(std::round(dw + 0.1f));
+//     dw /= 2.0f;
+//     dh /= 2.0f;
+//     int top    = int(std::round(dh - 0.1f));
+//     int bottom = int(std::round(dh + 0.1f));
+//     int left   = int(std::round(dw - 0.1f));
+//     int right  = int(std::round(dw + 0.1f));
 
-    cv::copyMakeBorder(tmp, tmp, top, bottom, left, right, cv::BORDER_CONSTANT, {114, 114, 114});
+//     cv::copyMakeBorder(tmp, tmp, top, bottom, left, right, cv::BORDER_CONSTANT, {114, 114, 114});
 
-    cv::dnn::blobFromImage(tmp, out, 1 / 255.f, cv::Size(), cv::Scalar(0, 0, 0), true, false, CV_32F);
-    this->pparam.ratio  = 1 / r;
-    this->pparam.dw     = dw;
-    this->pparam.dh     = dh;
-    this->pparam.height = height;
-    this->pparam.width  = width;
-    ;
-}
+//     cv::dnn::blobFromImage(tmp, out, 1 / 255.f, cv::Size(), cv::Scalar(0, 0, 0), true, false, CV_32F);
+//     this->pparam.ratio  = 1 / r;
+//     this->pparam.dw     = dw;
+//     this->pparam.dh     = dh;
+//     this->pparam.height = height;
+//     this->pparam.width  = width;
+// }
 
-void YOLOv8::copy_from_Mat(const cv::Mat& image)
-{
-    cv::Mat  nchw;
-    auto&    in_binding = this->input_bindings[0];
-    auto     width      = in_binding.dims.d[3];
-    auto     height     = in_binding.dims.d[2];
-    cv::Size size{width, height};
-    this->letterbox(image, nchw, size);
+// void YOLOv8::copy_from_Mat(const cv::Mat& image)
+// {
+//     cv::Mat  nchw;
+//     auto&    in_binding = this->input_bindings[0];
+//     auto     width      = in_binding.dims.d[3];
+//     auto     height     = in_binding.dims.d[2];
+//     cv::Size size{width, height};
+//     this->letterbox(image, nchw, size);
 
-    this->context->setBindingDimensions(0, nvinfer1::Dims{4, {1, 3, height, width}});
+//     this->context->setBindingDimensions(0, nvinfer1::Dims{4, {1, 3, height, width}});
 
-    CHECK(cudaMemcpyAsync(
-        this->device_ptrs[0], nchw.ptr<float>(), nchw.total() * nchw.elemSize(), cudaMemcpyHostToDevice, this->stream));
-}
+//     CHECK(cudaMemcpyAsync(
+//         this->device_ptrs[0], nchw.ptr<float>(), nchw.total() * nchw.elemSize(), cudaMemcpyHostToDevice, this->stream));
+// }
 
-void YOLOv8::copy_from_Mat(const cv::Mat& image, cv::Size& size)
-{
-    cv::Mat nchw;
-    this->letterbox(image, nchw, size);
-    this->context->setBindingDimensions(0, nvinfer1::Dims{4, {1, 3, size.height, size.width}});
-    CHECK(cudaMemcpyAsync(
-        this->device_ptrs[0], nchw.ptr<float>(), nchw.total() * nchw.elemSize(), cudaMemcpyHostToDevice, this->stream));
-}
+// void YOLOv8::copy_from_Mat(const cv::Mat& image, cv::Size& size)
+// {
+//     cv::Mat nchw;
+//     this->letterbox(image, nchw, size);
+//     this->context->setBindingDimensions(0, nvinfer1::Dims{4, {1, 3, size.height, size.width}});
+//     CHECK(cudaMemcpyAsync(
+//         this->device_ptrs[0], nchw.ptr<float>(), nchw.total() * nchw.elemSize(), cudaMemcpyHostToDevice, this->stream));
+// }
 
 void YOLOv8::infer()
 {

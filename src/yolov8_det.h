@@ -14,10 +14,10 @@ public:
     ~YOLOv8();
 
     void make_pipe(bool warmup = true);
-    void copy_from_Mat(const cv::Mat &image);
-    void copy_from_Mat(const cv::Mat &image, cv::Size &size);
+    // void copy_from_Mat(const cv::Mat &image);
+    // void copy_from_Mat(const cv::Mat &image, cv::Size &size);
     void preprocess_gpu(unsigned char *d_rgb);
-    void letterbox(const cv::Mat &image, cv::Mat &out, cv::Size &size);
+    // void letterbox(const cv::Mat &image, cv::Mat &out, cv::Size &size);
     void infer();
     void postprocess(std::vector<Object> &objs);
     static void          draw_objects(const cv::Mat&                                image,
@@ -47,6 +47,10 @@ private:
     float *d_planar;
     int img_width;
     int img_height;
+    int padw;
+    int padh;
+    int inp_h_int;
+    int inp_w_int;
 
     nvinfer1::ICudaEngine *engine = nullptr;
     nvinfer1::IRuntime *runtime = nullptr;

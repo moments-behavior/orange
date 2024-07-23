@@ -109,7 +109,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
     }
 }
 
-void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, CBOTSignalBuilder* cbot_signal_builder)
+void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, INDIGOSignalBuilder* indigo_signal_builder)
 {
 
     CameraState camera_state;
@@ -117,15 +117,21 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     
     COpenGLDisplay* openGLDisplay;
     if (camera_select->stream_on) {
-        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, cbot_signal_builder);
+        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, indigo_signal_builder);
         openGLDisplay->StartThread();
     }
 
     GPUVideoEncoder* gpu_encoder;
-    
+    bool encoder_ready_signal = false;
     if (camera_control->record_video) {
-        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name);
+        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name, &encoder_ready_signal);
         gpu_encoder->StartThread();
+        
+        // wait till encoder is ready
+        while(!encoder_ready_signal) {
+            usleep(10);
+        }
+        std::cout << "encoder ready\n" << std::endl;
     }
 
     if (camera_control->sync_camera)

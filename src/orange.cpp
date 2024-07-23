@@ -13,6 +13,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "acquire_frames.h"
+#include "enet_thread.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -39,17 +40,13 @@ int main(int argc, char **args)
     std::filesystem::path cwd = std::filesystem::current_path();
     std::string delimiter = "/";
     std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
-    std::string start_folder_name = "/home/" + tokenized_path[2] + "/exp";
-    std::string network_start_folder_name = "/home/" + tokenized_path[2] + "/multiservers";
-    file_dialog.SetPwd(start_folder_name);
-    file_dialog.SetTitle("Select working directory");
 
-    file_dialog.SetPwd(start_folder_name);
-    std::string input_folder = file_dialog.GetPwd();
+    std::string home_directory = "/home/" + tokenized_path[2];
+    std::string input_folder = home_directory + "/exp/unsorted";
+    file_dialog.SetPwd(input_folder);
     file_dialog.SetTitle("My files");
 
     bool check[cam_count] {0};
-
     CameraParams *cameras_params;
     CameraEachSelect *cameras_select;
     CameraEmergent *ecams;
@@ -67,7 +64,6 @@ int main(int argc, char **args)
     std::string encoder_preset = "p1";
     std::string folder_name;
 
-    bool load_camera_config = false;
     std::vector<std::string> camera_config_files;
 
     ScrollingBuffer* realtime_plot_data;
@@ -80,125 +76,54 @@ int main(int argc, char **args)
     if (enet_initialize(&server, 3333, 5)) {
         printf("Server Initiated\n");
     }
+    ConnectedServer my_servers[2] ;
+    intialize_servers(my_servers);
 
-    std::vector<ConnectedServer> my_servers;
-    CBOTSignalBuilder cbot_signal_builder;
-    cbot_signal_builder = {.builder = fb_builder, 
+    INDIGOSignalBuilder indigo_signal_builder;
+    indigo_signal_builder = {.builder = fb_builder, 
         .server = &server,
-        .cbot_connection = NULL};
+        .indigo_connection = NULL};
 
     std::vector<std::string> network_config_folders;
+    std::string network_start_folder_name = home_directory + "/config/network";
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
         network_config_folders.push_back(entry.path().string());
     }
-    
     int network_config_select = 0;
+
+    std::vector<std::string> local_config_folders;
+    std::string local_start_folder_name = home_directory + "/config/local";
+    for (const auto & entry : std::filesystem::directory_iterator(local_start_folder_name)) {
+        local_config_folders.push_back(entry.path().string());
+    }
+    int local_config_select = 0;
     bool select_all_cameras = false;
-    ServerState all_server_state = SERVER_DISCONNECTED;
-    int num_servers = 2;
     char* subfix_buf = (char*)malloc(64);
     *subfix_buf = '\0';
     char* temp_string = (char*)malloc(64);
     *temp_string = '\0';
     bool save_image_all_ready = true;
+    bool quite_enet = false;
+    
+    std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder, &quite_enet);
 
     while (!glfwWindowShouldClose(window->render_target))
     {
-        service_network(&server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
-        {
-            switch (evnt.type)
-            {
-            case ENET_EVENT_TYPE_CONNECT:
-                printf ("A new client connected from %x:%u.\n", evnt.peer -> address.host, evnt.peer -> address.port);
-                break;
-
-            case ENET_EVENT_TYPE_RECEIVE:
-                {
-                    // put server into a data structure
-                    printf("\t Client %d says: \n", evnt.peer->incomingPeerID);
-                    uint8_t* buffer_pointer = evnt.packet->data;
-                    auto server_control = FetchGame::GetServer(buffer_pointer);
-                    
-                    if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
-                        auto server_name = server_control->server_mesg()->server_name()->c_str();
-                        auto server_num_cameras = server_control->server_mesg()->num_cameras();
-                        ConnectedServer new_server;
-                        strcpy(new_server.name, server_name); 
-                        new_server.num_cameras = server_num_cameras;
-                        new_server.peer_id = evnt.peer->incomingPeerID;
-                        new_server.server_state = SERVER_UP;
-                        my_servers.push_back(new_server);
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientCameraOpened) {
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_OPEN_CAMERA;
-                            }
-                        }
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientThreadStarted) {
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_THREAD_READY;
-                            }
-                        }
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientStartRecording) {
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_RECORDING;
-                            }
-                        }
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientRecordDone) {
-                        for (int i = 0; i < my_servers.size(); i++) {
-                            if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                                my_servers[i].server_state = SERVER_DONE;
-                            }
-                        }   
-                    } else if (server_control->signal_type() == FetchGame::SignalType_CBOT) {
-                        cbot_signal_builder.cbot_connection = evnt.peer;
-                        std::cout << "cbot connected" << std::endl;
-                    }
-
-                    if (my_servers.size() == num_servers) {
-                        if (my_servers[0].server_state == my_servers[1].server_state) {
-                            all_server_state = my_servers[0].server_state;
-                        }
-                    }
-                    enet_packet_destroy(evnt.packet);
-                }
-                break;
-
-            case ENET_EVENT_TYPE_DISCONNECT:
-                printf("- Client %d has disconnected.\n", evnt.peer->incomingPeerID);
-                for (int i = 0; i < my_servers.size(); i++) {
-                    if(evnt.peer->incomingPeerID == my_servers[i].peer_id) {
-                        my_servers.erase(my_servers.begin() + i);
-                    }
-                } 
-                if (my_servers.size() == 0) {
-                    all_server_state = SERVER_DISCONNECTED;
-                }
-                break;
-            }
-        });
-
         create_new_frame();
-
         if (ImGui::Begin("Network")) 
         {
-            // if (ImGui::Button("Test Cbot Trigger")) {
-            //     send_cbot_ball_drop_trigger_signal(cbot_signal_builder.server, cbot_signal_builder.builder, cbot_signal_builder.cbot_connection);
-            // }
-
+            
             if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::Text("App");
                 ImGui::TableNextColumn();
-                ImGui::Text("Cbot");
+                ImGui::Text("Indigo");
                 ImGui::TableNextColumn();
                 sprintf(temp_string, "Not connected");
-                if (cbot_signal_builder.cbot_connection != nullptr) {
-                    if (cbot_signal_builder.cbot_connection->state == ENET_PEER_STATE_CONNECTED) {
+                if (indigo_signal_builder.indigo_connection != nullptr) {
+                    if (indigo_signal_builder.indigo_connection->state == ENET_PEER_STATE_CONNECTED) {
                         sprintf(temp_string, "Connected");
                     } 
                 }
@@ -206,18 +131,46 @@ int main(int argc, char **args)
                 ImGui::EndTable();
             }
 
-            if (ImGui::BeginTable("Servers", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+
+            if (ImGui::BeginTable("Servers", 4, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
-                for (int i = 0; i < my_servers.size(); i++)
+                for (int i = 0; i < 2; i++)
                 {
                     sprintf(temp_string, "##servers%d", i);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     ImGui::Text(my_servers[i].name);
                     ImGui::TableNextColumn();
+
+                    bool waffle_connected = false;
+                    if (my_servers[i].peer != nullptr) {
+                        if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED) {
+                            waffle_connected = true;
+                        }
+                    }
+
+                    if (ImGui::Button(waffle_connected? "Disconnect":"Connect"))
+                    {   
+                        if (waffle_connected) { 
+                            enet_peer_disconnect(my_servers[i].peer, 0);
+                        } else {
+                            my_servers[i].peer = connect_peer(&server, 
+                                my_servers[i].ip_add[0], 
+                                my_servers[i].ip_add[1], 
+                                my_servers[i].ip_add[2], 
+                                my_servers[i].ip_add[3],
+                                my_servers[i].port);
+                        }
+                    }
+                    ImGui::TableNextColumn();
                     ImGui::Text(std::to_string(my_servers[i].num_cameras).c_str());
                     ImGui::TableNextColumn();
-                    ImGui::Text(ServerStateStrings[my_servers[i].server_state]);
+
+                    if (waffle_connected) {
+                        ImGui::Text(FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
+                    } else {
+                        ImGui::Text("Not connected");
+                    }
                 }
                 ImGui::EndTable();
             }
@@ -230,12 +183,12 @@ int main(int argc, char **args)
                 if (i != network_config_folders.size()-1)
                     ImGui::SameLine();
             }
-
-            if (all_server_state == SERVER_UP || all_server_state == SERVER_DONE) {
+            
+            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
-                    input_folder = network_config_folders[network_config_select];
+                    select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
                     host_broadcast_open_cameras(fb_builder, &server, network_config_folders[network_config_select]);
                     // open cameras
                     num_cameras = 0;
@@ -279,12 +232,11 @@ int main(int argc, char **args)
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
                     camera_control->open = true;
-                    all_server_state = SERVER_WAIT;
                 }
                 ImGui::PopStyleColor(1);
             }
 
-            if (all_server_state == SERVER_OPEN_CAMERA) {
+            if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Clients start camera threads")) {
                     encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
@@ -318,40 +270,39 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
                     camera_control->subscribe = true;
-                    all_server_state = SERVER_WAIT;
                 }
                 ImGui::PopStyleColor(1);
             }
 
-            
-            if (all_server_state == SERVER_THREAD_READY) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if (ImGui::Button("Start Recording")) {
-                    // get the host ready, and then set global ptp time to start recording  
-                    unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                    int delay_in_second = 10;
-                    ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                    host_broadcast_set_start_ptp(fb_builder, &server, ptp_params->ptp_global_time);
-                    ptp_params->network_set_start_ptp = true;
-                    all_server_state = SERVER_WAIT;
+            if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTART && my_servers[1].server_state == FetchGame::ManagerState_WAITSTART) {
+                // check network servers are ready as well as local computer
+                if (ptp_params->ptp_counter==num_cameras) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
+                    if (ImGui::Button("Start Recording")) {
+                        // get the host ready, and then set global ptp time to start recording  
+                        unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
+                        int delay_in_second = 3;
+                        ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+                        host_broadcast_set_start_ptp(fb_builder, &server, ptp_params->ptp_global_time);
+                        ptp_params->network_set_start_ptp = true;
+                    }
+                    ImGui::PopStyleColor(1);
                 }
-                ImGui::PopStyleColor(1);
             }
 
-
-            if (all_server_state == SERVER_RECORDING) {
+            if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                    int delay_in_second = 10;
+                    int delay_in_second = 3;
                     ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
                     std::cout << ptp_params->ptp_stop_time << std::endl;
                     fb_builder->Clear();
                     FetchGame::ServerBuilder server_builder(*fb_builder);
-                    server_builder.add_control(FetchGame::ServerControl_STOP);
+                    server_builder.add_control(FetchGame::ServerControl_STOPRECORDING);
                     server_builder.add_ptp_global_time(ptp_params->ptp_stop_time);
                     auto my_server = server_builder.Finish();
                     fb_builder->Finish(my_server);
@@ -360,13 +311,11 @@ int main(int argc, char **args)
                     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
-                    all_server_state = SERVER_WAIT;
                 }
                 ImGui::PopStyleColor(1);
             }
 
-
-            if (my_servers.size() > 0) {
+            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
                 if(ImGui::Button("Clients close")) {
                     // broadcast data
                     fb_builder->Clear();
@@ -379,10 +328,7 @@ int main(int argc, char **args)
                     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                 }
-            } 
-
-
-
+            }    
         }
         ImGui::End();
 
@@ -433,6 +379,10 @@ int main(int argc, char **args)
             }
 
             camera_control->open = false;
+
+            for (int i=0; i<cam_count; i++) {
+                    check[i] = 0;
+            }
         }
 
         if (ImGui::Begin("Orange", NULL, ImGuiWindowFlags_MenuBar))
@@ -534,16 +484,22 @@ int main(int argc, char **args)
         if (ImGui::Begin("Local"))
         {
 
-            if (ImGui::Button("Load camera config")) {
-                load_camera_config = true;          
-                file_dialog.Open();
+            for (int i = 0; i < local_config_folders.size(); i++)
+            {
+                std::vector<std::string> folder_token = string_split(local_config_folders[i].c_str(), "/");
+                sprintf(temp_string, folder_token.back().c_str());
+                ImGui::RadioButton(temp_string, &local_config_select, i);
+                if (i != local_config_folders.size()-1)
+                    ImGui::SameLine();
             }
-
         
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
                 (camera_control->open) = !(camera_control->open);
                 if (camera_control->open) 
                 {
+                    update_camera_configs(camera_config_files, local_config_folders[local_config_select]);
+                    select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
+
                     num_cameras = 0;
                     for (int i = 0; i < cam_count; i++)
                     {
@@ -572,6 +528,7 @@ int main(int argc, char **args)
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
                                 cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo = true;
                             }
                         }
                         
@@ -596,10 +553,7 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (ImGui::Button(ptp_stream_sync ? "PTP off": "PTP on")) {
-                ptp_stream_sync = !ptp_stream_sync;
-            }
-
+            ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync); ImGui::SameLine();
             if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))
             {
                 (camera_control->subscribe) = !(camera_control->subscribe);
@@ -630,19 +584,17 @@ int main(int argc, char **args)
                         }
                     }
 
-                    if (ptp_stream_sync) {
-                        if (num_cameras > 1){
-                            for (int i = 0; i < num_cameras; i++)
-                            {
-                                ptp_camera_sync(&ecams[i].camera);
-                            }
-                            camera_control->sync_camera = true;
+                    if (ptp_stream_sync){
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            ptp_camera_sync(&ecams[i].camera);
                         }
+                        camera_control->sync_camera = true;
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
 
                 } else {
@@ -727,9 +679,6 @@ int main(int argc, char **args)
                     }
                 }
             }
-
-
-
             ImGui::Separator();
             ImGui::Spacing();
 
@@ -787,7 +736,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &cbot_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
                     camera_control->subscribe = true;                    
                 } else {
@@ -833,13 +782,6 @@ int main(int argc, char **args)
         file_dialog.Display();
         if (file_dialog.HasSelected())
         {
-            if (load_camera_config)
-            {
-                std::string camera_config_dir = file_dialog.GetSelected().string();
-                update_camera_configs(camera_config_files, file_dialog.GetSelected().string());
-                file_dialog.ClearSelected();
-                load_camera_config = false;
-            }
             input_folder = file_dialog.GetSelected().string();
             file_dialog.ClearSelected();
         }
@@ -915,7 +857,9 @@ int main(int argc, char **args)
 
         render_a_frame(window);
     }
-
+    
+    quite_enet = true;
+    enet_thread.join();
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();

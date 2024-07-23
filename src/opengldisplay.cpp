@@ -7,8 +7,8 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 
-COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, CBOTSignalBuilder* cbot_signal_builder)
-    : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), cbot_signal_builder(cbot_signal_builder)
+COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
+    : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
@@ -78,9 +78,10 @@ void COpenGLDisplay::ThreadRunning()
                     // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
                     // if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
                     if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
-                        // send a trigger signal to cbot
-                        std::cout << "trigger ball drop" << std::endl;
-                        send_cbot_ball_drop_trigger_signal(cbot_signal_builder->server, cbot_signal_builder->builder, cbot_signal_builder->cbot_connection);
+                        // std::cout << "trigger ball drop" << std::endl;
+                        if (indigo_signal_builder->indigo_connection != NULL) {
+                            send_indigo_ball_drop_trigger_signal(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection);
+                        }
                     }
                     objs_last_frame.push_back(objs[0]);
                 } else {

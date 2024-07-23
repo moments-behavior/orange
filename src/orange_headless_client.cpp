@@ -15,6 +15,7 @@
 #include <signal.h>
 
 #define evt_buffer_size 100
+#define max_cameras 20
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -80,6 +81,11 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
         camera_threads.push_back(std::thread(&acquire_frames_headless, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, encoder_setup, record_folder, ptp_params));
     }
 
+    // wait for all camera ready
+    while(ptp_params->ptp_counter!=num_cameras) {
+        usleep(10);
+    }
+
     return true;
 }
 
@@ -92,144 +98,68 @@ static void interruptHandler(const int signal)
     quit_server = true;
 }
 
-int main(int argc, char *argv[])
+struct ManagerContext
 {
-    if (enet_initialize() != 0)
-    {
-        quit_process(true, "ENET failed to initialize!");
-    }
+    FetchGame::ManagerState state;
+    bool quit;
+};
 
-    signal(SIGINT, interruptHandler);
+struct RecordingContext {
+    std::string record_folder;
+    std::string encoder_basic_setup;
+};
 
-    ENetPeer *server_connection;
-    EnetContext client;
-    if (enet_initialize(&client, 0, 1))
-    {
-        printf("Network Initialized!\n");
-        server_connection = connect_peer(&client, 192, 168, 20, 10, 3333);
-        // server_connection = connect_peer(&client, 127, 0, 0, 1, 3333);
-    }
-
-    f32 last_time = tick();
-    f32 current_time = tick();
-
-    int max_cameras = 20;
-    int cam_count;
-    GigEVisionDeviceInfo unsorted_device_info[max_cameras];
-    cam_count = scan_cameras(max_cameras, unsorted_device_info);
-    GigEVisionDeviceInfo device_info[max_cameras];
-    sort_cameras_ip(unsorted_device_info, device_info, cam_count);
-    std::cout << "available no of cameras: " << cam_count << std::endl;
-
-    CameraParams *cameras_params;
+void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigEVisionDeviceInfo* unsorted_device_info, GigEVisionDeviceInfo* device_info, std::string* config_folder, RecordingContext* recording_setup, PTPParams *ptp_params) 
+{
+    // TODO: selecting cameras 
     CameraEmergent *ecams;
+    CameraParams *cameras_params;
     std::vector<std::thread> camera_threads;
     CameraEachSelect *cameras_select;
-
-    ecams = new CameraEmergent[cam_count];
     CameraControl *camera_control = new CameraControl;
-    PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false, false};
-    
-    flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
 
-
-    while (!quit_server)
-    {
-        current_time = tick();
-        // Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
-        service_network(&client, current_time - last_time, [&](const ENetEvent &evnt)
-                        {
-            switch (evnt.type)
+    manager_context->state = FetchGame::ManagerState_IDLE;
+    while(!manager_context->quit) {
+        switch (manager_context->state) {
+            case FetchGame::ManagerState_CONNECT:
+                *cam_count = scan_cameras(max_cameras, unsorted_device_info);
+                std::cout << *cam_count << std::endl;
+                sort_cameras_ip(unsorted_device_info, device_info, *cam_count);
+                manager_context->state = FetchGame::ManagerState_CONNECTED;
+                break;
+            case FetchGame::ManagerState_OPENCAMERA:
+                ecams = new CameraEmergent[*cam_count];
+                cameras_params = new CameraParams[*cam_count];
+                cameras_select = new CameraEachSelect[*cam_count];
+                if (open_cameras(cameras_params, ecams, cameras_select, device_info, *cam_count, *config_folder)) 
                 {
-                //New connection request or an existing peer accepted our connection request
-                case ENET_EVENT_TYPE_CONNECT:
-                    {
-                        if (evnt.peer == server_connection)
-                        {
-                            printf("Network: Successfully connected to server! \n");
-                            client_send_bringup_message(&client, fb_builder, server_connection, cam_count);
-                        }
-                    }
-                    break;
-
-                //Server has sent us a new packet
-                case ENET_EVENT_TYPE_RECEIVE:
-                    {
-                        printf ("\n A packet of length %u was received from %s on channel %u.\n",
-                                evnt.packet -> dataLength,
-                                evnt.peer -> data,
-                                evnt.channelID);
-
-                        uint8_t* buffer_pointer = evnt.packet->data;
-                        auto server_control = FetchGame::GetServer(buffer_pointer);
-                        auto server_signal = server_control->control();
-
-                        if (server_signal == FetchGame::ServerControl_OPEN) {
-                            StopWatch w;
-                            w.Start();
-                            std::string config_folder = server_control->config_folder()->c_str();
-                            cameras_params = new CameraParams[cam_count];
-                            cameras_select = new CameraEachSelect[cam_count];
-                            bool camera_opened = open_cameras(cameras_params, ecams, cameras_select, device_info, cam_count, config_folder);
-                            double time_diff = w.Stop();
-                            std::cout << "Time to open cameras: " << time_diff << std::endl;
-                            if (camera_opened) {
-                                client_send_camera_open_message(&client, fb_builder, server_connection);
-                            }
-
-                        }
-                        else if (server_signal == FetchGame::ServerControl_START)
-                        {
-                            StopWatch w;
-                            w.Start();
-                            std::string record_folder = server_control->record_folder()->c_str();
-                            std::string encoder_basic_setup = server_control->encoder_setup()->c_str();
-                            bool recording_started = start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, cam_count, ptp_params, record_folder, encoder_basic_setup);
-                            double time_diff = w.Stop();
-                            std::cout << "Time to start camera threads: " << time_diff << std::endl;
-                            if(recording_started) 
-                            {
-                                client_send_thread_start_message(&client, fb_builder, server_connection);
-                            };
-                        } else if (server_signal == FetchGame::ServerControl_QUIT) {
-                            printf("Exit \n");
-                            quit_server = true;
-                        } else if (server_signal == FetchGame::ServerControl_SETPTP) {
-                            ptp_params->ptp_global_time = server_control->ptp_global_time();
-                            std::cout << ptp_params->ptp_global_time << std::endl;
-                            ptp_params->network_set_start_ptp = true;
-                            client_send_ptp_set_message(&client, fb_builder, server_connection);
-                        } else if (server_signal == FetchGame::ServerControl_STOP) {
-                            // stop recording
-                            std::cout << server_control->ptp_global_time() << std::endl;
-                            ptp_params->ptp_stop_time = server_control->ptp_global_time();
-                            std::cout << ptp_params->ptp_stop_time << std::endl;
-                            ptp_params->network_set_stop_ptp = true;
-                        }
-                        enet_packet_destroy(evnt.packet);
-                    }
-                    break;
-
-                //Server has disconnected
-                case ENET_EVENT_TYPE_DISCONNECT:
-                    {
-                        printf("Network: Server has disconnected!");
-                    }
-                    break;
-                } });
+                    manager_context->state = FetchGame::ManagerState_CAMERAOPENED;
+                } else {
+                    manager_context->state = FetchGame::ManagerState_ERROR;
+                }
+                break;
+            case FetchGame::ManagerState_STARTCAMTHREAD:
+                if (start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, *cam_count, ptp_params, recording_setup->record_folder, recording_setup->encoder_basic_setup))
+                {
+                    manager_context->state = FetchGame::ManagerState_THREADREADY;
+                } else {
+                    manager_context->state = FetchGame::ManagerState_ERROR;
+                }
+                break;                
+        }
 
         if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
             ptp_params->network_set_stop_ptp = false;
             for (auto &t : camera_threads)
                 t.join();
             
-            for (int i = 0; i < cam_count; i++)
+            for (int i = 0; i < *cam_count; i++)
             {
                 camera_threads.pop_back();
             }
 
 
-            for (int i = 0; i < cam_count; i++)
+            for (int i = 0; i < *cam_count; i++)
             {
                 ptp_sync_off(&ecams[i].camera);
             }
@@ -243,23 +173,151 @@ int main(int argc, char *argv[])
             
             camera_control->sync_camera = false;
 
-            for (int i = 0; i < cam_count; i++)
+            for (int i = 0; i < *cam_count; i++)
             {
                 destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
                 delete[] ecams[i].evt_frame;
                 check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
                 close_camera(&ecams[i].camera);
             }
-            // send signal the thread is idle
-            client_send_record_done_message(&client, fb_builder, server_connection);
+            delete[] ecams;
+            manager_context->state = FetchGame::ManagerState_RECORDSTOPPED;
         }
+        usleep(1000);
+    }
 
-        usleep(10000); // sleep for 10ms
+}
+
+
+int main(int argc, char *argv[])
+{
+    if (enet_initialize() != 0)
+    {
+        quit_process(true, "ENET failed to initialize!");
+    }
+
+    signal(SIGINT, interruptHandler);
+
+    EnetContext client;
+    if (enet_initialize(&client, 3333, 1))
+    {
+        printf("Network Initialized!\n");
+    }
+
+    f32 last_time = tick();
+    f32 current_time = tick();
+
+    int cam_count;
+    GigEVisionDeviceInfo unsorted_device_info[max_cameras];
+    cam_count = scan_cameras(max_cameras, unsorted_device_info);
+    GigEVisionDeviceInfo device_info[max_cameras];
+    sort_cameras_ip(unsorted_device_info, device_info, cam_count);
+    std::cout << "available no of cameras: " << cam_count << std::endl;
+
+    flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
+    std::string config_folder;
+    RecordingContext recording_setup;
+    ManagerContext manager_context;
+    PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, true, false, false, false};
+
+    std::thread* manager_thread = new std::thread(&create_camera_manager, &cam_count, &manager_context, unsorted_device_info, device_info, &config_folder, &recording_setup, ptp_params);
+    
+    while (!quit_server)
+    {
+        current_time = tick();
+        // Handle All Incoming Packets and Send any enqued packets, does this need to be on another thread?
+        service_network(&client, current_time - last_time, [&](const ENetEvent &evnt)
+        {
+            switch (evnt.type) 
+            {
+                //New connection request or an existing peer accepted our connection request
+                case ENET_EVENT_TYPE_CONNECT:
+                    {
+                        if (manager_context.state == FetchGame::ManagerState_IDLE) {
+                            printf("Network: Successfully connected! Rescaning cameras. \n");
+                            manager_context.state = FetchGame::ManagerState_CONNECT; // rescan number of cams
+                        } else {
+                            printf("Network: Successfully connected! \n");
+                            client_send_bringup_message(&client, fb_builder, evnt.peer, cam_count, manager_context.state);
+                        }
+                    }
+                    break;
+                //Server has sent us a new packet
+                case ENET_EVENT_TYPE_RECEIVE:
+                    {
+                        printf ("\n A packet of length %u was received from %s on channel %u.\n",
+                            evnt.packet -> dataLength,
+                            evnt.peer -> data,
+                            evnt.channelID);
+
+                        uint8_t* buffer_pointer = evnt.packet->data;
+                        auto server_control = FetchGame::GetServer(buffer_pointer);
+                        auto server_signal = server_control->control();
+
+                        if (server_signal == FetchGame::ServerControl_OPENCAMERA) {
+                            config_folder = server_control->config_folder()->c_str();
+                            manager_context.state = FetchGame::ManagerState_OPENCAMERA;
+                        }
+                        else if (server_signal == FetchGame::ServerControl_STARTTHREAD)
+                        {
+                            recording_setup.record_folder = server_control->record_folder()->c_str();
+                            recording_setup.encoder_basic_setup = server_control->encoder_setup()->c_str();
+                            manager_context.state = FetchGame::ManagerState_STARTCAMTHREAD;
+                        } else if (server_signal == FetchGame::ServerControl_QUIT) {
+                            printf("Exit \n");
+                            quit_server = true;
+                        } else if (server_signal == FetchGame::ServerControl_STARTRECORDING) {
+                            ptp_params->ptp_global_time = server_control->ptp_global_time();
+                            std::cout << ptp_params->ptp_global_time << std::endl;
+                            ptp_params->network_set_start_ptp = true;
+                            manager_context.state = FetchGame::ManagerState_WAITSTOP;
+                            client_send_state_update_message(&client, fb_builder, evnt.peer, manager_context.state);
+                        } else if (server_signal == FetchGame::ServerControl_STOPRECORDING) {
+                            // stop recording
+                            printf("stop signal\n");
+                            std::cout << server_control->ptp_global_time() << std::endl;
+                            ptp_params->ptp_stop_time = server_control->ptp_global_time();
+                            std::cout << ptp_params->ptp_stop_time << std::endl;
+                            ptp_params->network_set_stop_ptp = true;
+                        }
+                        enet_packet_destroy(evnt.packet);
+                    }
+                    break;
+
+                //Server has disconnected
+                case ENET_EVENT_TYPE_DISCONNECT:
+                    printf("Network: Server has disconnected!\n");
+                    break;
+            } });
+
+        // coordinate with other thread
+        if (manager_context.state == FetchGame::ManagerState_CONNECTED)
+        {
+            manager_context.state = FetchGame::ManagerState_IDLE;
+            client_send_bringup_message(&client, fb_builder, &client.m_pNetwork->peers[0], cam_count, manager_context.state);
+        }
+        if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {
+            manager_context.state = FetchGame::ManagerState_WAITTHREAD;
+            client_send_state_update_message(&client, fb_builder, &client.m_pNetwork->peers[0], manager_context.state);
+        } else if (manager_context.state == FetchGame::ManagerState_THREADREADY)
+        {
+            manager_context.state = FetchGame::ManagerState_WAITSTART;
+            client_send_state_update_message(&client, fb_builder, &client.m_pNetwork->peers[0], manager_context.state);
+        } else if (manager_context.state == FetchGame::ManagerState_RECORDSTOPPED)
+        {
+            manager_context.state = FetchGame::ManagerState_IDLE;
+            client_send_state_update_message(&client, fb_builder, &client.m_pNetwork->peers[0], manager_context.state);
+        }
+    
+        usleep(1000);
         last_time = current_time;
     }
 
+    manager_context.quit = true;
+    manager_thread->join();
+
     // Disconnect
-    enet_peer_disconnect(server_connection, 0);
+    enet_peer_disconnect(&client.m_pNetwork->peers[0], 0);
     uint8_t disconnected = false;
     /* Allow up to 3 seconds for the disconnect to succeed
      * and drop any packets received packets.
@@ -278,12 +336,14 @@ int main(int argc, char *argv[])
             break;
         }
     }
+    
+
     // Drop connection, since disconnection didn't successed
     if (!disconnected)
     {
-        enet_peer_reset(server_connection);
+        enet_peer_reset(&client.m_pNetwork->peers[0]);
     }
     enet_host_destroy(client.m_pNetwork);
-    quit_process();
+    enet_deinitialize();
     return 0;
 }

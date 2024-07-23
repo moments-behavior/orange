@@ -110,8 +110,8 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
 }
 
 
-GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name)
-    : CThreadWorker(name), camera_params(camera_params), display_buffer(display_buffer), encoder_setup(encoder_setup), folder_name(folder_name)
+GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name, bool* encoder_ready_signal)
+    : CThreadWorker(name), camera_params(camera_params), display_buffer(display_buffer), encoder_setup(encoder_setup), folder_name(folder_name), encoder_ready_signal(encoder_ready_signal)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = ENCODER_ENTRIES_MAX;
@@ -156,6 +156,7 @@ void GPUVideoEncoder::ThreadRunning()
     // start writing thread
     writer.video->create_thread();
 
+    *encoder_ready_signal = true;
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();

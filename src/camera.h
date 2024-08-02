@@ -90,6 +90,7 @@ void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera);
 void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip);
 void update_gain_value(Emergent::CEmergentCamera* camera, int gain_val, CameraParams* camera_params);
 void update_exposure_value(Emergent::CEmergentCamera* camera, int exposure_val, CameraParams* camera_params);
+void update_exposure_framerate_value(Emergent::CEmergentCamera *camera, int exposure_val, int* frame_rate_val, CameraParams *camera_params);
 void update_frame_rate_value(Emergent::CEmergentCamera* camera, int frame_rate_val, CameraParams* camera_params);
 void update_width_value(Emergent::CEmergentCamera* camera, int width_val, CameraParams* camera_params);
 void update_height_value(Emergent::CEmergentCamera* camera, int height_val, CameraParams* camera_params);

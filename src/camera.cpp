@@ -108,17 +108,48 @@ void update_height_value(Emergent::CEmergentCamera *camera, int height_val, Came
     }
 }
 
+
 void update_exposure_value(Emergent::CEmergentCamera *camera, int exposure_val, CameraParams *camera_params)
 {
     EVT_CameraGetUInt32ParamMax(camera, "Exposure", &camera_params->exposure_max);
     EVT_CameraGetUInt32ParamMin(camera, "Exposure", &camera_params->exposure_min);
     EVT_CameraGetUInt32ParamInc(camera, "Exposure", &camera_params->exposure_inc);
+
     if (exposure_val >= camera_params->exposure_min && exposure_val <= camera_params->exposure_max)
     {
         EVT_CameraSetUInt32Param(camera, "Exposure", exposure_val);
         camera_params->exposure = exposure_val;
     }
 }
+
+
+void update_exposure_framerate_value(Emergent::CEmergentCamera *camera, int exposure_val, int* frame_rate_val, CameraParams *camera_params)
+{
+    EVT_CameraGetUInt32ParamMax(camera, "Exposure", &camera_params->exposure_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Exposure", &camera_params->exposure_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Exposure", &camera_params->exposure_inc);
+
+    if (exposure_val >= camera_params->exposure_min && exposure_val <= camera_params->exposure_max)
+    {
+        EVT_CameraSetUInt32Param(camera, "Exposure", exposure_val);
+        camera_params->exposure = exposure_val;
+    
+        // framerate is correlated with exposure
+        EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &camera_params->frame_rate_max);
+        EVT_CameraGetUInt32ParamMin(camera, "FrameRate", &camera_params->frame_rate_min);
+        EVT_CameraGetUInt32ParamInc(camera, "FrameRate", &camera_params->frame_rate_inc);
+
+        if (*frame_rate_val < camera_params->frame_rate_min) {
+            *frame_rate_val = camera_params->frame_rate_min;
+        } else if (*frame_rate_val > camera_params->frame_rate_max) {
+            *frame_rate_val = camera_params->frame_rate_max;
+        }
+
+        EVT_CameraSetUInt32Param(camera, "FrameRate", *frame_rate_val);
+        camera_params->frame_rate = *frame_rate_val;
+    }
+}
+
 
 void update_frame_rate_value(Emergent::CEmergentCamera *camera, int frame_rate_val, CameraParams *camera_params)
 {

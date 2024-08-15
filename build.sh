@@ -43,4 +43,5 @@ g++ -w -Ofast -ffast-math -std=c++17 targets/*.o \
     -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d -lopencv_dnn -lopencv_features2d \
     -I/home/ro/build/TensorRT-8.6.1.6/include \
     -L/home/ro/build/TensorRT-8.6.1.6/lib/ -lnvinfer -lnvinfer_plugin \
+    -lLabJackM \
     `pkg-config --static --libs glfw3`

@@ -15,7 +15,15 @@
 #include "acquire_frames.h"
 #include "enet_thread.h"
 
+#include "lj_helper.h"  // labjack helper
+
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
+
+
+LabJackState lj_state;
+Pulse pulse;
+float duty_cycle = pulse.dutyCycle;
+float fps = pulse.frequency;
 
 int main(int argc, char **args)
 {
@@ -110,12 +118,48 @@ int main(int argc, char **args)
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
-        if (ImGui::Begin("Network")) 
+        if (ImGui::Begin("Labjack")) 
         {
-           // removed a 
-           
+            if(ImGui::Button(lj_state.is_connected? "disconnect T7": "connect to T7"))
+            {
+               
+                if (lj_state.is_connected)  {
+                    std::cout<<"disconnected from labjack" << std::endl;
+                    close_labjack(&lj_state);
+                }
+                else                {
+                    printf("connecting to labjack\n");
+                    std::cout<<"connected to labjack"<<std::endl;
+                    open_labjack(&lj_state);
+                }
+
+                
+            }
+            if(lj_state.is_connected) 
+            {
+                if(ImGui::Button(lj_state.pulse_on? "stop pulse": "start pulse"))
+                {
+                    if (lj_state.pulse_on) {
+                        lj_state.pulse_on = false;
+                        stop_pulsing(&lj_state);                    
+                        
+
+                    }
+                    else {
+                        lj_state.pulse_on = true;
+                        start_pulsing(&lj_state, &pulse);                    
+                    }
+                }
+
+                ImGui::SliderFloat("duty cycle", &duty_cycle, 10.0f, 20.0f, "%.3f");
+                ImGui::SliderFloat("fps", &fps, 1.0f, 180.0f, "%.3f");
+                
+                update_pulse(&pulse, fps, duty_cycle);
+            }
         }
         ImGui::End();
+
+
 
 
         if (ImGui::Begin("Orange", NULL, ImGuiWindowFlags_MenuBar))

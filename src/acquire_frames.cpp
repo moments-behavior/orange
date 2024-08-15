@@ -2,6 +2,7 @@
 #include "opengldisplay.h"
 #include "gpu_video_encoder.h"
 #include "acquire_frames.h"
+// #include "lj_helper.h"
 
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
 {
@@ -26,7 +27,6 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
     ptp_state->ptp_time_prev = ptp_state->ptp_time;
     ptp_state->frame_ts_prev = ptp_state->frame_ts;
 }
-
 
 static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, COpenGLDisplay* openGLDisplay, GPUVideoEncoder* gpu_encoder)
 {
@@ -113,7 +113,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
     }
 }
 
-void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, INDIGOSignalBuilder* indigo_signal_builder)
+void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, LabJackState *lj_state, INDIGOSignalBuilder* indigo_signal_builder)
 {
 
     CameraState camera_state;
@@ -147,45 +147,34 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
 
 
     StopWatch w;
-    w.Start();
+    bool stopwatch_started = false;
+    long long int pulse_count = 0;
+    // w.Start();
 
     while (camera_control->subscribe)
     {
-        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
-        // if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
-        //     if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {                
-        //         uint64_t ptp_stop_conuter = sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
-        //         printf("%lu\n", ptp_stop_conuter);
-        //         while (ptp_params->ptp_stop_counter != camera_params->num_cameras)
-        //         {
-        //             // printf(".");
-        //             // fflush(stdout);
-        //             usleep(10);
-        //         }
-        //         ptp_params->ptp_stop_reached = true;
-        //         camera_control->subscribe = false;
-        //         break;
-        //     }
-        // }
-        // if (offset == 200) {
-        //     phase = -1;
-        // }
-        // if (offset == 0) {
-        //     phase = 1;
-        // }
-        // if (phase == -1) {
-        //     offset--;
-        // } else { offset++; }
+        if(lj_state->pulse_on) {
+            pulse_count++;
+            get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
+            if(!stopwatch_started)
+            {
+                w.Start();
+                stopwatch_started = true;
+                
+            }
+        }
+        
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
     double time_diff = w.Stop();
 
+    
     if (camera_select->stream_on) {
         openGLDisplay->StopThread();
     }
     if (camera_control->record_video) {
         gpu_encoder->StopThread();
     }
-    report_statistics(camera_params, &camera_state, time_diff);
+    report_statistics(camera_params, &camera_state, time_diff,pulse_count);
 }

@@ -1,3 +1,4 @@
+
 #include "video_capture.h"
 #include <iostream>
 #include "camera.h"
@@ -12,21 +13,23 @@
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
+// #include "lj_helper.h"  // labjack helper
+
 #include "acquire_frames.h"
 #include "enet_thread.h"
 
-#include "lj_helper.h"  // labjack helper
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
 
-LabJackState lj_state;
+LabJackState *lj_state = new LabJackState{false, false,0,0};
 Pulse pulse;
 float duty_cycle = pulse.dutyCycle;
 float fps = pulse.frequency;
 
 int main(int argc, char **args)
 {
+    std::cout << "I'm here" << std::endl;
     gx_context *window = (gx_context *)malloc(sizeof(gx_context));
     *window = (gx_context){
         .swap_interval = 1, // use vsync
@@ -120,34 +123,34 @@ int main(int argc, char **args)
         create_new_frame();
         if (ImGui::Begin("Labjack")) 
         {
-            if(ImGui::Button(lj_state.is_connected? "disconnect T7": "connect to T7"))
+            if(ImGui::Button(lj_state->is_connected? "disconnect T7": "connect to T7"))
             {
                
-                if (lj_state.is_connected)  {
+                if (lj_state->is_connected)  {
                     std::cout<<"disconnected from labjack" << std::endl;
-                    close_labjack(&lj_state);
+                    close_labjack(lj_state);
                 }
                 else                {
                     printf("connecting to labjack\n");
                     std::cout<<"connected to labjack"<<std::endl;
-                    open_labjack(&lj_state);
+                    open_labjack(lj_state);
                 }
 
                 
             }
-            if(lj_state.is_connected) 
+            if(lj_state->is_connected) 
             {
-                if(ImGui::Button(lj_state.pulse_on? "stop pulse": "start pulse"))
+                if(ImGui::Button(lj_state->pulse_on? "stop pulse": "start pulse"))
                 {
-                    if (lj_state.pulse_on) {
-                        lj_state.pulse_on = false;
-                        stop_pulsing(&lj_state);                    
+                    if (lj_state->pulse_on) {
+                        lj_state->pulse_on = false;
+                        stop_pulsing(lj_state);                    
                         
 
                     }
                     else {
-                        lj_state.pulse_on = true;
-                        start_pulsing(&lj_state, &pulse);                    
+                        lj_state->pulse_on = true;
+                        start_pulsing(lj_state, &pulse);                    
                     }
                 }
 
@@ -336,6 +339,17 @@ int main(int argc, char **args)
                 
                 if (camera_control->subscribe)
                 {   
+                    // if on, turn off pulse and read the latest pulse settings
+                    // pulse needs to be off to open/close camera streams
+                    if(lj_state->pulse_on)
+                    {
+                        printf("pulse is on -- stopping pulse\n");
+                        stop_pulsing(lj_state);
+                    }
+                    printf("updating pulse settings\n");
+                    update_pulse(&pulse, fps, duty_cycle);
+                    
+                    // open stream --> allocate frame buffer
                     for (int i = 0; i < num_cameras; i++)
                     {               
                         camera_open_stream(&ecams[i].camera);
@@ -348,7 +362,7 @@ int main(int argc, char **args)
                         }
                     }
 
-                    // image rendering?
+                    // image rendering dependencies?
                     tex = new GL_Texture[num_cameras];                    
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -363,31 +377,41 @@ int main(int argc, char **args)
                         }
                     }
 
-                    // configure hardware sync
+                    // set hardware sync using EVT_NIC
                     for (int i = 0; i < num_cameras; i++)   {
                             set_hw_sync_evt_nic(&ecams[i].camera);
                     }
                     
-                    // start acquiring frames
+                    // start camera threads 
                     for (int i = 0; i < num_cameras; i++){
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, lj_state, &indigo_signal_builder));
                     }
 
+                    // once the threads are started, turn on the pulse
+                    start_pulsing(lj_state, &pulse);
+
                 } 
+                
                 else {
                     
                     // force cameras to stop acquiring frames (may not be the best way to do this as each camera may have different frame count)
-                    for (int i = 0; i < num_cameras; i++)   {                    
-                        check_camera_errors(EVT_CameraExecuteCommand(&ecams[i].camera, "AcquisitionStop"));
-                    }
+                    printf("stop streaming command received -- stopping pulse first\n");
+                    stop_pulsing(lj_state);
+                    sleep(1);
+                    
+                    // for (int i = 0; i < num_cameras; i++)   {                    
+                    //     check_camera_errors(EVT_CameraExecuteCommand(&ecams[i].camera, "AcquisitionStop"));
+                    // }
 
                     for (auto &t : camera_threads)
                         t.join();
-                    
+
+
                     for (int i = 0; i < num_cameras; i++)
                     {
                         camera_threads.pop_back();
                     }
+                    printf("cleaned up camera threads\n");
 
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -516,7 +540,7 @@ int main(int argc, char **args)
                     for (int i = 0; i < num_cameras; i++)
                     {
                         encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, lj_state, &indigo_signal_builder));
                     }
                     camera_control->subscribe = true;                    
                 } 

@@ -3,6 +3,7 @@
  * Desc: Provides some basic helper functions
 **/
 
+#pragma once
 #ifndef LJM_UTILITIES
 #define LJM_UTILITIES
 #include <time.h> // For timestamp info

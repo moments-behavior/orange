@@ -1,0 +1,14 @@
+{
+    "name": "Cam0",
+    "width": 3208,
+    "height": 2200,
+    "frame_rate": 30,
+    "gain": 1500,
+    "focus": 345,
+    "exposure": 2500,
+    "pixel_format": "BayerRG8",
+    "gpu_id": 1,
+    "color_temp": "CT_3000K",
+    "gpu_direct": false,
+    "color": true
+}

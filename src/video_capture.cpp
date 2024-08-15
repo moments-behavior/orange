@@ -65,7 +65,6 @@ void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, CameraParams *ca
     printf("PTP Gate time(ns): %llu\n", ptp_time_plus_delta_to_start);
 }
 
-
 void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam)
 {
     printf("Grabbing Frames after countdown...\n");

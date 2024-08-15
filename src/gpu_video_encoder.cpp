@@ -89,6 +89,7 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, D
                                      encoderInputFrame->numChromaPlanes);
 
     encoder->pEnc->EncodeFrame(encoder->vPacket);
+    std::cout << "encoded frame" << '\n';
     for (std::vector<uint8_t> &packet : encoder->vPacket)
     {
         // For each encoded packet

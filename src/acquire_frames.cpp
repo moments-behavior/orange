@@ -37,10 +37,11 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
     clock_gettime(CLOCK_REALTIME, &ts_rt1);
     uint64_t real_time = (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
 
-    if (camera_control->sync_camera)
-    {
-        PTP_timestamp_checking(ptp_state, ecam, camera_state);
-    }
+    // WILL NOT DO A SYNC CHECK HERE AS WE ARE RELYING ON THE TTL PULSE
+    // if (camera_control->sync_camera)
+    // {
+    //     PTP_timestamp_checking(ptp_state, ecam, camera_state);
+    // }
 
     if (!camera_state->camera_return)
     {
@@ -74,6 +75,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
         }
         
         if (camera_select->stream_on) {
+            //std::cout << "pushing to display" << std::endl;
             openGLDisplay->PushToDisplay(ecam->frame_recv.imagePtr, 
                 ecam->frame_recv.bufferSize, 
                 ecam->frame_recv.size_x, 
@@ -81,6 +83,8 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
                 ecam->frame_recv.pixel_type, 
                 ecam->frame_recv.timestamp,
                 camera_state->frame_count);
+            
+            //std::cout << "img sz= (" << ecam->frame_recv.size_x << ", " << ecam->frame_recv.size_y << ")" << std::endl;
         }
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
@@ -115,12 +119,16 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     CameraState camera_state;
     PTPState ptp_state;
     
+    // for display
     COpenGLDisplay* openGLDisplay;
     if (camera_select->stream_on) {
+        std::cout << "streaming on" << std::endl;
+        
         openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, indigo_signal_builder);
         openGLDisplay->StartThread();
     }
 
+    // for video encoding + recording
     GPUVideoEncoder* gpu_encoder;
     bool encoder_ready_signal = false;
     if (camera_control->record_video) {
@@ -133,47 +141,32 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
         }
         std::cout << "encoder ready\n" << std::endl;
     }
-
-    if (camera_control->sync_camera)
-    {
-        show_ptp_offset(&ptp_state, ecam);
-        start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
-    }
-
+   
+    // command camera to start image acquisition
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
 
-    if (camera_control->sync_camera)
-    {
-        grab_frames_after_countdown(&ptp_state, ecam);
-    }
 
     StopWatch w;
     w.Start();
 
-    // int OFFSET_X_VAL = 2848;
-    // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
-    // int offset = 0;
-    // int phase = 1;
     while (camera_control->subscribe)
     {
-        // int OFFSET_Y_VAL = 1300 + offset * 4;
-        // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
         get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);
-        if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
-            if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {                
-                uint64_t ptp_stop_conuter = sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
-                printf("%lu\n", ptp_stop_conuter);
-                while (ptp_params->ptp_stop_counter != camera_params->num_cameras)
-                {
-                    // printf(".");
-                    // fflush(stdout);
-                    usleep(10);
-                }
-                ptp_params->ptp_stop_reached = true;
-                camera_control->subscribe = false;
-                break;
-            }
-        }
+        // if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
+        //     if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {                
+        //         uint64_t ptp_stop_conuter = sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
+        //         printf("%lu\n", ptp_stop_conuter);
+        //         while (ptp_params->ptp_stop_counter != camera_params->num_cameras)
+        //         {
+        //             // printf(".");
+        //             // fflush(stdout);
+        //             usleep(10);
+        //         }
+        //         ptp_params->ptp_stop_reached = true;
+        //         camera_control->subscribe = false;
+        //         break;
+        //     }
+        // }
         // if (offset == 200) {
         //     phase = -1;
         // }

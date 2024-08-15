@@ -109,6 +109,7 @@ void COpenGLDisplay::ThreadRunning()
             }          
 
         }
+        std::cout << "CUDevice set to " << camera_params->gpu_id << std::endl;
         usleep(16000); // sleep for 16ms 
     }
     cudaFree(frame_original.d_orig);
@@ -124,6 +125,7 @@ bool COpenGLDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width,
     WORKER_ENTRY *entriesOut[WORK_ENTRIES_MAX]; // entris got out from saver thread, their frames should be returned to driver queue.
     int entriesOutCount = WORK_ENTRIES_MAX;
     GetObjectsFromQueueOut((void **)entriesOut, &entriesOutCount);
+    std::cout << "PushToDisplay GL tstamp: " << timestamp << std::endl;
     if (entriesOutCount)
     { // return the frames to driver, and put entries back to frameSaveEntriesFreeQueue
         // printf("++++++++++++++++++++++++ %s %s %d get WORKER_ENTRY from out entriesOutCount: %d\n", __FILE__, __FUNCTION__, __LINE__, entriesOutCount);

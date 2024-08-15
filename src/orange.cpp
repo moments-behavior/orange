@@ -69,7 +69,7 @@ int main(int argc, char **args)
     ScrollingBuffer* realtime_plot_data;
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
-    
+    bool hw_sync = true;
     flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
 
     EnetContext server;
@@ -112,278 +112,11 @@ int main(int argc, char **args)
         create_new_frame();
         if (ImGui::Begin("Network")) 
         {
-            
-            if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::Text("App");
-                ImGui::TableNextColumn();
-                ImGui::Text("Indigo");
-                ImGui::TableNextColumn();
-                sprintf(temp_string, "Not connected");
-                if (indigo_signal_builder.indigo_connection != nullptr) {
-                    if (indigo_signal_builder.indigo_connection->state == ENET_PEER_STATE_CONNECTED) {
-                        sprintf(temp_string, "Connected");
-                    } 
-                }
-                ImGui::Text(temp_string);
-                ImGui::EndTable();
-            }
-
-
-            if (ImGui::BeginTable("Servers", 4, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
-            {
-                for (int i = 0; i < 2; i++)
-                {
-                    sprintf(temp_string, "##servers%d", i);
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::Text(my_servers[i].name);
-                    ImGui::TableNextColumn();
-
-                    bool waffle_connected = false;
-                    if (my_servers[i].peer != nullptr) {
-                        if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED) {
-                            waffle_connected = true;
-                        }
-                    }
-
-                    if (ImGui::Button(waffle_connected? "Disconnect":"Connect"))
-                    {   
-                        if (waffle_connected) { 
-                            enet_peer_disconnect(my_servers[i].peer, 0);
-                        } else {
-                            my_servers[i].peer = connect_peer(&server, 
-                                my_servers[i].ip_add[0], 
-                                my_servers[i].ip_add[1], 
-                                my_servers[i].ip_add[2], 
-                                my_servers[i].ip_add[3],
-                                my_servers[i].port);
-                        }
-                    }
-                    ImGui::TableNextColumn();
-                    ImGui::Text(std::to_string(my_servers[i].num_cameras).c_str());
-                    ImGui::TableNextColumn();
-
-                    if (waffle_connected) {
-                        ImGui::Text(FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
-                    } else {
-                        ImGui::Text("Not connected");
-                    }
-                }
-                ImGui::EndTable();
-            }
-            
-            for (int i = 0; i < network_config_folders.size(); i++)
-            {
-                std::vector<std::string> folder_token = string_split(network_config_folders[i].c_str(), "/");
-                sprintf(temp_string, folder_token.back().c_str());
-                ImGui::RadioButton(temp_string, &network_config_select, i); 
-                if (i != network_config_folders.size()-1)
-                    ImGui::SameLine();
-            }
-            
-            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if(ImGui::Button("Open Cameras")) {
-                    update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
-                    select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
-                    host_broadcast_open_cameras(fb_builder, &server, network_config_folders[network_config_select]);
-                    // open cameras
-                    num_cameras = 0;
-                    for (int i = 0; i < cam_count; i++)
-                    {
-                        if (check[i])
-                        {
-                            num_cameras++;
-                        }
-                    }
-                    if (num_cameras > 0) {
-                        cameras_params = new CameraParams[num_cameras];
-                        cameras_select = new CameraEachSelect[num_cameras];
-                        
-                        std::vector<int> selected_cameras;
-                        for (int i = 0; i < cam_count; i++)
-                        {
-                            if (check[i]) {
-                                selected_cameras.push_back(i);
-                            }
-                        }
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
-                        }
-
-                        for (int i =0; i < num_cameras; i++) {
-                            cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name.compare("Cam16") == 0) {
-                                cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
-                            }
-                        }
-
-                        ecams = new CameraEmergent[num_cameras];
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
-                        }
-
-                        realtime_plot_data = new ScrollingBuffer[num_cameras];
-                    }
-                    camera_control->open = true;
-                }
-                ImGui::PopStyleColor(1);
-            }
-
-            if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if(ImGui::Button("Clients start camera threads")) {
-                    encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
-                    make_folder_for_recording(folder_name, input_folder, subfix_buf);
-                    ptp_params->network_sync = true;
-                    host_broadcast_start_threads(fb_builder, &server, folder_name, encoder_basic_setup);
-
-                    // start local recording threads
-                    allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
-        
-                    tex = new GL_Texture[num_cameras];
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        if (cameras_select[i].stream_on) {
-                            cudaStreamCreate(&tex[i].streams);
-                            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                            register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size, &tex[i].cuda_resource);
-                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
-                        }
-                    }
-
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        ptp_camera_sync(&ecams[i].camera);
-                    }
-                    camera_control->sync_camera = true;
-                    camera_control->record_video = true;
-
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
-                    }
-                    camera_control->subscribe = true;
-                }
-                ImGui::PopStyleColor(1);
-            }
-
-            if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTART && my_servers[1].server_state == FetchGame::ManagerState_WAITSTART) {
-                // check network servers are ready as well as local computer
-                if (ptp_params->ptp_counter==num_cameras) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                    if (ImGui::Button("Start Recording")) {
-                        // get the host ready, and then set global ptp time to start recording  
-                        unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                        int delay_in_second = 3;
-                        ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                        host_broadcast_set_start_ptp(fb_builder, &server, ptp_params->ptp_global_time);
-                        ptp_params->network_set_start_ptp = true;
-                    }
-                    ImGui::PopStyleColor(1);
-                }
-            }
-
-            if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if (ImGui::Button("Stop Recording")) {
-                    unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-                    int delay_in_second = 3;
-                    ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-                    std::cout << ptp_params->ptp_stop_time << std::endl;
-                    fb_builder->Clear();
-                    FetchGame::ServerBuilder server_builder(*fb_builder);
-                    server_builder.add_control(FetchGame::ServerControl_STOPRECORDING);
-                    server_builder.add_ptp_global_time(ptp_params->ptp_stop_time);
-                    auto my_server = server_builder.Finish();
-                    fb_builder->Finish(my_server);
-                    uint8_t *server_buffer = fb_builder->GetBufferPointer();
-                    int server_buf_size = fb_builder->GetSize();
-                    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
-                    ptp_params->network_set_stop_ptp = true;
-                }
-                ImGui::PopStyleColor(1);
-            }
-
-            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
-                if(ImGui::Button("Clients close")) {
-                    // broadcast data
-                    fb_builder->Clear();
-                    FetchGame::ServerBuilder server_builder(*fb_builder);
-                    server_builder.add_control(FetchGame::ServerControl_QUIT);
-                    auto my_server = server_builder.Finish();
-                    fb_builder->Finish(my_server);
-                    uint8_t *server_buffer = fb_builder->GetBufferPointer();
-                    int server_buf_size = fb_builder->GetSize();
-                    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
-                    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
-                }
-            }    
+           // removed a 
+           
         }
         ImGui::End();
 
-        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) 
-        {
-            
-            ptp_params->network_set_stop_ptp = false;
-
-            for (auto &t : camera_threads)
-                t.join();
-            
-            for (int i = 0; i < num_cameras; i++)
-            {
-                camera_threads.pop_back();
-            }
-            for (int i = 0; i < num_cameras; i++)
-            {
-                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-                delete[] ecams[i].evt_frame;
-                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                if (cameras_select[i].stream_on) {
-                    gx_delete_buffer(&tex[i].pbo);
-                    unmap_cuda_resource(&tex[i].cuda_resource);
-                    cuda_unregister_pbo(tex[i].cuda_resource);
-                }
-            }
-            
-            delete[] tex;                     
-
-            for (int i = 0; i < num_cameras; i++)
-            {
-                ptp_sync_off(&ecams[i].camera);
-            }
-            camera_control->sync_camera = false;
-            camera_control->record_video = false;
-
-            ptp_params->ptp_global_time = 0;
-            ptp_params->ptp_stop_time = 0;
-            ptp_params->ptp_counter = 0;
-            ptp_params->ptp_stop_counter = 0;
-            ptp_params->network_sync = false;
-            ptp_params->network_set_start_ptp = false;
-            ptp_params->ptp_stop_reached = false;
-
-            for (int i = 0; i < num_cameras; i++)
-            {
-                close_camera(&ecams[i].camera);
-            }
-
-            camera_control->open = false;
-
-            for (int i=0; i<cam_count; i++) {
-                    check[i] = 0;
-            }
-        }
 
         if (ImGui::Begin("Orange", NULL, ImGuiWindowFlags_MenuBar))
         {
@@ -497,14 +230,13 @@ int main(int argc, char **args)
                 (camera_control->open) = !(camera_control->open);
                 if (camera_control->open) 
                 {
+                    // this the configs and updates the config values in this namespace(?)
                     update_camera_configs(camera_config_files, local_config_folders[local_config_select]);
                     select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
 
                     num_cameras = 0;
-                    for (int i = 0; i < cam_count; i++)
-                    {
-                        if (check[i])
-                        {
+                    for (int i = 0; i < cam_count; i++) {
+                        if (check[i])   {
                             num_cameras++;
                         }
                     }
@@ -513,14 +245,13 @@ int main(int argc, char **args)
                         cameras_select = new CameraEachSelect[num_cameras];
 
                         std::vector<int> selected_cameras;
-                        for (int i = 0; i < cam_count; i++)
-                        {
+                        for (int i = 0; i < cam_count; i++) {
                             if (check[i]) {
                                 selected_cameras.push_back(i);
                             }
                         }
-                        for (int i = 0; i < num_cameras; i++)
-                        {
+
+                        for (int i = 0; i < num_cameras; i++)   {
                             set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
                         }
 
@@ -533,16 +264,17 @@ int main(int argc, char **args)
                         }
                         
                         ecams = new CameraEmergent[num_cameras];
-                        for (int i = 0; i < num_cameras; i++)
-                        {
+                        for (int i = 0; i < num_cameras; i++)   {
+                            
                             open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+
                         }
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
 
-                } else {
-                    for (int i = 0; i < num_cameras; i++)
-                    {
+                } 
+                else {
+                    for (int i = 0; i < num_cameras; i++){
                         close_camera(&ecams[i].camera);
                     }
                     delete[] cameras_params;
@@ -553,10 +285,11 @@ int main(int argc, char **args)
             ImGui::Separator();
             ImGui::Spacing();
 
-            ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync); ImGui::SameLine();
-            if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))
+            ImGui::Checkbox("HW Stream Sync", &hw_sync); ImGui::SameLine();            
+            if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))    
             {
                 (camera_control->subscribe) = !(camera_control->subscribe);
+                
                 if (camera_control->subscribe)
                 {   
                     for (int i = 0; i < num_cameras; i++)
@@ -571,10 +304,12 @@ int main(int argc, char **args)
                         }
                     }
 
-                    tex = new GL_Texture[num_cameras];
+                    // image rendering?
+                    tex = new GL_Texture[num_cameras];                    
                     for (int i = 0; i < num_cameras; i++)
                     {
                         if (cameras_select[i].stream_on) {
+                            std::cout << "streaming on" << std::endl;
                             cudaStreamCreate(&tex[i].streams);
                             create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
                             register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
@@ -584,20 +319,24 @@ int main(int argc, char **args)
                         }
                     }
 
-                    if (ptp_stream_sync){
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_camera_sync(&ecams[i].camera);
-                        }
-                        camera_control->sync_camera = true;
+                    // configure hardware sync
+                    for (int i = 0; i < num_cameras; i++)   {
+                            set_hw_sync_evt_nic(&ecams[i].camera);
                     }
-
-                    for (int i = 0; i < num_cameras; i++)
-                    {
+                    
+                    // start acquiring frames
+                    for (int i = 0; i < num_cameras; i++){
                         camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
 
-                } else {
+                } 
+                else {
+                    
+                    // force cameras to stop acquiring frames (may not be the best way to do this as each camera may have different frame count)
+                    for (int i = 0; i < num_cameras; i++)   {                    
+                        check_camera_errors(EVT_CameraExecuteCommand(&ecams[i].camera, "AcquisitionStop"));
+                    }
+
                     for (auto &t : camera_threads)
                         t.join();
                     
@@ -725,12 +464,9 @@ int main(int argc, char **args)
                         }
                     }
 
-                    if (num_cameras > 1){
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_camera_sync(&ecams[i].camera);
-                        }
-                        camera_control->sync_camera = true;
+                    // configure hardware sync
+                    for (int i = 0; i < num_cameras; i++)   {
+                            set_hw_sync_evt_nic(&ecams[i].camera);
                     }
 
                     for (int i = 0; i < num_cameras; i++)
@@ -739,7 +475,8 @@ int main(int argc, char **args)
                         camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
                     }
                     camera_control->subscribe = true;                    
-                } else {
+                } 
+                else {
                     camera_control->subscribe = false;
 
                     for (auto &t : camera_threads)

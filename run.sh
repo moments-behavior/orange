@@ -1,1 +1,1 @@
-sudo LD_LIBRARY_PATH=/usr/local/cuda/lib64:/home/user/nvidia/ffmpeg/build/lib:/home/user/build/mujoco-2.3.7/lib:/home/user/build/TensorRT-8.6.1.6/lib ./targets/orange
+sudo LD_LIBRARY_PATH=/usr/local/cuda/lib64:/home/ro/build/FFmpeg/build/lib:/home/ro/build/mujoco-2.3.7/lib:/home/ro/build/TensorRT-8.6.1.6/lib ./targets/orange

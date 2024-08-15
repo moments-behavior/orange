@@ -108,7 +108,6 @@ void update_height_value(Emergent::CEmergentCamera *camera, int height_val, Came
     }
 }
 
-
 void update_exposure_value(Emergent::CEmergentCamera *camera, int exposure_val, CameraParams *camera_params)
 {
     EVT_CameraGetUInt32ParamMax(camera, "Exposure", &camera_params->exposure_max);
@@ -121,7 +120,6 @@ void update_exposure_value(Emergent::CEmergentCamera *camera, int exposure_val, 
         camera_params->exposure = exposure_val;
     }
 }
-
 
 void update_exposure_framerate_value(Emergent::CEmergentCamera *camera, int exposure_val, int* frame_rate_val, CameraParams *camera_params)
 {
@@ -149,7 +147,6 @@ void update_exposure_framerate_value(Emergent::CEmergentCamera *camera, int expo
         camera_params->frame_rate = *frame_rate_val;
     }
 }
-
 
 void update_frame_rate_value(Emergent::CEmergentCamera *camera, int frame_rate_val, CameraParams *camera_params)
 {
@@ -265,6 +262,18 @@ void ptp_sync_off(Emergent::CEmergentCamera *camera)
     check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"));
     check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"));
     check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+}
+
+void set_hw_sync_evt_nic(Emergent::CEmergentCamera* camera)
+{
+    // configurations to sync using TTL pulse to an EVT NIC
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"));    
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"));    
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));    
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "Off"));
+    
 }
 
 // use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds

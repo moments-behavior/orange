@@ -83,6 +83,7 @@ void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergen
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size);
 void ptp_camera_sync(Emergent::CEmergentCamera* camera);
+void set_hw_sync_evt_nic(Emergent::CEmergentCamera* camera);
 void ptp_sync_off(Emergent::CEmergentCamera *camera);
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
 unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera);

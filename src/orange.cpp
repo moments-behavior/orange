@@ -142,16 +142,17 @@ int main(int argc, char **args)
                     ImGui::Text(my_servers[i].name);
                     ImGui::TableNextColumn();
 
-                    bool waffle_connected = false;
                     if (my_servers[i].peer != nullptr) {
                         if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED) {
-                            waffle_connected = true;
+                            my_servers[i].connected = true;
                         }
+                    } else {
+                        my_servers[i].connected = false;
                     }
-
-                    if (ImGui::Button(waffle_connected? "Disconnect":"Connect"))
+                    
+                    if (ImGui::Button(my_servers[i].connected ? "Disconnect":"Connect"))
                     {   
-                        if (waffle_connected) { 
+                        if (my_servers[i].connected) { 
                             enet_peer_disconnect(my_servers[i].peer, 0);
                         } else {
                             my_servers[i].peer = connect_peer(&server, 
@@ -166,7 +167,7 @@ int main(int argc, char **args)
                     ImGui::Text(std::to_string(my_servers[i].num_cameras).c_str());
                     ImGui::TableNextColumn();
 
-                    if (waffle_connected) {
+                    if (my_servers[i].connected) {
                         ImGui::Text(FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
                     } else {
                         ImGui::Text("Not connected");
@@ -184,7 +185,7 @@ int main(int argc, char **args)
                     ImGui::SameLine();
             }
             
-            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
+            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE && my_servers[0].connected && my_servers[1].connected) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
@@ -293,7 +294,7 @@ int main(int argc, char **args)
                 }
             }
 
-            if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP) {
+            if (ptp_params->ptp_start_reached && my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
@@ -372,6 +373,7 @@ int main(int argc, char **args)
             ptp_params->network_sync = false;
             ptp_params->network_set_start_ptp = false;
             ptp_params->ptp_stop_reached = false;
+            ptp_params->ptp_start_reached = false;
 
             for (int i = 0; i < num_cameras; i++)
             {
@@ -431,8 +433,7 @@ int main(int argc, char **args)
                 file_dialog.Open();
             }
             ImGui::SameLine();
-            ImGui::Text(input_folder.c_str());
-
+            ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, input_folder.c_str());
 
             {
                 const char* items[] = { "h264", "hevc"};

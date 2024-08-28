@@ -70,6 +70,7 @@ struct PTPParams{
     uint64_t ptp_counter;
     uint64_t ptp_stop_counter;
     bool network_sync = false;
+    bool ptp_start_reached = false;
     bool ptp_stop_reached = false;
     bool network_set_stop_ptp = false;
     bool network_set_start_ptp = false;

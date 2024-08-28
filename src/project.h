@@ -17,6 +17,7 @@ struct ConnectedServer {
     ENetPeer* peer;
     int num_cameras;
     FetchGame::ManagerState server_state;
+    bool connected;
 };
 
 
@@ -30,6 +31,7 @@ void intialize_servers(ConnectedServer* my_servers)
     my_servers[0].ip_add[2] = 20;
     my_servers[0].ip_add[3] = 60;
     my_servers[0].port = 3333;
+    my_servers[0].connected = false;
     strcpy(my_servers[0].name, "waffle-0");
 
 
@@ -41,6 +43,7 @@ void intialize_servers(ConnectedServer* my_servers)
     my_servers[1].ip_add[2] = 20;
     my_servers[1].ip_add[3] = 61;
     my_servers[1].port = 3333;
+    my_servers[1].connected = false;
     strcpy(my_servers[1].name, "waffle-1");
 }
 

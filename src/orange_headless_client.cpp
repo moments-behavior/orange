@@ -170,7 +170,7 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
             ptp_params->network_sync = true;
             ptp_params->network_set_start_ptp = false;
             ptp_params->ptp_stop_reached = false;
-            
+            ptp_params->ptp_start_reached = false;
             camera_control->sync_camera = false;
 
             for (int i = 0; i < *cam_count; i++)

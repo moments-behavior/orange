@@ -146,7 +146,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     {
         grab_frames_after_countdown(&ptp_state, ecam);
     }
-
+    ptp_params->ptp_start_reached = true;
     StopWatch w;
     w.Start();
 

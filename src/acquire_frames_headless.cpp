@@ -100,7 +100,7 @@ static inline void get_one_frame_headless(CameraState *camera_state, CameraEachS
 
 void acquire_frames_headless(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params)
 {
-
+    StopWatch w;
     CameraState camera_state;
     PTPState ptp_state;
 
@@ -131,7 +131,6 @@ void acquire_frames_headless(CameraEmergent *ecam, CameraParams *camera_params, 
     }
 
     ptp_params->ptp_start_reached = true;
-    StopWatch w;
     w.Start();
 
     while (camera_control->subscribe)

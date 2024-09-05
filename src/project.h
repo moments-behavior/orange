@@ -316,6 +316,7 @@ bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device
     return true;
 }
 
+
 void allocate_camera_frame_buffers(CameraEmergent* ecams, CameraParams* cameras_params, int evt_buffer_size, int num_cameras)
 {
     for (int i = 0; i < num_cameras; i++)

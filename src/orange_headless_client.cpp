@@ -191,41 +191,6 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
         }
         usleep(1000);
     }
-
-    // check camera threads, if still camera threads, force quit
-    if (camera_threads.size() > 0) {
-        camera_control->subscribe = false;
-        for (auto &t : camera_threads)
-            t.join();
-        
-        for (int i = 0; i < *cam_count; i++)
-        {
-            camera_threads.pop_back();
-        }
-
-        for (int i = 0; i < *cam_count; i++)
-        {
-            ptp_sync_off(&ecams[i].camera);
-        }
-        ptp_params->ptp_global_time = 0;
-        ptp_params->ptp_stop_time = 0;
-        ptp_params->ptp_counter = 0;
-        ptp_params->ptp_stop_counter = 0;
-        ptp_params->network_sync = true;
-        ptp_params->network_set_start_ptp = false;
-        ptp_params->ptp_stop_reached = false;
-        ptp_params->ptp_start_reached = false;
-        camera_control->sync_camera = false;
-
-        for (int i = 0; i < *cam_count; i++)
-        {
-            destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-            delete[] ecams[i].evt_frame;
-            check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-            close_camera(&ecams[i].camera);
-        }
-        delete[] ecams;
-    }
 }
 
 

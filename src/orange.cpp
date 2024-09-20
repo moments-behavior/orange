@@ -6,7 +6,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
-#include <imfilebrowser.h>
+#include <ImGuiFileDialog.h>
 #include "project.h"
 #include "gui.h"
 #include <sys/stat.h>
@@ -36,15 +36,14 @@ int main(int argc, char **args)
     GigEVisionDeviceInfo device_info[max_cameras];
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
-    ImGui::FileBrowser file_dialog(ImGuiFileBrowserFlags_SelectDirectory | ImGuiFileBrowserFlags_CreateNewDir);
     std::filesystem::path cwd = std::filesystem::current_path();
     std::string delimiter = "/";
     std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
 
     std::string home_directory = "/home/" + tokenized_path[2];
     std::string input_folder = home_directory + "/exp/unsorted";
-    file_dialog.SetPwd(input_folder);
-    file_dialog.SetTitle("My files");
+    std::string yolo_model_folder = home_directory + "/detect";
+    std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
 
     bool check[cam_count] {0};
     CameraParams *cameras_params;
@@ -430,8 +429,12 @@ int main(int argc, char **args)
 
             if (ImGui::Button("Save to"))
             {
-                file_dialog.Open();
+                IGFD::FileDialogConfig config;
+                config.countSelectionMax = 1;
+                config.path = input_folder;
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseDirDlgKey", "Choose a Directory", nullptr, config);
             }
+
             ImGui::SameLine();
             ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, input_folder.c_str());
 
@@ -448,6 +451,17 @@ int main(int argc, char **args)
                 ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
                 encoder_preset = items[item_current];
             }
+
+            // selection for yolo model
+            if (ImGui::Button("Select YOLO"))
+            {
+                IGFD::FileDialogConfig config;
+                config.countSelectionMax = 1;
+                config.path = yolo_model_folder;
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".engine", config);
+            }
+            ImGui::SameLine();
+            ImGui::Text(yolo_model.c_str());
 
             if (camera_control->open) {
                 set_camera_properties(ecams, cameras_params, num_cameras);
@@ -481,6 +495,28 @@ int main(int argc, char **args)
             }
         }
         ImGui::End();
+
+        // file explorer display
+        if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey"))
+        { // => will show a dialog
+            if (ImGuiFileDialog::Instance()->IsOk())
+            { // action if OK
+                yolo_model = ImGuiFileDialog::Instance()->GetFilePathName();
+            }
+            // close
+            ImGuiFileDialog::Instance()->Close();
+        }
+
+        if (ImGuiFileDialog::Instance()->Display("ChooseDirDlgKey"))
+        { // => will show a dialog
+            if (ImGuiFileDialog::Instance()->IsOk())
+            { // action if OK
+                auto selected_folder = ImGuiFileDialog::Instance()->GetSelection();
+                input_folder = ImGuiFileDialog::Instance()->GetCurrentPath();
+            }
+            // close
+            ImGuiFileDialog::Instance()->Close();
+        }
 
         if (ImGui::Begin("Local"))
         {
@@ -779,13 +815,6 @@ int main(int argc, char **args)
             ImGui::PopStyleColor(1);
         }
         ImGui::End();
-
-        file_dialog.Display();
-        if (file_dialog.HasSelected())
-        {
-            input_folder = file_dialog.GetSelected().string();
-            file_dialog.ClearSelected();
-        }
 
         if (camera_control->subscribe)
         {

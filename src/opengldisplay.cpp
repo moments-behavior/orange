@@ -72,6 +72,10 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->copy_keypoints_gpu(d_points, objs);
 
                 if (objs.size() > 0) {
+                    // unproject point to 3d for grabbing
+                    f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
+                    f32 bbox_center_y = objs[0].rect.y + objs[0].rec.height / 2.0;
+                    
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
                     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
                     // std::cout << bbox_center_x << std::endl;

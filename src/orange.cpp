@@ -9,6 +9,7 @@
 #include <ImGuiFileDialog.h>
 #include "project.h"
 #include "gui.h"
+#include "realtime_tool.h"
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
@@ -42,8 +43,11 @@ int main(int argc, char **args)
 
     std::string home_directory = "/home/" + tokenized_path[2];
     std::string input_folder = home_directory + "/exp/unsorted";
-    std::string yolo_model_folder = home_directory + "/detect";
-    std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
+
+    DetectionData* detection_data = new DetectionData;
+    detection_data->calibration_folder = home_directory + "/Calibration/5cam";
+    detection_data->yolo_model_folder = home_directory + "/detect";
+    detection_data->yolo_model = detection_data->yolo_model_folder + "/rat_bbox.engine";
 
     bool check[cam_count] {0};
     CameraParams *cameras_params;
@@ -267,10 +271,15 @@ int main(int argc, char **args)
                     camera_control->sync_camera = true;
                     camera_control->record_video = true;
 
+                    // detection data allocate
+                    detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
+                    for (int i = 0; i < num_cameras; i++) {
+                        detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
+                    }
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, &detection_data->detect_per_cam[i]));
                     }
                     camera_control->subscribe = true;
                 }
@@ -457,11 +466,12 @@ int main(int argc, char **args)
             {
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
-                config.path = yolo_model_folder;
+                config.path = detection_data->yolo_model_folder;
                 ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".engine", config);
             }
             ImGui::SameLine();
-            ImGui::Text(yolo_model.c_str());
+            ImGui::Text(detection_data->yolo_model.c_str());
+            ImGui::Text(detection_data->calibration_folder.c_str());
 
             if (camera_control->open) {
                 set_camera_properties(ecams, cameras_params, num_cameras);
@@ -501,7 +511,7 @@ int main(int argc, char **args)
         { // => will show a dialog
             if (ImGuiFileDialog::Instance()->IsOk())
             { // action if OK
-                yolo_model = ImGuiFileDialog::Instance()->GetFilePathName();
+                detection_data->yolo_model = ImGuiFileDialog::Instance()->GetFilePathName();
             }
             // close
             ImGuiFileDialog::Instance()->Close();
@@ -629,9 +639,15 @@ int main(int argc, char **args)
                         camera_control->sync_camera = true;
                     }
 
+                    // detection data allocate
+                    detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
+                    for (int i = 0; i < num_cameras; i++) {
+                        detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
+                    }
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, &detection_data->detect_per_cam[i]));
                     }
 
                 } else {
@@ -770,11 +786,17 @@ int main(int argc, char **args)
                         camera_control->sync_camera = true;
                     }
 
+                    // detection data allocate
+                    detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
+                    for (int i = 0; i < num_cameras; i++) {
+                        detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
+                    }
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, &detection_data->detect_per_cam[i]));
                     }
+                    
                     camera_control->subscribe = true;                    
                 } else {
                     camera_control->subscribe = false;

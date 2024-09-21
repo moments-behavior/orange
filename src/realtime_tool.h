@@ -25,6 +25,7 @@ struct CameraCalibResults
 
 struct DetectionDataPerCam {
     std::string yolo_model;
+    std::string calibration_file;
     CameraCalibResults camera_calib;
 };
 
@@ -37,5 +38,5 @@ struct DetectionData {
 
 void print_calibration_results(CameraCalibResults* calib_results);
 bool load_camera_calibration_results(std::string calibration_file, CameraCalibResults* calib_results); 
-
+std::vector<cv::Point3d> unproject2d_to_3d(const std::vector<cv::Point2d> &points, const std::vector<double> &Z, CameraCalibResults *camera_calib);
 #endif

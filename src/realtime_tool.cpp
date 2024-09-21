@@ -41,7 +41,6 @@ std::string cvmat_type2str(int type)
     return r;
 }
 
-
 void print_calibration_results(CameraCalibResults *calib_results)
 {
     std::cout << "k = " << std::endl
@@ -58,15 +57,15 @@ void print_calibration_results(CameraCalibResults *calib_results)
               << std::endl;
     std::cout << "tvec = " << std::endl
               << cv::format(calib_results->tvec, cv::Formatter::FMT_PYTHON) << std::endl
-              << cvmat_type2str(calib_results->tvec.type()) << std::endl              
+              << cvmat_type2str(calib_results->tvec.type()) << std::endl
               << std::endl;
     std::cout << "rvec = " << std::endl
               << cv::format(calib_results->rvec, cv::Formatter::FMT_PYTHON) << std::endl
-              << cvmat_type2str(calib_results->rvec.type()) << std::endl                            
+              << cvmat_type2str(calib_results->rvec.type()) << std::endl
               << std::endl;
     std::cout << "projection_mat = " << std::endl
               << cv::format(calib_results->projection_mat, cv::Formatter::FMT_PYTHON) << std::endl
-              << cvmat_type2str(calib_results->projection_mat.type()) << std::endl                                          
+              << cvmat_type2str(calib_results->projection_mat.type()) << std::endl
               << std::endl;
 }
 
@@ -89,13 +88,54 @@ bool load_camera_calibration_results(std::string calibration_file, CameraCalibRe
     return true;
 }
 
-// std::vector<cv::Point3f> unproject(std::vector<cv::Point2f> points2d, std::vector<cv::Point2f> z_coord, CameraCalibResults *camera_calib)
-// {
-//     f64 f_x = camera_calib->k.at<double>(0, 0);
-//     f64 f_y = camera_calib->k.at<double>(1, 1);
-//     f64 c_x = camera_calib->k.at<double>(0, 2);
-//     f64 c_y = camera_calib->k.at<double>(1, 2);
 
-//     // cv::Mat point_undistort;
-//     // cv::undistortPoints(points2d, point_undistort, camera_calib->k, camera_calib->dist_coeffs, cv::noArray(), camera_calib->k);
-// }
+std::vector<cv::Point3d> unproject2d_to_3d(const std::vector<cv::Point2d> &points, const std::vector<double> &Z, CameraCalibResults *camera_calib)
+{
+    double f_x = camera_calib->k.at<double>(0, 0);
+    double f_y = camera_calib->k.at<double>(1, 1);
+    double c_x = camera_calib->k.at<double>(0, 2);
+    double c_y = camera_calib->k.at<double>(1, 2);
+
+    std::vector<cv::Point2d> points_undistorted;
+    assert(Z.size() == 1 || Z.size() == points.size());
+    if (!points.empty())
+    {
+        cv::undistortPoints(points, points_undistorted, camera_calib->k, camera_calib->dist_coeffs, cv::noArray(), camera_calib->k);
+    }
+    
+    std::vector<cv::Point3d> temp_pts;
+    temp_pts.reserve(points.size());
+    for (size_t idx = 0; idx < points_undistorted.size(); ++idx)
+    {
+        temp_pts.push_back(
+            cv::Point3d((points_undistorted[idx].x - c_x) / f_x,
+                        (points_undistorted[idx].y - c_y) / f_y, 
+                        1.0));
+    }
+     
+    cv::Mat temp_pts_mat(3, temp_pts.size(), CV_64FC1, temp_pts.data());    
+    cv::Mat r_transpose = camera_calib->r;
+
+    cv::Mat left_eqn = r_transpose * temp_pts_mat;
+    cv::Mat right_eqn0 = r_transpose * camera_calib->tvec;
+
+    std::vector<cv::Point3d> z_camera;
+    for (size_t idx = 0; idx < points_undistorted.size(); ++idx) {
+        const double z = Z.size() == 1 ? Z[0] : Z[idx];
+        double temp_z =  (z + right_eqn0.at<double>(2, 0)) / left_eqn.at<double>(2, idx);
+        z_camera.push_back(temp_pts[idx] * temp_z);
+    }
+
+    cv::Mat z_camera_mat(3, temp_pts.size(), CV_64FC1, z_camera.data());
+    cv::Mat pts_world = r_transpose * (z_camera_mat - camera_calib->tvec);
+
+    std::vector<cv::Point3d> results;    
+    // Convert cv::Mat to std::vector<cv::Point3d>
+    for (int i = 0; i < pts_world.cols; i++) {
+        double x = pts_world.at<double>(0, i);
+        double y = pts_world.at<double>(1, i);
+        double z = pts_world.at<double>(2, i);
+        results.emplace_back(x, y, z);
+    }
+    return results;
+}

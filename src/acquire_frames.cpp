@@ -117,7 +117,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     
     COpenGLDisplay* openGLDisplay;
     if (camera_select->stream_on) {
-        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, indigo_signal_builder);
+        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, indigo_signal_builder, detect_per_cam);
         openGLDisplay->StartThread();
     }
 

@@ -2,13 +2,14 @@
 #include "threadworker.h"
 #include "image_processing.h"
 #include "yolov8_det.h"
+#include "realtime_tool.h"
 
 #define WORK_ENTRIES_MAX 2
 
 class COpenGLDisplay : public CThreadWorker
 {
 public:
-    COpenGLDisplay(const char* name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder); // name is the thread name
+    COpenGLDisplay(const char* name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder, DetectionDataPerCam* detect_per_cam); // name is the thread name
     ~COpenGLDisplay ();
 
 	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id);
@@ -20,6 +21,7 @@ public:
 	FrameGPU frame_original; // frame on gpu device 
 	Debayer debayer;
 	INDIGOSignalBuilder* indigo_signal_builder;
+	DetectionDataPerCam* detect_per_cam;
 	//for real time: refactor this
 	unsigned char *d_convert;
     YOLOv8* yolov8;

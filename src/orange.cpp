@@ -47,7 +47,7 @@ int main(int argc, char **args)
     DetectionData* detection_data = new DetectionData;
     detection_data->calibration_folder = home_directory + "/Calibration/5cam";
     detection_data->yolo_model_folder = home_directory + "/detect";
-    detection_data->yolo_model = detection_data->yolo_model_folder + "/rat_bbox.engine";
+    detection_data->yolo_model = detection_data->yolo_model_folder + "/ball.engine";
 
     bool check[cam_count] {0};
     CameraParams *cameras_params;
@@ -275,6 +275,7 @@ int main(int argc, char **args)
                     detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
                         detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
+                        detection_data->detect_per_cam->calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params->camera_serial + ".yaml";
                     }
 
                     for (int i = 0; i < num_cameras; i++)
@@ -643,6 +644,7 @@ int main(int argc, char **args)
                     detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
                         detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
+                        detection_data->detect_per_cam->calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params->camera_serial + ".yaml";
                     }
 
                     for (int i = 0; i < num_cameras; i++)
@@ -790,6 +792,7 @@ int main(int argc, char **args)
                     detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
                         detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
+                        detection_data->detect_per_cam->calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params->camera_serial + ".yaml";
                     }
 
                     for (int i = 0; i < num_cameras; i++)

@@ -1,10 +1,102 @@
 #include "camera.h"
-#include "camera_driver_helper.h"
 #include <iostream>
+
+std::string get_evt_error_string(EVT_ERROR error)
+{
+    std::string error_string; 
+    switch (error)
+    {
+        case EVT_ENOENT:
+            error_string = "No such file or directory.";
+            break;
+        case EVT_ERROR_SRCH: 
+            error_string = "No such process.";
+            break;
+        case EVT_ERROR_IO:
+            error_string = "I/O error";
+            break;
+        case EVT_ERROR_ECHILD:
+            error_string = "Child process or thread create error.";
+            break;
+        case EVT_ERROR_AGAIN:
+            error_string = "Try again";
+            break;
+        case EVT_ERROR_NOMEM:
+            error_string = "Out of memory.";
+            break;
+        case EVT_ERROR_ACCES:
+            error_string = "No access or permission.";
+            break;
+        case EVT_ERROR_ENODEV:
+            error_string = "No such device.";
+            break;
+        case EVT_ERROR_INVAL:
+            error_string = "Invalid argument.";
+            break;
+        case EVT_ERROR_NOT_SUPPORTED:
+            error_string = "Not supported.";
+            break;
+        case EVT_ERROR_DEVICE_CONNECTED_ALRD: 
+            error_string = "Camera has been opened.";
+            break;
+        case EVT_ERROR_DEVICE_NOT_CONNECTED: 
+            error_string = "Camera has not been opened.";
+            break;
+        case EVT_ERROR_DEVICE_LOST_CONNECTION:  
+            error_string = "Camera lost connection due to disconnected, powered off, crashing etc.";
+            break;
+        case EVT_ERROR_GENICAM_ERROR:
+            error_string = "Generic GeniCam error from GeniCam lib.";
+            break;
+        case EVT_ERROR_GENICAM_NOT_MATCH:
+            error_string =  "Parameter not matched.";
+            break;
+        case EVT_ERROR_GENICAM_OUT_OF_RANGE:
+            error_string = "Parameter out of range.";
+            break;        
+        case EVT_ERROR_SOCK: 
+            error_string = "Socket operation failed.";
+            break;        
+        case EVT_ERROR_GVCP_ACK: 
+            error_string = "GVCP ACK error.";
+            break;        
+        case EVT_ERROR_GVSP_DATA_CORRUPT:
+            error_string = "Gvsp stream data corrupted, would cause block dropped.";
+            break;        
+        case EVT_ERROR_NIC_LIB_INIT:
+            error_string = "Fail to initialize NIC's SDK library.";
+            break;    
+        case EVT_ERROR_OS_OBTAIN_ADAPTER:
+            error_string = "Failed to get host adapter info.";
+            break;
+        case EVT_ERROR_SDK:
+            error_string = "SDK error, should not occur. Can be removed if sdk is proved to be correct.";
+            break;
+        case EVT_GENERAL_ERROR:
+            error_string = "General error.";
+            break;
+    }
+    return error_string;
+}
+
+
+void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx)
+{
+    std::cout << "Camera: " << camera_idx << std::endl;
+    std::cout << "userDefinedName: " << device_info[camera_idx].userDefinedName << std::endl;
+    std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
+    std::cout << "deviceMode: " << device_info[camera_idx].deviceMode << std::endl;
+    std::cout << "serialNumber: " << device_info[camera_idx].serialNumber << std::endl;
+    std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
+    std::cout << "currentIp: " << device_info[camera_idx].currentIp << std::endl;
+    std::cout << "currentSubnetMask: " << device_info[camera_idx].currentSubnetMask << std::endl;
+    std::cout << "defaultGateway: " << device_info[camera_idx].defaultGateway << std::endl;
+    std::cout << "nic.ip4Address: " << device_info[camera_idx].nic.ip4Address << std::endl;
+}
 
 // A function to reset to factory defaults for running eSDK examples
 //  TODO: many thing doesn't work with this emergent native code
-void configure_factory_defaults(Emergent::CEmergentCamera *camera)
+void configure_factory_defaults(Emergent::CEmergentCamera *camera, CameraParams* camera_params)
 {
     unsigned int width_max, height_max, param_val_max;
     // const unsigned long enumBufferSize = 1000;
@@ -18,31 +110,31 @@ void configure_factory_defaults(Emergent::CEmergentCamera *camera)
     // check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "PixelFormat", enumMember));
     //  check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "FrameRate", 30));
 
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetX", 0));
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetY", 0));
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetX", 0), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "OffsetY", 0), camera_params->camera_serial.c_str());
 
-    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max));
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max), camera_params->camera_serial.c_str());
     // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera,    "Width", width_max));
 
-    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max), camera_params->camera_serial.c_str());
     // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera,    "Height", height_max));
 
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "AcquisitionMode", "Continuous"));
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"));
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"));
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "AcquisitionMode", "Continuous"), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"), camera_params->camera_serial.c_str());
     // check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "BufferMode", "Off"));
     // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "BufferNum", 0));
 
-    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max));
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "GevSCPSPacketSize", param_val_max));
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "GevSCPSPacketSize", param_val_max), camera_params->camera_serial.c_str());
 
     // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Gain", 1000));
     // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Offset", 0));
 
-    check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "LUTEnable", false));
-    check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false));
+    check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "LUTEnable", false), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false), camera_params->camera_serial.c_str());
 }
 
 void get_senstemp_range(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
@@ -206,13 +298,13 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
         camera->gpuDirectDeviceId = camera_params->gpu_id;
     }
 
-    check_camera_errors(EVT_CameraOpen(camera, device_info));
+    check_camera_errors(EVT_CameraOpen(camera, device_info), camera_params->camera_serial.c_str());
 
-    configure_factory_defaults(camera);
+    configure_factory_defaults(camera, camera_params);
 
     unsigned int width_max, height_max;
-    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max));
-    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max));
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max), camera_params->camera_serial.c_str());
     printf("Resolution: \t\t%d x %d\n", width_max, height_max);
 
     update_width_value(camera, camera_params->width, camera_params);
@@ -222,13 +314,13 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
     update_offsetY_value(camera, 0, camera_params);
 
     const char *pixel_format = camera_params->pixel_format.c_str();
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", pixel_format), camera_params->camera_serial.c_str());
     printf("PixelFormat: \t\t%s\n", pixel_format);
 
     if (camera_params->color)
     {
         const char *color_temp = camera_params->color_temp.c_str();
-        check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp));
+        check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp), camera_params->camera_serial.c_str());
     }
 
     // check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain", camera_params.gain));
@@ -248,23 +340,23 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
 }
 
 // **********************************************sync*****************************************************
-void ptp_camera_sync(Emergent::CEmergentCamera *camera)
+void ptp_camera_sync(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
 {
     // ptp triggering configuration settings
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"));
-    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"));
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"));
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"), camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"), camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1), camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"), camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"), camera_params->camera_serial.c_str());
 }
 
-void ptp_sync_off(Emergent::CEmergentCamera *camera)
+void ptp_sync_off(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
 {
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "AcquisitionMode", "Continuous"));
-    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1));
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"));
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"));
-    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"));
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "AcquisitionMode", "Continuous"), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"), camera_params->camera_serial.c_str());
 }
 
 // use one camera to get the PTP time, TODO: use linux to get current GMT time in seconds
@@ -318,9 +410,9 @@ void test_gpo_manual_toggle(Emergent::CEmergentCamera *camera)
     }
 }
 
-void close_camera(Emergent::CEmergentCamera *camera)
+void close_camera(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
 {
-    check_camera_errors(EVT_CameraClose(camera));
+    check_camera_errors(EVT_CameraClose(camera), camera_params->camera_serial.c_str());
     printf("\nClose Camera: \t\tCamera Closed\n");
 }
 
@@ -365,9 +457,9 @@ void set_frame_buffer(Emergent::CEmergentFrame *evt_frame, CameraParams *camera_
     }
 }
 
-void camera_open_stream(Emergent::CEmergentCamera *camera)
+void camera_open_stream(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
 {
-    check_camera_errors(EVT_CameraOpenStream(camera));
+    check_camera_errors(EVT_CameraOpenStream(camera), camera_params->camera_serial.c_str());
 }
 
 void allocate_frame_buffer(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *evt_frame, CameraParams *camera_params, int buffer_size)
@@ -375,8 +467,8 @@ void allocate_frame_buffer(Emergent::CEmergentCamera *camera, Emergent::CEmergen
     for (int frame_count = 0; frame_count < buffer_size; frame_count++)
     {
         set_frame_buffer(&evt_frame[frame_count], camera_params);
-        check_camera_errors(EVT_AllocateFrameBuffer(camera, &evt_frame[frame_count], EVT_FRAME_BUFFER_ZERO_COPY));
-        check_camera_errors(EVT_CameraQueueFrame(camera, &evt_frame[frame_count]));
+        check_camera_errors(EVT_AllocateFrameBuffer(camera, &evt_frame[frame_count], EVT_FRAME_BUFFER_ZERO_COPY), camera_params->camera_serial.c_str());
+        check_camera_errors(EVT_CameraQueueFrame(camera, &evt_frame[frame_count]), camera_params->camera_serial.c_str());
     }
 }
 
@@ -385,14 +477,14 @@ void allocate_frame_reorder_buffer(Emergent::CEmergentCamera *camera, Emergent::
     set_frame_buffer(frame_reorder, camera_params);
     frame_reorder->convertColor = EVT_COLOR_CONVERT_NONE;
     frame_reorder->convertBitDepth = EVT_CONVERT_NONE;
-    check_camera_errors(EVT_AllocateFrameBuffer(camera, frame_reorder, EVT_FRAME_BUFFER_DEFAULT));
+    check_camera_errors(EVT_AllocateFrameBuffer(camera, frame_reorder, EVT_FRAME_BUFFER_DEFAULT), camera_params->camera_serial.c_str());
 }
 
-void destroy_frame_buffer(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *evt_frame, int buffer_size)
+void destroy_frame_buffer(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *evt_frame, int buffer_size, CameraParams *camera_params)
 {
     for (int frame_count = 0; frame_count < buffer_size; frame_count++)
     {
-        check_camera_errors(EVT_ReleaseFrameBuffer(camera, &evt_frame[frame_count]));
+        check_camera_errors(EVT_ReleaseFrameBuffer(camera, &evt_frame[frame_count]), camera_params->camera_serial.c_str());
     }
 
     // Host side tear down for stream.
@@ -400,21 +492,21 @@ void destroy_frame_buffer(Emergent::CEmergentCamera *camera, Emergent::CEmergent
 }
 
 // Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip. non persistent
-void change_camera_ip(GigEVisionDeviceInfo *device_info, const char *new_ip)
+void change_camera_ip(GigEVisionDeviceInfo *device_info, const char *new_ip, CameraParams *camera_params)
 {
     const char *mac_address = device_info->macAddress;
     const char *subnet_mask = device_info->currentSubnetMask;
     const char *default_gateway = device_info->defaultGateway;
-    check_camera_errors(Emergent::EVT_ForceIPEx(mac_address, new_ip, subnet_mask, default_gateway));
+    check_camera_errors(Emergent::EVT_ForceIPEx(mac_address, new_ip, subnet_mask, default_gateway), camera_params->camera_serial.c_str());
 }
 
 // Use this function with caution, need to reintiate the GigEVisionDeviceInfo after changing the camera ip.
-void change_camera_ip_persistent(GigEVisionDeviceInfo *device_info, Emergent::CEmergentCamera *camera, const char *new_ip)
+void change_camera_ip_persistent(GigEVisionDeviceInfo *device_info, Emergent::CEmergentCamera *camera, const char *new_ip, CameraParams *camera_params)
 {
     const char *mac_address = device_info->macAddress;
     const char *subnet_mask = device_info->currentSubnetMask;
     const char *default_gateway = device_info->defaultGateway;
-    check_camera_errors(Emergent::EVT_IPConfig(camera, true, new_ip, subnet_mask, default_gateway));
+    check_camera_errors(Emergent::EVT_IPConfig(camera, true, new_ip, subnet_mask, default_gateway), camera_params->camera_serial.c_str());
 }
 
 void quick_print_camera(GigEVisionDeviceInfo *device_info, int camera_idx)

@@ -36,7 +36,7 @@ void COpenGLDisplay::ThreadRunning()
     if (camera_select->yolo) {
         printf("YOLO initialization...\n");
 
-        const std::string engine_file_path{"/home/user/detect/ball.engine"};
+        const std::string engine_file_path{"/home/user/detect/rat_bbox.engine"};
         yolov8 = new YOLOv8(engine_file_path, camera_params->width, camera_params->height);
         yolov8->make_pipe(true);
 

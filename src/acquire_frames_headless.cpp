@@ -93,7 +93,7 @@ static inline void get_one_frame_headless(CameraState *camera_state, CameraEachS
     else
     {
         camera_state->dropped_frames++;
-        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
+        std::cout << "EVT_CameraGetFrame Error, " << camera_state->camera_return << ", camera serial, " << camera_params->camera_serial << std::endl;
     }
 }
 
@@ -123,7 +123,7 @@ void acquire_frames_headless(CameraEmergent *ecam, CameraParams *camera_params, 
         start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
     }
 
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"), camera_params->camera_serial.c_str());
 
     if (camera_control->sync_camera)
     {
@@ -151,7 +151,7 @@ void acquire_frames_headless(CameraEmergent *ecam, CameraParams *camera_params, 
         }
     }
 
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"), camera_params->camera_serial.c_str());
     double time_diff = w.Stop();
 
     if (camera_control->record_video) {

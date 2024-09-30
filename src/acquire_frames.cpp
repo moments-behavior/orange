@@ -105,13 +105,12 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
     else
     {
         camera_state->dropped_frames++;
-        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
+        std::cout << "EVT_CameraGetFrame Error, " << camera_state->camera_return << ", camera serial, " << camera_params->camera_serial << std::endl;
     }
 }
 
 void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, INDIGOSignalBuilder* indigo_signal_builder)
 {
-
     CameraState camera_state;
     PTPState ptp_state;
     
@@ -140,7 +139,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
         start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
     }
 
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"), camera_params->camera_serial.c_str());
 
     if (camera_control->sync_camera)
     {
@@ -185,7 +184,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
         // } else { offset++; }
     }
 
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"), camera_params->camera_serial.c_str());
     double time_diff = w.Stop();
 
     if (camera_select->stream_on) {

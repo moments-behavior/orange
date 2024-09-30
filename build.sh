@@ -22,7 +22,7 @@ DIR_ICONFONT="third_party/IconFontCppHeaders"
 # g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
 
 g++ -Ofast -ffast-math -std=c++17 targets/*.o \
-    -o targets/orange -I ./src/ src/orange.cpp src/network_base.cpp src/FFmpegWriter.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture.cpp src/acquire_frames.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
+    -o targets/orange -I ./src/ src/orange.cpp src/network_base.cpp src/FFmpegWriter.cpp src/camera.cpp src/video_capture.cpp src/acquire_frames.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
     -I$DIR_IMGUI \
     -I$DIR_IMGUI_BACKEND \
     -I$DIR_IMPLOT \

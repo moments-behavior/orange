@@ -259,7 +259,7 @@ int main(int argc, char **args)
                     }
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                        evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
+                        evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                         &indigo_signal_builder);
 
                     camera_control->subscribe = true;

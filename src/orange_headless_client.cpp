@@ -151,7 +151,10 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
                 } else {
                     manager_context->state = FetchGame::ManagerState_ERROR;
                 }
-                break;                
+                break;
+            case FetchGame::ManagerState_ERROR:
+                quit_server = true;
+                break;
         }
 
         if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {

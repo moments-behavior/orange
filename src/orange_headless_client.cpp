@@ -100,6 +100,7 @@ bool quit_server = false;
 
 static void interruptHandler(const int signal)
 {
+    enet_deinitialize();
     printf("\nQuit Orange.\n");
     quit_server = true;
 }

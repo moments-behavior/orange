@@ -106,7 +106,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
     else
     {
         camera_state->dropped_frames++;
-        std::cout << "EVT_CameraGetFrame Error" << camera_state->camera_return << std::endl;
+        std::cout << "EVT_CameraGetFrame Error, " << camera_state->camera_return << ", camera serial, " << camera_params->camera_serial << std::endl;
     }
 }
 
@@ -142,7 +142,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
         start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
     }
 
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"));
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"), camera_params->camera_serial.c_str());
 
     if (camera_control->sync_camera)
     {
@@ -176,13 +176,13 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
                 OFFSET_X_VAL = OFFSET_X_VAL - OFFSET_X_VAL % 16;
                 // std::cout << OFFSET_X_VAL << std::endl;
                 if (OFFSET_X_VAL >= camera_params->offsetx_min && OFFSET_X_VAL <= camera_params->offsetx_max) {
-                    check_camera_errors(EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL));
+                    check_camera_errors(EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL), camera_params->camera_serial.c_str());
                 }
 
                 OFFSET_Y_VAL = OFFSET_Y_VAL - OFFSET_Y_VAL % 16;
                 // std::cout << OFFSET_Y_VAL << std::endl;
                 if (OFFSET_Y_VAL >= camera_params->offsety_min && OFFSET_Y_VAL <= camera_params->offsety_max) {
-                    check_camera_errors(EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL));
+                    check_camera_errors(EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL), camera_params->camera_serial.c_str());
                 }
                 
             }
@@ -216,7 +216,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
         // } else { offset++; }
     }
 
-    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"));
+    check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"), camera_params->camera_serial.c_str());
     double time_diff = w.Stop();
 
     if (camera_select->stream_on) {

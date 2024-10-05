@@ -1,7 +1,6 @@
 #include "video_capture.h"
 #include <iostream>
 #include "camera.h"
-#include <thread>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -13,7 +12,6 @@
 #include <sys/stat.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
-#include "acquire_frames.h"
 #include "enet_thread.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
@@ -61,12 +59,12 @@ int main(int argc, char **args)
 
     int evt_buffer_size {100};
     PTPParams* ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
-    std::string encoder_setup;
-    std::string encoder_basic_setup = "-codec h264 -preset p1 -fps ";
-    std::string encoder_codec = "h264"; 
-    std::string encoder_preset = "p1";
-    std::string folder_name;
 
+    EncoderConfig* encoder_config = new EncoderConfig {
+        "-codec h264 -preset p1 -fps ",
+        "h264",
+        "p1"
+    };
     std::vector<std::string> camera_config_files;
 
     ScrollingBuffer* realtime_plot_data;
@@ -243,14 +241,14 @@ int main(int argc, char **args)
             if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Clients start camera threads")) {
-                    encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
-                    make_folder_for_recording(folder_name, input_folder, subfix_buf);
+                    encoder_config->encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
+                    make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(fb_builder, &server, folder_name, encoder_basic_setup);
+                    host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_config->encoder_basic_setup);
+                    camera_control->record_video = true;
 
-                    // start local recording threads
-                    allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size, num_cameras);
-        
+                    std::string encoder_setup_for_recording = encoder_config->encoder_basic_setup + std::to_string(cameras_params[0].frame_rate);
+                    
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -264,25 +262,10 @@ int main(int argc, char **args)
                         }
                     }
 
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        ptp_camera_sync(&ecams[i].camera);
-                    }
-                    camera_control->sync_camera = true;
-                    camera_control->record_video = true;
+                    start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
+                        evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
+                        &indigo_signal_builder, detection_data);
 
-                    // detection data allocate
-                    detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
-                    for (int i = 0; i < num_cameras; i++) {
-                        detection_data->detect_per_cam[i].yolo_model = detection_data->yolo_model;
-                        detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
-                        detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
-                    }
-
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, detection_data));
-                    }
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -348,6 +331,30 @@ int main(int argc, char **args)
             
             ptp_params->network_set_stop_ptp = false;
 
+            for (int i =0; i < num_cameras; i++) {
+                int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
+                cudaMemset(tex[i].cuda_buffer, 0, size_pic);
+            }
+
+            for (int i=0; i< num_cameras; i++) {
+                bind_pbo(&tex[i].pbo);
+                bind_texture(&tex[i].texture);
+                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                unbind_pbo();
+                unbind_texture();
+            }
+
+            for (int i = 0; i < num_cameras; i++)
+            {
+                if (cameras_select[i].stream_on) {
+                    gx_delete_buffer(&tex[i].pbo);
+                    unmap_cuda_resource(&tex[i].cuda_resource);
+                    cuda_unregister_pbo(tex[i].cuda_resource);
+                }
+            }
+            delete[] tex;
+
+
             for (auto &t : camera_threads)
                 t.join();
             
@@ -357,21 +364,14 @@ int main(int argc, char **args)
             }
             for (int i = 0; i < num_cameras; i++)
             {
-                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);
                 delete[] ecams[i].evt_frame;
-                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                if (cameras_select[i].stream_on) {
-                    gx_delete_buffer(&tex[i].pbo);
-                    unmap_cuda_resource(&tex[i].cuda_resource);
-                    cuda_unregister_pbo(tex[i].cuda_resource);
-                }
+                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
             }
             
-            delete[] tex;                     
-
             for (int i = 0; i < num_cameras; i++)
             {
-                ptp_sync_off(&ecams[i].camera);
+                ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
             }
             camera_control->sync_camera = false;
             camera_control->record_video = false;
@@ -387,13 +387,13 @@ int main(int argc, char **args)
 
             for (int i = 0; i < num_cameras; i++)
             {
-                close_camera(&ecams[i].camera);
+                close_camera(&ecams[i].camera, &cameras_params[i]);
             }
 
             camera_control->open = false;
 
             for (int i=0; i<cam_count; i++) {
-                    check[i] = 0;
+                check[i] = 0;
             }
         }
 
@@ -453,14 +453,14 @@ int main(int argc, char **args)
                 const char* items[] = { "h264", "hevc"};
                 static int item_current = 0;
                 ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_codec = items[item_current];
+                encoder_config->encoder_codec = items[item_current];
             }
 
             {
                 const char* items[] = { "p1", "p3", "p5", "p7"};
                 static int item_current = 0;
                 ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_preset = items[item_current];
+                encoder_config->encoder_preset = items[item_current];
             }
 
             // selection for yolo model
@@ -592,7 +592,7 @@ int main(int argc, char **args)
                 } else {
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        close_camera(&ecams[i].camera);
+                        close_camera(&ecams[i].camera, &cameras_params[i]);
                     }
                     delete[] cameras_params;
                     delete[] ecams;
@@ -608,18 +608,6 @@ int main(int argc, char **args)
                 (camera_control->subscribe) = !(camera_control->subscribe);
                 if (camera_control->subscribe)
                 {   
-                    for (int i = 0; i < num_cameras; i++)
-                    {               
-                        camera_open_stream(&ecams[i].camera);
-                        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
-                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
-
-                        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
-                        {
-                            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
-                        }
-                    }
-
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -633,42 +621,26 @@ int main(int argc, char **args)
                         }
                     }
 
-                    if (ptp_stream_sync){
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_camera_sync(&ecams[i].camera);
-                        }
-                        camera_control->sync_camera = true;
-                    }
-
-                    // detection data allocate
-                    detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
-                    for (int i = 0; i < num_cameras; i++) {
-                        detection_data->detect_per_cam[i].yolo_model = detection_data->yolo_model;
-                        detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
-                        detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
-                    }
-
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, detection_data));
-                    }
-
+                    start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
+                        evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
+                        &indigo_signal_builder, detection_data);
                 } else {
-                    for (auto &t : camera_threads)
-                        t.join();
                     
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        camera_threads.pop_back();
+                    for (int i =0; i < num_cameras; i++) {
+                        int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
+                        cudaMemset(tex[i].cuda_buffer, 0, size_pic);
+                    }
+
+                    for (int i=0; i< num_cameras; i++) {
+                        bind_pbo(&tex[i].pbo);
+                        bind_texture(&tex[i].texture);
+                        upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                        unbind_pbo();
+                        unbind_texture();
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-                        delete[] ecams[i].evt_frame;
-                        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                        
                         if (cameras_select[i].stream_on) {
                             gx_delete_buffer(&tex[i].pbo);
                             unmap_cuda_resource(&tex[i].cuda_resource);
@@ -676,16 +648,9 @@ int main(int argc, char **args)
                         }
                     }
                     delete[] tex;
-                    
-                    if (num_cameras > 1) {
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_sync_off(&ecams[i].camera);
-                        }
-                        ptp_params->ptp_counter = 0;
-                        ptp_params->ptp_global_time = 0;
-                        camera_control->sync_camera = false;
-                    }
+
+                    stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras, 
+                        evt_buffer_size, ptp_params);
                 }
             }
 
@@ -754,21 +719,20 @@ int main(int argc, char **args)
                 (camera_control->stop_record) = !(camera_control->stop_record);
                 if (camera_control->stop_record)
                 {
-                    encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
+                    encoder_config->encoder_setup= "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                     camera_control->record_video = true;
-                    make_folder_for_recording(folder_name, input_folder, subfix_buf);
+                    make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
 
-                    for (int i = 0; i < num_cameras; i++)
-                    {               
-                        camera_open_stream(&ecams[i].camera);
-                        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
-                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
-                        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
-                        {
-                            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
-                        }
+                    bool ptp_sync_for_recording;
+                    if (num_cameras > 1) {
+                        ptp_sync_for_recording = true;
+                    } else {
+                        ptp_sync_for_recording = false;
                     }
-                    
+
+                    // frame rate are the same
+                    std::string encoder_setup_for_recording = encoder_config->encoder_basic_setup + std::to_string(cameras_params[0].frame_rate);
+
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -782,62 +746,38 @@ int main(int argc, char **args)
                         }
                     }
 
-                    if (num_cameras > 1){
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_camera_sync(&ecams[i].camera);
-                        }
-                        camera_control->sync_camera = true;
-                    }
-
-                    // detection data allocate
-                    detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
-                    for (int i = 0; i < num_cameras; i++) {
-                        detection_data->detect_per_cam[i].yolo_model = detection_data->yolo_model;
-                        detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
-                        detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
-                    }
-
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, detection_data));
-                    }
-                    
+                    start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
+                        evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
+                        &indigo_signal_builder, detection_data);                    
                     camera_control->subscribe = true;                    
                 } else {
                     camera_control->subscribe = false;
-
-                    for (auto &t : camera_threads)
-                        t.join();
                     
-                    for (int i = 0; i < num_cameras; i++)
-                    {
-                        camera_threads.pop_back();
+                    for (int i =0; i < num_cameras; i++) {
+                        int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
+                        cudaMemset(tex[i].cuda_buffer, 0, size_pic);
                     }
+
+                    for (int i=0; i< num_cameras; i++) {
+                        bind_pbo(&tex[i].pbo);
+                        bind_texture(&tex[i].texture);
+                        upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
+                        unbind_pbo();
+                        unbind_texture();
+                    }
+
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
-                        delete[] ecams[i].evt_frame;
-                        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
                         if (cameras_select[i].stream_on) {
                             gx_delete_buffer(&tex[i].pbo);
                             unmap_cuda_resource(&tex[i].cuda_resource);
                             cuda_unregister_pbo(tex[i].cuda_resource);
                         }
                     }
-                    
-                    delete[] tex;                     
+                    delete[] tex;
 
-                    if (num_cameras > 1) {
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            ptp_sync_off(&ecams[i].camera);
-                        }
-                        ptp_params->ptp_counter = 0;
-                        ptp_params->ptp_global_time = 0;
-                        camera_control->sync_camera = false;
-                    }
+                    stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras, 
+                        evt_buffer_size, ptp_params);
                     camera_control->record_video = false;
                 }
             }

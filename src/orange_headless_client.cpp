@@ -73,7 +73,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
 
     for (int i = 0; i < num_cameras; i++)
     {
-        ptp_camera_sync(&ecams[i].camera);
+        ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
     }
 
     for (int i = 0; i < num_cameras; i++)
@@ -100,6 +100,7 @@ bool quit_server = false;
 
 static void interruptHandler(const int signal)
 {
+    enet_deinitialize();
     printf("\nQuit Orange.\n");
     quit_server = true;
 }
@@ -151,7 +152,10 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
                 } else {
                     manager_context->state = FetchGame::ManagerState_ERROR;
                 }
-                break;                
+                break;
+            case FetchGame::ManagerState_ERROR:
+                quit_server = true;
+                break;
         }
 
         if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
@@ -167,7 +171,7 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
 
             for (int i = 0; i < *cam_count; i++)
             {
-                ptp_sync_off(&ecams[i].camera);
+                ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
             }
             ptp_params->ptp_global_time = 0;
             ptp_params->ptp_stop_time = 0;
@@ -181,12 +185,14 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
 
             for (int i = 0; i < *cam_count; i++)
             {
-                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size);
+                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);
                 delete[] ecams[i].evt_frame;
-                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera));
-                close_camera(&ecams[i].camera);
+                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
+                close_camera(&ecams[i].camera, &cameras_params[i]);
             }
             delete[] ecams;
+            delete[] cameras_params;
+            delete[] cameras_select;
             manager_context->state = FetchGame::ManagerState_RECORDSTOPPED;
         }
         usleep(1000);

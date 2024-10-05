@@ -4,6 +4,16 @@
 #include "camera.h"
 #include <math.h>
 #include "realtime_tool.h"
+#include <thread>
+#include "acquire_frames.h"
+
+struct EncoderConfig {
+    std::string encoder_basic_setup;
+    std::string encoder_codec; 
+    std::string encoder_preset;
+    std::string folder_name;
+    std::string encoder_setup;
+}; 
 
 struct GL_Texture {
     GLuint texture;
@@ -14,6 +24,73 @@ struct GL_Texture {
     cudaStream_t streams;
     int num_channels;
 };
+
+
+void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, 
+    CameraParams* cameras_params, CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras, int evt_buffer_size, bool ptp_stream_sync, 
+    std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder, DetectionData* detection_data)
+{
+    for (int i = 0; i < num_cameras; i++)
+    {               
+        camera_open_stream(&ecams[i].camera, &cameras_params[i]);
+        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
+
+        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
+        {
+            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+        }
+    }
+
+    if (ptp_stream_sync){
+        for (int i = 0; i < num_cameras; i++)
+        {
+            ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+        }
+        camera_control->sync_camera = true;
+    }
+
+    detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
+    for (int i = 0; i < num_cameras; i++) {
+        detection_data->detect_per_cam[i].yolo_model = detection_data->yolo_model;
+        detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
+        detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
+    }
+
+    for (int i = 0; i < num_cameras; i++)
+    {
+        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, indigo_signal_builder, detection_data));
+    }
+}
+
+void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, CameraParams* cameras_params, 
+    CameraEachSelect *cameras_select, int num_cameras, int evt_buffer_size, PTPParams* ptp_params)
+{
+    for (auto &t : camera_threads)
+        t.join();
+    
+    for (int i = 0; i < num_cameras; i++)
+    {
+        camera_threads.pop_back();
+    }
+
+    for (int i = 0; i < num_cameras; i++)
+    {
+        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, cameras_params);
+        delete[] ecams[i].evt_frame;
+        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
+    }
+    
+    if (num_cameras > 1) {
+        for (int i = 0; i < num_cameras; i++)
+        {
+            ptp_sync_off(&ecams[i].camera, cameras_params);
+        }
+        ptp_params->ptp_counter = 0;
+        ptp_params->ptp_global_time = 0;
+        camera_control->sync_camera = false;
+    }
+}
 
 static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, int num_cameras)
 {

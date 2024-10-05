@@ -7,8 +7,8 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 
-COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder, DetectionDataPerCam* detect_per_cam)
-    : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder), detect_per_cam(detect_per_cam)
+COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder, DetectionData* detection_data)
+    : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder), detection_data(detection_data)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
@@ -36,22 +36,18 @@ void COpenGLDisplay::ThreadRunning()
     if (camera_select->yolo) {
         printf("YOLO initialization...\n");
 
-        const std::string engine_file_path = detect_per_cam->yolo_model;
+        const std::string engine_file_path = detection_data->detect_per_cam[camera_params->used_cams_idx].yolo_model;
         yolov8 = new YOLOv8(engine_file_path, camera_params->width, camera_params->height);
         yolov8->make_pipe(true);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 8);
         cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
         CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8, cudaMemcpyHostToDevice));
-
-        // load calibration file 
-        load_camera_calibration_results(detect_per_cam->calibration_file, &detect_per_cam->camera_calib);
     }
 
     std::vector<Object> objs;
     std::vector<cv::Point2d> points2d;
     std::vector<double> points2d_z;
-    std::vector<cv::Point3d> points3d;
 
     while(IsMachineOn())
     {
@@ -78,7 +74,7 @@ void COpenGLDisplay::ThreadRunning()
 
                 points2d.clear();
                 points2d_z.clear();
-                points3d.clear(); // TODO: bundle data
+                detection_data->points3d.clear(); // TODO: bundle data
                 if (objs.size() > 0) {
                     // unproject point to 3d for grabbing
                     f64 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
@@ -100,8 +96,8 @@ void COpenGLDisplay::ThreadRunning()
                 }
                 // objs will be more than 1 now if we train multiple objects deteciton, think about it
                 if (points2d.size() > 0) {
-                    points3d = unproject2d_to_3d(points2d, points2d_z, &detect_per_cam->camera_calib);
-                    std::cout << points3d[0].x << ", " << points3d[0].y << ", " << points3d[0].z << std::endl;
+                    detection_data->points3d = unproject2d_to_3d(points2d, points2d_z, &detection_data->detect_per_cam[camera_params->used_cams_idx].camera_calib);
+                    // std::cout << detection_data->points3d[0].x << ", " << detection_data->points3d[0].y << ", " << detection_data->points3d[0].z << std::endl;
                 }
                     
                 gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream);

@@ -3,6 +3,7 @@
 #include "gx_helper.h"
 #include "camera.h"
 #include <math.h>
+#include "realtime_tool.h"
 
 struct GL_Texture {
     GLuint texture;
@@ -33,7 +34,6 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
                 slider_frame_rate = cameras_params[selected_camera].frame_rate; 
         }
     
-
         if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[selected_camera].width_max, "%d"))
         {
             slider_width = (slider_width / 16) * 16; // round to even number
@@ -134,5 +134,40 @@ struct RollingBuffer {
         Data.push_back(ImVec2(xmod, y));
     }
 };
+
+
+void gui_plot_world_coordinates(CameraCalibResults* cvp, CameraParams* camera_params)
+{
+    double axis_x_values[4]; double axis_y_values[4]; 
+    world_coordinates_projection_points(cvp, axis_x_values, axis_y_values, 50, camera_params);
+    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, ImVec4(1.0, 1.0, 1.0,1.0));
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 1.0,1.0), 3.0);
+    std::string name = "World Origin";
+    
+    float one_axis_x[2];
+    float one_axis_y[2];
+
+    std::vector<triple_f> node_colors = {
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f}};
+                
+    for (u32 edge=0; edge < 3; edge++)
+    {
+        double xs[2] {axis_x_values[0], axis_x_values[edge+1]};
+        double ys[2] {axis_y_values[0], axis_y_values[edge+1]};
+        
+        ImVec4 my_color; 
+        my_color.w = 1.0f; 
+        my_color.x = node_colors[edge+1].x;
+        my_color.y = node_colors[edge+1].y;
+        my_color.z = node_colors[edge+1].z;
+
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
+        ImPlot::SetNextLineStyle(my_color, 3.0);
+        ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
+    } 
+}
 
 #endif

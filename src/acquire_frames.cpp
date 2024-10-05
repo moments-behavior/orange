@@ -2,6 +2,7 @@
 #include "opengldisplay.h"
 #include "gpu_video_encoder.h"
 #include "acquire_frames.h"
+#include "realtime_tool.h"
 
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
 {
@@ -109,15 +110,16 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
     }
 }
 
-void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, INDIGOSignalBuilder* indigo_signal_builder, DetectionDataPerCam* detect_per_cam)
+void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, INDIGOSignalBuilder* indigo_signal_builder, DetectionData* detection_data)
 {
-
     CameraState camera_state;
     PTPState ptp_state;
     
+    std::vector<cv::Point2d> points2d;
+
     COpenGLDisplay* openGLDisplay;
     if (camera_select->stream_on) {
-        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, indigo_signal_builder, detect_per_cam);
+        openGLDisplay = new COpenGLDisplay("", camera_params, camera_select, display_buffer, indigo_signal_builder, detection_data);
         openGLDisplay->StartThread();
     }
 
@@ -155,7 +157,36 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     // int offset = 0;
     // int phase = 1;
     while (camera_control->subscribe)
-    {
+    {   
+        if (camera_params->camera_serial.compare("2005322") == 0) {
+            // project
+            
+            std::vector<cv::Point3d> point3d_copy;
+            for (int i=0; i<detection_data->points3d.size(); i++)  
+                point3d_copy.push_back(detection_data->points3d[i]);
+            // std::cout << "camera_serial: " << camera_params->camera_serial << ", used_cams_idx: " << camera_params->used_cams_idx << std::endl;
+
+            points2d = project3d_to_2d(point3d_copy, &detection_data->detect_per_cam[camera_params->used_cams_idx].camera_calib);
+            if (points2d.size() > 0) {
+                // std::cout << points2d[0].x << ", " << points2d[0].y << std::endl;
+                int OFFSET_X_VAL = (int) (points2d[0].x - camera_params->width / 2.0);
+                int OFFSET_Y_VAL = (int) (points2d[0].y - camera_params->height / 2.0);
+
+                //make sure it is in the range
+                OFFSET_X_VAL = OFFSET_X_VAL - OFFSET_X_VAL % 16;
+                // std::cout << OFFSET_X_VAL << std::endl;
+                if (OFFSET_X_VAL >= camera_params->offsetx_min && OFFSET_X_VAL <= camera_params->offsetx_max) {
+                    check_camera_errors(EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL));
+                }
+
+                OFFSET_Y_VAL = OFFSET_Y_VAL - OFFSET_Y_VAL % 16;
+                // std::cout << OFFSET_Y_VAL << std::endl;
+                if (OFFSET_Y_VAL >= camera_params->offsety_min && OFFSET_Y_VAL <= camera_params->offsety_max) {
+                    check_camera_errors(EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL));
+                }
+                
+            }
+        } 
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
         get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder);

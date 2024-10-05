@@ -80,12 +80,13 @@ std::vector<std::string> string_split_char(char* string_c, std::string delimiter
 }
 
 
-void load_camera_json_config_files(std::string file_name, CameraParams* camera_params, int camera_id, int num_cameras) {
+void load_camera_json_config_files(std::string file_name, CameraParams* camera_params, int used_cams_idx, int camera_id, int num_cameras) {
     
     std::ifstream f(file_name);
     json camera_config = json::parse(f);
 
     camera_params->camera_id = camera_id;
+    camera_params->used_cams_idx = used_cams_idx;
     camera_params->num_cameras = num_cameras;
     camera_params->need_reorder = false;
 
@@ -136,7 +137,7 @@ const std::string current_date_time() {
     return final_string.c_str();
 }
 
-void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure) 
+void init_galvo_camera_params(CameraParams* camera_params, int used_cams_idx, int camera_id, int num_cameras, int gain, int exposure) 
 {
     camera_params->width = 1280;
     camera_params->height = 1280;
@@ -146,6 +147,7 @@ void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int nu
     camera_params->pixel_format = "BayerRG8";
     camera_params->color_temp = "CT_3000K";
     camera_params->camera_id = camera_id;
+    camera_params->used_cams_idx = used_cams_idx;
     camera_params->gpu_id = 1;
     camera_params->num_cameras = num_cameras;
     camera_params->gpu_direct = false;
@@ -154,7 +156,7 @@ void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int nu
 }
 
 
-void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
+void init_65MP_camera_params_mono(CameraParams* camera_params, int used_cams_idx, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
 {
     // camera_params->width = 9344;
     // camera_params->height = 7000;
@@ -169,12 +171,13 @@ void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, in
     camera_params->gpu_direct = false;
     camera_params->need_reorder = false;
     camera_params->focus = 4311;
+    camera_params->used_cams_idx = used_cams_idx;
     camera_params->camera_id = camera_id;
     camera_params->color = false;
 }
 
 
-void init_65MP_camera_params_color(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
+void init_65MP_camera_params_color(CameraParams* camera_params, int used_cams_idx, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
 {
     camera_params->width = 512; // 8192; // 9344;
     camera_params->height = 512; // 7000; // 7000;
@@ -188,12 +191,13 @@ void init_65MP_camera_params_color(CameraParams* camera_params, int camera_id, i
     camera_params->need_reorder = false;
     camera_params->focus = 4419;
     camera_params->camera_id = camera_id;
+    camera_params->used_cams_idx = used_cams_idx;
     camera_params->color = true;
     camera_params->color_temp = "CT_3000K";
 }
 
 
-void init_7MP_camera_params_color(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
+void init_7MP_camera_params_color(CameraParams* camera_params, int used_cams_idx, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
 {
     camera_params->width = 3208;
     camera_params->height = 2200;
@@ -208,11 +212,12 @@ void init_7MP_camera_params_color(CameraParams* camera_params, int camera_id, in
     camera_params->need_reorder = false;
     camera_params->focus = 345;
     camera_params->camera_id = camera_id;
+    camera_params->used_cams_idx = used_cams_idx;
     camera_params->color = true;
 }
 
 
-void init_7MP_camera_params_mono(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
+void init_7MP_camera_params_mono(CameraParams* camera_params, int used_cams_idx, int camera_id, int num_cameras, int gain, int exposure, int gpu_id, int frame_rate) 
 {
     camera_params->width = 3208;
     camera_params->height = 2200;
@@ -227,6 +232,7 @@ void init_7MP_camera_params_mono(CameraParams* camera_params, int camera_id, int
     camera_params->need_reorder = false;
     camera_params->focus = 4700;
     camera_params->camera_id = camera_id;
+    camera_params->used_cams_idx = used_cams_idx;
     camera_params->color = false;
 }
 
@@ -281,7 +287,7 @@ void select_cameras_have_configs(std::vector<std::string>& camera_config_files, 
     }
 }
 
-bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device_info, std::vector<std::string>& camera_config_files, int camera_idx, int num_cameras)
+bool set_camera_params(CameraParams* camera_params, int used_cams_idx, GigEVisionDeviceInfo* device_info, std::vector<std::string>& camera_config_files, int camera_idx, int num_cameras)
 {
     // first checkt to see if it is in the config files 
     camera_params->camera_serial.append(device_info->serialNumber);
@@ -294,16 +300,16 @@ bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device
     {
         if (strcmp(device_info->modelName, "HB-65000GM")==0) {
             int gpu_id = 0;
-            init_65MP_camera_params_mono(camera_params, camera_idx, num_cameras, 2000, 1000, gpu_id, 400); //458 
+            init_65MP_camera_params_mono(camera_params, used_cams_idx, camera_idx, num_cameras, 2000, 1000, gpu_id, 400); //458 
         } else if (strcmp(device_info->modelName, "HB-7000SC")==0) {
             int gpu_id = 0;
-            init_7MP_camera_params_color(camera_params, camera_idx, num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
+            init_7MP_camera_params_color(camera_params, used_cams_idx, camera_idx, num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
         } else if (strcmp(device_info->modelName, "HB-65000GC")==0) {
             int gpu_id = 0;
-            init_65MP_camera_params_color(camera_params, camera_idx, num_cameras, 2000, 28000, gpu_id, 10); 
+            init_65MP_camera_params_color(camera_params, used_cams_idx, camera_idx, num_cameras, 2000, 28000, gpu_id, 10); 
         } else if (strcmp(device_info->modelName, "HB-7000SM")==0) {
             int gpu_id = 0;
-            init_7MP_camera_params_mono(camera_params, camera_idx, num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
+            init_7MP_camera_params_mono(camera_params, used_cams_idx, camera_idx, num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
         } else {
             printf("Camera not supported...Exit");
             return false;
@@ -311,7 +317,7 @@ bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device
     } else {
         auto config_idx = std::distance(camera_config_files.begin(), it);
         std::cout << "Load camera json file: " << camera_config_files[config_idx] << std::endl;
-        load_camera_json_config_files(camera_config_files[config_idx], camera_params, camera_idx, num_cameras); 
+        load_camera_json_config_files(camera_config_files[config_idx], camera_params, used_cams_idx, camera_idx, num_cameras); 
     }
     return true;
 }

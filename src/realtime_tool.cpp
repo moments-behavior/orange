@@ -88,6 +88,14 @@ bool load_camera_calibration_results(std::string calibration_file, CameraCalibRe
     return true;
 }
 
+std::vector<cv::Point2d> project3d_to_2d(const std::vector<cv::Point3d> &points, CameraCalibResults *camera_calib)
+{
+    std::vector<cv::Point2d> img_pts;
+    if (points.size() > 0) {
+        cv::projectPoints(points, camera_calib->rvec, camera_calib->tvec, camera_calib->k, camera_calib->dist_coeffs, img_pts);
+    }
+    return img_pts;
+}
 
 std::vector<cv::Point3d> unproject2d_to_3d(const std::vector<cv::Point2d> &points, const std::vector<double> &Z, CameraCalibResults *camera_calib)
 {
@@ -138,4 +146,21 @@ std::vector<cv::Point3d> unproject2d_to_3d(const std::vector<cv::Point2d> &point
         results.emplace_back(x, y, z);
     }
     return results;
+}
+
+void world_coordinates_projection_points(CameraCalibResults* cvp, double* axis_x_values, double* axis_y_values, float scale, CameraParams* camera_params)
+{
+    std::vector<cv::Point3f> world_coordinates;
+    world_coordinates.push_back(cv::Point3f(0.0f, 0.0f, 0.0f));
+    world_coordinates.push_back(cv::Point3f(scale * 1.0f, 0.0f, 0.0f));
+    world_coordinates.push_back(cv::Point3f(0.0f, scale * 1.0f, 0.0f));
+    world_coordinates.push_back(cv::Point3f(0.0f, 0.0f, scale * 1.0f));
+
+    std::vector<cv::Point2f> img_pts;
+    cv::projectPoints(world_coordinates, cvp->rvec, cvp->tvec, cvp->k, cvp->dist_coeffs, img_pts);
+    
+    for (int i = 0; i < 4; i++){
+        axis_x_values[i] = img_pts.at(i).x;
+        axis_y_values[i] = camera_params->height - img_pts.at(i).y;
+    }
 }

@@ -38,7 +38,7 @@ bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams, CameraEac
 
     for (int i = 0; i < num_cameras; i++)
     {
-        set_camera_params(&cameras_params[i], &device_info[i], camera_config_files, i, num_cameras);
+        set_camera_params(&cameras_params[i], i, &device_info[i], camera_config_files, i, num_cameras);
         open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
     }
     return true;

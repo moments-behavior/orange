@@ -216,7 +216,7 @@ int main(int argc, char **args)
                         }
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
+                            set_camera_params(&cameras_params[i], i, &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
                         }
 
                         for (int i =0; i < num_cameras; i++) {
@@ -274,13 +274,14 @@ int main(int argc, char **args)
                     // detection data allocate
                     detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
-                        detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
-                        detection_data->detect_per_cam->calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params->camera_serial + ".yaml";
+                        detection_data->detect_per_cam[i].yolo_model = detection_data->yolo_model;
+                        detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
+                        detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, &detection_data->detect_per_cam[i]));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, detection_data));
                     }
                     camera_control->subscribe = true;
                 }
@@ -569,7 +570,7 @@ int main(int argc, char **args)
                         }
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
+                            set_camera_params(&cameras_params[i], i, &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
                         }
 
                         for (int i =0; i < num_cameras; i++) {
@@ -643,13 +644,14 @@ int main(int argc, char **args)
                     // detection data allocate
                     detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
-                        detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
-                        detection_data->detect_per_cam->calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params->camera_serial + ".yaml";
+                        detection_data->detect_per_cam[i].yolo_model = detection_data->yolo_model;
+                        detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
+                        detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, &detection_data->detect_per_cam[i]));
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, detection_data));
                     }
 
                 } else {
@@ -791,13 +793,15 @@ int main(int argc, char **args)
                     // detection data allocate
                     detection_data->detect_per_cam = new DetectionDataPerCam[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
-                        detection_data->detect_per_cam->yolo_model = detection_data->yolo_model;
-                        detection_data->detect_per_cam->calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params->camera_serial + ".yaml";
+                        detection_data->detect_per_cam[i].yolo_model = detection_data->yolo_model;
+                        detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
+                        detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
                     }
 
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, &detection_data->detect_per_cam[i]));
+                        encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
+                        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, &indigo_signal_builder, detection_data));
                     }
                     
                     camera_control->subscribe = true;                    
@@ -871,6 +875,11 @@ int main(int argc, char **args)
                     {
                         ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
                         ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));                    
+                        
+                        if (detection_data->detect_per_cam[i].have_calibration_results) {
+                            gui_plot_world_coordinates(&detection_data->detect_per_cam[i].camera_calib, &cameras_params[i]);
+                        }
+                        
                         ImPlot::EndPlot();
                     }
                     ImGui::End();

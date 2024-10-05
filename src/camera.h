@@ -21,7 +21,8 @@ struct CameraParams{
     std::string pixel_format;
     std::string color_temp;
     int gpu_id;
-    int camera_id;
+    int camera_id; // global 
+    int used_cams_idx; // in only opened 
     std::string camera_name;
     std::string camera_serial;
     int num_cameras;

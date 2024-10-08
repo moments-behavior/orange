@@ -156,6 +156,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
     // int offset = 0;
     // int phase = 1;
+    int skip_frame_counter = 0;
     while (camera_control->subscribe)
     {   
         if (camera_params->camera_serial.compare("2005322") == 0) {

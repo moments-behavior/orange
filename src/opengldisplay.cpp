@@ -26,7 +26,9 @@ void COpenGLDisplay::ThreadRunning()
 {
     ck(cudaSetDevice(camera_params->gpu_id));
     // innitialization
-    initalize_gpu_frame(&frame_original, camera_params);
+    if (!camera_params->gpu_direct) {
+        initalize_gpu_frame(&frame_original, camera_params);
+    }
     initialize_gpu_debayer(&debayer, camera_params);
     initialize_cpu_frame(&frame_cpu, camera_params);
 
@@ -56,8 +58,13 @@ void COpenGLDisplay::ThreadRunning()
             WORKER_ENTRY entry = *(WORKER_ENTRY*)f;
             PutObjectToQueueOut(f);
             
-            // copy frame from cpu to gpu
-            ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            if (!camera_params->gpu_direct) {
+                // copy frame from cpu to gpu
+                ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            } else {
+                frame_original.d_orig = (unsigned char*) entry.imagePtr;
+            }
+
 
             if (camera_params->color){
                 debayer_frame_gpu(camera_params, &frame_original, &debayer);

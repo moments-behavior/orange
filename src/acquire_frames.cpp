@@ -88,6 +88,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
         if (camera_select->sync_detect) {
             if (!sync_detection->frame_unread[camera_select->sync_id]) {
                 // copy frame, maybe need multiple, need to make sure it is all copied
+                std::cout << "unread true" << std::endl;
                 sync_detection->frame_unread[camera_select->sync_id] = true;
             }
         }

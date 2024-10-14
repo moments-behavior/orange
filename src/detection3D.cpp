@@ -6,6 +6,8 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
     // ArucoMarker2d marker2d_all_cams;
     while(camera_control->subscribe) {
         bool frame_unread = std::all_of(sync_detection->frame_unread.begin(), sync_detection->frame_unread.end(), [](bool v) { return v;});
+        std::cout << frame_unread << "frame_unread" << std::endl;
+                
         if (frame_unread) {
             // signal detection proc to start 
             for (int i =0; i < sync_detection->frame_ready.size(); i++) {
@@ -52,7 +54,7 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
             // std::cout << detection_data->marker3d->new_detection << std::endl;
 
             for (int i =0; i < sync_detection->frame_unread.size(); i++) {
-                sync_detection->frame_unread[i] = true;
+                sync_detection->frame_unread[i] = false;
             }
         }
     }

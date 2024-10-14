@@ -13,7 +13,7 @@
 struct SyncDetection {
     std::condition_variable m_cond;
     std::mutex m_mutex;
-    std::atomic_bool frame_unread;
+    std::vector<bool> frame_unread;
     std::vector<bool> frame_ready;
     bool detection_ready;
 };

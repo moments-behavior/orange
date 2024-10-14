@@ -61,9 +61,9 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
     for (int i = 0; i < num_cameras; i++) {
         if (cameras_select[i].sync_detect) {
             sync_detection->frame_ready.push_back(false);
+            sync_detection->frame_unread.push_back(false);
         }
     }
-    sync_detection->frame_unread = false;
     sync_detection->detection_ready = false;
     
     int sync_count = 0;

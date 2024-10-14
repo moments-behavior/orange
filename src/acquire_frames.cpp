@@ -86,9 +86,9 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
         }
 
         if (camera_select->sync_detect) {
-            if (!sync_detection->frame_unread) {
+            if (!sync_detection->frame_unread[camera_select->sync_id]) {
                 // copy frame, maybe need multiple, need to make sure it is all copied
-                sync_detection->frame_unread = true;
+                sync_detection->frame_unread[camera_select->sync_id] = true;
             }
         }
 
@@ -160,10 +160,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     StopWatch w;
     w.Start();
 
-    // int OFFSET_X_VAL = 2848;
-    // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetX", OFFSET_X_VAL);
-    // int offset = 0;
-    // int phase = 1;
+
     int skip_frame_counter = 0;
     while (camera_control->subscribe)
     {   

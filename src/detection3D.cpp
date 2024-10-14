@@ -1,13 +1,12 @@
 #include "detection3D.h"
-
+#include <algorithm>
 void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control)
 {
     // threads for 3d triangulations
     // ArucoMarker2d marker2d_all_cams;
     while(camera_control->subscribe) {
-        // grab new data
-        if(sync_detection->frame_unread) {
-             
+        bool frame_unread = std::all_of(sync_detection->frame_unread.begin(), sync_detection->frame_unread.end(), [](bool v) { return v;});
+        if (frame_unread) {
             // signal detection proc to start 
             for (int i =0; i < sync_detection->frame_ready.size(); i++) {
                 sync_detection->frame_ready[i] = true;
@@ -52,7 +51,9 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
             // detection_data->marker3d->new_detection = find_marker3d(&marker2d_all_cams, detection_data->marker3d, detection_data->camera_calib, num_sync_cameras);
             // std::cout << detection_data->marker3d->new_detection << std::endl;
 
-            sync_detection->frame_unread = false;
+            for (int i =0; i < sync_detection->frame_unread.size(); i++) {
+                sync_detection->frame_unread[i] = true;
+            }
         }
     }
 }

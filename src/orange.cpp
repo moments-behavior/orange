@@ -13,6 +13,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "enet_thread.h"
+#include "detection3D.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -46,6 +47,10 @@ int main(int argc, char **args)
     detection_data->calibration_folder = home_directory + "/Calibration/5cam";
     detection_data->yolo_model_folder = home_directory + "/detect";
     detection_data->yolo_model = detection_data->yolo_model_folder + "/ball.engine";
+
+    SyncDetection* sync_detection = new SyncDetection;
+    std::vector<std::thread> detection_threads;
+    std::thread detection3d_thread;
 
     bool check[cam_count] {0};
     CameraParams *cameras_params;
@@ -263,9 +268,8 @@ int main(int argc, char **args)
                     }
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                        evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder, detection_data);
-
+                        evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
+                        &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -478,7 +482,7 @@ int main(int argc, char **args)
             if (camera_control->open) {
                 set_camera_properties(ecams, cameras_params, num_cameras);
                 
-                if (ImGui::BeginTable("Camera Control Setting", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+                if (ImGui::BeginTable("Camera Control Setting", 4, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
                 {
                     
                     ImGui::TableNextRow();
@@ -488,6 +492,8 @@ int main(int argc, char **args)
                     ImGui::Text("stream");
                     ImGui::TableNextColumn();
                     ImGui::Text("yolo"); 
+                    ImGui::TableNextColumn();
+                    ImGui::Text("sync detect"); 
 
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -500,6 +506,9 @@ int main(int argc, char **args)
                         ImGui::TableNextColumn();
                         sprintf(temp_string, "##checkbox_yolo%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].yolo);
+                        ImGui::TableNextColumn();
+                        sprintf(temp_string, "##checkbox_sync%d", i);
+                        ImGui::Checkbox(temp_string, &cameras_select[i].sync_detect);
                     }
                     ImGui::EndTable();
                 }
@@ -623,7 +632,7 @@ int main(int argc, char **args)
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                         evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder, detection_data);
+                        &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);
                 } else {
                     
                     for (int i =0; i < num_cameras; i++) {
@@ -747,8 +756,8 @@ int main(int argc, char **args)
                     }
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                        evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder, detection_data);                    
+                        evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
+                        &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);                   
                     camera_control->subscribe = true;                    
                 } else {
                     camera_control->subscribe = false;

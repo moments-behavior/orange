@@ -38,6 +38,31 @@ struct DetectionData {
     DetectionDataPerCam* detect_per_cam;
 };
 
+struct Aruco3d
+{
+    int id;
+    cv::Point3f* corners;
+    cv::Point2f** proj_corners;
+    cv::Point3f t_vec;
+    cv::Point3f normal; 
+    f32 angle_x_axis;
+    bool new_detection;
+};
+
+struct Aruco2d {
+    unsigned char* cpu_frame;
+    unsigned char* cpu_frame_gray;
+    int frame_number;
+    bool find_marker;
+    cv::Point2f* marker_corners;
+};
+
+struct AcuroDetectition {
+    Aruco2d* marker2d;
+    Aruco3d* marker3d;
+    bool draw_marker;
+};
+
 void print_calibration_results(CameraCalibResults* calib_results);
 bool load_camera_calibration_results(std::string calibration_file, CameraCalibResults* calib_results); 
 std::vector<cv::Point3d> unproject2d_to_3d(const std::vector<cv::Point2d> &points, const std::vector<double> &Z, CameraCalibResults *camera_calib);

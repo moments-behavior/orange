@@ -28,7 +28,8 @@ struct GL_Texture {
 
 void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, 
     CameraParams* cameras_params, CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras, int evt_buffer_size, bool ptp_stream_sync, 
-    std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder, DetectionData* detection_data)
+    std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder, DetectionData* detection_data, 
+    SyncDetection* sync_detection, std::vector<std::thread>& detection_threads, std::thread& detection3d_thread)
 {
     for (int i = 0; i < num_cameras; i++)
     {               
@@ -56,10 +57,29 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         detection_data->detect_per_cam[i].calibration_file = detection_data->calibration_folder + "/Cam" + cameras_params[i].camera_serial + ".yaml";
         detection_data->detect_per_cam[i].have_calibration_results = load_camera_calibration_results(detection_data->detect_per_cam[i].calibration_file, &detection_data->detect_per_cam[i].camera_calib);
     }
+    
+    for (int i = 0; i < num_cameras; i++) {
+        if (cameras_select[i].sync_detect) {
+            sync_detection->frame_ready.push_back(false);
+        }
+    }
+    sync_detection->frame_unread = false;
+    sync_detection->detection_ready = false;
+    
+    int sync_count = 0;
+    for (int i = 0; i < num_cameras; i++) {
+        if (cameras_select[i].sync_detect) {
+            cameras_select[i].sync_id = sync_count;
+            detection_threads.push_back(std::thread(&detection_proc, sync_detection, camera_control, sync_count));
+            sync_count++;
+        }
+    }
 
+    detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control);
+    
     for (int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, indigo_signal_builder, detection_data));
+        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, indigo_signal_builder, detection_data, sync_detection));
     }
 }
 

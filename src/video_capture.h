@@ -24,6 +24,8 @@ struct CameraEachSelect
 {
     bool stream_on = true;
     bool yolo = false;
+    bool sync_detect = false;
+    int sync_id = 0;
     PictureSaveState frame_save_state = State_Frame_Idle;
     int frame_save_idx = 0; 
     bool selected_to_save = false;

@@ -52,8 +52,10 @@ The repo has been tested with TensorRT-8.6.1.6. Download and install TensorRT in
 7. Install ENET
 Follow instruction: http://enet.bespin.org/Installation.html. 
 
-8. orange depends on github repos like `Dear Imgui`, `Implot` etc. Once cloned the repo, use the following command to pull submodules
+8. Clone the repo and submodules
+
 ```
+git clone https://github.com/JohnsonLabJanelia/orange.git
 git submodule init
 git submodule update
 ```

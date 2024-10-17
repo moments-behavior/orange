@@ -9,6 +9,7 @@ A multi-camera capture, streaming and recording GUI application for emergent cam
 2. PTP synchronization 
 3. GPU accelerated encoding (h264, h265)
 3. Support 7MP, 65MP, 100G, mono or color Emergent cameras
+4. Multiple servers communication
 
 ## Benchmark
 Encoding performance using GPU A6000 with 7MP Emergent camera

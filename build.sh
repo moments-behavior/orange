@@ -3,6 +3,7 @@ mkdir -p targets;
 rm -f targets/orange;
 nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 
+DIR_FFMPEG=$HOME/nvidia/ffmpeg
 DIR_IMGUI="third_party/imgui"
 DIR_IMGUI_BACKEND="third_party/imgui/backends"
 DIR_IMPLOT="third_party/implot"
@@ -37,8 +38,8 @@ g++ -Ofast -ffast-math -std=c++17 targets/*.o \
     -lenet -I/usr/local/include/ \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc -lnppig -lnppial \
     -lGLEW -lGL \
-    -I$HOME/nvidia/ffmpeg/build/include/ \
-    -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I$DIR_FFMPEG/build/include/ \
+    -L$DIR_FFMPEG/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     -I/usr/local/include/opencv4 \
     -lopencv_sfm -lopencv_core -lopencv_bgsegm -lopencv_imgcodecs -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio -lopencv_calib3d -lopencv_dnn -lopencv_features2d \
     -I/home/user/build/TensorRT-8.6.1.6/include \

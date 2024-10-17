@@ -26,7 +26,7 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 8. ENET
 
 ## Build instructions 
-1. Install CUDA (the software has been tested with version 11.7 - 12.1) follow instructions from Nvidia Cuda install instructions.
+1. Install CUDA (the software has been tested with version 11.7 - 12.1): https://docs.nvidia.com/cuda/cuda-installation-guide-linux/.
 
 2. Install Emergent camera SDK:
 Make sure you can stream all cameras individually with Emergent `eCapture`.  

@@ -88,7 +88,7 @@ Create a `config` folder in the home directory. Create subdirectories `local` an
     └── 180_light
 ```  
 
-In the node folder, it contains 1 or more camera configs `[camera serial].json`. An example config file is in the `config` folder. Please set the camera config according to your camera specifications. To enable `gpu_direct`, set `gpu_direct` to true, and set the `gpu_id` to select which gpu to use for image processing of the camera. 
+In the node folder (like 5cam folder), it contains 1 or more camera configs `[camera serial].json`. An example config file is in the `config` folder. Please name the file after the serial number of cameras and set the config according to your camera specifications. To enable `gpu_direct`, set `gpu_direct` to true, and set the `gpu_id` to select which gpu to use for image processing of the camera. 
 
 ## Contribute to the project 
 If you wish to contribute to the project, please make changes to your local branch, and create a pull request before pushing.  

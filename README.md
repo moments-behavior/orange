@@ -58,11 +58,11 @@ git submodule init
 git submodule update
 ```
 
-9. If you are building the project the first time, uncomment line 11 ~ line 21 for building `ImGui` and `Implot` obejct files. Run
+9. If you are building the project the first time, uncomment line 13 ~ line 23 for building `ImGui` and `Implot` obejct files. Run
 ```
 ./build.sh
 ```
-You can comment out line 11 ~ line 21 to reducing compiling time afterwards. 
+You can comment out line 13 ~ line 23 to reducing compiling time afterwards. 
 
 ## Contribute to the project 
 If you wish to contribute to the project, please make changes to your local branch, and create a pull request before pushing.  

@@ -26,7 +26,7 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 8. ENET
 
 ## Build instructions 
-1. Install CUDA (the software has been tested with version 11.7 - 12.1) fowllow instructions from Nvidia Cuda install instructions.
+1. Install CUDA (the software has been tested with version 11.7 - 12.1) follow instructions from Nvidia Cuda install instructions.
 
 2. Install Emergent camera SDK:
 Make sure you can stream all cameras individually with Emergent `eCapture`.  
@@ -47,7 +47,7 @@ sudo apt-get install libglew-dev
 Refer to `docs/install_opencv.md` for detailed instruction for building OpenCV. 
 
 6. Install TensorRT 
-The repo has been tested with TensorRT-8.6.1.6. Follow instruction: https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html. For instance, look for Tar File Installation. 
+The repo has been tested with TensorRT-8.6.1.6. Download and install TensorRT in `~/build/`, followings instruction: https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html. For instance, look for Tar File Installation. 
 
 7. Install ENET
 Follow instruction: http://enet.bespin.org/Installation.html. 
@@ -58,11 +58,39 @@ git submodule init
 git submodule update
 ```
 
-9. If you are building the project the first time, uncomment line 13 ~ line 23 for building `ImGui` and `Implot` obejct files. Run
+9. If you are building the project for the first time, uncomment line 13 ~ line 23 for building `ImGui` and `ImPlot` object files. Run
 ```
 ./build.sh
 ```
-You can comment out line 13 ~ line 23 to reducing compiling time afterwards. 
+You can comment out line 13 ~ line 23 to reduce compiling time afterwards. 
+
+Once built, it will make a folder called `targets`. The executable `orange` is the application. Start the program using the run script. 
+
+```
+./run.sh
+```
+
+## Use the Program
+Create a `config` folder in the home directory. Create subdirectories `local` and `network` in the config folder. If there is only one server being used, create folders with camera configs in the `local` directory. For instance, here is an example directory tree of `~/config` folder. 
+
+```
+.
+├── local
+│   ├── 5cam
+│   ├── 65
+│   ├── 65_full
+│   ├── 65_light
+│   ├── center_ceiling
+│   └── laser
+└── network
+    ├── 180_gpu_direct
+    ├── 180_laser
+    └── 180_light
+```  
+
+In the node folder, it contains 1 or more camera configs `[camera serial].json`. An example config file is in the `config` folder. Please set the camera config according to your camera specifications. To enable `gpu_direct`, set `gpu_direct` to true, and set the `gpu_id` to select which gpu to use for image processing of the camera. 
 
 ## Contribute to the project 
 If you wish to contribute to the project, please make changes to your local branch, and create a pull request before pushing.  
+
+

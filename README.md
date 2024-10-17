@@ -65,7 +65,7 @@ git submodule update
 ```
 ./build.sh
 ```
-You can comment out line 13 ~ line 23 to reduce compiling time afterwards. 
+Line 13 ~ line 23 to reduce compiling time afterwards. 
 
 Once built, it will make a folder called `targets`. The executable `orange` is the application. Start the program using the run script. 
 

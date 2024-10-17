@@ -44,7 +44,7 @@ int main(int argc, char **args)
     std::string input_folder = home_directory + "/exp/unsorted";
 
     DetectionData* detection_data = new DetectionData;
-    detection_data->calibration_folder = home_directory + "/Calibration/5cam";
+    detection_data->calibration_folder = home_directory + "/Calibration/all_cams";
     detection_data->yolo_model_folder = home_directory + "/detect";
     detection_data->yolo_model = detection_data->yolo_model_folder + "/ball.engine";
 

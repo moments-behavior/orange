@@ -10,14 +10,26 @@
 #include <atomic>
 #include <thread>
 
+
+struct CameraEntry{
+    void* imagePtr; // source image buffer
+    size_t bufferSize; // size of imagePtr in bytes
+    int width;
+    int height;
+    int pixelFormat;
+    unsigned long long timestamp;
+    unsigned long long frame_id;
+};
+
 struct SyncDetection {
     std::condition_variable m_cond;
     std::mutex m_mutex;
     std::vector<bool> frame_unread;
     std::vector<bool> frame_ready;
+    std::vector<CameraEntry*> m_frames;
     bool detection_ready;
 };
 
 void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control);
-void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control, int idx);
+void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control, CameraParams* camera_params, DetectionData* detection_data, int idx);
 #endif

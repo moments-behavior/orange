@@ -23,11 +23,29 @@ struct CameraCalibResults
     cv::Mat projection_mat;
 };
 
+struct Aruco2d {
+    int frame_number;
+    bool find_marker;
+    cv::Point2f marker_corners[4];
+    cv::Point2f proj_corners[4];
+};
+
 struct DetectionDataPerCam {
     bool have_calibration_results;
     std::string yolo_model;
     std::string calibration_file;
     CameraCalibResults camera_calib;
+    Aruco2d marker2d;
+};
+
+struct Aruco3d
+{
+    int id;
+    cv::Point3f corners[4];
+    cv::Point3f t_vec;
+    cv::Point3f normal; 
+    f32 angle_x_axis;
+    bool new_detection;
 };
 
 struct DetectionData {
@@ -35,32 +53,8 @@ struct DetectionData {
     std::string yolo_model; // TODO: remove this for the future? 
     std::string calibration_folder;
     std::vector<cv::Point3d> points3d;
+    Aruco3d marker3d;
     DetectionDataPerCam* detect_per_cam;
-};
-
-struct Aruco3d
-{
-    int id;
-    cv::Point3f* corners;
-    cv::Point2f** proj_corners;
-    cv::Point3f t_vec;
-    cv::Point3f normal; 
-    f32 angle_x_axis;
-    bool new_detection;
-};
-
-struct Aruco2d {
-    unsigned char* cpu_frame;
-    unsigned char* cpu_frame_gray;
-    int frame_number;
-    bool find_marker;
-    cv::Point2f* marker_corners;
-};
-
-struct AcuroDetectition {
-    Aruco2d* marker2d;
-    Aruco3d* marker3d;
-    bool draw_marker;
 };
 
 void print_calibration_results(CameraCalibResults* calib_results);

@@ -87,7 +87,12 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
 
         if (camera_select->sync_detect) {
             if (!sync_detection->frame_unread[camera_select->sync_id]) {
-                // copy frame, maybe need multiple, need to make sure it is all copied
+                sync_detection->m_frames[camera_select->sync_id]->imagePtr = ecam->frame_recv.imagePtr;
+                sync_detection->m_frames[camera_select->sync_id]->bufferSize = ecam->frame_recv.bufferSize;
+                sync_detection->m_frames[camera_select->sync_id]->width = ecam->frame_recv.size_x;
+                sync_detection->m_frames[camera_select->sync_id]->height = ecam->frame_recv.size_y;
+                sync_detection->m_frames[camera_select->sync_id]->pixelFormat = ecam->frame_recv.pixel_type;
+                sync_detection->m_frames[camera_select->sync_id]->timestamp = ecam->frame_recv.timestamp;
                 std::cout << "unread true" << std::endl;
                 sync_detection->frame_unread[camera_select->sync_id] = true;
             }

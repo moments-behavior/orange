@@ -62,6 +62,8 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         if (cameras_select[i].sync_detect) {
             sync_detection->frame_ready.push_back(false);
             sync_detection->frame_unread.push_back(false);
+            CameraEntry* camera_entry = new CameraEntry();
+            sync_detection->m_frames.push_back(camera_entry);
         }
     }
     sync_detection->detection_ready = false;
@@ -70,7 +72,7 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
     for (int i = 0; i < num_cameras; i++) {
         if (cameras_select[i].sync_detect) {
             cameras_select[i].sync_id = sync_count;
-            detection_threads.push_back(std::thread(&detection_proc, sync_detection, camera_control, sync_count));
+            detection_threads.push_back(std::thread(&detection_proc, sync_detection, camera_control, cameras_params, detection_data, sync_count));
             sync_count++;
         }
     }

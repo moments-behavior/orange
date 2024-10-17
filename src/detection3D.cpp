@@ -61,31 +61,36 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
 }
 
 
-void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control, int idx)
+void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control, CameraParams* cameras_params, DetectionData* detection_data, int idx)
 {
 
-    // ck(cudaSetDevice(camera_params->gpu_id));
-    // // innitialization
-	// FrameGPU frame_original; // frame on gpu device 
-    // Debayer debayer;
+    CameraParams* camera_params = &cameras_params[idx];
 
-    // // for opencv processing 
-    // unsigned char *d_bgr;
-    // cudaMalloc((void **)&d_bgr, camera_params->width * camera_params->height * 3);
+    ck(cudaSetDevice(camera_params->gpu_id));
+    
+    // innitialization
+	FrameGPU frame_original; // frame on gpu device 
+    Debayer debayer;
+
+    // for opencv processing 
+    unsigned char *d_bgr;
+    int size_of_picture = camera_params->width * camera_params->height * 3;
+    cudaMalloc((void **)&d_bgr, size_of_picture);
+    unsigned char* cpu_frame;
+    cpu_frame = (unsigned char *)malloc(size_of_picture);
 
     // unsigned char *d_gray;
     // cudaMalloc((void **)&d_gray, camera_params->width * camera_params->height);
-
     // NppiSize d_gray_size;
     // d_gray_size.width = camera_params->width;
     // d_gray_size.height = camera_params->height;
 
-    // initalize_gpu_frame(&frame_original, camera_params);
-    // initialize_gpu_debayer(&debayer, camera_params);
+    if (!camera_params->gpu_direct) {
+        initalize_gpu_frame(&frame_original, camera_params);
+    }
+    initialize_gpu_debayer(&debayer, camera_params);
 
-    // aruconano::MarkerDetector MDetector;
-    // DetectionResults detection_results;
-    // detection_results.camera_id = idx;
+    aruconano::MarkerDetector MDetector;
 
     while(camera_control->subscribe) {
         // wait for frame ready
@@ -95,18 +100,23 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
         
         // need to know all of them has started, then reset frame ready 
         std::cout << "detection per thread" << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        // // start of per process operations  
-        // ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, sync_manager->m_frames[idx]->imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
-        // if (camera_params->color){
-        //     debayer_frame_gpu(camera_params, &frame_original, &debayer);
-        // } else {
-        //     duplicate_channel_gpu(camera_params, &frame_original, &debayer);
-        // }
-        // // detection, aruco marker and yolo per thread goes here
-        // rgba2bgr_convert(d_bgr, debayer.d_debayer, camera_params->width, camera_params->height, 0);
-        // ck(cudaMemcpy2D(aruco_detection->marker2d[idx].cpu_frame, camera_params->width*3, d_bgr, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
-        // cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, aruco_detection->marker2d[idx].cpu_frame).reshape(3, camera_params->height);
+        
+        // start of per process operations
+        if (!camera_params->gpu_direct) {
+            ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, sync_detection->m_frames[idx]->imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+        } else {
+            frame_original.d_orig = (unsigned char*) sync_detection->m_frames[idx]->imagePtr;
+        }
+
+        if (camera_params->color){
+            debayer_frame_gpu(camera_params, &frame_original, &debayer);
+        } else {
+            duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+        }
+        // detection, aruco marker and yolo per thread goes here
+        rgba2bgr_convert(d_bgr, debayer.d_debayer, camera_params->width, camera_params->height, 0);
+        ck(cudaMemcpy2D(cpu_frame, camera_params->width*3, d_bgr, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
+        cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, cpu_frame).reshape(3, camera_params->height);
 
         // // convert rgba to grayscale, need to compare opencv marker detection and the package used, which is better, https://sourceforge.net/projects/aruco/ 
         // // const NppStatus npp_result = nppiRGBToGray_8u_AC4C1R(debayer.d_debayer, camera_params->width*4, d_gray, camera_params->width, d_gray_size);
@@ -118,17 +128,17 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
         // // ck(cudaMemcpy2D(detection_data->detection_per_cam[idx].cpu_frame_gray, camera_params->width, d_gray, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyDeviceToHost));
         // // cv::Mat view = cv::Mat(camera_params->width * camera_params->height, 1, CV_8U, detection_data->detection_per_cam[idx].cpu_frame).reshape(1, camera_params->height);
 
-        // std::vector<aruconano::Marker> markers = MDetector.detect(view);
-        // aruco_detection->marker2d[idx].find_marker = false;
-        // for (size_t i = 0; i < markers.size(); i++) {
-        //     // std::cout << markers[i].id << std::endl;
-        //     if (markers[i].id == 21) {
-        //         aruco_detection->marker2d[idx].find_marker = true;
-        //         for (size_t j = 0; j < 4; j++) {
-        //             aruco_detection->marker2d[idx].marker_corners[j] = markers[i][j];
-        //         }
-        //     }
-        // }
+        std::vector<aruconano::Marker> markers = MDetector.detect(view);
+        detection_data->detect_per_cam[idx].marker2d.find_marker = false;
+        for (size_t i = 0; i < markers.size(); i++) {
+            std::cout << markers[i].id << std::endl;
+            if (markers[i].id == 21) {
+                detection_data->detect_per_cam[idx].marker2d.find_marker = true;
+                for (size_t j = 0; j < 4; j++) {
+                    detection_data->detect_per_cam[idx].marker2d.marker_corners[j] = markers[i][j];
+                }
+            }
+        }
 
         // signal done 
         {

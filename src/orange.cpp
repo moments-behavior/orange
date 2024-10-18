@@ -493,7 +493,7 @@ int main(int argc, char **args)
                     ImGui::TableNextColumn();
                     ImGui::Text("yolo"); 
                     ImGui::TableNextColumn();
-                    ImGui::Text("sync detect"); 
+                    ImGui::Text("3D"); 
 
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -827,6 +827,7 @@ int main(int argc, char **args)
                         
                         if (detection_data->detect_per_cam[i].have_calibration_results) {
                             gui_plot_world_coordinates(&detection_data->detect_per_cam[i].camera_calib, &cameras_params[i]);
+                            draw_aruco_markers(&detection_data->detect_per_cam[i].marker2d);
                         }
                         
                         ImPlot::EndPlot();

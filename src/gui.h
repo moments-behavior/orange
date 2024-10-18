@@ -78,7 +78,7 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         }
     }
 
-    detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control, detection_data);
+    detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control, cameras_select, detection_data, num_cameras);
     
     for (int i = 0; i < num_cameras; i++)
     {
@@ -268,6 +268,27 @@ void gui_plot_world_coordinates(CameraCalibResults* cvp, CameraParams* camera_pa
         ImPlot::SetNextLineStyle(my_color, 3.0);
         ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
     } 
+}
+
+
+void draw_aruco_markers(Aruco2d* aruco_marker)
+{
+    double x[5] = {(double)aruco_marker->proj_corners[0].x, 
+        (double)aruco_marker->proj_corners[1].x, 
+        (double)aruco_marker->proj_corners[2].x, 
+        (double)aruco_marker->proj_corners[3].x, 
+        (double)aruco_marker->proj_corners[0].x};
+    
+    double y[5] = {(double)2200 - (double)aruco_marker->proj_corners[0].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[1].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[2].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[3].y, 
+        (double)2200 - (double)aruco_marker->proj_corners[0].y};
+
+    std::cout << "draw aruco marker: " << x[0] << ", " << 2200 - y[0] << ", " << x[1] << ", " << 2200 - y[1] << std::endl;
+
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
+    ImPlot::PlotLine("Aruco", x, y, 5); 
 }
 
 #endif

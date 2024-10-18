@@ -53,7 +53,8 @@ bool find_marker3d(TriangulatePoints* aruco_marker_2d, std::vector<CameraCalibRe
                 image_points_all.push_back(aruco_marker_2d->detected_points[j][i]);
             }
             cv::Mat output3d = triangulate_points(image_points_all, calib_results_all); 
-            cv::Point3f pts3d = cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
+            cv::Point3f pts3d = cv::Point3d(output3d);
+            // cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
             marker3d->corners[i] = pts3d;
         }
         
@@ -71,14 +72,13 @@ bool find_marker3d(TriangulatePoints* aruco_marker_2d, std::vector<CameraCalibRe
 }
 
 
-void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control, DetectionData* detection_data)
+void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control, CameraEachSelect *cameras_select, DetectionData* detection_data, int num_cameras)
 {
     // threads for 3d triangulations
     std::vector<CameraCalibResults*> calib_results;
     for (int i =0; i < sync_detection->cam_ids.size(); i++) {
         calib_results.push_back(&detection_data->detect_per_cam[sync_detection->cam_ids[i]].camera_calib);
     }
-
     TriangulatePoints marker2d_all_cams;
     while(camera_control->subscribe) {
         bool frame_unread = std::all_of(sync_detection->frame_unread.begin(), sync_detection->frame_unread.end(), [](bool v) { return v;});
@@ -124,7 +124,29 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
             }
 
             detection_data->marker3d.new_detection = find_marker3d(&marker2d_all_cams, calib_results, &detection_data->marker3d);
-            // std::cout << detection_data->marker3d->new_detection << std::endl;
+            // project onto streaming cameras
+            if (detection_data->marker3d.new_detection) {
+                for (int i=0; i<num_cameras; i++) {
+                    
+                    if (cameras_select[i].stream_on && detection_data->detect_per_cam[i].have_calibration_results) {
+                        std::cout << detection_data->detect_per_cam[i].calibration_file << std::endl;
+
+                        cv::Mat image_pts;
+                        CameraCalibResults* cam_calib = &detection_data->detect_per_cam[i].camera_calib;
+
+                        std::vector<cv::Point3f> points3d;
+                        for (int j=0; j<4; j++) {
+                            points3d.push_back(detection_data->marker3d.corners[j]);
+                        }
+
+                        cv::projectPoints(points3d, cam_calib->rvec, cam_calib->tvec, cam_calib->k, cam_calib->dist_coeffs, image_pts);
+                        for (int j=0; j<4; j++) {
+                            detection_data->detect_per_cam[i].marker2d.proj_corners[j].x = image_pts.at<float>(j, 0);
+                            detection_data->detect_per_cam[i].marker2d.proj_corners[j].y = image_pts.at<float>(j, 1);
+                        }
+                    }
+                }
+            }
 
             for (int i =0; i < sync_detection->frame_unread.size(); i++) {
                 sync_detection->frame_unread[i] = false;

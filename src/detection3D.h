@@ -36,6 +36,6 @@ struct SyncDetection {
     bool detection_ready;
 };
 
-void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control, DetectionData* detection_data);
+void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control, CameraEachSelect *cameras_select, DetectionData* detection_data, int num_cameras);
 void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control, CameraParams* camera_params, DetectionData* detection_data, int idx);
 #endif

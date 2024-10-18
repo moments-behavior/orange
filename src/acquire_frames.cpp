@@ -93,7 +93,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
                 sync_detection->m_frames[camera_select->sync_id]->height = ecam->frame_recv.size_y;
                 sync_detection->m_frames[camera_select->sync_id]->pixelFormat = ecam->frame_recv.pixel_type;
                 sync_detection->m_frames[camera_select->sync_id]->timestamp = ecam->frame_recv.timestamp;
-                std::cout << "unread true" << std::endl;
+                // std::cout << "unread true" << std::endl;
                 sync_detection->frame_unread[camera_select->sync_id] = true;
             }
         }

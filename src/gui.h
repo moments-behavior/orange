@@ -60,6 +60,7 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
     
     for (int i = 0; i < num_cameras; i++) {
         if (cameras_select[i].sync_detect) {
+            sync_detection->cam_ids.push_back(i);
             sync_detection->frame_ready.push_back(false);
             sync_detection->frame_unread.push_back(false);
             CameraEntry* camera_entry = new CameraEntry();
@@ -77,7 +78,7 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         }
     }
 
-    detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control);
+    detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control, detection_data);
     
     for (int i = 0; i < num_cameras; i++)
     {

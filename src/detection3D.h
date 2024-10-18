@@ -10,8 +10,13 @@
 #include <atomic>
 #include <thread>
 
+struct TriangulatePoints {
+    int id; 
+    std::vector<int> detected_cameras;
+    std::vector<std::vector<cv::Point2f>> detected_points;
+};
 
-struct CameraEntry{
+struct CameraEntry {
     void* imagePtr; // source image buffer
     size_t bufferSize; // size of imagePtr in bytes
     int width;
@@ -22,6 +27,7 @@ struct CameraEntry{
 };
 
 struct SyncDetection {
+    std::vector<int> cam_ids;
     std::condition_variable m_cond;
     std::mutex m_mutex;
     std::vector<bool> frame_unread;
@@ -30,6 +36,6 @@ struct SyncDetection {
     bool detection_ready;
 };
 
-void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control);
+void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control, DetectionData* detection_data);
 void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control, CameraParams* camera_params, DetectionData* detection_data, int idx);
 #endif

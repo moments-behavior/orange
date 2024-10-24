@@ -1,47 +1,142 @@
 #!/bin/bash
-mkdir -p targets;
-rm -f targets/orange;
-nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 
-DIR_FFMPEG=$HOME/nvidia/ffmpeg
-DIR_IMGUI="third_party/imgui"
-DIR_IMGUI_BACKEND="third_party/imgui/backends"
-DIR_IMPLOT="third_party/implot"
-DIR_FILEBROWSER="third_party/ImGuiFileDialog"
-DIR_ICONFONT="third_party/IconFontCppHeaders"
+# ANSI color codes
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+BLUE="\033[0;34m"
+NC="\033[0m"
 
-# g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui.o ./third_party/imgui/imgui.cpp
-# g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_demo.o ./third_party/imgui/imgui_demo.cpp
-# g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_draw.o ./third_party/imgui/imgui_draw.cpp
-# g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_tables.o ./third_party/imgui/imgui_tables.cpp
-# g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_widgets.o ./third_party/imgui/imgui_widgets.cpp
-# g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_impl_glfw.o ./third_party/imgui/backends/imgui_impl_glfw.cpp
-# g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui_impl_opengl3.o ./third_party/imgui/backends/imgui_impl_opengl3.cpp
+# Error handling
+error_exit() {
+    echo -e "${RED}Error: $1${NC}" >&2
+    exit 1
+}
 
-# g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot.o $DIR_IMPLOT/implot.cpp
-# g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_items.o $DIR_IMPLOT/implot_items.cpp
-# g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o targets/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
+# Installation paths
+ORANGE_ROOT="/opt/orange"
+FFMPEG_ROOT="${ORANGE_ROOT}/lib/ffmpeg-nvidia"
+OPENCV_ROOT="${ORANGE_ROOT}/lib/opencv"
+TENSORRT_ROOT="/usr/local/TensorRT-10.0.1.6"
+CUDA_ROOT="/usr/local/cuda"
+EVT_ROOT="/opt/EVT/eSDK"
 
-g++ -Ofast -ffast-math -std=c++17 targets/*.o \
-    -o targets/orange -I ./src/ src/orange.cpp src/network_base.cpp src/FFmpegWriter.cpp src/camera.cpp src/video_capture.cpp src/acquire_frames.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
-    -I$DIR_IMGUI \
-    -I$DIR_IMGUI_BACKEND \
-    -I$DIR_IMPLOT \
-    -I$DIR_FILEBROWSER \
-    -I$DIR_ICONFONT \
-    -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
-    -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
-    -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
-    -lm \
-    -lpthread \
-    -I./third_party/flatbuffers/include \
-    -lenet -I/usr/local/include/ \
-    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc -lnppig -lnppial \
-    -lGLEW -lGL \
-    -I$DIR_FFMPEG/build/include/ \
-    -L$DIR_FFMPEG/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
-    -I/usr/local/include/opencv4 \
-    -lopencv_sfm -lopencv_core -lopencv_imgcodecs -lopencv_imgproc \
-    -I/home/user/build/TensorRT-8.6.1.6/include \
-    -L/home/user/build/TensorRT-8.6.1.6/lib/ -lnvinfer -lnvinfer_plugin \
-    `pkg-config --static --libs glfw3`
+# Third-party directories
+IMGUI_DIR="third_party/imgui"
+IMPLOT_DIR="third_party/implot"
+FILEBROWSER_DIR="third_party/ImGuiFileDialog"
+
+# Create build directory
+mkdir -p targets || error_exit "Failed to create targets directory"
+rm -f targets/orange
+
+# Debug flags
+DEBUG_FLAGS="-g3 -O0 -DDEBUG -fno-omit-frame-pointer -fno-inline"
+# SANITIZER_FLAGS="-fsanitize=address -fsanitize=undefined"
+THREAD_SANITIZER_FLAGS="-fsanitize=thread -pie -fPIE"
+WARNING_FLAGS="-Wall -Wextra -Wpedantic -Wformat=2 -Wno-unused-parameter"
+
+# Common compiler flags with debug support
+COMMON_INCLUDES="\
+-I/usr/local/include \
+-I/usr/local/include/ffnvcodec \
+-I$FFMPEG_ROOT/include \
+-I$EVT_ROOT/include \
+-I$CUDA_ROOT/include \
+-I$TENSORRT_ROOT/include \
+-I./src \
+-I./src/NvEncoder \
+-I$IMGUI_DIR \
+-I$IMGUI_DIR/backends \
+-I$IMPLOT_DIR \
+-I$FILEBROWSER_DIR \
+-I./third_party/IconFontCppHeaders \
+-I./third_party/flatbuffers/include \
+$(pkg-config --cflags opencv4 glfw3)"
+
+# Library paths and flags
+LIBS="\
+-Wl,-rpath,$EVT_ROOT/lib \
+-Wl,-rpath,$CUDA_ROOT/lib64 \
+-Wl,-rpath,$FFMPEG_ROOT/lib \
+-Wl,-rpath,$TENSORRT_ROOT/lib \
+-L$EVT_ROOT/lib -lEmergentCamera -lEmergentGenICam -lEmergentGigEVision \
+-L$CUDA_ROOT/lib64 -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc -lnppig -lnppial \
+-L$TENSORRT_ROOT/lib -lnvinfer -lnvinfer_plugin \
+-L$FFMPEG_ROOT/lib -lavformat -lavcodec -lavutil -lswscale -lswresample \
+$(pkg-config --libs opencv4) \
+-lGLEW -lGL -lglfw -lenet -lpthread -lm"
+
+# Build type selection
+BUILD_TYPE=${1:-debug}  # Default to debug build if no argument provided
+if [ "$BUILD_TYPE" = "release" ]; then
+    echo -e "${BLUE}Building in Release mode...${NC}"
+    COMPILER_FLAGS="-O3"
+else
+    echo -e "${BLUE}Building in Debug mode...${NC}"
+    COMPILER_FLAGS="$DEBUG_FLAGS $WARNING_FLAGS $SANITIZER_FLAGS"
+fi
+
+# Build steps
+echo -e "${BLUE}Building Orange...${NC}"
+
+# 1. CUDA kernel with debug info
+echo -e "${GREEN}Compiling CUDA kernel...${NC}"
+nvcc -G -g -O0 -c src/kernel.cu -arch=sm_86 -o targets/kernel.o || \
+    error_exit "CUDA kernel compilation failed"
+
+# 2. ImGui and dependencies
+echo -e "${GREEN}Compiling ImGui and dependencies...${NC}"
+for src in \
+    "$IMGUI_DIR/imgui.cpp" \
+    "$IMGUI_DIR/imgui_demo.cpp" \
+    "$IMGUI_DIR/imgui_draw.cpp" \
+    "$IMGUI_DIR/imgui_tables.cpp" \
+    "$IMGUI_DIR/imgui_widgets.cpp" \
+    "$IMGUI_DIR/backends/imgui_impl_glfw.cpp" \
+    "$IMGUI_DIR/backends/imgui_impl_opengl3.cpp" \
+    "$IMPLOT_DIR/implot.cpp" \
+    "$IMPLOT_DIR/implot_items.cpp"; do
+    echo -e "${BLUE}Compiling $(basename $src)...${NC}"
+    g++ -std=c++17 $COMPILER_FLAGS -fPIC -c "$src" -o "targets/$(basename ${src%.cpp}).o" $COMMON_INCLUDES || \
+        error_exit "Failed to compile $src"
+done
+
+# 3. Direct compilation and linking with debug symbols
+echo -e "${GREEN}Compiling and linking project...${NC}"
+g++ -std=c++17 $COMPILER_FLAGS targets/kernel.o targets/imgui*.o targets/implot*.o \
+    src/orange.cpp \
+    src/network_base.cpp \
+    src/FFmpegWriter.cpp \
+    src/camera.cpp \
+    src/video_capture.cpp \
+    src/acquire_frames.cpp \
+    src/offthreadmachine.cpp \
+    src/opengldisplay.cpp \
+    src/threadworker.cpp \
+    src/gpu_video_encoder.cpp \
+    src/yolov8_det.cpp \
+    $FILEBROWSER_DIR/ImGuiFileDialog.cpp \
+    src/NvEncoder/*.cpp \
+    $COMMON_INCLUDES $LIBS \
+    -o targets/orange || error_exit "Compilation and linking failed"
+
+# Create debug symbols file
+if [ "$BUILD_TYPE" != "release" ]; then
+    echo -e "${BLUE}Extracting debug symbols...${NC}"
+    objcopy --only-keep-debug targets/orange targets/orange.debug
+    strip --strip-debug targets/orange
+    objcopy --add-gnu-debuglink=targets/orange.debug targets/orange
+fi
+
+# Verify build
+if [ -f "targets/orange" ]; then
+    echo -e "${GREEN}Build completed successfully${NC}"
+    echo -e "${BLUE}Executable: $(pwd)/targets/orange${NC}"
+    if [ "$BUILD_TYPE" != "release" ]; then
+        echo -e "${BLUE}Debug symbols: $(pwd)/targets/orange.debug${NC}"
+    fi
+    echo -e "${GREEN}Checking dependencies...${NC}"
+    ldd targets/orange
+else
+    error_exit "Build failed - executable not created"
+fi

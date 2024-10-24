@@ -22,14 +22,83 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 static inline void initialize_encoder(EncoderContext *encoder, std::string encoder_str, CameraParams *camera_params)
 {
-    encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
-    encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str.c_str());
-    CUdevice cuDevice;
-    ck(cuDeviceGet(&cuDevice, camera_params->gpu_id));
-    encoder->cuContext = NULL;
-    ck(cuCtxCreate(&encoder->cuContext, 0, cuDevice));
-    encoder->pEnc = new NvEncoderCuda(encoder->cuContext, camera_params->width, camera_params->height, encoder->eFormat);
-    InitializeEncoder(encoder->pEnc, encoder->encodeCLIOptions, encoder->eFormat);
+    try {
+        std::cout << "Initializing encoder with setup string: " << encoder_str << std::endl;
+        
+        // Parse the encoder string to verify codec
+        size_t codec_pos = encoder_str.find("-codec");
+        if (codec_pos != std::string::npos) {
+            size_t space_pos = encoder_str.find(" ", codec_pos + 6);
+            std::string codec = encoder_str.substr(codec_pos + 6, space_pos - (codec_pos + 6));
+            std::cout << "Using codec: " << codec << std::endl;
+        }
+
+        // Set up CUDA device
+        CUdevice cuDevice;
+        ck(cuDeviceGet(&cuDevice, camera_params->gpu_id));
+        encoder->cuContext = NULL;
+        ck(cuCtxCreate(&encoder->cuContext, 0, cuDevice));
+
+        // Initialize encoder parameters
+        encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
+        encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str.c_str());
+        encoder->pEnc = new NvEncoderCuda(encoder->cuContext, 
+                                         camera_params->width,
+                                         camera_params->height,
+                                         encoder->eFormat);
+
+        NV_ENC_INITIALIZE_PARAMS initializeParams = { NV_ENC_INITIALIZE_PARAMS_VER };
+        NV_ENC_CONFIG encodeConfig = { NV_ENC_CONFIG_VER };
+        initializeParams.encodeConfig = &encodeConfig;
+
+        // Create default parameters
+        encoder->pEnc->CreateDefaultEncoderParams(&initializeParams, 
+            encoder_str.find("hevc") != std::string::npos ? NV_ENC_CODEC_HEVC_GUID : NV_ENC_CODEC_H264_GUID,
+            encoder_str.find("p1") != std::string::npos ? NV_ENC_PRESET_P1_GUID : 
+            encoder_str.find("p3") != std::string::npos ? NV_ENC_PRESET_P3_GUID : 
+            encoder_str.find("p5") != std::string::npos ? NV_ENC_PRESET_P5_GUID : 
+            NV_ENC_PRESET_P7_GUID,
+            NV_ENC_TUNING_INFO_HIGH_QUALITY);
+
+        // Modify parameters for high resolution encoding
+        initializeParams.frameRateNum = camera_params->frame_rate;
+        initializeParams.frameRateDen = 1;
+
+        // Set reasonable bitrate for 4K resolution
+        encodeConfig.rcParams.averageBitRate = 20000000;  // 20 Mbps
+        encodeConfig.rcParams.maxBitRate = 25000000;      // 25 Mbps
+        encodeConfig.rcParams.vbvBufferSize = 20000000;   // 20 Mb buffer
+        encodeConfig.rcParams.vbvInitialDelay = 20000000; // 20 Mb delay
+
+        // Use VBR mode for high quality
+        encodeConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_VBR;
+        encodeConfig.rcParams.enableAQ = 1;
+        encodeConfig.rcParams.enableTemporalAQ = 1;
+        encodeConfig.rcParams.enableLookahead = 1;
+        encodeConfig.rcParams.lookaheadDepth = 8;
+
+        // Print detailed configuration
+        std::cout << "Encoder configuration:" << std::endl
+                  << "Width: " << camera_params->width << std::endl
+                  << "Height: " << camera_params->height << std::endl
+                  << "Frame Rate: " << camera_params->frame_rate << std::endl
+                  << "Bitrate: " << encodeConfig.rcParams.averageBitRate / 1000000 << " Mbps" << std::endl
+                  << "GPU ID: " << camera_params->gpu_id << std::endl
+                  << "Codec: " << (encoder_str.find("hevc") != std::string::npos ? "HEVC" : "H264") << std::endl;
+
+        // Initialize encoder
+        try {
+            encoder->pEnc->CreateEncoder(&initializeParams);
+            std::cout << "Encoder initialization successful" << std::endl;
+        } catch (const NVENCException& e) {
+            std::cerr << "NVENC initialization failed: " << e.what() << std::endl;
+            std::cerr << "Error code: " << e.getErrorCode() << std::endl;
+            throw;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error in initialize_encoder: " << e.what() << std::endl;
+        throw;
+    }
 }
 
 static inline void open_metadata_file(std::ofstream *frame_metadata, std::string metadata_file)

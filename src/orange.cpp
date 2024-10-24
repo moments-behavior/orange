@@ -1,5 +1,6 @@
 #include "video_capture.h"
 #include <iostream>
+#include <filesystem>
 #include "camera.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -12,6 +13,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "enet_thread.h"
+#include "encoder_config.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -57,10 +59,13 @@ int main(int argc, char **args)
     PTPParams* ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
 
     EncoderConfig* encoder_config = new EncoderConfig {
-        "-codec h264 -preset p1 -fps ",
-        "h264",
-        "p1"
+        "",         // Will be set by UpdateEncoderSetup
+        "h264",     // Default codec
+        "p1",       // Default preset
+        ""          // Folder name will be set later
+        ""          // Encoder setup
     };
+
     std::vector<std::string> camera_config_files;
 
     ScrollingBuffer* realtime_plot_data;
@@ -73,7 +78,7 @@ int main(int argc, char **args)
     if (enet_initialize(&server, 3333, 5)) {
         printf("Server Initiated\n");
     }
-    ConnectedServer my_servers[2] ;
+    ConnectedServer my_servers[2];
     intialize_servers(my_servers);
 
     INDIGOSignalBuilder indigo_signal_builder;
@@ -81,17 +86,67 @@ int main(int argc, char **args)
         .server = &server,
         .indigo_connection = NULL};
 
+    // Network config initialization
     std::vector<std::string> network_config_folders;
     std::string network_start_folder_name = home_directory + "/config/network";
-    for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
-        network_config_folders.push_back(entry.path().string());
+    std::string default_network_config = network_start_folder_name + "/default";
+
+    // Create default network subdirectory if it doesn't exist
+    if (!std::filesystem::exists(default_network_config)) {
+        try {
+            std::filesystem::create_directories(default_network_config);
+            std::cout << "Created default network config directory" << std::endl;
+        } catch (const std::filesystem::filesystem_error& e) {
+            std::cerr << "Error creating default network directory: " << e.what() << std::endl;
+        }
+    }
+
+    // Safely populate network configs
+    try {
+        for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
+            if (std::filesystem::is_directory(entry)) {
+                network_config_folders.push_back(entry.path().string());
+            }
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Error reading network config directory: " << e.what() << std::endl;
+    }
+
+    // Ensure we have at least one config directory
+    if (network_config_folders.empty()) {
+        network_config_folders.push_back(default_network_config);
     }
     int network_config_select = 0;
 
+    // Local config initialization
     std::vector<std::string> local_config_folders;
     std::string local_start_folder_name = home_directory + "/config/local";
-    for (const auto & entry : std::filesystem::directory_iterator(local_start_folder_name)) {
-        local_config_folders.push_back(entry.path().string());
+    std::string default_local_config = local_start_folder_name + "/default";
+
+    // Create default local subdirectory if it doesn't exist
+    if (!std::filesystem::exists(default_local_config)) {
+        try {
+            std::filesystem::create_directories(default_local_config);
+            std::cout << "Created default local config directory" << std::endl;
+        } catch (const std::filesystem::filesystem_error& e) {
+            std::cerr << "Error creating default local directory: " << e.what() << std::endl;
+        }
+    }
+
+    // Safely populate local configs
+    try {
+        for (const auto & entry : std::filesystem::directory_iterator(local_start_folder_name)) {
+            if (std::filesystem::is_directory(entry)) {
+                local_config_folders.push_back(entry.path().string());
+            }
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Error reading local config directory: " << e.what() << std::endl;
+    }
+
+    // Ensure we have at least one local config directory
+    if (local_config_folders.empty()) {
+        local_config_folders.push_back(default_local_config);
     }
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -237,7 +292,7 @@ int main(int argc, char **args)
             if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Clients start camera threads")) {
-                    encoder_config->encoder_setup= "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
+                    encoder_config->UpdateEncoderSetup();
                     make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
                     host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_config->encoder_basic_setup);
@@ -714,7 +769,7 @@ int main(int argc, char **args)
                 (camera_control->stop_record) = !(camera_control->stop_record);
                 if (camera_control->stop_record)
                 {
-                    encoder_config->encoder_setup= "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
+                    encoder_config->UpdateEncoderSetup();
                     camera_control->record_video = true;
                     make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
 

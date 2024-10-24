@@ -514,21 +514,58 @@ void quick_print_camera(GigEVisionDeviceInfo *device_info, int camera_idx)
     std::cout << "camera: " << camera_idx << ", serialNumber: " << device_info[camera_idx].serialNumber << ", currentIp: " << device_info[camera_idx].currentIp << ", nicIp: " << device_info[camera_idx].nic.ip4Address << std::endl;
 }
 
-int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info)
+int scan_cameras(int max_cameras, GigEVisionDeviceInfo* device_info)
 {
+    printf("Debug: Starting camera scan with max_cameras=%d\n", max_cameras);
     int cameras_found = 0;
     unsigned int listcam_buf_size = max_cameras;
     unsigned int count;
 
-    Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
-    if (count == 0)
-    {
-        printf("Enumerate Cameras: \tNo cameras found.\n");
+    try {
+        // Try to validate input parameters first
+        if (device_info == nullptr) {
+            printf("Error: device_info is null\n");
+            return 0;
+        }
+
+        printf("Debug: Calling EVT_ListDevices...\n");
+        EVT_ERROR result = Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
+        
+        if (result != EVT_SUCCESS) {
+            printf("Error: EVT_ListDevices failed with error code %d: %s\n", 
+                   result, get_evt_error_string(result).c_str());
+            return 0;
+        }
+
+        printf("Debug: EVT_ListDevices returned count=%u, buffer_size=%u\n", 
+               count, listcam_buf_size);
+
+        if (count == 0) {
+            printf("Debug: No cameras found\n");
+            // Let's print network interface information
+            printf("Available network interfaces:\n");
+            system("ip link show | grep -v 'lo:' | grep 'state UP'");
+            return 0;
+        }
+
+        // Print information about each found camera
+        for (unsigned int i = 0; i < count; i++) {
+            printf("Camera %d:\n", i);
+            printf("  Serial: %s\n", device_info[i].serialNumber);
+            printf("  IP: %s\n", device_info[i].currentIp);
+            printf("  MAC: %s\n", device_info[i].macAddress);
+            printf("  NIC IP: %s\n", device_info[i].nic.ip4Address);
+        }
+
+        return count;
+    }
+    catch (const std::exception& e) {
+        printf("Error: Exception in scan_cameras: %s\n", e.what());
         return 0;
     }
-    else
-    {
-        return count;
+    catch (...) {
+        printf("Error: Unknown exception in scan_cameras\n");
+        return 0;
     }
 }
 

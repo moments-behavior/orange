@@ -1,77 +1,68 @@
-# Linux:
-#   apt-get install libglfw-dev
+CXX=g++
+CFLAGS = -Wall -Wformat -std=c++17
 
-CXX = g++
-DIR_OUT = targets
-$(shell   mkdir -p $(DIR_OUT))
+DIR_OUT=./targets
+CXXEXE = $(DIR_OUT)/orange
 
+# Cuda config
+CUDA_PATH=/usr/local/cuda
+CUDA_INC_PATH=$(CUDA_PATH)/include
+CUDA_LIB_PATH=$(CUDA_PATH)/lib64
+NVCC=$(CUDA_PATH)/bin/nvcc
+LIBS_CUDA = -L$(CUDA_LIB_PATH) -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc
 
-DIR_SRC = ./src
-EXE = $(DIR_OUT)/orange
+# OpenGL config
+LIBS_GL=-lGL -lGLEW
 
+#Emergent config
+DIR_EMERGENT_INC = $(EMERGENT_DIR)/eSDK/include/ 
+LIBS_EMERGENT = -L$(EMERGENT_DIR)/eSDK/lib/  -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision
 
-EMERGENT_DIR = /opt/EVT/eSDK
-CUDA_DIR = /usr/local/cuda-11.4
-NVENC = ./third_party/NvEncoder
-IMGUI_DIR = ./third_party/imgui
-OTHER_LIB = ./third_party/other_lib
+# IMGUI 
+IMGUI_DIR = third_party/imgui
 
+# IMPLOT
+IMPLOT_DIR = third_party/implot
+IMFILEBROWSER_DIR = third_party/imgui-filebrowser
+ICONFONT_DIR= third_party/IconFontCppHeaders
 
-DIR_INC = -I$(DIR_SRC)
-DIR_INC += -I$(OTHER_LIB)
-DIR_INC += -I$(EMERGENT_DIR)/include
-DIR_INC += -I$(NVENC)/include -I$(NVENC) 
-DIR_INC += -I/usr/include/opencv4 -I/usr/lib/x86_64-linux-gnu/gstreamer-1.0 -I$(CUDA_DIR)/include
-DIR_INC += -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
+# FFmpeg
+FFMPEG_INC = $(HOME)/nvidia/ffmpeg/build/include/
+FFMPEG_LIB = -L$(HOME)/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec
 
-SOURCES = $(wildcard $(DIR_SRC)/*.cpp) 
-SOURCES += $(wildcard $(NVENC)/*.cpp) 
-SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
-SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
+DIR_INC = -I$(CUDA_INC_PATH) -I$(DIR_EMERGENT_INC) -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I./src/NvEncoder -I./nvenc_api/include -I$(FFMPEG_INC) -I$(IMPLOT_DIR) -I$(IMFILEBROWSER_DIR) -I$(ICONFONT_DIR)
+LDLIBS_FLAGS = -lpthread $(LIBS_EMERGENT) $(LIBS_CUDA) $(LIBS_GL) $(FFMPEG_LIB) 	
+LDLIBS_FLAGS += `pkg-config --static --libs glfw3`
 
-SOURCES_NO_DIR = $(notdir $(SOURCES))
-OBJS_CXX = $(patsubst %.cpp,$(DIR_OUT)/%.o,$(SOURCES_NO_DIR)) 
+SOURCE_CXX = src/orange.cpp src/FFmpegWriter.cpp src/camera_driver_helper.cpp src/camera.cpp src/video_capture.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp
+SOURCE_CXX += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
+SOURCE_CXX += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
+SOURCE_CXX += $(IMPLOT_DIR)/implot.cpp $(IMPLOT_DIR)/implot_items.cpp $(IMPLOT_DIR)/implot_demo.cpp
+SOURCE_CXX += $(wildcard src/NvEncoder/*.cpp) 
+OBJS_CXX = $(patsubst %.cpp,$(DIR_OUT)/%.o,$(SOURCE_CXX)) 
 
+SOURCE_CU = $(wildcard src/*.cu)
+OBJS_CU = $(patsubst %.cu,$(DIR_OUT)/%.cb, $(SOURCE_CU)) 
 
-CXXFLAGS += -g -Ofast -ffast-math  -std=c++11
+CFLAGS += `pkg-config --cflags glfw3`
 
-LDLIBS_FLAGS += -lGLEW
-LDLIBS_FLAGS += -lGL `pkg-config --static --libs glfw3`
-LDLIBS_FLAGS += `pkg-config --cflags --libs x11`
-LDLIBS_FLAGS += `pkg-config --cflags libavformat libswscale libswresample libavutil libavcodec`
-LDLIBS_FLAGS += `pkg-config --libs libavformat libswscale libswresample libavutil libavcodec`
-LDLIBS_FLAGS += -L$(CUDA_DIR)/lib64/ -lcudart -lcuda -lnppicc -lnvidia-encode
-LDLIBS_FLAGS += -lopencv_core -lopencv_imgcodecs -lopencv_bgsegm -lopencv_imgproc -lopencv_video -lopencv_highgui -lopencv_videoio
-LDLIBS_FLAGS += -lm -lpthread -lgstreamer-1.0 
-LDLIBS_FLAGS += -L$(EMERGENT_DIR)/lib  -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision
+$(DIR_OUT)/%.o: %.cpp
+	mkdir -p $(dir $@)
+	$(CXX) -c $(CFLAGS) $(DIR_INC) $< -o $@
 
-
-$(DIR_OUT)/%.o: $(IMGUI_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
-
-
-$(DIR_OUT)/%.o: $(IMGUI_DIR)/backends/%.cpp
-	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
-
-
-$(DIR_OUT)/%.o: $(NVENC)/%.cpp
-	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
+$(DIR_OUT)/%.cb: %.cu
+	mkdir -p $(dir $@)
+	$(NVCC) --lib -Xcompiler -fPIC $< -o $@
 
 
-$(DIR_OUT)/%.o: $(DIR_SRC)/%.cpp
-	$(CXX) $(CXXFLAGS) $(DIR_INC) -c -o $@ $<
-
-
-$(EXE): $(OBJS_CXX)
-	$(CXX) -o $@ $^ $(CXXFLAGS) $(LDLIBS_FLAGS)
-
+$(CXXEXE) : $(OBJS_CXX) $(OBJS_CU)
+	$(CXX) -o $(CXXEXE) $(OBJS_CXX) $(OBJS_CU) $(LDLIBS_FLAGS)
 
 .PHONY:all
-all:  
-	$(EXE)
-
+all:  $(CXXEXE)
 
 .PHONY:clean
 clean:
-	sudo rm -rf $(CXXEXE) $(DIR_OUT)
+	rm -fr $(CXXEXE) $(DIR_OUT)
+
 

@@ -1,18 +1,11 @@
 #ifndef ORANGE_GUI
 #define ORANGE_GUI
 #include "gx_helper.h"
+#include "encoder_config.h"
 #include "camera.h"
 #include <math.h>
 #include <thread>
 #include "acquire_frames.h"
-
-struct EncoderConfig {
-    std::string encoder_basic_setup;
-    std::string encoder_codec; 
-    std::string encoder_preset;
-    std::string folder_name;
-    std::string encoder_setup;
-}; 
 
 struct GL_Texture {
     GLuint texture;

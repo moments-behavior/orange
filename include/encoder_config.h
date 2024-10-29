@@ -10,14 +10,11 @@ struct EncoderConfig {
     std::string folder_name;
     std::string encoder_setup;        // Add this for backwards compatibility
 
-    // Declare the method
-    void UpdateEncoderSetup();
+    // Declare the method inside the struct
+    void UpdateEncoderSetup() {
+        encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
+        encoder_setup = encoder_basic_setup;  // Keep encoder_setup updated for compatibility
+    }
 };
-
-// Define the method outside the struct
-inline void EncoderConfig::UpdateEncoderSetup() {
-    encoder_basic_setup = "-codec " + encoder_codec + " -preset " + encoder_preset + " -fps ";
-    encoder_setup = encoder_basic_setup;  // Keep encoder_setup updated for compatibility
-}
 
 #endif // ORANGE_ENCODER_CONFIG_H

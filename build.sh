@@ -43,6 +43,7 @@ COMMON_INCLUDES="\
 -I$EVT_ROOT/include \
 -I$CUDA_ROOT/include \
 -I$TENSORRT_ROOT/include \
+-I./include \
 -I./src \
 -I./src/NvEncoder \
 -I$IMGUI_DIR \
@@ -81,8 +82,8 @@ echo -e "${BLUE}Building Orange...${NC}"
 
 # 1. CUDA kernel with debug info
 echo -e "${GREEN}Compiling CUDA kernel...${NC}"
-nvcc -G -g -O0 -c src/kernel.cu -arch=sm_86 -o targets/kernel.o || \
-    error_exit "CUDA kernel compilation failed"
+nvcc -G -g -O0 -c src/kernel.cu -arch=sm_86 -o targets/kernel.o \
+    -I./include -I./src || error_exit "CUDA kernel compilation failed"
 
 # 2. ImGui and dependencies
 echo -e "${GREEN}Compiling ImGui and dependencies...${NC}"

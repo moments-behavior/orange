@@ -536,10 +536,8 @@ int main(int argc, char **args)
                 std::vector<std::string> folder_token = string_split(local_config_folders[i].c_str(), "/");
                 sprintf(temp_string, folder_token.back().c_str());
                 ImGui::RadioButton(temp_string, &local_config_select, i);
-                if (i != local_config_folders.size()-1)
-                    ImGui::SameLine();
+                ImGui::SameLine();
             }
-            ImGui::SameLine();
             ImGui::RadioButton("Null", &local_config_select, local_config_folders.size());
 
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {

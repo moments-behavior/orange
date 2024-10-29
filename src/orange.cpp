@@ -37,10 +37,12 @@ int main(int argc, char **args)
     std::filesystem::path cwd = std::filesystem::current_path();
     std::string delimiter = "/";
     std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
+    std::string orange_root_dir_str = "/home/" + tokenized_path[2] + "/orange_data";
+    prepare_application_folders(orange_root_dir_str);
+    std::string input_folder = orange_root_dir_str + "/exp/unsorted";
 
-    std::string home_directory = "/home/" + tokenized_path[2];
-    std::string input_folder = home_directory + "/exp/unsorted";
-    std::string yolo_model_folder = home_directory + "/detect";
+
+    std::string yolo_model_folder = orange_root_dir_str + "/detect";
     std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
 
     bool check[cam_count] {0};
@@ -82,17 +84,18 @@ int main(int argc, char **args)
         .indigo_connection = NULL};
 
     std::vector<std::string> network_config_folders;
-    std::string network_start_folder_name = home_directory + "/config/network";
+    std::string network_start_folder_name = orange_root_dir_str + "/config/network";
     for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
         network_config_folders.push_back(entry.path().string());
     }
     int network_config_select = 0;
 
     std::vector<std::string> local_config_folders;
-    std::string local_start_folder_name = home_directory + "/config/local";
+    std::string local_start_folder_name = orange_root_dir_str + "/config/local";
     for (const auto & entry : std::filesystem::directory_iterator(local_start_folder_name)) {
         local_config_folders.push_back(entry.path().string());
     }
+
     int local_config_select = 0;
     bool select_all_cameras = false;
     char* subfix_buf = (char*)malloc(64);
@@ -536,13 +539,16 @@ int main(int argc, char **args)
                 if (i != local_config_folders.size()-1)
                     ImGui::SameLine();
             }
-        
+            ImGui::SameLine();
+            ImGui::RadioButton("Null", &local_config_select, local_config_folders.size());
+
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
-                (camera_control->open) = !(camera_control->open);
                 if (camera_control->open) 
                 {
-                    update_camera_configs(camera_config_files, local_config_folders[local_config_select]);
-                    select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
+                    if (local_config_select < local_config_folders.size()) {
+                        update_camera_configs(camera_config_files, local_config_folders[local_config_select]);
+                        select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
+                    }
 
                     num_cameras = 0;
                     for (int i = 0; i < cam_count; i++)
@@ -553,6 +559,7 @@ int main(int argc, char **args)
                         }
                     }
                     if (num_cameras > 0) {
+                        camera_control->open = true;
                         cameras_params = new CameraParams[num_cameras];
                         cameras_select = new CameraEachSelect[num_cameras];
 
@@ -585,6 +592,7 @@ int main(int argc, char **args)
                     }
 
                 } else {
+                    camera_control->open = false;
                     for (int i = 0; i < num_cameras; i++)
                     {
                         close_camera(&ecams[i].camera, &cameras_params[i]);

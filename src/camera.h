@@ -111,6 +111,7 @@ void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergent
 void ptp_camera_sync(Emergent::CEmergentCamera* camera, CameraParams *camera_params);
 void ptp_sync_off(Emergent::CEmergentCamera *camera, CameraParams *camera_params);
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
+void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx);
 unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera);
 void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera);
 void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip, CameraParams *camera_params);

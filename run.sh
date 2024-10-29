@@ -1,0 +1,1 @@
+sudo LD_LIBRARY_PATH=/usr/local/cuda/lib64:$HOME/nvidia/ffmpeg/build/lib:$HOME/build/TensorRT-8.6.1.6/lib ./targets/orange

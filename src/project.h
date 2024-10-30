@@ -21,6 +21,50 @@ struct ConnectedServer {
 };
 
 
+void prepare_application_folders(std::string orange_root_dir_str) 
+{
+
+    std::string recordings_str = orange_root_dir_str + "/exp/unsorted";
+    std::filesystem::path recordings_path(recordings_str);
+    if (!std::filesystem::exists(recordings_path)) {
+        if(std::filesystem::create_directories(recordings_path)) {
+            std::cout << "Create recording folder..." << std::endl;
+        }
+    }
+
+    std::string detect_str = orange_root_dir_str + "/detect";
+    std::filesystem::path detect_path(detect_str);
+    if (!std::filesystem::exists(detect_path)) {
+        if(std::filesystem::create_directory(detect_path)) {
+            std::cout << "Create detecting folder..." << std::endl;
+        }
+    }
+
+    std::string config_local = orange_root_dir_str + "/config/local";
+    std::filesystem::path config_local_path(config_local);
+    if (!std::filesystem::exists(config_local_path)) {
+        if(std::filesystem::create_directories(config_local_path)) {
+            std::cout << "Create config/local folder..." << std::endl;
+        }
+    }
+
+    std::string config_network = orange_root_dir_str + "/config/network";
+    std::filesystem::path config_network_path(config_network);
+    if (!std::filesystem::exists(config_network_path)) {
+        if(std::filesystem::create_directory(config_network_path)) {
+            std::cout << "Create config/network folder..." << std::endl;
+        }
+    }
+
+    std::string picture_str = orange_root_dir_str + "/pictures";
+    std::filesystem::path picture_path(picture_str);
+    if (!std::filesystem::exists(picture_path)) {
+        if(std::filesystem::create_directory(picture_path)) {
+            std::cout << "Create config/network folder..." << std::endl;
+        }
+    }
+}
+
 void intialize_servers(ConnectedServer* my_servers)
 {
     my_servers[0].server_state = FetchGame::ManagerState_IDLE;

@@ -6,7 +6,7 @@ nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 DIR_IMGUI="third_party/imgui"
 DIR_IMGUI_BACKEND="third_party/imgui/backends"
 DIR_IMPLOT="third_party/implot"
-DIR_FILEBROWSER="third_party/imgui-filebrowser"
+DIR_FILEBROWSER="third_party/ImGuiFileDialog"
 DIR_ICONFONT="third_party/IconFontCppHeaders"
 
 # g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o targets/imgui.o ./third_party/imgui/imgui.cpp

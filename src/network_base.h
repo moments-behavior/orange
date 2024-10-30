@@ -4,6 +4,7 @@
 #include <functional>
 #include <enet/enet.h>
 #include "fetch_generated.h"
+#include "realtime_tool.h"
 
 enum PacketTransportType
 {
@@ -38,4 +39,5 @@ ENetPeer* connect_peer(EnetContext* enet_context, uint8_t ip_part1, uint8_t ip_p
 void enqueue_packet(EnetContext* enet_context, ENetPeer* peer, PacketTransportType transport_type, void* packet_data, size_t data_length);
 void service_network(EnetContext* enet_context, float dt, std::function<void(const ENetEvent&)> callback);
 void send_indigo_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *indigo_connection);
+void send_indigo_aruco_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *indigo_connection, Aruco3d* marker3d);
 #endif

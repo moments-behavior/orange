@@ -2,7 +2,7 @@
 #include "network_base.h"
 #include "imgui.h"
 
-void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, bool* quite_enet)
+void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, DetectionData* detection_data, bool* quite_enet)
 {
     while(!(*quite_enet)) {
         service_network(server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -47,6 +47,19 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                 break;
             }
         });
+
+        if (detection_data->trigger_ball_drop && indigo_signal_builder->indigo_connection != NULL) {
+            std::cout << "send trigger signal" << std::endl;
+            send_indigo_ball_drop_trigger_signal(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection);
+            detection_data->trigger_ball_drop = false;
+        }
+
+        if (detection_data->marker3d.new_detection && indigo_signal_builder->indigo_connection != NULL) {
+            std::cout << "send aruco marker signal" << std::endl;
+            send_indigo_aruco_signal(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, &detection_data->marker3d);
+            detection_data->marker3d.new_detection = false;
+        }
+
         usleep(10);
     }
 }

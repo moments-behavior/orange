@@ -68,7 +68,6 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         }
     }
     sync_detection->detection_ready = false;
-    
     int sync_count = 0;
     for (int i = 0; i < num_cameras; i++) {
         if (cameras_select[i].sync_detect) {
@@ -78,7 +77,9 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         }
     }
 
-    detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control, cameras_select, detection_data, num_cameras);
+    if (sync_count > 0) {
+        detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control, cameras_select, detection_data, num_cameras);
+    }
     
     for (int i = 0; i < num_cameras; i++)
     {
@@ -284,8 +285,6 @@ void draw_aruco_markers(Aruco2d* aruco_marker)
         (double)2200 - (double)aruco_marker->proj_corners[2].y, 
         (double)2200 - (double)aruco_marker->proj_corners[3].y, 
         (double)2200 - (double)aruco_marker->proj_corners[0].y};
-
-    std::cout << "draw aruco marker: " << x[0] << ", " << 2200 - y[0] << ", " << x[1] << ", " << 2200 - y[1] << std::endl;
 
     ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
     ImPlot::PlotLine("Aruco", x, y, 5); 

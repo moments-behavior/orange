@@ -137,3 +137,24 @@ void send_indigo_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(indigo_connection, 0, enet_packet);
 }
+
+void send_indigo_aruco_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *indigo_connection, Aruco3d* marker3d) 
+{
+    builder->Clear();
+
+    auto position_aruco = FetchGame::Vec3(marker3d->t_vec.x, marker3d->t_vec.y, marker3d->t_vec.z);
+    float orientation_aruco = marker3d->angle_x_axis;
+    auto aruco_fb = FetchGame::CreateRigidObject(*builder, &position_aruco, orientation_aruco);
+
+    FetchGame::ServerBuilder server_builder(*builder);
+    server_builder.add_signal_type(FetchGame::SignalType_INDIGO_ARUCO);
+    server_builder.add_rigid_object(aruco_fb);
+    auto server_fb = server_builder.Finish();
+    builder->Finish(server_fb);
+
+
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
+    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_peer_send(indigo_connection, 0, enet_packet);
+}

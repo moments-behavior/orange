@@ -111,7 +111,7 @@ int main(int argc, char **args)
     bool save_image_all_ready = true;
     bool quite_enet = false;
     
-    std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder, &quite_enet);
+    std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder, detection_data, &quite_enet);
 
     while (!glfwWindowShouldClose(window->render_target))
     {

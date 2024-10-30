@@ -25,7 +25,7 @@ void marker3d_to_pose(Aruco3d* aruco_maker_3d)
 {
     aruco_maker_3d->t_vec = aruco_maker_3d->corners[0] + aruco_maker_3d->corners[1] + aruco_maker_3d->corners[2] + aruco_maker_3d->corners[3];
     aruco_maker_3d->t_vec = aruco_maker_3d->t_vec / 4.0;
-    std::cout << aruco_maker_3d->t_vec << std::endl;
+    // std::cout << aruco_maker_3d->t_vec << std::endl;
     cv::Point3f corner1to4 = aruco_maker_3d->corners[3] - aruco_maker_3d->corners[0];
     cv::Point3f corner1to2 = aruco_maker_3d->corners[1] - aruco_maker_3d->corners[0];
     aruco_maker_3d->normal = corner1to4.cross(corner1to2);
@@ -129,7 +129,6 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
                 for (int i=0; i<num_cameras; i++) {
                     
                     if (cameras_select[i].stream_on && detection_data->detect_per_cam[i].have_calibration_results) {
-                        std::cout << detection_data->detect_per_cam[i].calibration_file << std::endl;
 
                         cv::Mat image_pts;
                         CameraCalibResults* cam_calib = &detection_data->detect_per_cam[i].camera_calib;
@@ -227,7 +226,7 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
         detection_data->detect_per_cam[idx].marker2d.find_marker = false;
         for (size_t i = 0; i < markers.size(); i++) {
             // std::cout << "marder id: " << markers[i].id << std::endl;
-            if (markers[i].id == 20) {
+            if (markers[i].id == 12) {
                 detection_data->detect_per_cam[idx].marker2d.find_marker = true;
                 for (size_t j = 0; j < 4; j++) {
                     detection_data->detect_per_cam[idx].marker2d.marker_corners[j] = markers[i][j];

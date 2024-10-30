@@ -10,6 +10,7 @@
 #include "camera.h"
 #include <map>
 #include <iostream>
+#include <atomic>
 
 #define PI 3.14159265
 
@@ -45,13 +46,14 @@ struct Aruco3d
     cv::Point3f t_vec;
     cv::Point3f normal; 
     f32 angle_x_axis;
-    bool new_detection;
+    std::atomic_bool new_detection;
 };
 
 struct DetectionData {
     std::string yolo_model_folder; 
     std::string yolo_model; // TODO: remove this for the future? 
     std::string calibration_folder;
+    std::atomic_bool trigger_ball_drop;
     std::vector<cv::Point3d> points3d;
     Aruco3d marker3d;
     DetectionDataPerCam* detect_per_cam;

@@ -18,6 +18,11 @@ namespace FetchGame {
 struct bring_up_message;
 struct bring_up_messageBuilder;
 
+struct Vec3;
+
+struct RigidObject;
+struct RigidObjectBuilder;
+
 struct Server;
 struct ServerBuilder;
 
@@ -68,33 +73,36 @@ enum SignalType : int8_t {
   SignalType_ClientStateUpdate = 1,
   SignalType_INDIGO = 2,
   SignalType_INDIGO_TRIAL_TRIGGER = 3,
+  SignalType_INDIGO_ARUCO = 4,
   SignalType_MIN = SignalType_ClientBringup,
-  SignalType_MAX = SignalType_INDIGO_TRIAL_TRIGGER
+  SignalType_MAX = SignalType_INDIGO_ARUCO
 };
 
-inline const SignalType (&EnumValuesSignalType())[4] {
+inline const SignalType (&EnumValuesSignalType())[5] {
   static const SignalType values[] = {
     SignalType_ClientBringup,
     SignalType_ClientStateUpdate,
     SignalType_INDIGO,
-    SignalType_INDIGO_TRIAL_TRIGGER
+    SignalType_INDIGO_TRIAL_TRIGGER,
+    SignalType_INDIGO_ARUCO
   };
   return values;
 }
 
 inline const char * const *EnumNamesSignalType() {
-  static const char * const names[5] = {
+  static const char * const names[6] = {
     "ClientBringup",
     "ClientStateUpdate",
     "INDIGO",
     "INDIGO_TRIAL_TRIGGER",
+    "INDIGO_ARUCO",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameSignalType(SignalType e) {
-  if (::flatbuffers::IsOutRange(e, SignalType_ClientBringup, SignalType_INDIGO_TRIAL_TRIGGER)) return "";
+  if (::flatbuffers::IsOutRange(e, SignalType_ClientBringup, SignalType_INDIGO_ARUCO)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesSignalType()[index];
 }
@@ -159,6 +167,35 @@ inline const char *EnumNameManagerState(ManagerState e) {
   return EnumNamesManagerState()[index];
 }
 
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec3 FLATBUFFERS_FINAL_CLASS {
+ private:
+  float x_;
+  float y_;
+  float z_;
+
+ public:
+  Vec3()
+      : x_(0),
+        y_(0),
+        z_(0) {
+  }
+  Vec3(float _x, float _y, float _z)
+      : x_(::flatbuffers::EndianScalar(_x)),
+        y_(::flatbuffers::EndianScalar(_y)),
+        z_(::flatbuffers::EndianScalar(_z)) {
+  }
+  float x() const {
+    return ::flatbuffers::EndianScalar(x_);
+  }
+  float y() const {
+    return ::flatbuffers::EndianScalar(y_);
+  }
+  float z() const {
+    return ::flatbuffers::EndianScalar(z_);
+  }
+};
+FLATBUFFERS_STRUCT_END(Vec3, 12);
+
 struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef bring_up_messageBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -222,6 +259,57 @@ inline ::flatbuffers::Offset<bring_up_message> Createbring_up_messageDirect(
       num_cameras);
 }
 
+struct RigidObject FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef RigidObjectBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_POSITION = 4,
+    VT_ORIENTATION = 6
+  };
+  const FetchGame::Vec3 *position() const {
+    return GetStruct<const FetchGame::Vec3 *>(VT_POSITION);
+  }
+  float orientation() const {
+    return GetField<float>(VT_ORIENTATION, 0.0f);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<FetchGame::Vec3>(verifier, VT_POSITION, 4) &&
+           VerifyField<float>(verifier, VT_ORIENTATION, 4) &&
+           verifier.EndTable();
+  }
+};
+
+struct RigidObjectBuilder {
+  typedef RigidObject Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_position(const FetchGame::Vec3 *position) {
+    fbb_.AddStruct(RigidObject::VT_POSITION, position);
+  }
+  void add_orientation(float orientation) {
+    fbb_.AddElement<float>(RigidObject::VT_ORIENTATION, orientation, 0.0f);
+  }
+  explicit RigidObjectBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<RigidObject> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<RigidObject>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<RigidObject> CreateRigidObject(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const FetchGame::Vec3 *position = nullptr,
+    float orientation = 0.0f) {
+  RigidObjectBuilder builder_(_fbb);
+  builder_.add_orientation(orientation);
+  builder_.add_position(position);
+  return builder_.Finish();
+}
+
 struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ServerBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -232,7 +320,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_RECORD_FOLDER = 12,
     VT_ENCODER_SETUP = 14,
     VT_PTP_GLOBAL_TIME = 16,
-    VT_SERVER_STATE = 18
+    VT_SERVER_STATE = 18,
+    VT_RIGID_OBJECT = 20
   };
   FetchGame::SignalType signal_type() const {
     return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 0));
@@ -258,6 +347,9 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   FetchGame::ManagerState server_state() const {
     return static_cast<FetchGame::ManagerState>(GetField<int8_t>(VT_SERVER_STATE, 0));
   }
+  const FetchGame::RigidObject *rigid_object() const {
+    return GetPointer<const FetchGame::RigidObject *>(VT_RIGID_OBJECT);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_SIGNAL_TYPE, 1) &&
@@ -272,6 +364,8 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyString(encoder_setup()) &&
            VerifyField<uint64_t>(verifier, VT_PTP_GLOBAL_TIME, 8) &&
            VerifyField<int8_t>(verifier, VT_SERVER_STATE, 1) &&
+           VerifyOffset(verifier, VT_RIGID_OBJECT) &&
+           verifier.VerifyTable(rigid_object()) &&
            verifier.EndTable();
   }
 };
@@ -304,6 +398,9 @@ struct ServerBuilder {
   void add_server_state(FetchGame::ManagerState server_state) {
     fbb_.AddElement<int8_t>(Server::VT_SERVER_STATE, static_cast<int8_t>(server_state), 0);
   }
+  void add_rigid_object(::flatbuffers::Offset<FetchGame::RigidObject> rigid_object) {
+    fbb_.AddOffset(Server::VT_RIGID_OBJECT, rigid_object);
+  }
   explicit ServerBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -324,9 +421,11 @@ inline ::flatbuffers::Offset<Server> CreateServer(
     ::flatbuffers::Offset<::flatbuffers::String> record_folder = 0,
     ::flatbuffers::Offset<::flatbuffers::String> encoder_setup = 0,
     uint64_t ptp_global_time = 0,
-    FetchGame::ManagerState server_state = FetchGame::ManagerState_IDLE) {
+    FetchGame::ManagerState server_state = FetchGame::ManagerState_IDLE,
+    ::flatbuffers::Offset<FetchGame::RigidObject> rigid_object = 0) {
   ServerBuilder builder_(_fbb);
   builder_.add_ptp_global_time(ptp_global_time);
+  builder_.add_rigid_object(rigid_object);
   builder_.add_encoder_setup(encoder_setup);
   builder_.add_record_folder(record_folder);
   builder_.add_config_folder(config_folder);
@@ -346,7 +445,8 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
     const char *record_folder = nullptr,
     const char *encoder_setup = nullptr,
     uint64_t ptp_global_time = 0,
-    FetchGame::ManagerState server_state = FetchGame::ManagerState_IDLE) {
+    FetchGame::ManagerState server_state = FetchGame::ManagerState_IDLE,
+    ::flatbuffers::Offset<FetchGame::RigidObject> rigid_object = 0) {
   auto config_folder__ = config_folder ? _fbb.CreateString(config_folder) : 0;
   auto record_folder__ = record_folder ? _fbb.CreateString(record_folder) : 0;
   auto encoder_setup__ = encoder_setup ? _fbb.CreateString(encoder_setup) : 0;
@@ -359,7 +459,8 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
       record_folder__,
       encoder_setup__,
       ptp_global_time,
-      server_state);
+      server_state,
+      rigid_object);
 }
 
 inline const FetchGame::Server *GetServer(const void *buf) {

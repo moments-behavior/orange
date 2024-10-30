@@ -48,8 +48,9 @@ void COpenGLDisplay::ThreadRunning()
     }
 
     std::vector<Object> objs;
-    std::vector<cv::Point2d> points2d;
-    std::vector<double> points2d_z;
+    // std::vector<cv::Point2d> points2d;
+    // std::vector<double> points2d_z;
+    detection_data->trigger_ball_drop = false;
 
     while(IsMachineOn())
     {
@@ -79,33 +80,31 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->postprocess(objs);
                 yolov8->copy_keypoints_gpu(d_points, objs);
 
-                points2d.clear();
-                points2d_z.clear();
-                detection_data->points3d.clear(); // TODO: bundle data
+                // points2d.clear();
+                // points2d_z.clear();
+                // detection_data->points3d.clear(); // TODO: bundle data
                 if (objs.size() > 0) {
-                    // unproject point to 3d for grabbing
-                    f64 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
-                    f64 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
-                    cv::Point2d point2d(bbox_center_x, bbox_center_y);
-                    points2d.push_back(point2d);
-                    points2d_z.push_back(16.69);
+                    // // unproject point to 3d for grabbing
+                    // f64 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
+                    // f64 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
+                    // cv::Point2d point2d(bbox_center_x, bbox_center_y);
+                    // points2d.push_back(point2d);
+                    // points2d_z.push_back(16.69);
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
                     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
                     // std::cout << bbox_center_x << std::endl;
                     // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
                     // if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
                     if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
-                        // std::cout << "trigger ball drop" << std::endl;
-                        if (indigo_signal_builder->indigo_connection != NULL) {
-                            send_indigo_ball_drop_trigger_signal(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection);
-                        }
+                        std::cout << "set trigger to true" << std::endl;
+                        detection_data->trigger_ball_drop = true;
                     }
                 }
-                // objs will be more than 1 now if we train multiple objects deteciton, think about it
-                if (points2d.size() > 0) {
-                    detection_data->points3d = unproject2d_to_3d(points2d, points2d_z, &detection_data->detect_per_cam[camera_params->used_cams_idx].camera_calib);
-                    // std::cout << detection_data->points3d[0].x << ", " << detection_data->points3d[0].y << ", " << detection_data->points3d[0].z << std::endl;
-                }
+                // // objs will be more than 1 now if we train multiple objects deteciton, think about it
+                // if (points2d.size() > 0) {
+                //     detection_data->points3d = unproject2d_to_3d(points2d, points2d_z, &detection_data->detect_per_cam[camera_params->used_cams_idx].camera_calib);
+                //     // std::cout << detection_data->points3d[0].x << ", " << detection_data->points3d[0].y << ", " << detection_data->points3d[0].z << std::endl;
+                // }
                     
                 gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream);
             }

@@ -13,7 +13,8 @@ enum SignalType: byte {
     ClientBringup,
     ClientStateUpdate,
     INDIGO,
-    INDIGO_TRIAL_TRIGGER
+    INDIGO_TRIAL_TRIGGER,
+    INDIGO_ARUCO
 }
 
 enum ManagerState: byte {
@@ -36,6 +37,17 @@ table bring_up_message {
     num_cameras:short;
 }
 
+struct Vec3 {
+  x:float;
+  y:float;
+  z:float;
+}
+
+table RigidObject {
+    position:Vec3;
+    orientation:float;
+}
+
 table Server {
     signal_type:SignalType = ClientBringup;
     control:ServerControl = IDLE;
@@ -45,6 +57,7 @@ table Server {
     encoder_setup:string;
     ptp_global_time:ulong;
     server_state:ManagerState = IDLE;
+    rigid_object:RigidObject;
 }
 
 root_type Server;

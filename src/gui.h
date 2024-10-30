@@ -49,6 +49,7 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         camera_control->sync_camera = true;
     }
 
+
     for (int i = 0; i < num_cameras; i++)
     {
         camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, indigo_signal_builder));

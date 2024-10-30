@@ -27,8 +27,8 @@ struct CameraEachSelect
     PictureSaveState frame_save_state = State_Frame_Idle;
     int frame_save_idx = 0; 
     bool selected_to_save = false;
-    char* picture_save_folder;
-    char* yolo_model;
+    const char* picture_save_folder;
+    const char* yolo_model;
 };
 
 struct CameraState

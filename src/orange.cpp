@@ -168,9 +168,9 @@ int main(int argc, char **args)
                     ImGui::TableNextColumn();
 
                     if (my_servers[i].connected) {
-                        ImGui::Text(FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
+                        ImGui::Text("%s", FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
                     } else {
-                        ImGui::Text("Not connected");
+                        ImGui::Text("%s", "Not connected");
                     }
                 }
                 ImGui::EndTable();
@@ -263,7 +263,7 @@ int main(int argc, char **args)
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                         evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder);
+                        &indigo_signal_builder, yolo_model, picture_save_folder);
 
                     camera_control->subscribe = true;
                 }
@@ -412,9 +412,9 @@ int main(int argc, char **args)
                     ImGui::TableNextColumn();
                     ImGui::Selectable(temp_string, &check[i], ImGuiSelectableFlags_SpanAllColumns);
                     ImGui::TableNextColumn();
-                    ImGui::Text(device_info[i].serialNumber);
+                    ImGui::Text("%s", device_info[i].serialNumber);
                     ImGui::TableNextColumn();
-                    ImGui::Text(device_info[i].currentIp);
+                    ImGui::Text("%s", device_info[i].currentIp);
                 }
                 ImGui::EndTable();
             }
@@ -637,7 +637,7 @@ int main(int argc, char **args)
 
                         start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder);
+                            &indigo_signal_builder, yolo_model, picture_save_folder);
                     } else {
                         
                         for (int i =0; i < num_cameras; i++) {
@@ -812,7 +812,7 @@ int main(int argc, char **args)
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                         evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder);
+                        &indigo_signal_builder, yolo_model, picture_save_folder);
 
                     camera_control->subscribe = true;                    
                 } else {

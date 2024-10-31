@@ -31,9 +31,9 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 
 3. Install FFmpeg 4.4
 
-Refer to ![`docs/install_ffmpeg.md`](docs/install_ffmpeg.md) for detailed instruction for building FFmpeg 4.4. 
+Refer to [`docs/install_ffmpeg.md`](docs/install_ffmpeg.md) for detailed instruction for building FFmpeg 4.4. 
 
-The project build file `build.sh` assumes FFmpeg is installed at `$HOME/nvidia/ffmpeg`, if you installed it at a different location, please change the `build.sh` `DIR_FFMPEG` to match your install directory. 
+The project build file [`build.sh`](build.sh) assumes FFmpeg is installed at `$HOME/nvidia/ffmpeg`, if you installed it at a different location, please change the `build.sh` `DIR_FFMPEG` to match your install directory. 
 
 4. Install OpenGL and GLEW
 ```
@@ -43,10 +43,10 @@ sudo apt-get install libglew-dev
 ```
 
 5. Install OpenCV
-Refer to `docs/install_opencv.md` for detailed instruction for building OpenCV. 
+Refer to [`docs/install_opencv.md`](docs/install_opencv.md) for detailed instruction for building OpenCV. 
 
 6. Install TensorRT 
-The repo has been tested with TensorRT-8.6.1.6. Followings instruction: `docs/install_tensorrt.md`. The project build assumes TensorRT installed at `$HOME/nvidia/TensorRT-8.6.1.6`. If you installed in at a different location, please change the `build.sh` `DIR_TENSORRT` to match your install directory.
+The repo has been tested with TensorRT-8.6.1.6. Followings instruction: [`docs/install_tensorrt.md`](docs/install_tensorrt.md). The project build assumes TensorRT installed at `$HOME/nvidia/TensorRT-8.6.1.6`. If you installed in at a different location, please change the [`build.sh`](build.sh) `DIR_TENSORRT` to match your install directory.
 
 7. Install ENET
 Follow instruction: http://enet.bespin.org/Installation.html. 

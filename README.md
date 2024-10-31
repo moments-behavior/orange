@@ -30,7 +30,8 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 1. Install CUDA (the software has been tested with version 12.x) and Emergent camera SDK. Follow instructions in `docs/install_linux_cuda_eSDK.md`. Make sure you can stream all cameras individually with Emergent `eCapture`.  
 
 3. Install FFmpeg 4.4
-Refer to `docs/install_ffmpeg.md` for detailed instruction for building FFmpeg 4.4. 
+
+Refer to ![`docs/install_ffmpeg.md`](docs/install_ffmpeg.md) for detailed instruction for building FFmpeg 4.4. 
 
 The project build file `build.sh` assumes FFmpeg is installed at `$HOME/nvidia/ffmpeg`, if you installed it at a different location, please change the `build.sh` `DIR_FFMPEG` to match your install directory. 
 

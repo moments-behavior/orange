@@ -89,7 +89,7 @@ orange_data
 The are two modes of using the application: local vs network. Local means all cameras are connected to one server, while network can support multiple servers. 
 
 ### Local mode
-One could save preconfigued camera settings in a folder under `local`. For instance,
+One could save preconfigued camera settings in a folder under `local`, for instance,
 
 ```
 orange_data

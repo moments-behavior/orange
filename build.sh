@@ -4,6 +4,8 @@ rm -f targets/orange;
 nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 
 DIR_FFMPEG=$HOME/nvidia/ffmpeg
+DIR_TENSORRT=$HOME/nvidia/ffmpeg/TensorRT-8.6.1.6
+
 DIR_IMGUI="third_party/imgui"
 DIR_IMGUI_BACKEND="third_party/imgui/backends"
 DIR_IMPLOT="third_party/implot"
@@ -42,6 +44,6 @@ g++ -Ofast -ffast-math -std=c++17 targets/*.o \
     -L$DIR_FFMPEG/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     -I/usr/local/include/opencv4 \
     -lopencv_sfm -lopencv_core -lopencv_imgcodecs -lopencv_imgproc \
-    -I/home/user/build/TensorRT-8.6.1.6/include \
-    -L/home/user/build/TensorRT-8.6.1.6/lib/ -lnvinfer -lnvinfer_plugin \
+    -I$DIR_TENSORRT/include \
+    -L$DIR_TENSORRT/lib/ -lnvinfer -lnvinfer_plugin \
     `pkg-config --static --libs glfw3`

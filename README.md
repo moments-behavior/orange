@@ -27,15 +27,12 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 8. ENET
 
 ## Build instructions 
-1. Install CUDA (the software has been tested with version 11.7 - 12.1): https://docs.nvidia.com/cuda/cuda-installation-guide-linux/.
-
-2. Install Emergent camera SDK:
-Make sure you can stream all cameras individually with Emergent `eCapture`.  
+1. Install CUDA (the software has been tested with version 12.x) and Emergent camera SDK. Follow instructions in `docs/install_linux_cuda_eSDK.md`. Make sure you can stream all cameras individually with Emergent `eCapture`.  
 
 3. Install FFmpeg 4.4
 Refer to `docs/install_ffmpeg.md` for detailed instruction for building FFmpeg 4.4. 
 
-The project build file `build.sh` assumes FFmpeg is installed at `$HOME/nvidia/ffmpeg/build/include/` and `$HOME/nvidia/ffmpeg/build/lib/`, if you install it at a different location, please change the `build.sh` `DIR_FFMPEG` to match your install directory. 
+The project build file `build.sh` assumes FFmpeg is installed at `$HOME/nvidia/ffmpeg`, if you installed it at a different location, please change the `build.sh` `DIR_FFMPEG` to match your install directory. 
 
 4. Install OpenGL and GLEW
 ```
@@ -48,7 +45,7 @@ sudo apt-get install libglew-dev
 Refer to `docs/install_opencv.md` for detailed instruction for building OpenCV. 
 
 6. Install TensorRT 
-The repo has been tested with TensorRT-8.6.1.6. Download and install TensorRT in `~/build/`, followings instruction: https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html. For instance, look for Tar File Installation. 
+The repo has been tested with TensorRT-8.6.1.6. Followings instruction: `docs/install_tensorrt.md`. The project build assumes TensorRT installed at `$HOME/nvidia/TensorRT-8.6.1.6`. If you installed in at a different location, please change the `build.sh` `DIR_TENSORRT` to match your install directory.
 
 7. Install ENET
 Follow instruction: http://enet.bespin.org/Installation.html. 
@@ -61,11 +58,11 @@ git submodule init
 git submodule update
 ```
 
-9. If you are building the project for the first time, uncomment line 13 ~ line 23 for building `ImGui` and `ImPlot` object files. Run
+9. If you are building the project for the first time, uncomment line 15 ~ line 25 for building `ImGui` and `ImPlot` object files. Run
 ```
 ./build.sh
 ```
-Line 13 ~ line 23 to reduce compiling time afterwards. 
+Comment out Line 15 ~ line 25 to reduce compiling time afterwards. 
 
 Once built, it will make a folder called `targets`. The executable `orange` is the application. Start the program using the run script. 
 

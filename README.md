@@ -59,7 +59,7 @@ git submodule init
 git submodule update
 ```
 
-9. If you are building the project for the first time, uncomment [line 15 ~ line 25](https://github.com/JohnsonLabJanelia/orange/blob/5d7a1b9ec4738f8075895a2a0b27cff556aca834/build.sh#L15) for building `ImGui` and `ImPlot` object files. Run
+9. If you are building the project for the first time, uncomment [`line 15 ~ line 25`](https://github.com/JohnsonLabJanelia/orange/blob/5d7a1b9ec4738f8075895a2a0b27cff556aca834/build.sh#L15) for building `ImGui` and `ImPlot` object files. Run
 ```
 ./build.sh
 ```

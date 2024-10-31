@@ -89,7 +89,7 @@ orange_data
 The are two modes of using the application: local vs network. Local means all cameras are connected to one server, while network can support multiple servers. 
 
 ### Local mode
-One could save preconfigued camera settings in a folder under `local`, for instance,
+One could save preconfigued camera settings in a folder under `local`, for instance
 
 ```
 orange_data
@@ -115,7 +115,7 @@ orange_data
     └── 710038_0.tiff
 
 ```
-In the node folder (like 5cam folder), it contains 1 or more camera configs `[camera serial].json`. An example config file is in the `config` folder. Please name the file after the serial number of your cameras and set the config according to your camera specifications. To enable `gpu_direct`, set `gpu_direct` to true, and set the `gpu_id` to select which gpu to use for image processing of the camera. 
+In the node folder (like `5cam` folder), it contains 1 or more camera configs `[camera serial].json`. An example config file is in the `config` folder. Please name the file after the serial number of your cameras and set the config according to your camera specifications. To enable `gpu_direct`, set `gpu_direct` to true, and set the `gpu_id` to select which gpu to use for image processing of the camera. 
 
 ### Network mode
 One can network multiple PCs to scale to more cameras. 

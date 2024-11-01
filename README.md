@@ -3,6 +3,8 @@ A multi-camera capture, streaming and recording GUI application for emergent cam
 
 ![gui](images/gui.png)
 
+## Video demo 
+Please see this [link](https://youtu.be/ahceluqBYj8) for a video demo of the app. 
 
 ## Features 
 1. Multiple cameras streaming 

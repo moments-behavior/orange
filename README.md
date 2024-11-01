@@ -124,7 +124,7 @@ One can network multiple PCs to scale up to more cameras.
 
 The recorded videos are saved at `orange_data/exp/unsorted` by default. But it can be easily changed while using the app. 
 
-## Contribute to the project 
-If you wish to contribute to the project, please make changes to your local branch, and create a pull request before pushing.  
+## Contributer
+If you wish to make changes to the source code, you can fork the repo. If you wish to contribute to the project, please create a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
 
 

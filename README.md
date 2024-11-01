@@ -29,7 +29,7 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 8. ENET
 
 ## Build instructions 
-1. Install CUDA (the software has been tested with version 12.x) and Emergent camera SDK. Follow instructions in `docs/install_linux_cuda_eSDK.md`. Make sure you can stream all cameras individually with Emergent `eCapture`.  
+1. Install CUDA (the software has been tested with version 12.x) and Emergent camera SDK. Follow instructions in [`docs/install_linux_cuda_eSDK.md`](docs/install_linux_cuda_eSDK.md). Make sure you can stream all cameras individually with Emergent `eCapture`.  
 
 2. Install FFmpeg 4.4
 

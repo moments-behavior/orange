@@ -1,6 +1,8 @@
 # orange :orange: 
 A multi-camera capture, streaming and recording GUI application for emergent cameras in C++
 
+Contact [Jinyao Yan](yanj11@janelia.hhmi.org) if you have questions about the software 
+
 ![gui](images/gui.png)
 
 ## Video demo 

@@ -4,7 +4,7 @@ rm -f targets/orange;
 nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 
 DIR_FFMPEG=$HOME/nvidia/ffmpeg
-DIR_TENSORRT=$HOME/nvidia/ffmpeg/TensorRT-8.6.1.6
+DIR_TENSORRT=$HOME/nvidia/TensorRT-8.6.1.6
 
 DIR_IMGUI="third_party/imgui"
 DIR_IMGUI_BACKEND="third_party/imgui/backends"

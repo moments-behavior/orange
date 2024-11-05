@@ -20,7 +20,8 @@ struct GL_Texture {
 
 void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, 
     CameraParams* cameras_params, CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras, int evt_buffer_size, bool ptp_stream_sync, 
-    std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder)
+    std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder, 
+    std::string& yolo_model, std::string& picture_save_folder)
 {
     for (int i = 0; i < num_cameras; i++)
     {               
@@ -40,6 +41,12 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
             ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
         }
         camera_control->sync_camera = true;
+    }
+    
+    for (int i = 0; i < num_cameras; i++)
+    {
+        cameras_select[i].yolo_model = yolo_model.c_str();
+        cameras_select[i].picture_save_folder = picture_save_folder.c_str();
     }
 
     for (int i = 0; i < num_cameras; i++)

@@ -36,7 +36,7 @@ void COpenGLDisplay::ThreadRunning()
     if (camera_select->yolo) {
         printf("YOLO initialization...\n");
 
-        const std::string engine_file_path{"/home/user/detect/rat_bbox.engine"};
+        const std::string engine_file_path = camera_select->yolo_model;
         yolov8 = new YOLOv8(engine_file_path, camera_params->width, camera_params->height);
         yolov8->make_pipe(true);
 
@@ -102,7 +102,8 @@ void COpenGLDisplay::ThreadRunning()
                 cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
                 cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
                 
-                std::string image_name = "/home/user/Pictures/Orange/Cam" + camera_params->camera_serial + "_image" + std::to_string(camera_select->frame_save_idx) + ".tif";
+                std::string picture_save_folder(camera_select->picture_save_folder);
+                std::string image_name = picture_save_folder + "/" + camera_params->camera_serial + "_" + std::to_string(camera_select->frame_save_idx) + ".tiff";
                 cv::imwrite(image_name, view);
                 camera_select->frame_save_idx++;
                 camera_select->frame_save_state = State_Frame_Idle;

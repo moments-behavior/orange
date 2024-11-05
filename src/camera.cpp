@@ -1,5 +1,8 @@
 #include "camera.h"
 #include <iostream>
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
 
 std::string get_evt_error_string(EVT_ERROR error)
 {
@@ -459,7 +462,103 @@ void set_frame_buffer(Emergent::CEmergentFrame *evt_frame, CameraParams *camera_
 
 void camera_open_stream(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
 {
-    check_camera_errors(EVT_CameraOpenStream(camera), camera_params->camera_serial.c_str());
+    // Get camera temperature to verify we can still communicate
+    int temp;
+    EVT_ERROR check_err = EVT_CameraGetInt32Param(camera, "SensTemp", &temp);
+    if (check_err == EVT_SUCCESS) {
+        std::cout << "Camera sensor temperature before stream: " << temp << std::endl;
+    } else {
+        std::cerr << "Failed to get camera temperature: " << get_evt_error_string(check_err) << std::endl;
+        return;
+    }
+
+    // Try to get packet size
+    unsigned int packet_size;
+    check_err = EVT_CameraGetUInt32Param(camera, "GevSCPSPacketSize", &packet_size);
+    if (check_err == EVT_SUCCESS) {
+        std::cout << "Current packet size: " << packet_size << std::endl;
+    } else {
+        std::cerr << "Failed to get packet size: " << get_evt_error_string(check_err) << std::endl;
+    }
+
+    // Configure GPU Direct before opening stream
+    if (camera_params->gpu_direct) {
+        int deviceCount = 0;
+        cudaGetDeviceCount(&deviceCount);
+        std::cout << "Found " << deviceCount << " CUDA devices" << std::endl;
+        
+        // Print info for all available GPUs
+        for (int i = 0; i < deviceCount; i++) {
+            cudaDeviceProp prop;
+            cudaGetDeviceProperties(&prop, i);
+            std::cout << "GPU " << i << ": " << prop.name 
+                      << " (Compute " << prop.major << "." << prop.minor << ")" << std::endl;
+        }
+
+        if (camera_params->gpu_id >= deviceCount) {
+            std::cerr << "Invalid GPU ID " << camera_params->gpu_id << ". Max ID is " << (deviceCount-1) << std::endl;
+            return;
+        }
+
+        // Set device properties for GPU Direct
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, camera_params->gpu_id);
+        
+        // Print the GPU Direct capabilities
+        std::cout << "Using GPU " << camera_params->gpu_id << ": " << prop.name << std::endl;
+        std::cout << "GPU Direct RDMA Capable: " << (prop.directManagedMemAccessFromHost ? "Yes" : "No") << std::endl;
+        
+        cudaError_t cuda_err = cudaSetDevice(camera_params->gpu_id);
+        if (cuda_err != cudaSuccess) {
+            std::cerr << "Failed to set CUDA device: " << cudaGetErrorString(cuda_err) << std::endl;
+            return;
+        }
+
+        // Initialize GPU Direct settings
+        camera->gpuDirectDeviceId = camera_params->gpu_id;
+        
+        std::cout << "GPU Direct enabled on GPU " << camera_params->gpu_id << std::endl;
+        cuda_err = cudaDeviceSynchronize();
+        if (cuda_err != cudaSuccess) {
+            std::cerr << "Failed to synchronize CUDA device: " << cudaGetErrorString(cuda_err) << std::endl;
+            return;
+        }
+    }
+
+    // Now try to open stream
+    EVT_ERROR err = EVT_CameraOpenStream(camera);
+    if (err != EVT_SUCCESS) {
+        std::cerr << "Failed to open camera stream: " << get_evt_error_string(err) 
+                  << " (Error code: " << err << ")" << std::endl;
+        
+        if (camera_params->gpu_direct) {
+            std::cout << "Stream failed with GPU Direct enabled. GPU ID: " << camera_params->gpu_id 
+                      << ", Camera: " << camera_params->camera_serial << std::endl;
+            
+            size_t free_mem = 0, total_mem = 0;
+            if (cudaMemGetInfo(&free_mem, &total_mem) == cudaSuccess) {
+                std::cout << "GPU Memory - Free: " << (free_mem/1024/1024) << "MB, Total: " 
+                          << (total_mem/1024/1024) << "MB" << std::endl;
+            }
+
+            // Print current CUDA context
+            cudaDeviceProp prop;
+            cudaGetDeviceProperties(&prop, camera_params->gpu_id);
+            std::cout << "Current GPU Context: " << prop.name << std::endl;
+        }
+        
+        // Print camera state
+        char status_buffer[100];
+        unsigned long status_size_ret;
+        EVT_CameraGetStringParam(camera, "DeviceStatus", status_buffer, 100, &status_size_ret);
+        std::cerr << "Camera status: " << status_buffer << std::endl;
+
+        // Try to get more detailed error info
+        char error_buffer[100];
+        EVT_CameraGetStringParam(camera, "DeviceErrorStatus", error_buffer, 100, &status_size_ret);
+        std::cerr << "Device Error Status: " << error_buffer << std::endl;
+    }
+    check_camera_errors(err, camera_params->camera_serial.c_str());
 }
 
 void allocate_frame_buffer(Emergent::CEmergentCamera *camera, Emergent::CEmergentFrame *evt_frame, CameraParams *camera_params, int buffer_size)

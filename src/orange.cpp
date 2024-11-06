@@ -42,7 +42,8 @@ int main(int argc, char **args)
     std::string orange_root_dir_str = "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
     std::string input_folder = orange_root_dir_str + "/exp/unsorted";
-
+    
+    std::string home_directory = "/home/" + tokenized_path[2];
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
     std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
     std::string picture_save_folder = orange_root_dir_str + "/pictures";

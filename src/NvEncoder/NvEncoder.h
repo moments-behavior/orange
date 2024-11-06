@@ -1,24 +1,41 @@
 /*
-* Copyright 2017-2021 NVIDIA Corporation.  All rights reserved.
-*
-* Please refer to the NVIDIA end user license agreement (EULA) associated
-* with this source code for terms and conditions that govern your use of
-* this software. Any use, reproduction, disclosure, or distribution of
-* this software and related documentation outside the terms of the EULA
-* is strictly prohibited.
-*
-*/
+ * This copyright notice applies to this header file only:
+ *
+ * Copyright (c) 2010-2023 NVIDIA Corporation
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the software, and to permit persons to whom the
+ * software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #pragma once
 
 #include <vector>
-#include <nvEncodeAPI.h>
+#include "nvEncodeAPI.h"
 #include <stdint.h>
 #include <mutex>
 #include <string>
 #include <iostream>
 #include <sstream>
 #include <string.h>
+#include "NvCodecUtils.h"
 
 /**
 * @brief Exception class for error reporting from NvEncodeAPI calls.
@@ -253,6 +270,11 @@ public:
     *  @brief This function returns the number of allocated buffers.
     */
     uint32_t GetEncoderBufferCount() const { return m_nEncoderBuffer; }
+
+    /*
+    * @brief This function returns initializeParams(width, height, fps etc).
+    */
+    NV_ENC_INITIALIZE_PARAMS GetinitializeParams() const { return m_initializeParams; }
 protected:
 
     /**
@@ -260,7 +282,8 @@ protected:
     *  NvEncoder class constructor cannot be called directly by the application.
     */
     NvEncoder(NV_ENC_DEVICE_TYPE eDeviceType, void *pDevice, uint32_t nWidth, uint32_t nHeight,
-        NV_ENC_BUFFER_FORMAT eBufferFormat, uint32_t nOutputDelay, bool bMotionEstimationOnly, bool bOutputInVideoMemory = false, bool bDX12Encode = false);
+        NV_ENC_BUFFER_FORMAT eBufferFormat, uint32_t nOutputDelay, bool bMotionEstimationOnly, bool bOutputInVideoMemory = false, bool bDX12Encode = false,
+        bool bUseIVFContainer = true);
 
     /**
     *  @brief This function is used to check if hardware encoder is properly initialized.
@@ -286,7 +309,7 @@ protected:
     */
     NV_ENC_REGISTERED_PTR RegisterResource(void *pBuffer, NV_ENC_INPUT_RESOURCE_TYPE eResourceType,
         int width, int height, int pitch, NV_ENC_BUFFER_FORMAT bufferFormat, NV_ENC_BUFFER_USAGE bufferUsage = NV_ENC_INPUT_IMAGE,
-        NV_ENC_FENCE_POINT_D3D12* pInputFencePoint = NULL, NV_ENC_FENCE_POINT_D3D12* pOutputFencePoint = NULL);
+        NV_ENC_FENCE_POINT_D3D12* pInputFencePoint = NULL);
 
     /**
     *  @brief This function returns maximum width used to open the encoder session.
@@ -412,6 +435,7 @@ protected:
     bool m_bIsDX12Encode = false;
     void *m_hEncoder = nullptr;
     NV_ENCODE_API_FUNCTION_LIST m_nvenc;
+    NV_ENC_INITIALIZE_PARAMS m_initializeParams = {};
     std::vector<NvEncInputFrame> m_vInputFrames;
     std::vector<NV_ENC_REGISTERED_PTR> m_vRegisteredResources;
     std::vector<NvEncInputFrame> m_vReferenceFrames;
@@ -424,6 +448,9 @@ protected:
     int32_t m_iGot = 0;
     int32_t m_nEncoderBuffer = 0;
     int32_t m_nOutputDelay = 0;
+    IVFUtils m_IVFUtils;
+    bool m_bWriteIVFFileHeader = true;
+    bool m_bUseIVFContainer = true;
 
 private:
     uint32_t m_nWidth;
@@ -431,7 +458,6 @@ private:
     NV_ENC_BUFFER_FORMAT m_eBufferFormat;
     void *m_pDevice;
     NV_ENC_DEVICE_TYPE m_eDeviceType;
-    NV_ENC_INITIALIZE_PARAMS m_initializeParams = {};
     NV_ENC_CONFIG m_encodeConfig = {};
     bool m_bEncoderInitialized = false;
     uint32_t m_nExtraOutputDelay = 3; // To ensure encode and graphics can work in parallel, m_nExtraOutputDelay should be set to at least 1

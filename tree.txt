@@ -1,0 +1,2568 @@
+.
+├── build_output.log
+├── build.sh
+├── config
+│   └── 2002496.json
+├── debug.sh
+├── docs
+│   ├── install_ffmpeg.md
+│   ├── install_linux_cuda_eSDK.md
+│   ├── install_opencv.md
+│   └── install_tensorrt.md
+├── fonts
+│   ├── fa-solid-900.ttf
+│   ├── fontawesome-webfont.ttf
+│   ├── forkawesome-webfont.ttf
+│   └── Roboto-Regular.ttf
+├── headless_client.sh
+├── images
+│   ├── cuda_install.png
+│   ├── devices_ecap.png
+│   ├── encoding_benchmark.png
+│   ├── gui.png
+│   ├── network_settings_home.png
+│   └── ubuntu_splash_screen.png
+├── imgui.ini
+├── include
+│   ├── acquire_frames.h
+│   ├── acquire_frames_headless.h
+│   ├── camera.h
+│   ├── camera_manager.h
+│   ├── common.hpp
+│   ├── encoder_config.h
+│   ├── enet_thread.h
+│   ├── fetch_generated.h
+│   ├── FFmpegWriter.h
+│   ├── genericmutex.h
+│   ├── gpu_video_encoder.h
+│   ├── gui.h
+│   ├── gx_helper.h
+│   ├── image_processing.h
+│   ├── json.hpp
+│   ├── kernel.cuh
+│   ├── network_base.h
+│   ├── offthreadmachine.h
+│   ├── opengldisplay.h
+│   ├── project.h
+│   ├── stb_image_write.h
+│   ├── thread.h
+│   ├── threadworker.h
+│   ├── types.h
+│   ├── video_capture.h
+│   └── yolov8_det.h
+├── LICENSE
+├── Makefile
+├── nvenc_api
+│   └── include
+│       ├── cuviddec.h
+│       ├── cuviddec.h.bak
+│       ├── nvcuvid.h
+│       ├── nvcuvid.h.bak
+│       ├── nvEncodeAPI.h
+│       └── nvEncodeAPI.h.bak
+├── README.md
+├── run.sh
+├── schema
+│   └── fetch.fbs
+├── scripts
+│   └── set_up_ptp.txt
+├── src
+│   ├── acquire_frames.cpp
+│   ├── acquire_frames_headless.cpp
+│   ├── camera.cpp
+│   ├── camera_manager.cpp
+│   ├── FFmpegWriter.cpp
+│   ├── gpu_video_encoder.cpp
+│   ├── kernel.cu
+│   ├── network_base.cpp
+│   ├── NvEncoder
+│   │   ├── BitDepth.cu
+│   │   ├── ColorSpace.cu
+│   │   ├── ColorSpace.h
+│   │   ├── crc.cu
+│   │   ├── FFmpegDemuxer.h
+│   │   ├── FFmpegStreamer.h
+│   │   ├── NvCodecUtils.h
+│   │   ├── NvEncoderCLIOptions.h
+│   │   ├── NvEncoder.cpp
+│   │   ├── NvEncoderCuda.cpp
+│   │   ├── NvEncoderCuda.h
+│   │   ├── NvEncoderGL.cpp
+│   │   ├── NvEncoderGL.h
+│   │   ├── NvEncoder.h
+│   │   ├── NvEncoderOutputInVidMemCuda.cpp
+│   │   ├── NvEncoderOutputInVidMemCuda.h
+│   │   ├── NvEncoderOutputInVidMemD3D11.cpp
+│   │   ├── NvEncoderOutputInVidMemD3D11.h
+│   │   └── Resize.cu
+│   ├── NvEncoder.bak
+│   │   ├── Logger.h
+│   │   ├── NvCodecUtils.h
+│   │   ├── NvEncoderCLIOptions.h
+│   │   ├── NvEncoder.cpp
+│   │   ├── NvEncoderCuda.cpp
+│   │   ├── NvEncoderCuda.h
+│   │   ├── NvEncoder.h
+│   │   ├── NvEncoderOutputInVidMemCuda.cpp
+│   │   └── NvEncoderOutputInVidMemCuda.h
+│   ├── offthreadmachine.cpp
+│   ├── opengldisplay.cpp
+│   ├── orange.cpp
+│   ├── orange_headless_client.cpp
+│   ├── threadworker.cpp
+│   ├── tree.txt
+│   ├── Utils
+│   │   └── Logger.h
+│   ├── video_capture.cpp
+│   └── yolov8_det.cpp
+├── targets
+│   ├── imgui_demo.o
+│   ├── imgui_draw.o
+│   ├── imgui_impl_glfw.o
+│   ├── imgui_impl_opengl3.o
+│   ├── imgui.o
+│   ├── imgui_tables.o
+│   ├── imgui_widgets.o
+│   ├── implot_items.o
+│   ├── implot.o
+│   ├── kernel.o
+│   └── orange.debug
+├── third_party
+│   ├── flatbuffers
+│   │   ├── android
+│   │   │   ├── AndroidManifest.xml
+│   │   │   ├── app
+│   │   │   │   ├── build.gradle
+│   │   │   │   ├── proguard-rules.pro
+│   │   │   │   └── src
+│   │   │   │       └── main
+│   │   │   │           ├── AndroidManifest.xml
+│   │   │   │           ├── cpp
+│   │   │   │           │   ├── animals.cpp
+│   │   │   │           │   ├── CMakeLists.txt
+│   │   │   │           │   ├── flatbuffers
+│   │   │   │           │   │   └── CMakeLists.txt
+│   │   │   │           │   └── generated
+│   │   │   │           │       └── animal_generated.h
+│   │   │   │           ├── fbs
+│   │   │   │           │   └── animal.fbs
+│   │   │   │           ├── java
+│   │   │   │           │   ├── com
+│   │   │   │           │   │   └── flatbuffers
+│   │   │   │           │   │       └── app
+│   │   │   │           │   │           └── MainActivity.kt
+│   │   │   │           │   └── generated
+│   │   │   │           │       └── com
+│   │   │   │           │           └── fbs
+│   │   │   │           │               └── app
+│   │   │   │           │                   └── Animal.kt
+│   │   │   │           └── res
+│   │   │   │               ├── drawable
+│   │   │   │               │   └── ic_launcher_background.xml
+│   │   │   │               ├── drawable-v24
+│   │   │   │               │   └── ic_launcher_foreground.xml
+│   │   │   │               ├── layout
+│   │   │   │               │   └── activity_main.xml
+│   │   │   │               ├── mipmap-anydpi-v26
+│   │   │   │               │   ├── ic_launcher_round.xml
+│   │   │   │               │   └── ic_launcher.xml
+│   │   │   │               ├── mipmap-hdpi
+│   │   │   │               │   ├── ic_launcher.png
+│   │   │   │               │   └── ic_launcher_round.png
+│   │   │   │               ├── mipmap-mdpi
+│   │   │   │               │   ├── ic_launcher.png
+│   │   │   │               │   └── ic_launcher_round.png
+│   │   │   │               ├── mipmap-xhdpi
+│   │   │   │               │   ├── ic_launcher.png
+│   │   │   │               │   └── ic_launcher_round.png
+│   │   │   │               ├── mipmap-xxhdpi
+│   │   │   │               │   ├── ic_launcher.png
+│   │   │   │               │   └── ic_launcher_round.png
+│   │   │   │               ├── mipmap-xxxhdpi
+│   │   │   │               │   ├── ic_launcher.png
+│   │   │   │               │   └── ic_launcher_round.png
+│   │   │   │               └── values
+│   │   │   │                   ├── colors.xml
+│   │   │   │                   ├── strings.xml
+│   │   │   │                   └── styles.xml
+│   │   │   ├── build.gradle
+│   │   │   ├── gradle
+│   │   │   │   └── wrapper
+│   │   │   │       ├── gradle-wrapper.jar
+│   │   │   │       └── gradle-wrapper.properties
+│   │   │   ├── gradle.properties
+│   │   │   ├── gradlew
+│   │   │   ├── gradlew.bat
+│   │   │   └── settings.gradle
+│   │   ├── bazel
+│   │   │   └── BUILD.bazel
+│   │   ├── benchmarks
+│   │   │   ├── CMakeLists.txt
+│   │   │   └── cpp
+│   │   │       ├── bench.h
+│   │   │       ├── benchmark_main.cpp
+│   │   │       ├── flatbuffers
+│   │   │       │   ├── bench.fbs
+│   │   │       │   ├── bench_generated.h
+│   │   │       │   ├── fb_bench.cpp
+│   │   │       │   └── fb_bench.h
+│   │   │       └── raw
+│   │   │           ├── raw_bench.cpp
+│   │   │           └── raw_bench.h
+│   │   ├── BUILD.bazel
+│   │   ├── build_defs.bzl
+│   │   ├── CHANGELOG.md
+│   │   ├── CMake
+│   │   │   ├── BuildFlatBuffers.cmake
+│   │   │   ├── DESCRIPTION.txt
+│   │   │   ├── FindFlatBuffers.cmake
+│   │   │   ├── flatbuffers-config.cmake
+│   │   │   ├── flatbuffers-config-version.cmake.in
+│   │   │   ├── flatbuffers.pc.in
+│   │   │   ├── PackageDebian.cmake
+│   │   │   ├── PackageRedhat.cmake
+│   │   │   └── Version.cmake
+│   │   ├── CMakeLists.txt
+│   │   ├── composer.json
+│   │   ├── conan
+│   │   │   ├── build.py
+│   │   │   ├── CMakeLists.txt
+│   │   │   └── test_package
+│   │   │       ├── CMakeLists.txt
+│   │   │       ├── conanfile.py
+│   │   │       └── test_package.cpp
+│   │   ├── conanfile.py
+│   │   ├── CONTRIBUTING.md
+│   │   ├── dart
+│   │   │   ├── analysis_options.yaml
+│   │   │   ├── CHANGELOG.md
+│   │   │   ├── example
+│   │   │   │   ├── example.dart
+│   │   │   │   └── monster_my_game.sample_generated.dart
+│   │   │   ├── lib
+│   │   │   │   ├── flat_buffers.dart
+│   │   │   │   ├── flex_buffers.dart
+│   │   │   │   └── src
+│   │   │   │       ├── builder.dart
+│   │   │   │       ├── reference.dart
+│   │   │   │       └── types.dart
+│   │   │   ├── LICENSE
+│   │   │   ├── publish.sh
+│   │   │   ├── pubspec.yaml
+│   │   │   ├── README.md
+│   │   │   └── test
+│   │   │       ├── bool_structs.fbs
+│   │   │       ├── bool_structs_generated.dart
+│   │   │       ├── flat_buffers_test.dart
+│   │   │       ├── flex_builder_test.dart
+│   │   │       ├── flex_reader_test.dart
+│   │   │       ├── flex_types_test.dart
+│   │   │       ├── include_test1_generated.dart
+│   │   │       ├── include_test2_my_game.other_name_space_generated.dart
+│   │   │       ├── keyword_test_keyword_test_generated.dart
+│   │   │       ├── list_of_enums.fbs
+│   │   │       ├── list_of_enums_generated.dart
+│   │   │       ├── monsterdata_test.mon
+│   │   │       ├── monster_test.fbs
+│   │   │       ├── monster_test_my_game.example2_generated.dart
+│   │   │       ├── monster_test_my_game.example_generated.dart
+│   │   │       └── monster_test_my_game_generated.dart
+│   │   ├── docs
+│   │   │   ├── footer.html
+│   │   │   ├── header.html
+│   │   │   ├── images
+│   │   │   │   ├── fpl_logo_small.png
+│   │   │   │   ├── ftv2mnode.png
+│   │   │   │   └── ftv2pnode.png
+│   │   │   └── source
+│   │   │       ├── Benchmarks.md
+│   │   │       ├── Building.md
+│   │   │       ├── Compiler.md
+│   │   │       ├── CONTRIBUTING.md -> ../../CONTRIBUTING.md
+│   │   │       ├── CppUsage.md
+│   │   │       ├── CsharpUsage.md
+│   │   │       ├── CUsage.md
+│   │   │       ├── DartUsage.md
+│   │   │       ├── doxyfile
+│   │   │       ├── doxygen_layout.xml
+│   │   │       ├── FlatBuffers.md
+│   │   │       ├── FlexBuffers.md
+│   │   │       ├── GoApi_generated.txt
+│   │   │       ├── GoApi.md
+│   │   │       ├── GoUsage.md
+│   │   │       ├── Grammar.md
+│   │   │       ├── groups
+│   │   │       ├── gRPC
+│   │   │       │   └── CppUsage.md
+│   │   │       ├── IntermediateRepresentation.md
+│   │   │       ├── Internals.md
+│   │   │       ├── JavaScriptUsage.md
+│   │   │       ├── JavaUsage.md
+│   │   │       ├── KotlinUsage.md
+│   │   │       ├── LobsterUsage.md
+│   │   │       ├── LuaUsage.md
+│   │   │       ├── PHPUsage.md
+│   │   │       ├── PythonUsage.md
+│   │   │       ├── README_TO_GENERATE_DOCS.md
+│   │   │       ├── RustUsage.md
+│   │   │       ├── Schemas.md
+│   │   │       ├── style.css
+│   │   │       ├── Support.md
+│   │   │       ├── SwiftUsage.md
+│   │   │       ├── Tutorial.md
+│   │   │       ├── TypeScriptUsage.md
+│   │   │       └── WhitePaper.md
+│   │   ├── examples
+│   │   │   └── go-echo
+│   │   │       ├── client
+│   │   │       │   └── client.go
+│   │   │       ├── go.mod
+│   │   │       ├── hero
+│   │   │       │   └── Warrior.go
+│   │   │       ├── hero.fbs
+│   │   │       ├── net
+│   │   │       │   ├── Request.go
+│   │   │       │   └── Response.go
+│   │   │       ├── net.fbs
+│   │   │       ├── README.md
+│   │   │       └── server
+│   │   │           └── server.go
+│   │   ├── FlatBuffers.podspec
+│   │   ├── Formatters.md
+│   │   ├── go
+│   │   │   ├── BUILD.bazel
+│   │   │   ├── builder.go
+│   │   │   ├── doc.go
+│   │   │   ├── encode.go
+│   │   │   ├── grpc.go
+│   │   │   ├── lib.go
+│   │   │   ├── sizes.go
+│   │   │   ├── struct.go
+│   │   │   └── table.go
+│   │   ├── goldens
+│   │   │   ├── cpp
+│   │   │   │   ├── basic_generated.h
+│   │   │   │   └── generate.py
+│   │   │   ├── csharp
+│   │   │   │   ├── Galaxy.cs
+│   │   │   │   ├── generate.py
+│   │   │   │   └── Universe.cs
+│   │   │   ├── dart
+│   │   │   │   ├── basic_generated.dart
+│   │   │   │   └── generate.py
+│   │   │   ├── generate_goldens.py
+│   │   │   ├── go
+│   │   │   │   ├── Galaxy.go
+│   │   │   │   ├── generate.py
+│   │   │   │   └── Universe.go
+│   │   │   ├── golden_utils.py
+│   │   │   ├── java
+│   │   │   │   ├── Galaxy.java
+│   │   │   │   ├── generate.py
+│   │   │   │   └── Universe.java
+│   │   │   ├── kotlin
+│   │   │   │   ├── Galaxy.kt
+│   │   │   │   ├── generate.py
+│   │   │   │   └── Universe.kt
+│   │   │   ├── lobster
+│   │   │   │   ├── basic_generated.lobster
+│   │   │   │   └── generate.py
+│   │   │   ├── lua
+│   │   │   │   ├── Galaxy.lua
+│   │   │   │   ├── generate.py
+│   │   │   │   └── Universe.lua
+│   │   │   ├── nim
+│   │   │   │   ├── Galaxy.nim
+│   │   │   │   ├── generate.py
+│   │   │   │   └── Universe.nim
+│   │   │   ├── php
+│   │   │   │   ├── Galaxy.php
+│   │   │   │   ├── generate.py
+│   │   │   │   └── Universe.php
+│   │   │   ├── py
+│   │   │   │   ├── Galaxy.py
+│   │   │   │   ├── generate.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── Universe.py
+│   │   │   ├── README.md
+│   │   │   ├── rust
+│   │   │   │   ├── basic_generated.rs
+│   │   │   │   └── generate.py
+│   │   │   ├── schema
+│   │   │   │   └── basic.fbs
+│   │   │   ├── swift
+│   │   │   │   ├── basic_generated.swift
+│   │   │   │   └── generate.py
+│   │   │   └── ts
+│   │   │       ├── basic.ts
+│   │   │       ├── galaxy.ts
+│   │   │       ├── generate.py
+│   │   │       └── universe.ts
+│   │   ├── grpc
+│   │   │   ├── boringssl.patch
+│   │   │   ├── BUILD.bazel
+│   │   │   ├── build_grpc.sh
+│   │   │   ├── build_grpc_with_cxx14.patch
+│   │   │   ├── examples
+│   │   │   │   ├── go
+│   │   │   │   │   ├── format.sh
+│   │   │   │   │   └── greeter
+│   │   │   │   │       ├── client
+│   │   │   │   │       │   ├── go.mod
+│   │   │   │   │       │   └── main.go
+│   │   │   │   │       ├── models
+│   │   │   │   │       │   ├── go.mod
+│   │   │   │   │       │   ├── Greeter_grpc.go
+│   │   │   │   │       │   ├── HelloReply.go
+│   │   │   │   │       │   └── HelloRequest.go
+│   │   │   │   │       ├── README.md
+│   │   │   │   │       └── server
+│   │   │   │   │           ├── go.mod
+│   │   │   │   │           └── main.go
+│   │   │   │   ├── greeter.fbs
+│   │   │   │   ├── python
+│   │   │   │   │   └── greeter
+│   │   │   │   │       ├── client.py
+│   │   │   │   │       ├── models
+│   │   │   │   │       │   ├── greeter_grpc_fb.py
+│   │   │   │   │       │   ├── HelloReply.py
+│   │   │   │   │       │   ├── HelloRequest.py
+│   │   │   │   │       │   └── __init__.py
+│   │   │   │   │       ├── README.md
+│   │   │   │   │       └── server.py
+│   │   │   │   ├── README.md
+│   │   │   │   ├── swift
+│   │   │   │   │   └── Greeter
+│   │   │   │   │       ├── Package.swift
+│   │   │   │   │       ├── README.md
+│   │   │   │   │       └── Sources
+│   │   │   │   │           ├── client
+│   │   │   │   │           │   └── main.swift
+│   │   │   │   │           ├── Model
+│   │   │   │   │           │   ├── greeter_generated.swift
+│   │   │   │   │           │   └── greeter.grpc.swift
+│   │   │   │   │           └── server
+│   │   │   │   │               └── main.swift
+│   │   │   │   └── ts
+│   │   │   │       └── greeter
+│   │   │   │           ├── package.json
+│   │   │   │           ├── README.md
+│   │   │   │           ├── src
+│   │   │   │           │   ├── client.ts
+│   │   │   │           │   ├── greeter_generated.ts
+│   │   │   │           │   ├── greeter_grpc.d.ts
+│   │   │   │           │   ├── greeter_grpc.js
+│   │   │   │           │   ├── greeter.ts
+│   │   │   │           │   ├── models
+│   │   │   │           │   │   ├── hello-reply.ts
+│   │   │   │           │   │   └── hello-request.ts
+│   │   │   │           │   ├── models.ts
+│   │   │   │           │   └── server.ts
+│   │   │   │           └── tsconfig.json
+│   │   │   ├── flatbuffers-java-grpc
+│   │   │   │   ├── pom.xml
+│   │   │   │   └── src
+│   │   │   │       └── main
+│   │   │   │           └── java
+│   │   │   │               └── com
+│   │   │   │                   └── google
+│   │   │   │                       └── flatbuffers
+│   │   │   │                           └── grpc
+│   │   │   │                               └── FlatbuffersUtils.java
+│   │   │   ├── pom.xml
+│   │   │   ├── README.md
+│   │   │   ├── samples
+│   │   │   │   └── greeter
+│   │   │   │       ├── client.cpp
+│   │   │   │       ├── greeter.fbs
+│   │   │   │       ├── Makefile
+│   │   │   │       └── server.cpp
+│   │   │   ├── src
+│   │   │   │   └── compiler
+│   │   │   │       ├── BUILD.bazel
+│   │   │   │       ├── cpp_generator.cc
+│   │   │   │       ├── cpp_generator.h
+│   │   │   │       ├── go_generator.cc
+│   │   │   │       ├── go_generator.h
+│   │   │   │       ├── java_generator.cc
+│   │   │   │       ├── java_generator.h
+│   │   │   │       ├── python_generator.cc
+│   │   │   │       ├── python_generator.h
+│   │   │   │       ├── schema_interface.h
+│   │   │   │       ├── swift_generator.cc
+│   │   │   │       ├── swift_generator.h
+│   │   │   │       ├── ts_generator.cc
+│   │   │   │       └── ts_generator.h
+│   │   │   └── tests
+│   │   │       ├── BUILD
+│   │   │       ├── GameFactory.java
+│   │   │       ├── go_test.go
+│   │   │       ├── grpctest.cpp
+│   │   │       ├── grpctest.py
+│   │   │       ├── JavaGrpcTest.java
+│   │   │       ├── java-grpc-test.sh
+│   │   │       ├── message_builder_test.cpp
+│   │   │       └── pom.xml
+│   │   ├── include
+│   │   │   └── flatbuffers
+│   │   │       ├── allocator.h
+│   │   │       ├── array.h
+│   │   │       ├── base.h
+│   │   │       ├── buffer.h
+│   │   │       ├── buffer_ref.h
+│   │   │       ├── code_generator.h
+│   │   │       ├── code_generators.h
+│   │   │       ├── default_allocator.h
+│   │   │       ├── detached_buffer.h
+│   │   │       ├── file_manager.h
+│   │   │       ├── flatbuffer_builder.h
+│   │   │       ├── flatbuffers.h
+│   │   │       ├── flatc.h
+│   │   │       ├── flexbuffers.h
+│   │   │       ├── flex_flat_util.h
+│   │   │       ├── grpc.h
+│   │   │       ├── hash.h
+│   │   │       ├── idl.h
+│   │   │       ├── minireflect.h
+│   │   │       ├── pch
+│   │   │       │   ├── flatc_pch.h
+│   │   │       │   └── pch.h
+│   │   │       ├── reflection_generated.h
+│   │   │       ├── reflection.h
+│   │   │       ├── registry.h
+│   │   │       ├── stl_emulation.h
+│   │   │       ├── string.h
+│   │   │       ├── struct.h
+│   │   │       ├── table.h
+│   │   │       ├── util.h
+│   │   │       ├── vector_downward.h
+│   │   │       ├── vector.h
+│   │   │       └── verifier.h
+│   │   ├── java
+│   │   │   ├── pom.xml
+│   │   │   └── src
+│   │   │       ├── main
+│   │   │       │   └── java
+│   │   │       │       └── com
+│   │   │       │           └── google
+│   │   │       │               └── flatbuffers
+│   │   │       │                   ├── ArrayReadWriteBuf.java
+│   │   │       │                   ├── BaseVector.java
+│   │   │       │                   ├── BooleanVector.java
+│   │   │       │                   ├── ByteBufferReadWriteBuf.java
+│   │   │       │                   ├── ByteBufferUtil.java
+│   │   │       │                   ├── ByteVector.java
+│   │   │       │                   ├── Constants.java
+│   │   │       │                   ├── DoubleVector.java
+│   │   │       │                   ├── FlatBufferBuilder.java
+│   │   │       │                   ├── FlexBuffersBuilder.java
+│   │   │       │                   ├── FlexBuffers.java
+│   │   │       │                   ├── FloatVector.java
+│   │   │       │                   ├── IntVector.java
+│   │   │       │                   ├── LongVector.java
+│   │   │       │                   ├── ReadBuf.java
+│   │   │       │                   ├── ReadWriteBuf.java
+│   │   │       │                   ├── reflection
+│   │   │       │                   │   ├── AdvancedFeatures.java
+│   │   │       │                   │   ├── BaseType.java
+│   │   │       │                   │   ├── Enum.java
+│   │   │       │                   │   ├── EnumVal.java
+│   │   │       │                   │   ├── Field.java
+│   │   │       │                   │   ├── KeyValue.java
+│   │   │       │                   │   ├── Object.java
+│   │   │       │                   │   ├── RPCCall.java
+│   │   │       │                   │   ├── SchemaFile.java
+│   │   │       │                   │   ├── Schema.java
+│   │   │       │                   │   ├── Service.java
+│   │   │       │                   │   └── Type.java
+│   │   │       │                   ├── ShortVector.java
+│   │   │       │                   ├── StringVector.java
+│   │   │       │                   ├── Struct.java
+│   │   │       │                   ├── Table.java
+│   │   │       │                   ├── UnionVector.java
+│   │   │       │                   ├── Utf8.java
+│   │   │       │                   ├── Utf8Old.java
+│   │   │       │                   └── Utf8Safe.java
+│   │   │       └── test
+│   │   │           ├── java
+│   │   │           │   ├── DictionaryLookup -> ../../../../tests/DictionaryLookup
+│   │   │           │   ├── JavaTest.java
+│   │   │           │   ├── MyGame -> ../../../../tests/MyGame
+│   │   │           │   ├── NamespaceA -> ../../../../tests/namespace_test/NamespaceA
+│   │   │           │   ├── NamespaceC -> ../../../../tests/namespace_test/NamespaceC
+│   │   │           │   ├── optional_scalars -> ../../../../tests/optional_scalars
+│   │   │           │   └── union_vector -> ../../../../tests/union_vector
+│   │   │           └── resources
+│   │   │               └── monsterdata_test.mon
+│   │   ├── js
+│   │   │   └── README.md
+│   │   ├── kotlin
+│   │   │   ├── benchmark
+│   │   │   │   ├── build.gradle.kts
+│   │   │   │   ├── monster_test_java.fbs
+│   │   │   │   ├── monster_test_kotlin.fbs
+│   │   │   │   └── src
+│   │   │   │       └── jvmMain
+│   │   │   │           └── kotlin
+│   │   │   │               └── com
+│   │   │   │                   └── google
+│   │   │   │                       └── flatbuffers
+│   │   │   │                           └── kotlin
+│   │   │   │                               └── benchmark
+│   │   │   │                                   ├── FlatbufferBenchmark.kt
+│   │   │   │                                   ├── FlexBuffersBenchmark.kt
+│   │   │   │                                   ├── JsonBenchmark.kt
+│   │   │   │                                   └── UTF8Benchmark.kt
+│   │   │   ├── build.gradle.kts
+│   │   │   ├── flatbuffers-kotlin
+│   │   │   │   ├── build.gradle.kts
+│   │   │   │   └── src
+│   │   │   │       ├── commonMain
+│   │   │   │       │   └── kotlin
+│   │   │   │       │       └── com
+│   │   │   │       │           └── google
+│   │   │   │       │               └── flatbuffers
+│   │   │   │       │                   └── kotlin
+│   │   │   │       │                       ├── Buffers.kt
+│   │   │   │       │                       ├── ByteArray.kt
+│   │   │   │       │                       ├── FlatBufferBuilder.kt
+│   │   │   │       │                       ├── Flatbuffers.kt
+│   │   │   │       │                       ├── FlexBuffersBuilder.kt
+│   │   │   │       │                       ├── FlexBuffersInternals.kt
+│   │   │   │       │                       ├── FlexBuffers.kt
+│   │   │   │       │                       ├── json.kt
+│   │   │   │       │                       └── Utf8.kt
+│   │   │   │       ├── commonTest
+│   │   │   │       │   └── kotlin
+│   │   │   │       │       └── com
+│   │   │   │       │           └── google
+│   │   │   │       │               └── flatbuffers
+│   │   │   │       │                   └── kotlin
+│   │   │   │       │                       ├── Asserts.kt
+│   │   │   │       │                       ├── BuffersTest.kt
+│   │   │   │       │                       ├── ByteArrayTest.kt
+│   │   │   │       │                       ├── FlatBufferBuilderTest.kt
+│   │   │   │       │                       ├── FlexBuffersTest.kt
+│   │   │   │       │                       └── JSONTest.kt
+│   │   │   │       ├── jsMain
+│   │   │   │       │   └── kotlin
+│   │   │   │       │       └── com
+│   │   │   │       │           └── google
+│   │   │   │       │               └── flatbuffers
+│   │   │   │       │                   └── kotlin
+│   │   │   │       │                       └── ByteArray.kt
+│   │   │   │       ├── jvmMain
+│   │   │   │       │   └── kotlin
+│   │   │   │       │       └── com
+│   │   │   │       │           └── google
+│   │   │   │       │               └── flatbuffers
+│   │   │   │       │                   └── kotlin
+│   │   │   │       │                       └── ByteArray.kt
+│   │   │   │       ├── jvmTest
+│   │   │   │       │   ├── kotlin
+│   │   │   │       │   │   └── com
+│   │   │   │       │   │       └── google
+│   │   │   │       │   │           └── flatbuffers
+│   │   │   │       │   │               └── kotlin
+│   │   │   │       │   │                   └── Utf8Test.kt
+│   │   │   │       │   └── resources
+│   │   │   │       │       └── utf8_sample.txt
+│   │   │   │       └── nativeMain
+│   │   │   │           └── kotlin
+│   │   │   │               └── com
+│   │   │   │                   └── google
+│   │   │   │                       └── flatbuffers
+│   │   │   │                           └── kotlin
+│   │   │   │                               └── ByteArray.kt
+│   │   │   ├── gradle
+│   │   │   │   ├── libs.versions.toml
+│   │   │   │   └── wrapper
+│   │   │   │       ├── gradle-wrapper.jar
+│   │   │   │       └── gradle-wrapper.properties
+│   │   │   ├── gradle.properties
+│   │   │   ├── gradlew
+│   │   │   ├── gradlew.bat
+│   │   │   ├── settings.gradle.kts
+│   │   │   └── spotless
+│   │   │       └── spotless.kt
+│   │   ├── LICENSE
+│   │   ├── lobster
+│   │   │   └── flatbuffers.lobster
+│   │   ├── lua
+│   │   │   ├── flatbuffers
+│   │   │   │   ├── binaryarray.lua
+│   │   │   │   ├── builder.lua
+│   │   │   │   ├── compat_5_1.lua
+│   │   │   │   ├── compat_5_3.lua
+│   │   │   │   ├── compat.lua
+│   │   │   │   ├── compat_luajit.lua
+│   │   │   │   ├── numTypes.lua
+│   │   │   │   └── view.lua
+│   │   │   └── flatbuffers.lua
+│   │   ├── mjs
+│   │   │   └── README.md
+│   │   ├── net
+│   │   │   └── FlatBuffers
+│   │   │       ├── ByteBuffer.cs
+│   │   │       ├── ByteBufferUtil.cs
+│   │   │       ├── FlatBufferBuilder.cs
+│   │   │       ├── FlatBufferConstants.cs
+│   │   │       ├── FlatBuffers.net35.csproj
+│   │   │       ├── flatbuffers.png
+│   │   │       ├── flatbuffers.snk
+│   │   │       ├── FlatBufferVerify.cs
+│   │   │       ├── Google.FlatBuffers.csproj
+│   │   │       ├── IFlatbufferObject.cs
+│   │   │       ├── Offset.cs
+│   │   │       ├── Struct.cs
+│   │   │       └── Table.cs
+│   │   ├── nim
+│   │   │   ├── flatbuffers
+│   │   │   │   ├── flatbuffers.nim
+│   │   │   │   └── src
+│   │   │   │       ├── builder.nim
+│   │   │   │       ├── endian.nim
+│   │   │   │       ├── struct.nim
+│   │   │   │       └── table.nim
+│   │   │   └── flatbuffers.nimble
+│   │   ├── package.json
+│   │   ├── Package.swift
+│   │   ├── Package@swift-5.5.swift
+│   │   ├── php
+│   │   │   ├── ByteBuffer.php
+│   │   │   ├── Constants.php
+│   │   │   ├── FlatbufferBuilder.php
+│   │   │   ├── Struct.php
+│   │   │   └── Table.php
+│   │   ├── pnpm-lock.yaml
+│   │   ├── python
+│   │   │   ├── flatbuffers
+│   │   │   │   ├── builder.py
+│   │   │   │   ├── compat.py
+│   │   │   │   ├── encode.py
+│   │   │   │   ├── flexbuffers.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── number_types.py
+│   │   │   │   ├── packer.py
+│   │   │   │   ├── reflection
+│   │   │   │   │   ├── AdvancedFeatures.py
+│   │   │   │   │   ├── BaseType.py
+│   │   │   │   │   ├── Enum.py
+│   │   │   │   │   ├── EnumVal.py
+│   │   │   │   │   ├── Field.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── KeyValue.py
+│   │   │   │   │   ├── Object.py
+│   │   │   │   │   ├── RPCCall.py
+│   │   │   │   │   ├── SchemaFile.py
+│   │   │   │   │   ├── Schema.py
+│   │   │   │   │   ├── Service.py
+│   │   │   │   │   └── Type.py
+│   │   │   │   ├── table.py
+│   │   │   │   ├── util.py
+│   │   │   │   └── _version.py
+│   │   │   ├── __init__.py
+│   │   │   ├── py.typed
+│   │   │   ├── setup.cfg
+│   │   │   └── setup.py
+│   │   ├── README.md
+│   │   ├── reflection
+│   │   │   ├── BUILD.bazel
+│   │   │   ├── reflection.fbs
+│   │   │   └── ts
+│   │   │       └── BUILD.bazel
+│   │   ├── rust
+│   │   │   ├── flatbuffers
+│   │   │   │   ├── build.rs
+│   │   │   │   ├── Cargo.toml
+│   │   │   │   ├── README.md
+│   │   │   │   └── src
+│   │   │   │       ├── array.rs
+│   │   │   │       ├── builder.rs
+│   │   │   │       ├── endian_scalar.rs
+│   │   │   │       ├── follow.rs
+│   │   │   │       ├── get_root.rs
+│   │   │   │       ├── lib.rs
+│   │   │   │       ├── primitives.rs
+│   │   │   │       ├── push.rs
+│   │   │   │       ├── table.rs
+│   │   │   │       ├── vector.rs
+│   │   │   │       ├── verifier.rs
+│   │   │   │       ├── vtable.rs
+│   │   │   │       └── vtable_writer.rs
+│   │   │   └── flexbuffers
+│   │   │       ├── Cargo.toml
+│   │   │       ├── README.md
+│   │   │       └── src
+│   │   │           ├── bitwidth.rs
+│   │   │           ├── buffer.rs
+│   │   │           ├── builder
+│   │   │           │   ├── map.rs
+│   │   │           │   ├── mod.rs
+│   │   │           │   ├── push.rs
+│   │   │           │   ├── ser.rs
+│   │   │           │   ├── value.rs
+│   │   │           │   └── vector.rs
+│   │   │           ├── flexbuffer_type.rs
+│   │   │           ├── lib.rs
+│   │   │           └── reader
+│   │   │               ├── de.rs
+│   │   │               ├── iter.rs
+│   │   │               ├── map.rs
+│   │   │               ├── mod.rs
+│   │   │               ├── serialize.rs
+│   │   │               └── vector.rs
+│   │   ├── samples
+│   │   │   ├── csharp_sample.sh
+│   │   │   ├── dart_sample.sh
+│   │   │   ├── go.mod
+│   │   │   ├── go_sample.sh
+│   │   │   ├── java_sample.sh
+│   │   │   ├── javascript_sample.sh
+│   │   │   ├── kotlin_sample.sh
+│   │   │   ├── lua
+│   │   │   │   └── MyGame
+│   │   │   │       └── Sample
+│   │   │   │           ├── Color.lua
+│   │   │   │           ├── Equipment.lua
+│   │   │   │           ├── Monster.lua
+│   │   │   │           ├── Vec3.lua
+│   │   │   │           └── Weapon.lua
+│   │   │   ├── monster.bfbs
+│   │   │   ├── monsterdata.json
+│   │   │   ├── monster.fbs
+│   │   │   ├── monster_generated.h
+│   │   │   ├── monster_generated.lobster
+│   │   │   ├── monster_generated.swift
+│   │   │   ├── php_sample.sh
+│   │   │   ├── python_sample.sh
+│   │   │   ├── rust_generated
+│   │   │   │   ├── mod.rs
+│   │   │   │   └── my_game
+│   │   │   │       └── sample
+│   │   │   │           ├── color_generated.rs
+│   │   │   │           ├── equipment_generated.rs
+│   │   │   │           ├── monster_generated.rs
+│   │   │   │           ├── vec_3_generated.rs
+│   │   │   │           └── weapon_generated.rs
+│   │   │   ├── sample_bfbs.cpp
+│   │   │   ├── sample_binary.cpp
+│   │   │   ├── SampleBinary.cs
+│   │   │   ├── sample_binary.go
+│   │   │   ├── SampleBinary.java
+│   │   │   ├── SampleBinary.kt
+│   │   │   ├── sample_binary.lobster
+│   │   │   ├── sample_binary.lua
+│   │   │   ├── SampleBinary.php
+│   │   │   ├── sample_binary.py
+│   │   │   ├── sample_binary.rs
+│   │   │   ├── sample_binary.swift
+│   │   │   ├── sample_flexbuffers.rs
+│   │   │   ├── sample_flexbuffers_serde.rs
+│   │   │   ├── sample_text.cpp
+│   │   │   └── sample_text.lobster
+│   │   ├── scripts
+│   │   │   ├── check_generate_code.py
+│   │   │   ├── check-grpc-generated-code.py
+│   │   │   ├── clang-format-all.sh
+│   │   │   ├── clang-format-git.sh
+│   │   │   ├── clang-tidy-git.sh
+│   │   │   ├── generate_code.py
+│   │   │   ├── generate_grpc_examples.py
+│   │   │   ├── release.sh
+│   │   │   └── util.py
+│   │   ├── SECURITY.md
+│   │   ├── snap
+│   │   │   └── snapcraft.yaml
+│   │   ├── src
+│   │   │   ├── annotated_binary_text_gen.cpp
+│   │   │   ├── annotated_binary_text_gen.h
+│   │   │   ├── bfbs_gen.h
+│   │   │   ├── bfbs_gen_lua.cpp
+│   │   │   ├── bfbs_gen_lua.h
+│   │   │   ├── bfbs_gen_nim.cpp
+│   │   │   ├── bfbs_gen_nim.h
+│   │   │   ├── bfbs_namer.h
+│   │   │   ├── binary_annotator.cpp
+│   │   │   ├── binary_annotator.h
+│   │   │   ├── BUILD.bazel
+│   │   │   ├── code_generators.cpp
+│   │   │   ├── file_binary_writer.cpp
+│   │   │   ├── file_name_saving_file_manager.cpp
+│   │   │   ├── file_writer.cpp
+│   │   │   ├── flatc.cpp
+│   │   │   ├── flatc_main.cpp
+│   │   │   ├── flathash.cpp
+│   │   │   ├── idl_gen_binary.cpp
+│   │   │   ├── idl_gen_binary.h
+│   │   │   ├── idl_gen_cpp.cpp
+│   │   │   ├── idl_gen_cpp.h
+│   │   │   ├── idl_gen_csharp.cpp
+│   │   │   ├── idl_gen_csharp.h
+│   │   │   ├── idl_gen_dart.cpp
+│   │   │   ├── idl_gen_dart.h
+│   │   │   ├── idl_gen_fbs.cpp
+│   │   │   ├── idl_gen_fbs.h
+│   │   │   ├── idl_gen_go.cpp
+│   │   │   ├── idl_gen_go.h
+│   │   │   ├── idl_gen_grpc.cpp
+│   │   │   ├── idl_gen_java.cpp
+│   │   │   ├── idl_gen_java.h
+│   │   │   ├── idl_gen_json_schema.cpp
+│   │   │   ├── idl_gen_json_schema.h
+│   │   │   ├── idl_gen_kotlin.cpp
+│   │   │   ├── idl_gen_kotlin.h
+│   │   │   ├── idl_gen_kotlin_kmp.cpp
+│   │   │   ├── idl_gen_lobster.cpp
+│   │   │   ├── idl_gen_lobster.h
+│   │   │   ├── idl_gen_php.cpp
+│   │   │   ├── idl_gen_php.h
+│   │   │   ├── idl_gen_python.cpp
+│   │   │   ├── idl_gen_python.h
+│   │   │   ├── idl_gen_rust.cpp
+│   │   │   ├── idl_gen_rust.h
+│   │   │   ├── idl_gen_swift.cpp
+│   │   │   ├── idl_gen_swift.h
+│   │   │   ├── idl_gen_text.cpp
+│   │   │   ├── idl_gen_text.h
+│   │   │   ├── idl_gen_ts.cpp
+│   │   │   ├── idl_gen_ts.h
+│   │   │   ├── idl_namer.h
+│   │   │   ├── idl_parser.cpp
+│   │   │   ├── namer.h
+│   │   │   ├── reflection.cpp
+│   │   │   └── util.cpp
+│   │   ├── swift
+│   │   │   ├── BUILD.bazel
+│   │   │   ├── LICENSE
+│   │   │   ├── README.md
+│   │   │   └── Sources
+│   │   │       └── FlatBuffers
+│   │   │           ├── ByteBuffer.swift
+│   │   │           ├── Constants.swift
+│   │   │           ├── Documentation.docc
+│   │   │           │   ├── Documentation.md
+│   │   │           │   ├── Resources
+│   │   │           │   │   ├── code
+│   │   │           │   │   │   ├── fbs
+│   │   │           │   │   │   │   ├── monster_step_1.fbs
+│   │   │           │   │   │   │   ├── monster_step_2.fbs
+│   │   │           │   │   │   │   ├── monster_step_3.fbs
+│   │   │           │   │   │   │   ├── monster_step_4.fbs
+│   │   │           │   │   │   │   ├── monster_step_5.fbs
+│   │   │           │   │   │   │   ├── monster_step_6.fbs
+│   │   │           │   │   │   │   └── monster_step_7.fbs
+│   │   │           │   │   │   └── swift
+│   │   │           │   │   │       ├── swift_code_10.swift
+│   │   │           │   │   │       ├── swift_code_11.swift
+│   │   │           │   │   │       ├── swift_code_12.swift
+│   │   │           │   │   │       ├── swift_code_13.swift
+│   │   │           │   │   │       ├── swift_code_1.swift
+│   │   │           │   │   │       ├── swift_code_2.swift
+│   │   │           │   │   │       ├── swift_code_3.swift
+│   │   │           │   │   │       ├── swift_code_4.swift
+│   │   │           │   │   │       ├── swift_code_5.swift
+│   │   │           │   │   │       ├── swift_code_6.swift
+│   │   │           │   │   │       ├── swift_code_7.swift
+│   │   │           │   │   │       ├── swift_code_8.swift
+│   │   │           │   │   │       └── swift_code_9.swift
+│   │   │           │   │   └── images
+│   │   │           │   │       └── tutorial_cover_image_1.png
+│   │   │           │   └── Tutorials
+│   │   │           │       ├── create_your_first_buffer.tutorial
+│   │   │           │       ├── creating_flatbuffer_schema.tutorial
+│   │   │           │       ├── reading_bytebuffer.tutorial
+│   │   │           │       └── Tutorial_Table_of_Contents.tutorial
+│   │   │           ├── Enum.swift
+│   │   │           ├── FlatBufferBuilder.swift
+│   │   │           ├── FlatBufferObject.swift
+│   │   │           ├── FlatbuffersErrors.swift
+│   │   │           ├── FlatBuffersUtils.swift
+│   │   │           ├── Int+extension.swift
+│   │   │           ├── Message.swift
+│   │   │           ├── Mutable.swift
+│   │   │           ├── NativeObject.swift
+│   │   │           ├── Offset.swift
+│   │   │           ├── Root.swift
+│   │   │           ├── String+extension.swift
+│   │   │           ├── Struct.swift
+│   │   │           ├── Table.swift
+│   │   │           ├── TableVerifier.swift
+│   │   │           ├── VeriferOptions.swift
+│   │   │           ├── Verifiable.swift
+│   │   │           └── Verifier.swift
+│   │   ├── swift.swiftformat
+│   │   ├── tests
+│   │   │   ├── 64bit
+│   │   │   │   ├── evolution
+│   │   │   │   │   ├── v1.fbs
+│   │   │   │   │   ├── v1_generated.h
+│   │   │   │   │   ├── v2.fbs
+│   │   │   │   │   └── v2_generated.h
+│   │   │   │   ├── offset64_test.cpp
+│   │   │   │   ├── offset64_test.h
+│   │   │   │   ├── test_64bit.afb
+│   │   │   │   ├── test_64bit.bfbs
+│   │   │   │   ├── test_64bit_bfbs_generated.h
+│   │   │   │   ├── test_64bit.bin
+│   │   │   │   ├── test_64bit.fbs
+│   │   │   │   ├── test_64bit_generated.h
+│   │   │   │   └── test_64bit.json
+│   │   │   ├── Abc.nim
+│   │   │   ├── alignment_test_after_fix.afb
+│   │   │   ├── alignment_test_after_fix.bin
+│   │   │   ├── alignment_test_before_fix.afb
+│   │   │   ├── alignment_test_before_fix.bin
+│   │   │   ├── alignment_test.cpp
+│   │   │   ├── alignment_test.fbs
+│   │   │   ├── alignment_test.h
+│   │   │   ├── alignment_test.json
+│   │   │   ├── annotated_binary
+│   │   │   │   ├── annotated_binary.afb
+│   │   │   │   ├── annotated_binary.bfbs
+│   │   │   │   ├── annotated_binary.bin
+│   │   │   │   ├── annotated_binary.fbs
+│   │   │   │   ├── annotated_binary.json
+│   │   │   │   ├── annotated_binary_old.afb
+│   │   │   │   ├── annotated_binary_old.fbs
+│   │   │   │   ├── generate_annotations.py
+│   │   │   │   ├── README.md
+│   │   │   │   └── tests
+│   │   │   │       ├── invalid_root_offset.afb
+│   │   │   │       ├── invalid_root_offset.bin
+│   │   │   │       ├── invalid_root_table_too_short.afb
+│   │   │   │       ├── invalid_root_table_too_short.bin
+│   │   │   │       ├── invalid_root_table_vtable_offset.afb
+│   │   │   │       ├── invalid_root_table_vtable_offset.bin
+│   │   │   │       ├── invalid_string_length.afb
+│   │   │   │       ├── invalid_string_length.bin
+│   │   │   │       ├── invalid_string_length_cut_short.afb
+│   │   │   │       ├── invalid_string_length_cut_short.bin
+│   │   │   │       ├── invalid_struct_array_field_cut_short.afb
+│   │   │   │       ├── invalid_struct_array_field_cut_short.bin
+│   │   │   │       ├── invalid_struct_field_cut_short.afb
+│   │   │   │       ├── invalid_struct_field_cut_short.bin
+│   │   │   │       ├── invalid_table_field_offset.afb
+│   │   │   │       ├── invalid_table_field_offset.bin
+│   │   │   │       ├── invalid_table_field_size.afb
+│   │   │   │       ├── invalid_table_field_size.bin
+│   │   │   │       ├── invalid_union_type_value.afb
+│   │   │   │       ├── invalid_union_type_value.bin
+│   │   │   │       ├── invalid_vector_length_cut_short.afb
+│   │   │   │       ├── invalid_vector_length_cut_short.bin
+│   │   │   │       ├── invalid_vector_scalars_cut_short.afb
+│   │   │   │       ├── invalid_vector_scalars_cut_short.bin
+│   │   │   │       ├── invalid_vector_strings_cut_short.afb
+│   │   │   │       ├── invalid_vector_strings_cut_short.bin
+│   │   │   │       ├── invalid_vector_structs_cut_short.afb
+│   │   │   │       ├── invalid_vector_structs_cut_short.bin
+│   │   │   │       ├── invalid_vector_tables_cut_short.afb
+│   │   │   │       ├── invalid_vector_tables_cut_short.bin
+│   │   │   │       ├── invalid_vector_unions_cut_short.afb
+│   │   │   │       ├── invalid_vector_unions_cut_short.bin
+│   │   │   │       ├── invalid_vector_union_type_value.afb
+│   │   │   │       ├── invalid_vector_union_type_value.bin
+│   │   │   │       ├── invalid_vtable_field_offset.afb
+│   │   │   │       ├── invalid_vtable_field_offset.bin
+│   │   │   │       ├── invalid_vtable_ref_table_size.afb
+│   │   │   │       ├── invalid_vtable_ref_table_size.bin
+│   │   │   │       ├── invalid_vtable_ref_table_size_short.afb
+│   │   │   │       ├── invalid_vtable_ref_table_size_short.bin
+│   │   │   │       ├── invalid_vtable_size.afb
+│   │   │   │       ├── invalid_vtable_size.bin
+│   │   │   │       ├── invalid_vtable_size_short.afb
+│   │   │   │       ├── invalid_vtable_size_short.bin
+│   │   │   │       └── README.md
+│   │   │   ├── arrays_test
+│   │   │   │   ├── mod.rs
+│   │   │   │   └── my_game
+│   │   │   │       └── example
+│   │   │   │           ├── array_struct_generated.rs
+│   │   │   │           ├── array_table_generated.rs
+│   │   │   │           ├── nested_struct_generated.rs
+│   │   │   │           └── test_enum_generated.rs
+│   │   │   ├── arrays_test.bfbs
+│   │   │   ├── arrays_test.fbs
+│   │   │   ├── arrays_test.golden
+│   │   │   ├── arrays_test.schema.json
+│   │   │   ├── BUILD.bazel
+│   │   │   ├── cpp17
+│   │   │   │   ├── generated_cpp17
+│   │   │   │   │   ├── monster_test_generated.h
+│   │   │   │   │   ├── optional_scalars2_generated.h
+│   │   │   │   │   ├── optional_scalars_generated.h
+│   │   │   │   │   └── union_vector_generated.h
+│   │   │   │   ├── stringify_util.h
+│   │   │   │   └── test_cpp17.cpp
+│   │   │   ├── DartTest.sh
+│   │   │   ├── DictionaryLookup
+│   │   │   │   ├── LongFloatEntry.java
+│   │   │   │   ├── LongFloatEntry.kt
+│   │   │   │   ├── LongFloatMap.java
+│   │   │   │   └── LongFloatMap.kt
+│   │   │   ├── dictionary_lookup.fbs
+│   │   │   ├── docker
+│   │   │   │   ├── build_flatc.run.sh
+│   │   │   │   ├── cpp_test.run.sh
+│   │   │   │   ├── Dockerfile.testing.build_flatc_debian_stretch
+│   │   │   │   ├── Dockerfile.testing.cpp.debian_buster
+│   │   │   │   ├── languages
+│   │   │   │   │   ├── Dockerfile.testing.csharp.mono_5_18
+│   │   │   │   │   ├── Dockerfile.testing.golang.1_11
+│   │   │   │   │   ├── Dockerfile.testing.java.openjdk_10_0_2
+│   │   │   │   │   ├── Dockerfile.testing.java.openjdk_11_0_1
+│   │   │   │   │   ├── Dockerfile.testing.node.12_20_1
+│   │   │   │   │   ├── Dockerfile.testing.node.14_15_4
+│   │   │   │   │   ├── Dockerfile.testing.php.zend_7_3
+│   │   │   │   │   ├── Dockerfile.testing.python.cpython_2_7_15
+│   │   │   │   │   ├── Dockerfile.testing.python.cpython_3_7_1
+│   │   │   │   │   ├── Dockerfile.testing.python.numpy.cpython_2_7_15
+│   │   │   │   │   ├── Dockerfile.testing.python.numpy.cpython_3_7_1
+│   │   │   │   │   ├── Dockerfile.testing.rust.1_51_0
+│   │   │   │   │   ├── Dockerfile.testing.rust.big_endian.1_51_0
+│   │   │   │   │   ├── Dockerfile.testing.rust.nightly
+│   │   │   │   │   └── Dockerfile.testing.swift_5_2
+│   │   │   │   ├── TODO.Dockerfile.testing.php.hhvm_2019_01_16
+│   │   │   │   ├── TODO.Dockerfile.testing.python.cpython_with_conda
+│   │   │   │   ├── TODO.Dockerfile.testing.python.cpython_with_numpy
+│   │   │   │   ├── TODO.Dockerfile.testing.python.pypy_6_0_0_py2
+│   │   │   │   └── TODO.Dockerfile.testing.python.pypy_6_0_0_py3
+│   │   │   ├── evolution_test
+│   │   │   │   ├── evolution_v1.fbs
+│   │   │   │   ├── evolution_v1_generated.h
+│   │   │   │   ├── evolution_v1.json
+│   │   │   │   ├── evolution_v2.fbs
+│   │   │   │   ├── evolution_v2_generated.h
+│   │   │   │   └── evolution_v2.json
+│   │   │   ├── evolution_test.cpp
+│   │   │   ├── evolution_test.h
+│   │   │   ├── FlatBuffers.Benchmarks
+│   │   │   │   ├── FlatBufferBuilderBenchmark.cs
+│   │   │   │   ├── FlatBuffers.Benchmarks.csproj
+│   │   │   │   └── Program.cs
+│   │   │   ├── FlatBuffers.Test
+│   │   │   │   ├── Assert.cs
+│   │   │   │   ├── ByteBufferTests.cs
+│   │   │   │   ├── clean.sh
+│   │   │   │   ├── FlatBufferBuilderTests.cs
+│   │   │   │   ├── FlatBuffers.Core.Test.csproj
+│   │   │   │   ├── FlatBuffersExampleTests.cs
+│   │   │   │   ├── FlatBuffersFuzzTests.cs
+│   │   │   │   ├── FlatBuffersTestClassAttribute.cs
+│   │   │   │   ├── FlatBuffers.Test.csproj
+│   │   │   │   ├── FlatBuffersTestMethodAttribute.cs
+│   │   │   │   ├── FuzzTestData.cs
+│   │   │   │   ├── Lcg.cs
+│   │   │   │   ├── NetTest.bat
+│   │   │   │   ├── NetTest.sh
+│   │   │   │   ├── packages.config
+│   │   │   │   ├── Program.cs
+│   │   │   │   ├── Properties
+│   │   │   │   │   └── AssemblyInfo.cs
+│   │   │   │   ├── README.md
+│   │   │   │   └── TestTable.cs
+│   │   │   ├── flatc
+│   │   │   │   ├── bar
+│   │   │   │   │   ├── bar.fbs
+│   │   │   │   │   ├── bar_with_foo.fbs
+│   │   │   │   │   ├── bar_with_ns.fbs
+│   │   │   │   │   └── baz
+│   │   │   │   │       ├── baz.fbs
+│   │   │   │   │       └── baz_with_ns.fbs
+│   │   │   │   ├── enum_val_attributes.fbs
+│   │   │   │   ├── flatc_cpp_tests.py
+│   │   │   │   ├── flatc_kotlin_tests.py
+│   │   │   │   ├── flatc_schema_tests.py
+│   │   │   │   ├── flatc_test.py
+│   │   │   │   ├── flatc_ts_tests.py
+│   │   │   │   ├── foo.fbs
+│   │   │   │   ├── foo_with_ns.fbs
+│   │   │   │   └── main.py
+│   │   │   ├── flexbuffers_test.cpp
+│   │   │   ├── flexbuffers_test.h
+│   │   │   ├── fuzzer
+│   │   │   │   ├── CMakeLists.txt
+│   │   │   │   ├── flatbuffers_64bit_fuzzer.cc
+│   │   │   │   ├── flatbuffers_annotator_fuzzer.cc
+│   │   │   │   ├── flatbuffers_monster_fuzzer.cc
+│   │   │   │   ├── flatbuffers_parser_fuzzer.cc
+│   │   │   │   ├── flatbuffers_scalar_fuzzer.cc
+│   │   │   │   ├── flatbuffers_verifier_fuzzer.cc
+│   │   │   │   ├── flexbuffers_verifier_fuzzer.cc
+│   │   │   │   ├── fuzzer_assert.h
+│   │   │   │   ├── monster_debug.cpp
+│   │   │   │   ├── monster_fuzzer.dict
+│   │   │   │   ├── parser_fuzzer.dict
+│   │   │   │   ├── readme.md
+│   │   │   │   ├── scalar_debug.cpp
+│   │   │   │   ├── scalar_fuzzer.dict
+│   │   │   │   └── test_init.h
+│   │   │   ├── fuzz_test.cpp
+│   │   │   ├── fuzz_test.h
+│   │   │   ├── gold_flexbuffer_example.bin
+│   │   │   ├── go_test.go
+│   │   │   ├── GoTest.sh
+│   │   │   ├── include_build_test.cc
+│   │   │   ├── included_test.fbs
+│   │   │   ├── includer_test.fbs
+│   │   │   ├── include_test
+│   │   │   │   ├── include_test1.fbs
+│   │   │   │   ├── order.fbs
+│   │   │   │   └── sub
+│   │   │   │       ├── include_test2.fbs
+│   │   │   │       └── no_namespace.fbs
+│   │   │   ├── include_test1
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── my_game
+│   │   │   │   │   └── other_name_space
+│   │   │   │   │       ├── from_include_generated.rs
+│   │   │   │   │       ├── table_b_generated.rs
+│   │   │   │   │       └── unused_generated.rs
+│   │   │   │   └── table_a_generated.rs
+│   │   │   ├── include_test1_generated.dart
+│   │   │   ├── include_test2
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── my_game
+│   │   │   │   │   └── other_name_space
+│   │   │   │   │       ├── from_include_generated.rs
+│   │   │   │   │       ├── table_b_generated.rs
+│   │   │   │   │       └── unused_generated.rs
+│   │   │   │   └── table_a_generated.rs
+│   │   │   ├── include_test2_my_game.other_name_space_generated.dart
+│   │   │   ├── is_quiet_nan.h
+│   │   │   ├── javatest.bin
+│   │   │   ├── json_test.cpp
+│   │   │   ├── json_test.h
+│   │   │   ├── key_field
+│   │   │   │   ├── key_field_sample.fbs
+│   │   │   │   └── key_field_sample_generated.h
+│   │   │   ├── key_field_test.cpp
+│   │   │   ├── key_field_test.h
+│   │   │   ├── keyword_test
+│   │   │   │   ├── keyword_test
+│   │   │   │   │   ├── abc_generated.rs
+│   │   │   │   │   ├── keywords_in_table_generated.rs
+│   │   │   │   │   ├── keywords_in_union_generated.rs
+│   │   │   │   │   ├── public_generated.rs
+│   │   │   │   │   └── table_2_generated.rs
+│   │   │   │   └── mod.rs
+│   │   │   ├── KeywordTest
+│   │   │   │   ├── ABC.cs
+│   │   │   │   ├── KeywordsInTable.cs
+│   │   │   │   ├── KeywordsInUnion.cs
+│   │   │   │   ├── public.cs
+│   │   │   │   └── Table2.cs
+│   │   │   ├── keyword_test.fbs
+│   │   │   ├── KotlinTest.kt
+│   │   │   ├── KotlinTest.sh
+│   │   │   ├── LobsterTest.bat
+│   │   │   ├── lobstertest.lobster
+│   │   │   ├── LuaTest.bat
+│   │   │   ├── luatest.lua
+│   │   │   ├── LuaTest.sh
+│   │   │   ├── minified_enums
+│   │   │   │   ├── enums.fbs
+│   │   │   │   └── enums_generated.h
+│   │   │   ├── monsterdata_extra.json
+│   │   │   ├── monsterdata_go_wire.mon.sp
+│   │   │   ├── monsterdata_python_wire.mon
+│   │   │   ├── monsterdata_test.afb
+│   │   │   ├── monsterdata_test.golden
+│   │   │   ├── monsterdata_test.json
+│   │   │   ├── monsterdata_test.mon
+│   │   │   ├── monster_extra.fbs
+│   │   │   ├── monster_extra_generated.h
+│   │   │   ├── monster_extra_my_game_generated.dart
+│   │   │   ├── monster_test
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── my_game
+│   │   │   │   │   ├── example
+│   │   │   │   │   │   ├── ability_generated.rs
+│   │   │   │   │   │   ├── any_ambiguous_aliases_generated.rs
+│   │   │   │   │   │   ├── any_generated.rs
+│   │   │   │   │   │   ├── any_unique_aliases_generated.rs
+│   │   │   │   │   │   ├── color_generated.rs
+│   │   │   │   │   │   ├── long_enum_generated.rs
+│   │   │   │   │   │   ├── monster_generated.rs
+│   │   │   │   │   │   ├── race_generated.rs
+│   │   │   │   │   │   ├── referrable_generated.rs
+│   │   │   │   │   │   ├── stat_generated.rs
+│   │   │   │   │   │   ├── struct_of_structs_generated.rs
+│   │   │   │   │   │   ├── struct_of_structs_of_structs_generated.rs
+│   │   │   │   │   │   ├── test_generated.rs
+│   │   │   │   │   │   ├── test_simple_table_with_enum_generated.rs
+│   │   │   │   │   │   ├── type_aliases_generated.rs
+│   │   │   │   │   │   └── vec_3_generated.rs
+│   │   │   │   │   ├── example_2
+│   │   │   │   │   │   └── monster_generated.rs
+│   │   │   │   │   ├── in_parent_namespace_generated.rs
+│   │   │   │   │   └── other_name_space
+│   │   │   │   │       ├── from_include_generated.rs
+│   │   │   │   │       ├── table_b_generated.rs
+│   │   │   │   │       └── unused_generated.rs
+│   │   │   │   └── table_a_generated.rs
+│   │   │   ├── monster_test.afb
+│   │   │   ├── monster_test.bfbs
+│   │   │   ├── monster_test_bfbs_generated.h
+│   │   │   ├── monster_test.cpp
+│   │   │   ├── monster_test.fbs
+│   │   │   ├── monster_test_generated.grpc.fb.cc
+│   │   │   ├── monster_test_generated.grpc.fb.h
+│   │   │   ├── monster_test_generated.h
+│   │   │   ├── monster_test_generated.lobster
+│   │   │   ├── monster_test_generated.py
+│   │   │   ├── monster_test_generated.ts
+│   │   │   ├── monster_test.grpc.fb.cc
+│   │   │   ├── monster_test.grpc.fb.h
+│   │   │   ├── monster_test.h
+│   │   │   ├── monster_test_my_game.example2_generated.dart
+│   │   │   ├── monster_test_my_game.example_generated.dart
+│   │   │   ├── monster_test_my_game_generated.dart
+│   │   │   ├── monster_test.schema.json
+│   │   │   ├── monster_test_serialize
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── my_game
+│   │   │   │   │   ├── example
+│   │   │   │   │   │   ├── ability_generated.rs
+│   │   │   │   │   │   ├── any_ambiguous_aliases_generated.rs
+│   │   │   │   │   │   ├── any_generated.rs
+│   │   │   │   │   │   ├── any_unique_aliases_generated.rs
+│   │   │   │   │   │   ├── color_generated.rs
+│   │   │   │   │   │   ├── long_enum_generated.rs
+│   │   │   │   │   │   ├── monster_generated.rs
+│   │   │   │   │   │   ├── race_generated.rs
+│   │   │   │   │   │   ├── referrable_generated.rs
+│   │   │   │   │   │   ├── stat_generated.rs
+│   │   │   │   │   │   ├── struct_of_structs_generated.rs
+│   │   │   │   │   │   ├── struct_of_structs_of_structs_generated.rs
+│   │   │   │   │   │   ├── test_generated.rs
+│   │   │   │   │   │   ├── test_simple_table_with_enum_generated.rs
+│   │   │   │   │   │   ├── type_aliases_generated.rs
+│   │   │   │   │   │   └── vec_3_generated.rs
+│   │   │   │   │   ├── example_2
+│   │   │   │   │   │   └── monster_generated.rs
+│   │   │   │   │   ├── in_parent_namespace_generated.rs
+│   │   │   │   │   └── other_name_space
+│   │   │   │   │       ├── from_include_generated.rs
+│   │   │   │   │       ├── table_b_generated.rs
+│   │   │   │   │       └── unused_generated.rs
+│   │   │   │   └── table_a_generated.rs
+│   │   │   ├── monster_test_suffix
+│   │   │   │   ├── ext_only
+│   │   │   │   │   ├── monster_test_generated.hpp
+│   │   │   │   │   ├── monster_test.grpc.fb.cc
+│   │   │   │   │   └── monster_test.grpc.fb.h
+│   │   │   │   ├── filesuffix_only
+│   │   │   │   │   ├── monster_test.grpc.fb.cc
+│   │   │   │   │   ├── monster_test.grpc.fb.h
+│   │   │   │   │   └── monster_test_suffix.h
+│   │   │   │   ├── monster_test.grpc.fb.cc
+│   │   │   │   ├── monster_test.grpc.fb.h
+│   │   │   │   └── monster_test_suffix.hpp
+│   │   │   ├── more_defaults
+│   │   │   │   ├── abc_generated.rs
+│   │   │   │   ├── mod.rs
+│   │   │   │   └── more_defaults_generated.rs
+│   │   │   ├── more_defaults.fbs
+│   │   │   ├── MoreDefaults.nim
+│   │   │   ├── MutatingBool.fbs
+│   │   │   ├── MyGame
+│   │   │   │   ├── Example
+│   │   │   │   │   ├── Ability.cs
+│   │   │   │   │   ├── Ability.go
+│   │   │   │   │   ├── Ability.java
+│   │   │   │   │   ├── Ability.kt
+│   │   │   │   │   ├── Ability.lua
+│   │   │   │   │   ├── Ability.nim
+│   │   │   │   │   ├── Ability.php
+│   │   │   │   │   ├── Ability.py
+│   │   │   │   │   ├── AbilityT.java
+│   │   │   │   │   ├── AnyAmbiguousAliases.cs
+│   │   │   │   │   ├── AnyAmbiguousAliases.go
+│   │   │   │   │   ├── AnyAmbiguousAliases.java
+│   │   │   │   │   ├── AnyAmbiguousAliases.kt
+│   │   │   │   │   ├── AnyAmbiguousAliases.lua
+│   │   │   │   │   ├── AnyAmbiguousAliases.nim
+│   │   │   │   │   ├── AnyAmbiguousAliases.php
+│   │   │   │   │   ├── AnyAmbiguousAliases.py
+│   │   │   │   │   ├── AnyAmbiguousAliasesUnion.java
+│   │   │   │   │   ├── Any.cs
+│   │   │   │   │   ├── Any.go
+│   │   │   │   │   ├── Any.java
+│   │   │   │   │   ├── Any.kt
+│   │   │   │   │   ├── Any.lua
+│   │   │   │   │   ├── Any.nim
+│   │   │   │   │   ├── Any.php
+│   │   │   │   │   ├── Any.py
+│   │   │   │   │   ├── AnyUnion.java
+│   │   │   │   │   ├── AnyUniqueAliases.cs
+│   │   │   │   │   ├── AnyUniqueAliases.go
+│   │   │   │   │   ├── AnyUniqueAliases.java
+│   │   │   │   │   ├── AnyUniqueAliases.kt
+│   │   │   │   │   ├── AnyUniqueAliases.lua
+│   │   │   │   │   ├── AnyUniqueAliases.nim
+│   │   │   │   │   ├── AnyUniqueAliases.php
+│   │   │   │   │   ├── AnyUniqueAliases.py
+│   │   │   │   │   ├── AnyUniqueAliasesUnion.java
+│   │   │   │   │   ├── ArrayStruct.cs
+│   │   │   │   │   ├── ArrayStruct.java
+│   │   │   │   │   ├── ArrayStruct.py
+│   │   │   │   │   ├── ArrayStructT.java
+│   │   │   │   │   ├── ArrayTable.cs
+│   │   │   │   │   ├── ArrayTable.java
+│   │   │   │   │   ├── ArrayTable.py
+│   │   │   │   │   ├── ArrayTableT.java
+│   │   │   │   │   ├── Color.cs
+│   │   │   │   │   ├── Color.go
+│   │   │   │   │   ├── Color.java
+│   │   │   │   │   ├── Color.kt
+│   │   │   │   │   ├── Color.lua
+│   │   │   │   │   ├── Color.nim
+│   │   │   │   │   ├── Color.php
+│   │   │   │   │   ├── Color.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── LongEnum.cs
+│   │   │   │   │   ├── LongEnum.go
+│   │   │   │   │   ├── LongEnum.java
+│   │   │   │   │   ├── LongEnum.kt
+│   │   │   │   │   ├── LongEnum.lua
+│   │   │   │   │   ├── LongEnum.nim
+│   │   │   │   │   ├── LongEnum.php
+│   │   │   │   │   ├── LongEnum.py
+│   │   │   │   │   ├── Monster.cs
+│   │   │   │   │   ├── Monster.go
+│   │   │   │   │   ├── Monster.java
+│   │   │   │   │   ├── Monster.kt
+│   │   │   │   │   ├── Monster.lua
+│   │   │   │   │   ├── Monster.nim
+│   │   │   │   │   ├── Monster.php
+│   │   │   │   │   ├── Monster.py
+│   │   │   │   │   ├── MonsterStorage_grpc.go
+│   │   │   │   │   ├── MonsterStorageGrpc.java
+│   │   │   │   │   ├── monster_test_grpc_fb.py
+│   │   │   │   │   ├── MonsterT.java
+│   │   │   │   │   ├── NestedStruct.cs
+│   │   │   │   │   ├── NestedStruct.java
+│   │   │   │   │   ├── NestedStruct.py
+│   │   │   │   │   ├── NestedStructT.java
+│   │   │   │   │   ├── NestedUnion
+│   │   │   │   │   │   ├── Any.py
+│   │   │   │   │   │   ├── Color.py
+│   │   │   │   │   │   ├── __init__.py
+│   │   │   │   │   │   ├── NestedUnionTest.py
+│   │   │   │   │   │   ├── Test.py
+│   │   │   │   │   │   ├── TestSimpleTableWithEnum.py
+│   │   │   │   │   │   └── Vec3.py
+│   │   │   │   │   ├── Race.cs
+│   │   │   │   │   ├── Race.go
+│   │   │   │   │   ├── Race.java
+│   │   │   │   │   ├── Race.kt
+│   │   │   │   │   ├── Race.lua
+│   │   │   │   │   ├── Race.nim
+│   │   │   │   │   ├── Race.php
+│   │   │   │   │   ├── Race.py
+│   │   │   │   │   ├── Referrable.cs
+│   │   │   │   │   ├── Referrable.go
+│   │   │   │   │   ├── Referrable.java
+│   │   │   │   │   ├── Referrable.kt
+│   │   │   │   │   ├── Referrable.lua
+│   │   │   │   │   ├── Referrable.nim
+│   │   │   │   │   ├── Referrable.php
+│   │   │   │   │   ├── Referrable.py
+│   │   │   │   │   ├── ReferrableT.java
+│   │   │   │   │   ├── Stat.cs
+│   │   │   │   │   ├── Stat.go
+│   │   │   │   │   ├── Stat.java
+│   │   │   │   │   ├── Stat.kt
+│   │   │   │   │   ├── Stat.lua
+│   │   │   │   │   ├── Stat.nim
+│   │   │   │   │   ├── Stat.php
+│   │   │   │   │   ├── Stat.py
+│   │   │   │   │   ├── StatT.java
+│   │   │   │   │   ├── StructOfStructs.cs
+│   │   │   │   │   ├── StructOfStructs.go
+│   │   │   │   │   ├── StructOfStructs.java
+│   │   │   │   │   ├── StructOfStructs.kt
+│   │   │   │   │   ├── StructOfStructs.lua
+│   │   │   │   │   ├── StructOfStructs.nim
+│   │   │   │   │   ├── StructOfStructsOfStructs.cs
+│   │   │   │   │   ├── StructOfStructsOfStructs.go
+│   │   │   │   │   ├── StructOfStructsOfStructs.java
+│   │   │   │   │   ├── StructOfStructsOfStructs.kt
+│   │   │   │   │   ├── StructOfStructsOfStructs.lua
+│   │   │   │   │   ├── StructOfStructsOfStructs.nim
+│   │   │   │   │   ├── StructOfStructsOfStructs.php
+│   │   │   │   │   ├── StructOfStructsOfStructs.py
+│   │   │   │   │   ├── StructOfStructsOfStructsT.java
+│   │   │   │   │   ├── StructOfStructs.php
+│   │   │   │   │   ├── StructOfStructs.py
+│   │   │   │   │   ├── StructOfStructsT.java
+│   │   │   │   │   ├── Test.cs
+│   │   │   │   │   ├── TestEnum.cs
+│   │   │   │   │   ├── TestEnum.java
+│   │   │   │   │   ├── TestEnum.kt
+│   │   │   │   │   ├── TestEnum.py
+│   │   │   │   │   ├── Test.go
+│   │   │   │   │   ├── Test.java
+│   │   │   │   │   ├── Test.kt
+│   │   │   │   │   ├── Test.lua
+│   │   │   │   │   ├── Test.nim
+│   │   │   │   │   ├── Test.php
+│   │   │   │   │   ├── Test.py
+│   │   │   │   │   ├── TestSimpleTableWithEnum.cs
+│   │   │   │   │   ├── TestSimpleTableWithEnum.go
+│   │   │   │   │   ├── TestSimpleTableWithEnum.java
+│   │   │   │   │   ├── TestSimpleTableWithEnum.kt
+│   │   │   │   │   ├── TestSimpleTableWithEnum.lua
+│   │   │   │   │   ├── TestSimpleTableWithEnum.nim
+│   │   │   │   │   ├── TestSimpleTableWithEnum.php
+│   │   │   │   │   ├── TestSimpleTableWithEnum.py
+│   │   │   │   │   ├── TestSimpleTableWithEnumT.java
+│   │   │   │   │   ├── TestT.java
+│   │   │   │   │   ├── TypeAliases.cs
+│   │   │   │   │   ├── TypeAliases.go
+│   │   │   │   │   ├── TypeAliases.java
+│   │   │   │   │   ├── TypeAliases.kt
+│   │   │   │   │   ├── TypeAliases.lua
+│   │   │   │   │   ├── TypeAliases.nim
+│   │   │   │   │   ├── TypeAliases.php
+│   │   │   │   │   ├── TypeAliases.py
+│   │   │   │   │   ├── TypeAliasesT.java
+│   │   │   │   │   ├── Vec3.cs
+│   │   │   │   │   ├── Vec3.go
+│   │   │   │   │   ├── Vec3.java
+│   │   │   │   │   ├── Vec3.kt
+│   │   │   │   │   ├── Vec3.lua
+│   │   │   │   │   ├── Vec3.nim
+│   │   │   │   │   ├── Vec3.php
+│   │   │   │   │   ├── Vec3.py
+│   │   │   │   │   └── Vec3T.java
+│   │   │   │   ├── Example2
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── Monster.cs
+│   │   │   │   │   ├── Monster.go
+│   │   │   │   │   ├── Monster.java
+│   │   │   │   │   ├── Monster.kt
+│   │   │   │   │   ├── Monster.lua
+│   │   │   │   │   ├── Monster.nim
+│   │   │   │   │   ├── Monster.php
+│   │   │   │   │   ├── Monster.py
+│   │   │   │   │   └── MonsterT.java
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── InParentNamespace.cs
+│   │   │   │   ├── InParentNamespace.go
+│   │   │   │   ├── InParentNamespace.java
+│   │   │   │   ├── InParentNamespace.kt
+│   │   │   │   ├── InParentNamespace.lua
+│   │   │   │   ├── InParentNamespace.nim
+│   │   │   │   ├── InParentNamespace.php
+│   │   │   │   ├── InParentNamespace.py
+│   │   │   │   ├── InParentNamespaceT.java
+│   │   │   │   ├── MonsterExtra.cs
+│   │   │   │   ├── MonsterExtra.java
+│   │   │   │   ├── MonsterExtra.kt
+│   │   │   │   ├── MonsterExtra.py
+│   │   │   │   ├── MonsterExtraT.java
+│   │   │   │   └── OtherNameSpace
+│   │   │   │       ├── FromInclude.lua
+│   │   │   │       ├── FromInclude.nim
+│   │   │   │       ├── TableB.lua
+│   │   │   │       ├── TableB.nim
+│   │   │   │       ├── TableBT.java
+│   │   │   │       ├── Unused.lua
+│   │   │   │       ├── Unused.nim
+│   │   │   │       └── UnusedT.java
+│   │   │   ├── name_clash_test
+│   │   │   │   ├── invalid_test1.fbs
+│   │   │   │   ├── invalid_test2.fbs
+│   │   │   │   ├── valid_test1.fbs
+│   │   │   │   └── valid_test2.fbs
+│   │   │   ├── namespace_test
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── namespace_a
+│   │   │   │   │   ├── namespace_b
+│   │   │   │   │   │   ├── enum_in_nested_ns_generated.rs
+│   │   │   │   │   │   ├── struct_in_nested_ns_generated.rs
+│   │   │   │   │   │   ├── table_in_nested_ns_generated.rs
+│   │   │   │   │   │   └── union_in_nested_ns_generated.rs
+│   │   │   │   │   ├── second_table_in_a_generated.rs
+│   │   │   │   │   └── table_in_first_ns_generated.rs
+│   │   │   │   ├── NamespaceA
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── NamespaceB
+│   │   │   │   │   │   ├── EnumInNestedNS.cs
+│   │   │   │   │   │   ├── EnumInNestedNS.go
+│   │   │   │   │   │   ├── EnumInNestedNS.java
+│   │   │   │   │   │   ├── EnumInNestedNS.kt
+│   │   │   │   │   │   ├── EnumInNestedNS.lua
+│   │   │   │   │   │   ├── EnumInNestedNS.php
+│   │   │   │   │   │   ├── EnumInNestedNS.py
+│   │   │   │   │   │   ├── __init__.py
+│   │   │   │   │   │   ├── StructInNestedNS.cs
+│   │   │   │   │   │   ├── StructInNestedNS.go
+│   │   │   │   │   │   ├── StructInNestedNS.java
+│   │   │   │   │   │   ├── StructInNestedNS.kt
+│   │   │   │   │   │   ├── StructInNestedNS.lua
+│   │   │   │   │   │   ├── StructInNestedNS.php
+│   │   │   │   │   │   ├── StructInNestedNS.py
+│   │   │   │   │   │   ├── StructInNestedNST.java
+│   │   │   │   │   │   ├── TableInNestedNS.cs
+│   │   │   │   │   │   ├── TableInNestedNS.go
+│   │   │   │   │   │   ├── TableInNestedNS.java
+│   │   │   │   │   │   ├── TableInNestedNS.kt
+│   │   │   │   │   │   ├── TableInNestedNS.lua
+│   │   │   │   │   │   ├── TableInNestedNS.php
+│   │   │   │   │   │   ├── TableInNestedNS.py
+│   │   │   │   │   │   ├── TableInNestedNST.java
+│   │   │   │   │   │   ├── UnionInNestedNS.cs
+│   │   │   │   │   │   ├── UnionInNestedNS.go
+│   │   │   │   │   │   ├── UnionInNestedNS.java
+│   │   │   │   │   │   ├── UnionInNestedNS.kt
+│   │   │   │   │   │   ├── UnionInNestedNS.lua
+│   │   │   │   │   │   ├── UnionInNestedNS.php
+│   │   │   │   │   │   ├── UnionInNestedNS.py
+│   │   │   │   │   │   └── UnionInNestedNSUnion.java
+│   │   │   │   │   ├── SecondTableInA.cs
+│   │   │   │   │   ├── SecondTableInA.go
+│   │   │   │   │   ├── SecondTableInA.java
+│   │   │   │   │   ├── SecondTableInA.kt
+│   │   │   │   │   ├── SecondTableInA.lua
+│   │   │   │   │   ├── SecondTableInA.php
+│   │   │   │   │   ├── SecondTableInA.py
+│   │   │   │   │   ├── SecondTableInAT.java
+│   │   │   │   │   ├── TableInC.cs
+│   │   │   │   │   ├── TableInC.go
+│   │   │   │   │   ├── TableInC.php
+│   │   │   │   │   ├── TableInC.py
+│   │   │   │   │   ├── TableInFirstNS.cs
+│   │   │   │   │   ├── TableInFirstNS.go
+│   │   │   │   │   ├── TableInFirstNS.java
+│   │   │   │   │   ├── TableInFirstNS.kt
+│   │   │   │   │   ├── TableInFirstNS.lua
+│   │   │   │   │   ├── TableInFirstNS.php
+│   │   │   │   │   ├── TableInFirstNS.py
+│   │   │   │   │   └── TableInFirstNST.java
+│   │   │   │   ├── namespace_c
+│   │   │   │   │   └── table_in_c_generated.rs
+│   │   │   │   ├── NamespaceC
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── TableInC.cs
+│   │   │   │   │   ├── TableInC.go
+│   │   │   │   │   ├── TableInC.java
+│   │   │   │   │   ├── TableInC.kt
+│   │   │   │   │   ├── TableInC.lua
+│   │   │   │   │   ├── TableInC.php
+│   │   │   │   │   ├── TableInC.py
+│   │   │   │   │   └── TableInCT.java
+│   │   │   │   ├── namespace_test1.fbs
+│   │   │   │   ├── namespace_test1_generated.h
+│   │   │   │   ├── namespace_test1_generated.lobster
+│   │   │   │   ├── namespace_test1_namespace_a.namespace_b_generated.dart
+│   │   │   │   ├── namespace_test2.fbs
+│   │   │   │   ├── namespace_test2_generated.h
+│   │   │   │   ├── namespace_test2_generated.lobster
+│   │   │   │   ├── namespace_test2_namespace_a_generated.dart
+│   │   │   │   └── namespace_test2_namespace_c_generated.dart
+│   │   │   ├── nan_inf_test.fbs
+│   │   │   ├── native_inline_table_test.fbs
+│   │   │   ├── native_inline_table_test_generated.h
+│   │   │   ├── native_type_test.fbs
+│   │   │   ├── native_type_test_generated.h
+│   │   │   ├── native_type_test_impl.cpp
+│   │   │   ├── native_type_test_impl.h
+│   │   │   ├── nested_namespace_test
+│   │   │   │   ├── nested_namespace_test1.fbs
+│   │   │   │   ├── nested_namespace_test1_generated.cs
+│   │   │   │   ├── nested_namespace_test2.fbs
+│   │   │   │   ├── nested_namespace_test2_generated.cs
+│   │   │   │   ├── nested_namespace_test3.fbs
+│   │   │   │   └── nested_namespace_test3_generated.cs
+│   │   │   ├── nested_union_test.fbs
+│   │   │   ├── nim
+│   │   │   │   ├── testnim.py
+│   │   │   │   └── tests
+│   │   │   │       ├── moredefaults
+│   │   │   │       │   └── test.nim
+│   │   │   │       ├── mutatingbool
+│   │   │   │       │   └── test.nim
+│   │   │   │       ├── mygame
+│   │   │   │       │   └── test.nim
+│   │   │   │       └── optional_scalars
+│   │   │   │           └── test.nim
+│   │   │   ├── optional_scalars
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── OptionalByte.cs
+│   │   │   │   ├── OptionalByte.go
+│   │   │   │   ├── OptionalByte.java
+│   │   │   │   ├── OptionalByte.kt
+│   │   │   │   ├── OptionalByte.nim
+│   │   │   │   ├── OptionalByte.py
+│   │   │   │   ├── optional_scalars
+│   │   │   │   │   ├── optional_byte_generated.rs
+│   │   │   │   │   └── scalar_stuff_generated.rs
+│   │   │   │   ├── ScalarStuff.cs
+│   │   │   │   ├── ScalarStuff.go
+│   │   │   │   ├── ScalarStuff.java
+│   │   │   │   ├── ScalarStuff.kt
+│   │   │   │   ├── ScalarStuff.nim
+│   │   │   │   └── ScalarStuff.py
+│   │   │   ├── optional_scalars_defaults.json
+│   │   │   ├── optional_scalars.fbs
+│   │   │   ├── optional_scalars_generated.h
+│   │   │   ├── optional_scalars_generated.lobster
+│   │   │   ├── optional_scalars_generated.ts
+│   │   │   ├── optional_scalars.json
+│   │   │   ├── optional_scalars_test.cpp
+│   │   │   ├── optional_scalars_test.h
+│   │   │   ├── order
+│   │   │   │   └── Food.go
+│   │   │   ├── parser_test.cpp
+│   │   │   ├── parser_test.h
+│   │   │   ├── phpTest.php
+│   │   │   ├── phpUnionVectorTest.php
+│   │   │   ├── phpUnionVectorTest.sh
+│   │   │   ├── Pizza.go
+│   │   │   ├── private_annotation_test
+│   │   │   │   ├── ab_generated.rs
+│   │   │   │   ├── annotations_generated.rs
+│   │   │   │   ├── any_generated.rs
+│   │   │   │   ├── game_generated.rs
+│   │   │   │   ├── mod.rs
+│   │   │   │   └── object_generated.rs
+│   │   │   ├── private_annotation_test.fbs
+│   │   │   ├── Property.nim
+│   │   │   ├── prototest
+│   │   │   │   ├── GenerateProtoGoldens.sh
+│   │   │   │   ├── imported.proto
+│   │   │   │   ├── non-positive-id.proto
+│   │   │   │   ├── test.golden.fbs
+│   │   │   │   ├── test_id.golden.fbs
+│   │   │   │   ├── test_include.golden.fbs
+│   │   │   │   ├── test_include_id.golden.fbs
+│   │   │   │   ├── test.proto
+│   │   │   │   ├── test_suffix.golden.fbs
+│   │   │   │   ├── test_suffix_id.golden.fbs
+│   │   │   │   ├── test_union.golden.fbs
+│   │   │   │   ├── test_union_id.golden.fbs
+│   │   │   │   ├── test_union_include.golden.fbs
+│   │   │   │   ├── test_union_include_id.golden.fbs
+│   │   │   │   ├── test_union_suffix.golden.fbs
+│   │   │   │   ├── test_union_suffix_id.golden.fbs
+│   │   │   │   ├── twice-id.proto
+│   │   │   │   └── use-reserved-id.proto
+│   │   │   ├── proto_test.cpp
+│   │   │   ├── proto_test.h
+│   │   │   ├── py_flexbuffers_test.py
+│   │   │   ├── py_test.py
+│   │   │   ├── PythonTest.sh
+│   │   │   ├── reflection_test.cpp
+│   │   │   ├── reflection_test.h
+│   │   │   ├── required_strings.fbs
+│   │   │   ├── rust_namer_test
+│   │   │   │   ├── mod.rs
+│   │   │   │   └── rust_namer_test
+│   │   │   │       ├── field_table_generated.rs
+│   │   │   │       ├── field_union_generated.rs
+│   │   │   │       ├── game_message_generated.rs
+│   │   │   │       ├── game_message_wrapper_generated.rs
+│   │   │   │       ├── player_input_change_generated.rs
+│   │   │   │       ├── player_spectate_generated.rs
+│   │   │   │       ├── player_stat_event_generated.rs
+│   │   │   │       └── root_table_generated.rs
+│   │   │   ├── rust_namer_test.fbs
+│   │   │   ├── rust_no_std_compilation_test
+│   │   │   │   ├── Cargo.toml
+│   │   │   │   └── src
+│   │   │   │       └── main.rs
+│   │   │   ├── rust_serialize_test
+│   │   │   │   ├── Cargo.toml
+│   │   │   │   └── src
+│   │   │   │       └── main.rs
+│   │   │   ├── RustTest.bat
+│   │   │   ├── RustTest.sh
+│   │   │   ├── rust_usage_test
+│   │   │   │   ├── benches
+│   │   │   │   │   ├── benchmarks.rs
+│   │   │   │   │   ├── flatbuffers_benchmarks.rs
+│   │   │   │   │   └── flexbuffers_benchmarks.rs
+│   │   │   │   ├── bin
+│   │   │   │   │   ├── flatbuffers_alloc_check.rs
+│   │   │   │   │   ├── flexbuffers_alloc_check.rs
+│   │   │   │   │   └── monster_example.rs
+│   │   │   │   ├── Cargo.toml
+│   │   │   │   ├── outdir
+│   │   │   │   │   ├── build.rs
+│   │   │   │   │   ├── Cargo.toml
+│   │   │   │   │   └── src
+│   │   │   │   │       └── main.rs
+│   │   │   │   └── tests
+│   │   │   │       ├── arrays_test.rs
+│   │   │   │       ├── flexbuffers_tests
+│   │   │   │       │   ├── binary_format.rs
+│   │   │   │       │   ├── interop.rs
+│   │   │   │       │   ├── mod.rs
+│   │   │   │       │   ├── other_api.rs
+│   │   │   │       │   ├── qc_serious.rs
+│   │   │   │       │   └── rwyw.rs
+│   │   │   │       ├── integration_test.rs
+│   │   │   │       ├── more_defaults_test.rs
+│   │   │   │       └── optional_scalars_test.rs
+│   │   │   ├── swift
+│   │   │   │   ├── benchmarks
+│   │   │   │   │   ├── Package.swift
+│   │   │   │   │   └── Sources
+│   │   │   │   │       └── benchmarks
+│   │   │   │   │           └── main.swift
+│   │   │   │   ├── tests
+│   │   │   │   │   ├── CodeGenerationTests
+│   │   │   │   │   │   ├── test_import.fbs
+│   │   │   │   │   │   ├── test_import_generated.swift
+│   │   │   │   │   │   ├── test_no_include.fbs
+│   │   │   │   │   │   └── test_no_include_generated.swift
+│   │   │   │   │   ├── monsterdata_test.mon
+│   │   │   │   │   ├── Package.swift
+│   │   │   │   │   ├── Sources
+│   │   │   │   │   │   └── SwiftFlatBuffers
+│   │   │   │   │   │       ├── fuzzer.fbs
+│   │   │   │   │   │       ├── fuzzer_generated.swift
+│   │   │   │   │   │       └── main.swift
+│   │   │   │   │   ├── SwiftTest.sh
+│   │   │   │   │   └── Tests
+│   │   │   │   │       ├── FlatBuffers.Test.SwiftTests
+│   │   │   │   │       │   ├── FlatbuffersDoubleTests.swift
+│   │   │   │   │       │   ├── FlatBuffersMonsterWriterTests.swift
+│   │   │   │   │       │   ├── FlatbuffersMoreDefaults.swift
+│   │   │   │   │       │   ├── FlatBuffersNanInfTests.swift
+│   │   │   │   │       │   ├── FlatBuffersStructsTests.swift
+│   │   │   │   │       │   ├── FlatBuffersTests.swift
+│   │   │   │   │       │   ├── FlatBuffersUnionTests.swift
+│   │   │   │   │       │   ├── FlatBuffersVectorsTests.swift
+│   │   │   │   │       │   ├── FlatbuffersVerifierTests.swift
+│   │   │   │   │       │   ├── monster_test_generated.swift
+│   │   │   │   │       │   ├── monster_test.grpc.swift
+│   │   │   │   │       │   ├── more_defaults_generated.swift
+│   │   │   │   │       │   ├── MutatingBool_generated.swift
+│   │   │   │   │       │   ├── nan_inf_test_generated.swift
+│   │   │   │   │       │   ├── optional_scalars_generated.swift
+│   │   │   │   │       │   ├── union_vector_generated.swift
+│   │   │   │   │       │   ├── vector_has_test_generated.swift
+│   │   │   │   │       │   └── XCTestManifests.swift
+│   │   │   │   │       └── LinuxMain.swift
+│   │   │   │   └── Wasm.tests
+│   │   │   │       ├── Package.swift
+│   │   │   │       ├── Sources
+│   │   │   │       │   └── Wasm
+│   │   │   │       │       └── Wasm.swift
+│   │   │   │       └── Tests
+│   │   │   │           └── FlatBuffers.Test.Swift.WasmTests
+│   │   │   │               ├── FlatBuffersMonsterWriterTests.swift
+│   │   │   │               └── monster_test_generated.swift
+│   │   │   ├── TableA.lua
+│   │   │   ├── TableA.nim
+│   │   │   ├── TableAT.java
+│   │   │   ├── TestAll.sh
+│   │   │   ├── test_assert.cpp
+│   │   │   ├── test_assert.h
+│   │   │   ├── test_builder.cpp
+│   │   │   ├── test_builder.h
+│   │   │   ├── test.cpp
+│   │   │   ├── test.fbs
+│   │   │   ├── TestMutatingBool.nim
+│   │   │   ├── ts
+│   │   │   │   ├── arrays_test_complex
+│   │   │   │   │   ├── arrays_test_complex.fbs
+│   │   │   │   │   ├── arrays_test_complex_generated.cjs
+│   │   │   │   │   └── my-game
+│   │   │   │   │       ├── example
+│   │   │   │   │       │   ├── array-struct.d.ts
+│   │   │   │   │       │   ├── array-struct.js
+│   │   │   │   │       │   ├── array-struct.ts
+│   │   │   │   │       │   ├── array-table.d.ts
+│   │   │   │   │       │   ├── array-table.js
+│   │   │   │   │       │   ├── array-table.ts
+│   │   │   │   │       │   ├── inner-struct.d.ts
+│   │   │   │   │       │   ├── inner-struct.js
+│   │   │   │   │       │   ├── inner-struct.ts
+│   │   │   │   │       │   ├── nested-struct.d.ts
+│   │   │   │   │       │   ├── nested-struct.js
+│   │   │   │   │       │   ├── nested-struct.ts
+│   │   │   │   │       │   ├── outer-struct.d.ts
+│   │   │   │   │       │   ├── outer-struct.js
+│   │   │   │   │       │   ├── outer-struct.ts
+│   │   │   │   │       │   ├── test-enum.d.ts
+│   │   │   │   │       │   ├── test-enum.js
+│   │   │   │   │       │   └── test-enum.ts
+│   │   │   │   │       ├── example.d.ts
+│   │   │   │   │       ├── example.js
+│   │   │   │   │       └── example.ts
+│   │   │   │   ├── bazel_repository_test_dir
+│   │   │   │   │   ├── BUILD.bazel
+│   │   │   │   │   ├── import_test.js
+│   │   │   │   │   ├── one.fbs
+│   │   │   │   │   ├── package.json
+│   │   │   │   │   ├── pnpm-lock.yaml
+│   │   │   │   │   ├── two.fbs
+│   │   │   │   │   └── WORKSPACE
+│   │   │   │   ├── bazel_repository_test.sh
+│   │   │   │   ├── BUILD.bazel
+│   │   │   │   ├── foobar
+│   │   │   │   │   ├── abc.d.ts
+│   │   │   │   │   ├── abc.js
+│   │   │   │   │   ├── abc.ts
+│   │   │   │   │   ├── class.d.ts
+│   │   │   │   │   ├── class.js
+│   │   │   │   │   ├── class.ts
+│   │   │   │   │   └── tab.ts
+│   │   │   │   ├── foobar.d.ts
+│   │   │   │   ├── foobar.js
+│   │   │   │   ├── foobar.ts
+│   │   │   │   ├── JavaScriptComplexArraysTest.js
+│   │   │   │   ├── JavaScriptFlexBuffersTest.js
+│   │   │   │   ├── JavaScriptRequiredStringTest.js
+│   │   │   │   ├── JavaScriptTest.js
+│   │   │   │   ├── JavaScriptTestv1.cjs
+│   │   │   │   ├── JavaScriptUnionUnderlyingTypeTest.js
+│   │   │   │   ├── JavaScriptUnionVectorTest.js
+│   │   │   │   ├── monsterdata_javascript_wire.mon
+│   │   │   │   ├── monster_test.d.ts
+│   │   │   │   ├── monster_test_generated.cjs
+│   │   │   │   ├── monster_test.js
+│   │   │   │   ├── monster_test.ts
+│   │   │   │   ├── my-game
+│   │   │   │   │   ├── example
+│   │   │   │   │   │   ├── ability.d.ts
+│   │   │   │   │   │   ├── ability.js
+│   │   │   │   │   │   ├── ability.ts
+│   │   │   │   │   │   ├── any-ambiguous-aliases.d.ts
+│   │   │   │   │   │   ├── any-ambiguous-aliases.js
+│   │   │   │   │   │   ├── any-ambiguous-aliases.ts
+│   │   │   │   │   │   ├── any.d.ts
+│   │   │   │   │   │   ├── any.js
+│   │   │   │   │   │   ├── any.ts
+│   │   │   │   │   │   ├── any-unique-aliases.d.ts
+│   │   │   │   │   │   ├── any-unique-aliases.js
+│   │   │   │   │   │   ├── any-unique-aliases.ts
+│   │   │   │   │   │   ├── color.d.ts
+│   │   │   │   │   │   ├── color.js
+│   │   │   │   │   │   ├── color.ts
+│   │   │   │   │   │   ├── long-enum.d.ts
+│   │   │   │   │   │   ├── long-enum.js
+│   │   │   │   │   │   ├── long-enum.ts
+│   │   │   │   │   │   ├── monster.d.ts
+│   │   │   │   │   │   ├── monster.js
+│   │   │   │   │   │   ├── monster.ts
+│   │   │   │   │   │   ├── race.d.ts
+│   │   │   │   │   │   ├── race.js
+│   │   │   │   │   │   ├── race.ts
+│   │   │   │   │   │   ├── referrable.d.ts
+│   │   │   │   │   │   ├── referrable.js
+│   │   │   │   │   │   ├── referrable.ts
+│   │   │   │   │   │   ├── stat.d.ts
+│   │   │   │   │   │   ├── stat.js
+│   │   │   │   │   │   ├── stat.ts
+│   │   │   │   │   │   ├── struct-of-structs.d.ts
+│   │   │   │   │   │   ├── struct-of-structs.js
+│   │   │   │   │   │   ├── struct-of-structs-of-structs.d.ts
+│   │   │   │   │   │   ├── struct-of-structs-of-structs.js
+│   │   │   │   │   │   ├── struct-of-structs-of-structs.ts
+│   │   │   │   │   │   ├── struct-of-structs.ts
+│   │   │   │   │   │   ├── test.d.ts
+│   │   │   │   │   │   ├── test.js
+│   │   │   │   │   │   ├── test-simple-table-with-enum.d.ts
+│   │   │   │   │   │   ├── test-simple-table-with-enum.js
+│   │   │   │   │   │   ├── test-simple-table-with-enum.ts
+│   │   │   │   │   │   ├── test.ts
+│   │   │   │   │   │   ├── type-aliases.d.ts
+│   │   │   │   │   │   ├── type-aliases.js
+│   │   │   │   │   │   ├── type-aliases.ts
+│   │   │   │   │   │   ├── vec3.d.ts
+│   │   │   │   │   │   ├── vec3.js
+│   │   │   │   │   │   └── vec3.ts
+│   │   │   │   │   ├── example2
+│   │   │   │   │   │   ├── monster.d.ts
+│   │   │   │   │   │   ├── monster.js
+│   │   │   │   │   │   └── monster.ts
+│   │   │   │   │   ├── example2.d.ts
+│   │   │   │   │   ├── example2.js
+│   │   │   │   │   ├── example2.ts
+│   │   │   │   │   ├── example.d.ts
+│   │   │   │   │   ├── example.js
+│   │   │   │   │   ├── example.ts
+│   │   │   │   │   ├── in-parent-namespace.d.ts
+│   │   │   │   │   ├── in-parent-namespace.js
+│   │   │   │   │   ├── in-parent-namespace.ts
+│   │   │   │   │   ├── other-name-space
+│   │   │   │   │   │   ├── from-include.d.ts
+│   │   │   │   │   │   ├── from-include.js
+│   │   │   │   │   │   ├── from-include.ts
+│   │   │   │   │   │   ├── table-b.d.ts
+│   │   │   │   │   │   ├── table-b.js
+│   │   │   │   │   │   ├── table-b.ts
+│   │   │   │   │   │   ├── unused.d.ts
+│   │   │   │   │   │   ├── unused.js
+│   │   │   │   │   │   └── unused.ts
+│   │   │   │   │   ├── other-name-space.d.ts
+│   │   │   │   │   ├── other-name-space.js
+│   │   │   │   │   └── other-name-space.ts
+│   │   │   │   ├── my-game.d.ts
+│   │   │   │   ├── my-game.js
+│   │   │   │   ├── my-game.ts
+│   │   │   │   ├── no_import_ext
+│   │   │   │   │   ├── optional-scalars
+│   │   │   │   │   │   ├── optional-byte.d.ts
+│   │   │   │   │   │   ├── optional-byte.js
+│   │   │   │   │   │   ├── optional-byte.ts
+│   │   │   │   │   │   ├── scalar-stuff.d.ts
+│   │   │   │   │   │   ├── scalar-stuff.js
+│   │   │   │   │   │   └── scalar-stuff.ts
+│   │   │   │   │   ├── optional-scalars.d.ts
+│   │   │   │   │   ├── optional_scalars.d.ts
+│   │   │   │   │   ├── optional-scalars.js
+│   │   │   │   │   ├── optional_scalars.js
+│   │   │   │   │   ├── optional-scalars.ts
+│   │   │   │   │   └── optional_scalars.ts
+│   │   │   │   ├── optional-scalars
+│   │   │   │   │   ├── optional-byte.ts
+│   │   │   │   │   └── scalar-stuff.ts
+│   │   │   │   ├── optional-scalars.ts
+│   │   │   │   ├── optional_scalars.ts
+│   │   │   │   ├── package.json
+│   │   │   │   ├── reflection
+│   │   │   │   │   ├── advanced-features.d.ts
+│   │   │   │   │   ├── advanced-features.js
+│   │   │   │   │   ├── advanced-features.ts
+│   │   │   │   │   ├── base-type.d.ts
+│   │   │   │   │   ├── base-type.js
+│   │   │   │   │   ├── base-type.ts
+│   │   │   │   │   ├── enum.d.ts
+│   │   │   │   │   ├── enum.js
+│   │   │   │   │   ├── enum.ts
+│   │   │   │   │   ├── enum-val.d.ts
+│   │   │   │   │   ├── enum-val.js
+│   │   │   │   │   ├── enum-val.ts
+│   │   │   │   │   ├── field.d.ts
+│   │   │   │   │   ├── field.js
+│   │   │   │   │   ├── field.ts
+│   │   │   │   │   ├── key-value.d.ts
+│   │   │   │   │   ├── key-value.js
+│   │   │   │   │   ├── key-value.ts
+│   │   │   │   │   ├── object.d.ts
+│   │   │   │   │   ├── object.js
+│   │   │   │   │   ├── object.ts
+│   │   │   │   │   ├── rpccall.d.ts
+│   │   │   │   │   ├── rpccall.js
+│   │   │   │   │   ├── rpccall.ts
+│   │   │   │   │   ├── schema.d.ts
+│   │   │   │   │   ├── schema-file.d.ts
+│   │   │   │   │   ├── schema-file.js
+│   │   │   │   │   ├── schema-file.ts
+│   │   │   │   │   ├── schema.js
+│   │   │   │   │   ├── schema.ts
+│   │   │   │   │   ├── service.d.ts
+│   │   │   │   │   ├── service.js
+│   │   │   │   │   ├── service.ts
+│   │   │   │   │   ├── type.d.ts
+│   │   │   │   │   ├── type.js
+│   │   │   │   │   └── type.ts
+│   │   │   │   ├── reflection.d.ts
+│   │   │   │   ├── reflection_generated.cjs
+│   │   │   │   ├── reflection.js
+│   │   │   │   ├── reflection.ts
+│   │   │   │   ├── required-strings
+│   │   │   │   │   ├── foo.js
+│   │   │   │   │   └── foo.ts
+│   │   │   │   ├── required_strings_generated.js
+│   │   │   │   ├── required_strings_generated.ts
+│   │   │   │   ├── table-a.d.ts
+│   │   │   │   ├── table-a.js
+│   │   │   │   ├── table-a.ts
+│   │   │   │   ├── test_dir
+│   │   │   │   │   ├── BUILD.bazel
+│   │   │   │   │   ├── import_test.js
+│   │   │   │   │   ├── package.json
+│   │   │   │   │   ├── typescript_include.fbs
+│   │   │   │   │   └── typescript_transitive_include.fbs
+│   │   │   │   ├── tsconfig.json
+│   │   │   │   ├── tsconfig.node.json
+│   │   │   │   ├── typescript
+│   │   │   │   │   ├── class.d.ts
+│   │   │   │   │   ├── class.js
+│   │   │   │   │   ├── class.ts
+│   │   │   │   │   ├── object.d.ts
+│   │   │   │   │   ├── object.js
+│   │   │   │   │   └── object.ts
+│   │   │   │   ├── typescript.d.ts
+│   │   │   │   ├── typescript_include_generated.cjs
+│   │   │   │   ├── typescript_include.ts
+│   │   │   │   ├── typescript.js
+│   │   │   │   ├── typescript_keywords.d.ts
+│   │   │   │   ├── typescript_keywords.fbs
+│   │   │   │   ├── typescript_keywords_generated.cjs
+│   │   │   │   ├── typescript_keywords.js
+│   │   │   │   ├── typescript_keywords.ts
+│   │   │   │   ├── TypeScriptTest.py
+│   │   │   │   ├── typescript_transitive_include_generated.cjs
+│   │   │   │   ├── typescript_transitive_include.ts
+│   │   │   │   ├── typescript.ts
+│   │   │   │   ├── unicode_test.mon
+│   │   │   │   ├── union-underlying-type
+│   │   │   │   │   ├── abc.d.ts
+│   │   │   │   │   ├── abc.js
+│   │   │   │   │   ├── abc.ts
+│   │   │   │   │   ├── a.d.ts
+│   │   │   │   │   ├── a.js
+│   │   │   │   │   ├── a.ts
+│   │   │   │   │   ├── b.d.ts
+│   │   │   │   │   ├── b.js
+│   │   │   │   │   ├── b.ts
+│   │   │   │   │   ├── c.d.ts
+│   │   │   │   │   ├── c.js
+│   │   │   │   │   ├── c.ts
+│   │   │   │   │   ├── d.d.ts
+│   │   │   │   │   ├── d.js
+│   │   │   │   │   └── d.ts
+│   │   │   │   ├── union-underlying-type.d.ts
+│   │   │   │   ├── union-underlying-type.js
+│   │   │   │   ├── union_underlying_type_test.d.ts
+│   │   │   │   ├── union_underlying_type_test.js
+│   │   │   │   ├── union_underlying_type_test.ts
+│   │   │   │   ├── union-underlying-type.ts
+│   │   │   │   └── union_vector
+│   │   │   │       ├── attacker.d.ts
+│   │   │   │       ├── attacker.js
+│   │   │   │       ├── attacker.ts
+│   │   │   │       ├── book-reader.d.ts
+│   │   │   │       ├── book-reader.js
+│   │   │   │       ├── book-reader.ts
+│   │   │   │       ├── character.d.ts
+│   │   │   │       ├── character.js
+│   │   │   │       ├── character.ts
+│   │   │   │       ├── falling-tub.d.ts
+│   │   │   │       ├── falling-tub.js
+│   │   │   │       ├── falling-tub.ts
+│   │   │   │       ├── gadget.d.ts
+│   │   │   │       ├── gadget.js
+│   │   │   │       ├── gadget.ts
+│   │   │   │       ├── hand-fan.d.ts
+│   │   │   │       ├── hand-fan.js
+│   │   │   │       ├── hand-fan.ts
+│   │   │   │       ├── movie.d.ts
+│   │   │   │       ├── movie.js
+│   │   │   │       ├── movie.ts
+│   │   │   │       ├── rapunzel.d.ts
+│   │   │   │       ├── rapunzel.js
+│   │   │   │       ├── rapunzel.ts
+│   │   │   │       ├── union_vector.d.ts
+│   │   │   │       ├── union_vector_generated.cjs
+│   │   │   │       ├── union_vector.js
+│   │   │   │       └── union_vector.ts
+│   │   │   ├── type_field_collsion
+│   │   │   │   └── Collision.cs
+│   │   │   ├── type_field_collsion.fbs
+│   │   │   ├── unicode_test.json
+│   │   │   ├── unicode_test.mon
+│   │   │   ├── union_underlying_type_test.fbs
+│   │   │   ├── union_underlying_type_test_generated.h
+│   │   │   ├── union_value_collision.fbs
+│   │   │   ├── union_value_collsion
+│   │   │   │   └── union_value_collision_generated.cs
+│   │   │   ├── union_vector
+│   │   │   │   ├── Attacker.cs
+│   │   │   │   ├── Attacker.java
+│   │   │   │   ├── Attacker.kt
+│   │   │   │   ├── Attacker.php
+│   │   │   │   ├── AttackerT.java
+│   │   │   │   ├── BookReader.cs
+│   │   │   │   ├── BookReader.java
+│   │   │   │   ├── BookReader.kt
+│   │   │   │   ├── BookReader.php
+│   │   │   │   ├── BookReaderT.java
+│   │   │   │   ├── Character.cs
+│   │   │   │   ├── Character.java
+│   │   │   │   ├── Character.kt
+│   │   │   │   ├── Character.php
+│   │   │   │   ├── CharacterUnion.java
+│   │   │   │   ├── FallingTub.cs
+│   │   │   │   ├── FallingTub.java
+│   │   │   │   ├── FallingTub.kt
+│   │   │   │   ├── FallingTub.php
+│   │   │   │   ├── FallingTubT.java
+│   │   │   │   ├── Gadget.cs
+│   │   │   │   ├── Gadget.java
+│   │   │   │   ├── Gadget.kt
+│   │   │   │   ├── Gadget.php
+│   │   │   │   ├── GadgetUnion.java
+│   │   │   │   ├── HandFan.cs
+│   │   │   │   ├── HandFan.java
+│   │   │   │   ├── HandFan.kt
+│   │   │   │   ├── HandFan.php
+│   │   │   │   ├── HandFanT.java
+│   │   │   │   ├── Movie.cs
+│   │   │   │   ├── Movie.java
+│   │   │   │   ├── Movie.kt
+│   │   │   │   ├── Movie.php
+│   │   │   │   ├── MovieT.java
+│   │   │   │   ├── Rapunzel.cs
+│   │   │   │   ├── Rapunzel.java
+│   │   │   │   ├── Rapunzel.kt
+│   │   │   │   ├── Rapunzel.php
+│   │   │   │   ├── RapunzelT.java
+│   │   │   │   ├── union_vector.fbs
+│   │   │   │   ├── union_vector_generated.h
+│   │   │   │   └── union_vector.json
+│   │   │   ├── util_test.cpp
+│   │   │   ├── util_test.h
+│   │   │   └── vector_has_test.fbs
+│   │   ├── ts
+│   │   │   ├── BUILD.bazel
+│   │   │   ├── builder.ts
+│   │   │   ├── byte-buffer.ts
+│   │   │   ├── compile_flat_file.sh
+│   │   │   ├── constants.ts
+│   │   │   ├── encoding.ts
+│   │   │   ├── flatbuffers.ts
+│   │   │   ├── flexbuffers
+│   │   │   │   ├── bit-width.ts
+│   │   │   │   ├── bit-width-util.ts
+│   │   │   │   ├── builder.ts
+│   │   │   │   ├── flexbuffers-util.ts
+│   │   │   │   ├── reference.ts
+│   │   │   │   ├── reference-util.ts
+│   │   │   │   ├── stack-value.ts
+│   │   │   │   ├── value-type.ts
+│   │   │   │   └── value-type-util.ts
+│   │   │   ├── flexbuffers.ts
+│   │   │   ├── types.ts
+│   │   │   └── utils.ts
+│   │   ├── tsconfig.json
+│   │   ├── tsconfig.mjs.json
+│   │   ├── typescript.bzl
+│   │   └── WORKSPACE
+│   ├── IconFontCppHeaders
+│   │   ├── GenerateIconFontCppHeaders.py
+│   │   ├── IconsFontaudio.cs
+│   │   ├── IconsFontaudio.h
+│   │   ├── IconsFontAwesome4.cs
+│   │   ├── IconsFontAwesome4.h
+│   │   ├── IconsFontAwesome5Brands.cs
+│   │   ├── IconsFontAwesome5Brands.h
+│   │   ├── IconsFontAwesome5.cs
+│   │   ├── IconsFontAwesome5.h
+│   │   ├── IconsFontAwesome5ProBrands.cs
+│   │   ├── IconsFontAwesome5ProBrands.h
+│   │   ├── IconsFontAwesome5Pro.cs
+│   │   ├── IconsFontAwesome5Pro.h
+│   │   ├── IconsFontAwesome6Brands.cs
+│   │   ├── IconsFontAwesome6Brands.h
+│   │   ├── IconsFontAwesome6.cs
+│   │   ├── IconsFontAwesome6.h
+│   │   ├── IconsForkAwesome.cs
+│   │   ├── IconsForkAwesome.h
+│   │   ├── IconsKenney.cs
+│   │   ├── IconsKenney.h
+│   │   ├── IconsMaterialDesign.cs
+│   │   ├── IconsMaterialDesign.h
+│   │   ├── licence.txt
+│   │   └── README.md
+│   ├── imgui
+│   │   ├── backends
+│   │   │   ├── imgui_impl_allegro5.cpp
+│   │   │   ├── imgui_impl_allegro5.h
+│   │   │   ├── imgui_impl_android.cpp
+│   │   │   ├── imgui_impl_android.h
+│   │   │   ├── imgui_impl_dx10.cpp
+│   │   │   ├── imgui_impl_dx10.h
+│   │   │   ├── imgui_impl_dx11.cpp
+│   │   │   ├── imgui_impl_dx11.h
+│   │   │   ├── imgui_impl_dx12.cpp
+│   │   │   ├── imgui_impl_dx12.h
+│   │   │   ├── imgui_impl_dx9.cpp
+│   │   │   ├── imgui_impl_dx9.h
+│   │   │   ├── imgui_impl_glfw.cpp
+│   │   │   ├── imgui_impl_glfw.h
+│   │   │   ├── imgui_impl_glut.cpp
+│   │   │   ├── imgui_impl_glut.h
+│   │   │   ├── imgui_impl_metal.h
+│   │   │   ├── imgui_impl_metal.mm
+│   │   │   ├── imgui_impl_opengl2.cpp
+│   │   │   ├── imgui_impl_opengl2.h
+│   │   │   ├── imgui_impl_opengl3.cpp
+│   │   │   ├── imgui_impl_opengl3.h
+│   │   │   ├── imgui_impl_opengl3_loader.h
+│   │   │   ├── imgui_impl_osx.h
+│   │   │   ├── imgui_impl_osx.mm
+│   │   │   ├── imgui_impl_sdl2.cpp
+│   │   │   ├── imgui_impl_sdl2.h
+│   │   │   ├── imgui_impl_sdl3.cpp
+│   │   │   ├── imgui_impl_sdl3.h
+│   │   │   ├── imgui_impl_sdlrenderer2.cpp
+│   │   │   ├── imgui_impl_sdlrenderer2.h
+│   │   │   ├── imgui_impl_sdlrenderer3.cpp
+│   │   │   ├── imgui_impl_sdlrenderer3.h
+│   │   │   ├── imgui_impl_vulkan.cpp
+│   │   │   ├── imgui_impl_vulkan.h
+│   │   │   ├── imgui_impl_wgpu.cpp
+│   │   │   ├── imgui_impl_wgpu.h
+│   │   │   ├── imgui_impl_win32.cpp
+│   │   │   ├── imgui_impl_win32.h
+│   │   │   └── vulkan
+│   │   │       ├── generate_spv.sh
+│   │   │       ├── glsl_shader.frag
+│   │   │       └── glsl_shader.vert
+│   │   ├── docs
+│   │   │   ├── BACKENDS.md
+│   │   │   ├── CHANGELOG.txt
+│   │   │   ├── CONTRIBUTING.md
+│   │   │   ├── EXAMPLES.md
+│   │   │   ├── FAQ.md
+│   │   │   ├── FONTS.md
+│   │   │   ├── README.md
+│   │   │   └── TODO.txt
+│   │   ├── examples
+│   │   │   ├── example_allegro5
+│   │   │   │   ├── example_allegro5.vcxproj
+│   │   │   │   ├── example_allegro5.vcxproj.filters
+│   │   │   │   ├── imconfig_allegro5.h
+│   │   │   │   ├── main.cpp
+│   │   │   │   └── README.md
+│   │   │   ├── example_android_opengl3
+│   │   │   │   ├── android
+│   │   │   │   │   ├── app
+│   │   │   │   │   │   ├── build.gradle
+│   │   │   │   │   │   └── src
+│   │   │   │   │   │       └── main
+│   │   │   │   │   │           ├── AndroidManifest.xml
+│   │   │   │   │   │           └── java
+│   │   │   │   │   │               └── MainActivity.kt
+│   │   │   │   │   ├── build.gradle
+│   │   │   │   │   └── settings.gradle
+│   │   │   │   ├── CMakeLists.txt
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_apple_metal
+│   │   │   │   ├── example_apple_metal.xcodeproj
+│   │   │   │   │   └── project.pbxproj
+│   │   │   │   ├── iOS
+│   │   │   │   │   ├── Info-iOS.plist
+│   │   │   │   │   └── LaunchScreen.storyboard
+│   │   │   │   ├── macOS
+│   │   │   │   │   ├── Info-macOS.plist
+│   │   │   │   │   └── MainMenu.storyboard
+│   │   │   │   ├── main.mm
+│   │   │   │   └── README.md
+│   │   │   ├── example_apple_opengl2
+│   │   │   │   ├── example_apple_opengl2.xcodeproj
+│   │   │   │   │   └── project.pbxproj
+│   │   │   │   └── main.mm
+│   │   │   ├── example_glfw_metal
+│   │   │   │   ├── main.mm
+│   │   │   │   └── Makefile
+│   │   │   ├── example_glfw_opengl2
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_glfw_opengl2.vcxproj
+│   │   │   │   ├── example_glfw_opengl2.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   └── Makefile
+│   │   │   ├── example_glfw_opengl3
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_glfw_opengl3.vcxproj
+│   │   │   │   ├── example_glfw_opengl3.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   ├── Makefile
+│   │   │   │   └── Makefile.emscripten
+│   │   │   ├── example_glfw_vulkan
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── build_win64.bat
+│   │   │   │   ├── CMakeLists.txt
+│   │   │   │   ├── example_glfw_vulkan.vcxproj
+│   │   │   │   ├── example_glfw_vulkan.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_glfw_wgpu
+│   │   │   │   ├── CMakeLists.txt
+│   │   │   │   ├── main.cpp
+│   │   │   │   ├── Makefile.emscripten
+│   │   │   │   ├── README.md
+│   │   │   │   └── web
+│   │   │   │       └── index.html
+│   │   │   ├── example_glut_opengl2
+│   │   │   │   ├── example_glut_opengl2.vcxproj
+│   │   │   │   ├── example_glut_opengl2.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   └── Makefile
+│   │   │   ├── example_null
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── main.cpp
+│   │   │   │   └── Makefile
+│   │   │   ├── example_sdl2_directx11
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_sdl2_directx11.vcxproj
+│   │   │   │   ├── example_sdl2_directx11.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_sdl2_metal
+│   │   │   │   ├── main.mm
+│   │   │   │   └── Makefile
+│   │   │   ├── example_sdl2_opengl2
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_sdl2_opengl2.vcxproj
+│   │   │   │   ├── example_sdl2_opengl2.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   ├── Makefile
+│   │   │   │   └── README.md
+│   │   │   ├── example_sdl2_opengl3
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_sdl2_opengl3.vcxproj
+│   │   │   │   ├── example_sdl2_opengl3.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   ├── Makefile
+│   │   │   │   ├── Makefile.emscripten
+│   │   │   │   └── README.md
+│   │   │   ├── example_sdl2_sdlrenderer2
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_sdl2_sdlrenderer2.vcxproj
+│   │   │   │   ├── example_sdl2_sdlrenderer2.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   ├── Makefile
+│   │   │   │   └── README.md
+│   │   │   ├── example_sdl2_vulkan
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_sdl2_vulkan.vcxproj
+│   │   │   │   ├── example_sdl2_vulkan.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_sdl3_opengl3
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_sdl3_opengl3.vcxproj
+│   │   │   │   ├── example_sdl3_opengl3.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   ├── Makefile
+│   │   │   │   ├── Makefile.emscripten
+│   │   │   │   └── README.md
+│   │   │   ├── example_sdl3_sdlrenderer3
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_sdl3_sdlrenderer3.vcxproj
+│   │   │   │   ├── example_sdl3_sdlrenderer3.vcxproj.filters
+│   │   │   │   ├── main.cpp
+│   │   │   │   └── Makefile
+│   │   │   ├── example_win32_directx10
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_win32_directx10.vcxproj
+│   │   │   │   ├── example_win32_directx10.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_win32_directx11
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_win32_directx11.vcxproj
+│   │   │   │   ├── example_win32_directx11.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_win32_directx12
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_win32_directx12.vcxproj
+│   │   │   │   ├── example_win32_directx12.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_win32_directx9
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_win32_directx9.vcxproj
+│   │   │   │   ├── example_win32_directx9.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── example_win32_opengl3
+│   │   │   │   ├── build_win32.bat
+│   │   │   │   ├── example_win32_opengl3.vcxproj
+│   │   │   │   ├── example_win32_opengl3.vcxproj.filters
+│   │   │   │   └── main.cpp
+│   │   │   ├── imgui_examples.sln
+│   │   │   ├── libs
+│   │   │   │   ├── emscripten
+│   │   │   │   │   ├── emscripten_mainloop_stub.h
+│   │   │   │   │   └── shell_minimal.html
+│   │   │   │   ├── glfw
+│   │   │   │   │   ├── COPYING.txt
+│   │   │   │   │   ├── include
+│   │   │   │   │   │   └── GLFW
+│   │   │   │   │   │       ├── glfw3.h
+│   │   │   │   │   │       └── glfw3native.h
+│   │   │   │   │   ├── lib-vc2010-32
+│   │   │   │   │   │   └── glfw3.lib
+│   │   │   │   │   └── lib-vc2010-64
+│   │   │   │   │       └── glfw3.lib
+│   │   │   │   └── usynergy
+│   │   │   │       ├── README.txt
+│   │   │   │       ├── uSynergy.c
+│   │   │   │       └── uSynergy.h
+│   │   │   └── README.txt
+│   │   ├── imconfig.h
+│   │   ├── imgui.cpp
+│   │   ├── imgui_demo.cpp
+│   │   ├── imgui_draw.cpp
+│   │   ├── imgui.h
+│   │   ├── imgui_internal.h
+│   │   ├── imgui_tables.cpp
+│   │   ├── imgui_widgets.cpp
+│   │   ├── imstb_rectpack.h
+│   │   ├── imstb_textedit.h
+│   │   ├── imstb_truetype.h
+│   │   ├── LICENSE.txt
+│   │   └── misc
+│   │       ├── cpp
+│   │       │   ├── imgui_stdlib.cpp
+│   │       │   ├── imgui_stdlib.h
+│   │       │   └── README.txt
+│   │       ├── debuggers
+│   │       │   ├── imgui.gdb
+│   │       │   ├── imgui.natstepfilter
+│   │       │   ├── imgui.natvis
+│   │       │   └── README.txt
+│   │       ├── fonts
+│   │       │   ├── binary_to_compressed_c.cpp
+│   │       │   ├── Cousine-Regular.ttf
+│   │       │   ├── DroidSans.ttf
+│   │       │   ├── Karla-Regular.ttf
+│   │       │   ├── ProggyClean.ttf
+│   │       │   ├── ProggyTiny.ttf
+│   │       │   └── Roboto-Medium.ttf
+│   │       ├── freetype
+│   │       │   ├── imgui_freetype.cpp
+│   │       │   ├── imgui_freetype.h
+│   │       │   └── README.md
+│   │       ├── README.txt
+│   │       └── single_file
+│   │           └── imgui_single_file.h
+│   ├── imgui-filebrowser
+│   │   ├── imfilebrowser.h
+│   │   ├── LICENSE
+│   │   ├── README.md
+│   │   └── screenshots
+│   │       └── 0.png
+│   ├── ImGuiFileDialog
+│   │   ├── CMakeLists.txt
+│   │   ├── dirent
+│   │   │   ├── ChangeLog
+│   │   │   ├── dirent.h
+│   │   │   ├── LICENSE
+│   │   │   └── README.md
+│   │   ├── Documentation.md
+│   │   ├── ImGuiFileDialogConfig.h
+│   │   ├── ImGuiFileDialog.cpp
+│   │   ├── ImGuiFileDialog.h
+│   │   ├── LICENSE
+│   │   ├── README.md
+│   │   └── stb
+│   │       ├── LICENSE
+│   │       ├── README.md
+│   │       ├── stb_image.h
+│   │       └── stb_image_resize2.h
+│   ├── implot
+│   │   ├── implot.cpp
+│   │   ├── implot_demo.cpp
+│   │   ├── implot.h
+│   │   ├── implot_internal.h
+│   │   ├── implot_items.cpp
+│   │   ├── LICENSE
+│   │   ├── README.md
+│   │   └── TODO.md
+│   └── NvEncoder
+│       ├── include
+│       │   ├── cuviddec.h
+│       │   ├── nvcuvid.h
+│       │   └── nvEncodeAPI.h
+│       └── NvEncoderCLIOptions.h
+└── tree.txt
+
+420 directories, 2145 files

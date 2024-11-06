@@ -243,10 +243,10 @@ int main(int argc, char **args)
                     encoder_config->encoder_setup= "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                     make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_config->encoder_basic_setup);
+                    host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_config->encoder_setup);
                     camera_control->record_video = true;
 
-                    std::string encoder_setup_for_recording = encoder_config->encoder_basic_setup + std::to_string(cameras_params[0].frame_rate);
+                    std::string encoder_setup_for_recording = encoder_config->encoder_setup + std::to_string(cameras_params[0].frame_rate);
                     
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
@@ -855,7 +855,7 @@ int main(int argc, char **args)
                         }
 
                         // frame rate are the same
-                        std::string encoder_setup_for_recording = encoder_config->encoder_basic_setup + std::to_string(cameras_params[0].frame_rate);
+                        std::string encoder_setup_for_recording = encoder_config->encoder_setup + std::to_string(cameras_params[0].frame_rate);
 
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++)

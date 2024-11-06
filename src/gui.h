@@ -7,11 +7,10 @@
 #include "acquire_frames.h"
 
 struct EncoderConfig {
-    std::string encoder_basic_setup;
+    std::string encoder_setup;
     std::string encoder_codec; 
     std::string encoder_preset;
     std::string folder_name;
-    std::string encoder_setup;
 }; 
 
 struct GL_Texture {

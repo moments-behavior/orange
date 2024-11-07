@@ -116,6 +116,7 @@ g++ -std=c++17 $COMPILER_FLAGS targets/kernel.o targets/imgui*.o targets/implot*
     src/threadworker.cpp \
     src/gpu_video_encoder.cpp \
     src/yolov8_det.cpp \
+    src/fs_utils.cpp \
     $FILEBROWSER_DIR/ImGuiFileDialog.cpp \
     src/NvEncoder/*.cpp \
     $COMMON_INCLUDES $LIBS \

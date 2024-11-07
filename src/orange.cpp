@@ -1,21 +1,58 @@
-#include "video_capture.h"
+// Standard C++ headers
 #include <iostream>
 #include <filesystem>
-#include "camera.h"
+#include <pwd.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+// Third-party library headers
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
 #include <ImGuiFileDialog.h>
+
+// NVIDIA specific headers
+#include "NvEncoder/NvCodecUtils.h"
+
+// Project-specific headers
+#include "video_capture.h"
+#include "camera.h"
 #include "project.h"
 #include "gui.h"
-#include <sys/stat.h>
-#include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "enet_thread.h"
 #include "encoder_config.h"
+#include "fs_utils.hpp"
 
+// Add this state structure
+struct EncoderErrorState {
+    bool show_error_popup = false;
+    std::string error_message;
+};
+
+EncoderErrorState encoder_error_state;
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
+
+void render_encoder_popup() {
+    if (encoder_error_state.show_error_popup) {
+        ImGui::OpenPopup("Encoder Error");
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+        if (ImGui::BeginPopupModal("Encoder Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("Invalid compression selected. Use HEVC instead.");
+            ImGui::Separator();
+
+            if (ImGui::Button("OK", ImVec2(120, 0))) {
+                encoder_error_state.show_error_popup = false;  
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
+}
 
 int main(int argc, char **args)
 {
@@ -35,18 +72,6 @@ int main(int argc, char **args)
     cam_count = scan_cameras(max_cameras, unsorted_device_info);
     GigEVisionDeviceInfo device_info[max_cameras];
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
-
-    std::filesystem::path cwd = std::filesystem::current_path();
-    std::string delimiter = "/";
-    std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
-    std::string orange_root_dir_str = "/home/" + tokenized_path[2] + "/orange_data";
-    prepare_application_folders(orange_root_dir_str);
-    std::string input_folder = orange_root_dir_str + "/exp/unsorted";
-    
-    std::string home_directory = "/home/" + tokenized_path[2];
-    std::string yolo_model_folder = orange_root_dir_str + "/detect";
-    std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
-    std::string picture_save_folder = orange_root_dir_str + "/pictures";
 
     bool check[cam_count] {0};
     CameraParams *cameras_params;
@@ -89,33 +114,63 @@ int main(int argc, char **args)
         .server = &server,
         .indigo_connection = NULL};
 
-    // Network config initialization
-    std::vector<std::string> network_config_folders;
-    std::string network_start_folder_name = home_directory + "/config/network";
-    std::string default_network_config = network_start_folder_name + "/default";
+// Initialize paths and user info
+    std::filesystem::path cwd = std::filesystem::current_path();
+    std::string delimiter = "/";
+    std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
+    std::string username = tokenized_path[2];
+    std::string orange_root_dir_str = "/home/" + username + "/orange_data";
 
-    // Create default network subdirectory if it doesn't exist
-    if (!std::filesystem::exists(default_network_config)) {
-        try {
-            std::filesystem::create_directories(default_network_config);
-            std::cout << "Created default network config directory" << std::endl;
-        } catch (const std::filesystem::filesystem_error& e) {
-            std::cerr << "Error creating default network directory: " << e.what() << std::endl;
+    // Get user and group IDs
+    uid_t uid;
+    gid_t gid;
+    if (!fs_utils::get_user_ids(username, uid, gid)) {
+        return 1;
+    }
+
+    // Create directory structure
+    std::vector<std::string> required_dirs = {
+        orange_root_dir_str,
+        orange_root_dir_str + "/exp/unsorted",
+        orange_root_dir_str + "/detect",
+        orange_root_dir_str + "/pictures",
+        orange_root_dir_str + "/config/network",
+        orange_root_dir_str + "/config/local"
+    };
+
+    for (const auto& dir : required_dirs) {
+        if (!fs_utils::create_dir_with_ownership(dir, uid, gid)) {
+            std::cerr << "Failed to create/setup directory: " << dir << std::endl;
         }
     }
+
+    // Initialize paths for use throughout the program
+    std::string input_folder = orange_root_dir_str + "/exp/unsorted";
+    std::string yolo_model_folder = orange_root_dir_str + "/detect";
+    std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
+    std::string picture_save_folder = orange_root_dir_str + "/pictures";
+
+    // Network config initialization
+    std::vector<std::string> network_config_folders;
+    std::string network_start_folder_name = orange_root_dir_str + "/config/network";
+    std::string default_network_config = network_start_folder_name + "/default";
+
+    // Create and ensure ownership of default network config directory
+    fs_utils::create_dir_with_ownership(default_network_config, uid, gid);
 
     // Safely populate network configs
     try {
         for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
             if (std::filesystem::is_directory(entry)) {
                 network_config_folders.push_back(entry.path().string());
+                // Ensure ownership of existing config directories
+                fs_utils::set_recursive_ownership(entry.path().string(), uid, gid);
             }
         }
     } catch (const std::filesystem::filesystem_error& e) {
         std::cerr << "Error reading network config directory: " << e.what() << std::endl;
     }
 
-    // Ensure we have at least one config directory
     if (network_config_folders.empty()) {
         network_config_folders.push_back(default_network_config);
     }
@@ -123,36 +178,30 @@ int main(int argc, char **args)
 
     // Local config initialization
     std::vector<std::string> local_config_folders;
-    std::string local_start_folder_name = home_directory + "/config/local";
+    std::string local_start_folder_name = orange_root_dir_str + "/config/local";
     std::string default_local_config = local_start_folder_name + "/default";
 
-    // Create default local subdirectory if it doesn't exist
-    if (!std::filesystem::exists(default_local_config)) {
-        try {
-            std::filesystem::create_directories(default_local_config);
-            std::cout << "Created default local config directory" << std::endl;
-        } catch (const std::filesystem::filesystem_error& e) {
-            std::cerr << "Error creating default local directory: " << e.what() << std::endl;
-        }
-    }
+    // Create and ensure ownership of default local config directory
+    fs_utils::create_dir_with_ownership(default_local_config, uid, gid);
 
     // Safely populate local configs
     try {
         for (const auto & entry : std::filesystem::directory_iterator(local_start_folder_name)) {
             if (std::filesystem::is_directory(entry)) {
                 local_config_folders.push_back(entry.path().string());
+                // Ensure ownership of existing config directories
+                fs_utils::set_recursive_ownership(entry.path().string(), uid, gid);
             }
         }
     } catch (const std::filesystem::filesystem_error& e) {
         std::cerr << "Error reading local config directory: " << e.what() << std::endl;
     }
 
-    // Ensure we have at least one local config directory
     if (local_config_folders.empty()) {
         local_config_folders.push_back(default_local_config);
     }
-
     int local_config_select = 0;
+
     bool select_all_cameras = false;
     char* subfix_buf = (char*)malloc(64);
     *subfix_buf = '\0';

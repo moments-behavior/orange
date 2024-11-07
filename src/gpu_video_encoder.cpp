@@ -7,6 +7,9 @@
 #include "gpu_video_encoder.h"
 #include <cuda_runtime_api.h>
 
+// Maximum practical dimensions supported by H.264
+const int H264_MAX_DIMENSION = 2048;
+
 template <class EncoderClass>
 void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, NV_ENC_BUFFER_FORMAT eFormat)
 {
@@ -293,4 +296,23 @@ bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width
         return true;
     }
     return false;
+}
+
+bool is_h264_codec(const std::string& encoder_str) {
+    return encoder_str.find("h264") != std::string::npos;
+}
+
+bool validate_encoder_parameters(CameraParams* camera_params, const std::string& encoder_str) {
+    // Only validate H.264
+    if (!is_h264_codec(encoder_str)) {
+        return true;
+    }
+
+    // Check if dimensions exceed H.264 limits
+    if (camera_params->width > H264_MAX_DIMENSION || 
+        camera_params->height > H264_MAX_DIMENSION) {
+        return false;
+    }
+
+    return true;
 }

@@ -55,7 +55,7 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
         }
 
         if (detection_data->marker3d.new_detection && indigo_signal_builder->indigo_connection != NULL) {
-            std::cout << "send aruco marker signal" << std::endl;
+            // std::cout << "send aruco marker signal" << std::endl;
             send_indigo_aruco_signal(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, &detection_data->marker3d);
             detection_data->marker3d.new_detection = false;
         }

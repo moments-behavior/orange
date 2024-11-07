@@ -586,7 +586,7 @@ int main(int argc, char **args)
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
+                                cameras_select[i].yolo = false;
                             }
                         }
                         
@@ -754,7 +754,6 @@ int main(int argc, char **args)
                             create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
                         }
                     }
-
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                         evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
                         &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);                   

@@ -251,5 +251,8 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
                 sync_detection->m_cond.notify_all();
             }
         }
+        
+        // sleep longer since don't need to update too often
+        usleep(1000);
     }
 }

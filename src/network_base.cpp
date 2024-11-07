@@ -141,7 +141,7 @@ void send_indigo_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers
 void send_indigo_aruco_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *indigo_connection, Aruco3d* marker3d) 
 {
     builder->Clear();
-
+    // std::cout << marker3d->t_vec.x << ", " << marker3d->t_vec.y << std::endl;
     auto position_aruco = FetchGame::Vec3(marker3d->t_vec.x, marker3d->t_vec.y, marker3d->t_vec.z);
     float orientation_aruco = marker3d->angle_x_axis;
     auto aruco_fb = FetchGame::CreateRigidObject(*builder, &position_aruco, orientation_aruco);

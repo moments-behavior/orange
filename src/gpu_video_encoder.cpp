@@ -23,11 +23,11 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
     pEnc->CreateEncoder(&initializeParams);
 }
 
-static inline void initialize_encoder(EncoderContext *encoder, std::string encoder_str, CameraParams *camera_params)
-{
+static inline void initialize_encoder(EncoderContext* encoder, std::string encoder_str, const CameraParams* camera_params) {
+    
     try {
         std::cout << "Initializing encoder with setup string: " << encoder_str << std::endl;
-        
+           
         // Parse the encoder string to verify codec
         size_t codec_pos = encoder_str.find("-codec");
         if (codec_pos != std::string::npos) {
@@ -122,8 +122,7 @@ static inline void write_meatadata(std::ofstream *metadata, unsigned long long f
 }
 
 
-static inline void initialize_writer(Writer *writer, CameraParams *camera_params, std::string folder_name, std::string encoder_str)
-{
+static inline void initialize_writer(Writer* writer, const CameraParams* camera_params, std::string folder_name, std::string encoder_str) {
     // writer->video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
     // writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
     writer->video_file = folder_name + "/Cam" + camera_params->camera_serial + ".mp4";
@@ -182,13 +181,21 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
 }
 
 
-GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name, bool* encoder_ready_signal)
-    : CThreadWorker(name), camera_params(camera_params), display_buffer(display_buffer), encoder_setup(encoder_setup), folder_name(folder_name), encoder_ready_signal(encoder_ready_signal)
+GPUVideoEncoder::GPUVideoEncoder(const char* name, 
+                               const CameraParams* camera_params,  // Made const
+                               std::string encoder_setup, 
+                               std::string folder_name, 
+                               bool* encoder_ready_signal)
+    : CThreadWorker(name), 
+      camera_params(camera_params), 
+      display_buffer(display_buffer),
+      encoder_setup(encoder_setup), 
+      folder_name(folder_name), 
+      encoder_ready_signal(encoder_ready_signal)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = ENCODER_ENTRIES_MAX;
-    for (int i = 0; i < workerEntriesFreeQueueCount; i++)
-    {
+    for (int i = 0; i < workerEntriesFreeQueueCount; i++) {
         workerEntriesFreeQueue[i] = &workerEntries[i];
     }
 }

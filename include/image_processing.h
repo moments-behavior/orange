@@ -4,6 +4,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include <nppi.h>
 #include "video_capture.h"
+#include "camera_params.h"
 
 typedef struct {
 	void* imagePtr; // source image buffer
@@ -38,23 +39,19 @@ struct Debayer
     NppiBayerGridPosition grid;
 };
 
-static inline void initialize_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
-{
+static inline void initialize_cpu_frame(FrameCPU* cpu_buffer, const CameraParams* camera_params) {
     int size_pic = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
-    cpu_buffer->frame = (unsigned char *)malloc(size_pic);
+    cpu_buffer->frame = (unsigned char*)malloc(size_pic);
 }
 
-static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *camera_params)
-{
+static inline void initalize_gpu_frame(FrameGPU* frame_original, const CameraParams* camera_params) {
     frame_original->size_pic = camera_params->width * camera_params->height * 1 * sizeof(unsigned char);
-    ck(cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic));
+    ck(cudaMalloc((void**)&frame_original->d_orig, frame_original->size_pic));
 }
-
-static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params)
-{
+static inline void initialize_gpu_debayer(Debayer* debayer, const CameraParams* camera_params) {
     int output_channels = 4;
     int size_pic = camera_params->width * camera_params->height * sizeof(unsigned char) * output_channels;
-    cudaMalloc((void **)&debayer->d_debayer, size_pic);
+    cudaMalloc((void**)&debayer->d_debayer, size_pic);
     cudaMemset(debayer->d_debayer, 0xFF, size_pic);
 
     debayer->size.width = camera_params->width;
@@ -74,8 +71,7 @@ static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera
     }
 }
 
-static inline void debayer_frame_gpu(CameraParams *camera_params, FrameGPU *frame_original, Debayer *debayer)
-{
+static inline void debayer_frame_gpu(const CameraParams* camera_params, FrameGPU* frame_original, Debayer* debayer) {
     const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(frame_original->d_orig,
                                                          camera_params->width * sizeof(unsigned char),
                                                          debayer->size,
@@ -85,15 +81,12 @@ static inline void debayer_frame_gpu(CameraParams *camera_params, FrameGPU *fram
                                                          debayer->grid,
                                                          NPPI_INTER_UNDEFINED,
                                                          debayer->nAlpha);
-    if (npp_result != 0)
-    {
-        std::cout << "\nNPP error %d \n"
-                  << npp_result << std::endl;
+    if (npp_result != 0) {
+        std::cout << "\nNPP error " << npp_result << std::endl;
     }
 }
 
-static inline void duplicate_channel_gpu(CameraParams *camera_params, FrameGPU *frame_original, Debayer *debayer)
-{
+static inline void duplicate_channel_gpu(const CameraParams* camera_params, FrameGPU* frame_original, Debayer* debayer) {
     const NppStatus npp_result = nppiDup_8u_C1AC4R(
         frame_original->d_orig,
         camera_params->width * sizeof(unsigned char),
@@ -101,12 +94,9 @@ static inline void duplicate_channel_gpu(CameraParams *camera_params, FrameGPU *
         camera_params->width * sizeof(uchar4),
         debayer->size);
 
-    if (npp_result != 0)
-    {
-        std::cout << "\nNPP error %d \n"
-                  << npp_result << std::endl;
+    if (npp_result != 0) {
+        std::cout << "\nNPP error " << npp_result << std::endl;
     }
 }
-
 
 #endif

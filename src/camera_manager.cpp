@@ -1,136 +1,221 @@
-#include "camera_manager.h"
+#pragma once
 
-// Get current date/time, format is YYYY-MM-DD.HH:mm:ss
-const std::string current_date_time() {
-    time_t     now = time(0);
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&now);
-    strftime(buf, sizeof(buf), "%Y-%m-%d_%X", &tstruct);
-    return buf;
-}
+#include <vector>
+#include <memory>
+#include <string>
+#include "emergent_camera.h"
+#include "frame_streaming.h"
+#include "gpu_streaming.h"
+#include "camera_params.h"  
+#include "camera.h"         // For GigEVisionDeviceInfo
 
+namespace evt {
 
-void start_one_camera(CameraParams camera_params, GigEVisionDeviceInfo* device_info, int* key_num_ptr, string folder_name, PTPParams* ptp_params)
-{
-    int buffer_size {100};
-    Emergent::CEmergentCamera camera;
-    Emergent::CEmergentFrame evt_frame[buffer_size]; 
-    
-    string encoder_setup = "-preset p1 -fps " + to_string(camera_params.frame_rate);
-    const char *encoder_str = encoder_setup.c_str();
+class CameraManager {
+public:
+    // Structure to hold camera instance and its associated objects
+    struct CameraInstance {
+        std::unique_ptr<EmergentCamera> camera;
+        std::unique_ptr<GPUStreaming> gpu_stream;
+        GPUStreaming::StreamingConfig config;
+        CameraParams params;
+        bool is_streaming{false};
+        bool is_recording{false};
+    };
 
-    // determine which gpu to use
-    int gpu_idx = 0;
-    const char* nic_ip = device_info->nic.ip4Address;    
-    if(strcmp("192.168.2.20", nic_ip) == 0)
-    {
-        gpu_idx = 1;
-    }
+    CameraManager() = default;
+    ~CameraManager() = default;
 
-    try{        
-        char* camera_ip = device_info->currentIp;
-        string file_name = folder_name + "/Cam" + std::to_string(camera_params.camera_id) + ".mp4"; 
-        const char *output_file= file_name.c_str();
-
-        open_camera_with_params(&camera, device_info, camera_params); 
-
-        // sync 
-        ptp_camera_sync(&camera);
-
-        allocate_frame_buffer(&camera, evt_frame, camera_params, buffer_size);
-        Emergent::CEmergentFrame frame_recv;
-        set_frame_buffer(&frame_recv, camera_params);
-
-        aquire_frames_gpu_encode(&camera, &frame_recv, camera_params, output_file, encoder_str, gpu_idx, key_num_ptr, ptp_params, folder_name);
-        destroy_frame_buffer(&camera, evt_frame, buffer_size);
-        close_camera(&camera);
-    }
-    catch(int &ex)
-    {
-        printf("\nError...camera_id: %d", camera_params.camera_id);
-        destroy_frame_buffer(&camera, evt_frame, buffer_size);
-        close_camera(&camera);
-    }
-}
-
-
-void camera_manager() 
-{
-    short max_cameras {10};
-    GigEVisionDeviceInfo device_info[max_cameras];
-    GigEVisionDeviceInfo ordered_device_info[max_cameras];
-
-    int num_cameras = 1;
-
-    int cam_count;
-    cam_count = check_cameras(max_cameras, device_info, ordered_device_info);
-    if (cam_count < num_cameras) 
-    {
-        printf("Missing cameras...Exit\n");
-        // return 0;
-        exit(1);
-    }
-
-    // popular change to camera settings 
-    unsigned int width {3208}; 
-    unsigned int height {2200};
-    unsigned int frame_rate {60};
-    unsigned int gain {1000}; 
-    unsigned int exposure {4000};
-    string pixel_format = "BayerRG8"; 
-    string color_temp = "CT_2800K";
-
-    std::vector<thread> camera_threads;
-
-    // esc to exit 
-    int key_num;
-    int* key_num_ptr = &key_num;  
-
-
-    string folder_string = current_date_time();
-    string folder_name = "/home/jinyao/Videos/dev/" + folder_string;
-    // string folder_name = "/mnt/md129/videos/" + folder_string;
-    
-    // Creating a directory to save recorded video;
-    if (mkdir(folder_name.c_str(), 0777) == -1)
-    {
-        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
-        // return 0;
-        exit(1);
-    }
-    else
-        std::cout << "Recorded video saves to : " << folder_name << std::endl;
-
-
-    PTPParams* ptp_params = new PTPParams{0, 0};
-    int camera_orders[] = {0, 1, 3, 5, 2, 4, 6};  
-    //int camera_orders[] = {0, 2};
-    
-    
-    int camera_id {0};
-    for(int i = 0; i < num_cameras; i++)
-    {
-        camera_id = camera_orders[i];
-        CameraParams camera_params = create_camera_params(width, height, frame_rate, gain, exposure, pixel_format, color_temp, camera_id, num_cameras);
-        // camera_threads.push_back(std::thread(&start_one_camera, camera_params, &ordered_device_info[camera_id], key_num_ptr, folder_name, ptp_params));
-        camera_threads.push_back(std::thread(&start_one_camera, camera_params, &device_info[camera_id], key_num_ptr, folder_name, ptp_params));
-    }
-
-    // main thread event loop
-    while (true){
-        key_num = getchar();
-        if(key_num == 27)
-            {
-                std::cout << "ESC pressed. Quit program." << std::endl;
-                break;
+    // Initialize cameras based on selected devices
+    void initializeCameras(const std::vector<bool>& selected_cameras,
+                          const std::vector<GigEVisionDeviceInfo>& device_info,
+                          const std::vector<std::string>& config_files) {
+        cameras.clear();
+        
+        for (size_t i = 0; i < selected_cameras.size(); ++i) {
+            if (selected_cameras[i]) {
+                CameraInstance instance;
+                
+                // Create new camera with default parameters
+                instance.params = CameraParams{}; // Initialize with defaults
+                instance.camera = std::make_unique<EmergentCamera>(instance.params);
+                
+                // Load configuration if available
+                if (i < config_files.size()) {
+                    loadCameraConfig(instance, config_files[i], device_info[i]);
+                }
+                
+                // Store camera instance
+                cameras.push_back(std::move(instance));
             }
+        }
     }
 
-    // wait for threads to join
-    for (auto& t : camera_threads)
-            t.join();
-    
+    // Start/stop streaming for specific camera
+    void startStreaming(size_t camera_idx, bool enable_gpu = false) {
+        if (camera_idx >= cameras.size()) return;
+        
+        auto& instance = cameras[camera_idx];
+        if (instance.is_streaming) return;
 
-    std::cout << folder_name << std::endl;
-}
+        try {
+            // Open the camera if not already open
+            if (!instance.camera->isOpen()) {
+                instance.camera->open(nullptr); // You'll need to pass proper device info here
+            }
+
+            if (enable_gpu) {
+                // Configure GPU streaming
+                instance.config.enable_gpu_direct = true;
+                instance.config.gpu_device_id = 0; // Would come from settings
+                instance.gpu_stream = std::make_unique<GPUStreaming>(
+                    *instance.camera,
+                    instance.config
+                );
+                
+                // Start GPU streaming
+                instance.gpu_stream->startStreaming([](const void* data, 
+                                                   size_t size,
+                                                   int width, 
+                                                   int height,
+                                                   uint64_t timestamp) {
+                    // Frame callback - integrate with GUI display
+                });
+            }
+            
+            instance.is_streaming = true;
+        }
+        catch (const CameraException& e) {
+            std::cerr << "Failed to start streaming: " << e.what() << std::endl;
+            throw;
+        }
+    }
+
+    void stopStreaming(size_t camera_idx) {
+        if (camera_idx >= cameras.size()) return;
+        
+        auto& instance = cameras[camera_idx];
+        if (!instance.is_streaming) return;
+
+        try {
+            if (instance.gpu_stream) {
+                instance.gpu_stream->stopStreaming();
+            }
+            
+            instance.is_streaming = false;
+        }
+        catch (const CameraException& e) {
+            std::cerr << "Error stopping stream: " << e.what() << std::endl;
+            throw;
+        }
+    }
+
+    // Start/stop recording
+    void startRecording(const std::string& output_folder,
+                       const std::string& encoder_setup) {
+        if (recording_active) return;
+        
+        try {
+            for (auto& instance : cameras) {
+                if (instance.is_streaming) {
+                    // Configure recording
+                    instance.config.enable_encoding = true;
+                    instance.config.output_folder = output_folder;
+                    instance.config.encoder_setup = encoder_setup;
+                    
+                    // Restart streaming with recording enabled
+                    if (instance.gpu_stream) {
+                        instance.gpu_stream->stopStreaming();
+                        setupGPUStreaming(instance, output_folder, encoder_setup);
+                        instance.gpu_stream->startStreaming([](const void* data, 
+                                                           size_t size,
+                                                           int width, 
+                                                           int height,
+                                                           uint64_t timestamp) {
+                            // Frame callback for recording
+                        });
+                    }
+                }
+            }
+            
+            recording_active = true;
+        }
+        catch (const CameraException& e) {
+            std::cerr << "Failed to start recording: " << e.what() << std::endl;
+            throw;
+        }
+    }
+
+    void stopRecording() {
+        if (!recording_active) return;
+        
+        try {
+            for (auto& instance : cameras) {
+                if (instance.is_streaming && instance.gpu_stream) {
+                    // Restart streaming without recording
+                    instance.gpu_stream->stopStreaming();
+                    instance.config.enable_encoding = false;
+                    setupGPUStreaming(instance, "", "");
+                    instance.gpu_stream->startStreaming([](const void* data, 
+                                                       size_t size,
+                                                       int width, 
+                                                       int height,
+                                                       uint64_t timestamp) {
+                        // Frame callback for display only
+                    });
+                }
+            }
+            
+            recording_active = false;
+        }
+        catch (const CameraException& e) {
+            std::cerr << "Error stopping recording: " << e.what() << std::endl;
+            throw;
+        }
+    }
+
+    // Camera control methods
+    void updateExposure(size_t camera_idx, int exposure) {
+        if (camera_idx >= cameras.size()) return;
+        cameras[camera_idx].camera->updateExposure(exposure);
+    }
+
+    void updateGain(size_t camera_idx, int gain) {
+        if (camera_idx >= cameras.size()) return;
+        cameras[camera_idx].camera->updateGain(gain);
+    }
+
+    void updateFrameRate(size_t camera_idx, int frame_rate) {
+        if (camera_idx >= cameras.size()) return;
+        cameras[camera_idx].camera->updateFrameRate(frame_rate);
+    }
+
+    // Status queries
+    size_t getCameraCount() const { return cameras.size(); }
+    bool isStreaming(size_t camera_idx) const { 
+        return camera_idx < cameras.size() && cameras[camera_idx].is_streaming;
+    }
+    bool isRecording() const { return recording_active; }
+    
+    // Access to camera instances for GUI
+    const CameraInstance& getCamera(size_t idx) const { return cameras[idx]; }
+    CameraInstance& getCamera(size_t idx) { return cameras[idx]; }
+
+private:
+    std::vector<CameraInstance> cameras;
+    bool recording_active{false};
+    
+    void loadCameraConfig(CameraInstance& instance, 
+                         const std::string& config_file,
+                         const GigEVisionDeviceInfo& device_info) {
+        // TODO: Implement configuration loading
+    }
+
+    void setupGPUStreaming(CameraInstance& instance,
+                          const std::string& output_folder,
+                          const std::string& encoder_setup) {
+        // TODO: Implement GPU streaming setup
+    }
+};
+
+} // namespace evt

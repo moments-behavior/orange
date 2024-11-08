@@ -3,8 +3,48 @@
 #include <unistd.h>
 #include <iostream>
 #include <sys/stat.h>
+#include <vector>
 
 namespace fs_utils {
+
+bool initialize_directories() {
+    try {
+        std::vector<std::string> required_dirs = {
+            "recordings",
+            "config",
+            "config/local",
+            "config/network",
+            "exp",
+            "exp/unsorted",
+            "detect",
+            "pictures"
+        };
+
+        // Get current working directory or specify base directory
+        std::filesystem::path base_dir = std::filesystem::current_path();
+        
+        // Create each required directory
+        for (const auto& dir : required_dirs) {
+            std::filesystem::path dir_path = base_dir / dir;
+            if (!std::filesystem::exists(dir_path)) {
+                if (std::filesystem::create_directories(dir_path)) {
+                    std::cout << "Created directory: " << dir_path << std::endl;
+                } else {
+                    std::cerr << "Failed to create directory: " << dir_path << std::endl;
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Filesystem error: " << e.what() << std::endl;
+        return false;
+    } catch (const std::exception& e) {
+        std::cerr << "Error initializing directories: " << e.what() << std::endl;
+        return false;
+    }
+}
 
 bool get_user_ids(const std::string& username, uid_t& uid, gid_t& gid) {
     struct passwd *pw = getpwnam(username.c_str());

@@ -7,6 +7,8 @@
 
 namespace fs_utils {
 
+bool initialize_directories();
+
 // Standard permission constants
 constexpr mode_t DIR_PERMS = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;  // 755
 constexpr mode_t FILE_PERMS = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;           // 644

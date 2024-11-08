@@ -44,8 +44,10 @@ COMMON_INCLUDES="\
 -I$CUDA_ROOT/include \
 -I$TENSORRT_ROOT/include \
 -I./include \
+-I./include/gui \
 -I./src \
 -I./src/NvEncoder \
+-I./src/gui \
 -I$IMGUI_DIR \
 -I$IMGUI_DIR/backends \
 -I$IMPLOT_DIR \
@@ -68,7 +70,7 @@ $(pkg-config --libs opencv4) \
 -lGLEW -lGL -lglfw -lenet -lpthread -lm"
 
 # Build type selection
-BUILD_TYPE=${1:-debug}  # Default to debug build if no argument provided
+BUILD_TYPE=${1:-debug}
 if [ "$BUILD_TYPE" = "release" ]; then
     echo -e "${BLUE}Building in Release mode...${NC}"
     COMPILER_FLAGS="-O3"
@@ -81,34 +83,60 @@ fi
 echo -e "${BLUE}Building Orange...${NC}"
 
 # 1. CUDA kernel with debug info
-echo -e "${GREEN}Compiling CUDA kernel...${NC}"
+echo -e "${BLUE}Compiling CUDA kernel...${NC}"
 nvcc -G -g -O0 -c src/kernel.cu -arch=sm_86 -o targets/kernel.o \
     -I./include -I./src || error_exit "CUDA kernel compilation failed"
 
 # 2. ImGui and dependencies
-# echo -e "${GREEN}Compiling ImGui and dependencies...${NC}"
-# for src in \
-#     "$IMGUI_DIR/imgui.cpp" \
-#     "$IMGUI_DIR/imgui_demo.cpp" \
-#     "$IMGUI_DIR/imgui_draw.cpp" \
-#     "$IMGUI_DIR/imgui_tables.cpp" \
-#     "$IMGUI_DIR/imgui_widgets.cpp" \
-#     "$IMGUI_DIR/backends/imgui_impl_glfw.cpp" \
-#     "$IMGUI_DIR/backends/imgui_impl_opengl3.cpp" \
-#     "$IMPLOT_DIR/implot.cpp" \
-#     "$IMPLOT_DIR/implot_items.cpp"; do
-#     echo -e "${BLUE}Compiling $(basename $src)...${NC}"
-#     g++ -std=c++17 $COMPILER_FLAGS -fPIC -c "$src" -o "targets/$(basename ${src%.cpp}).o" $COMMON_INCLUDES || \
-#         error_exit "Failed to compile $src"
-# done
+echo -e "${BLUE}Compiling ImGui and dependencies...${NC}"
+for src in \
+    "$IMGUI_DIR/imgui.cpp" \
+    "$IMGUI_DIR/imgui_demo.cpp" \
+    "$IMGUI_DIR/imgui_draw.cpp" \
+    "$IMGUI_DIR/imgui_tables.cpp" \
+    "$IMGUI_DIR/imgui_widgets.cpp" \
+    "$IMGUI_DIR/backends/imgui_impl_glfw.cpp" \
+    "$IMGUI_DIR/backends/imgui_impl_opengl3.cpp" \
+    "$IMPLOT_DIR/implot.cpp" \
+    "$IMPLOT_DIR/implot_items.cpp"; do
+    echo -e "${BLUE}Compiling $(basename $src)...${NC}"
+    g++ -std=c++17 $COMPILER_FLAGS -fPIC -c "$src" -o "targets/$(basename ${src%.cpp}).o" $COMMON_INCLUDES || \
+        error_exit "Failed to compile $src"
+done
 
-# 3. Direct compilation and linking with debug symbols
+# 3. Compile core camera and streaming components
+echo -e "${BLUE}Compiling core components...${NC}"
+CORE_SOURCES="\
+    src/emergent_camera.cpp \
+    src/frame_streaming.cpp \
+    src/gpu_streaming.cpp \
+    src/gpu_manager.cpp \
+    src/camera_manager.cpp"
+
+for src in $CORE_SOURCES; do
+    echo -e "${BLUE}Compiling $(basename $src)...${NC}"
+    g++ -std=c++17 $COMPILER_FLAGS -fPIC -c "$src" -o "targets/$(basename ${src%.cpp}).o" $COMMON_INCLUDES || \
+        error_exit "Failed to compile $src"
+done
+
+# 4. Compile GUI components
+echo -e "${BLUE}Compiling GUI components...${NC}"
+GUI_SOURCES="\
+    src/gui/camera_control_panel.cpp \
+    src/gui/main_window.cpp"
+
+for src in $GUI_SOURCES; do
+    echo -e "${BLUE}Compiling $(basename $src)...${NC}"
+    g++ -std=c++17 $COMPILER_FLAGS -fPIC -c "$src" -o "targets/$(basename ${src%.cpp}).o" $COMMON_INCLUDES || \
+        error_exit "Failed to compile $src"
+done
+
+# 5. Direct compilation and linking with debug symbols
 echo -e "${GREEN}Compiling and linking project...${NC}"
-g++ -std=c++17 $COMPILER_FLAGS targets/kernel.o targets/imgui*.o targets/implot*.o \
-    src/orange.cpp \
+g++ -std=c++17 $COMPILER_FLAGS \
+    targets/*.o \
     src/network_base.cpp \
     src/FFmpegWriter.cpp \
-    src/camera.cpp \
     src/video_capture.cpp \
     src/acquire_frames.cpp \
     src/offthreadmachine.cpp \
@@ -119,6 +147,7 @@ g++ -std=c++17 $COMPILER_FLAGS targets/kernel.o targets/imgui*.o targets/implot*
     src/fs_utils.cpp \
     $FILEBROWSER_DIR/ImGuiFileDialog.cpp \
     src/NvEncoder/*.cpp \
+    src/orange.cpp \
     $COMMON_INCLUDES $LIBS \
     -o targets/orange || error_exit "Compilation and linking failed"
 

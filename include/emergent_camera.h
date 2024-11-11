@@ -7,6 +7,13 @@
 #include "camera_params.h"
 #include "gpu_manager.h"
 
+#ifndef  EMERGENT_SDK
+#include <EmergentCameraAPIs.h>
+#include <emergentframe.h>
+#include <EvtParamAttribute.h>
+#include <gigevisiondeviceinfo.h>
+#endif
+
 namespace evt {
 
 class CameraException : public std::runtime_error {
@@ -56,7 +63,6 @@ public:
     // PTP synchronization
     void enablePTPSync();
     void disablePTPSync();
-    uint64_t getCurrentPTPTime() const;
 
     // Status and monitoring
     int getSensorTemperature() const;

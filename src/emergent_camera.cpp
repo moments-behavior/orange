@@ -1,4 +1,3 @@
-// emergent_camera.cpp
 #include "emergent_camera.h"
 #include <iostream>
 #include <sstream>
@@ -59,7 +58,6 @@ void EmergentCamera::open(const GigEVisionDeviceInfo* device_info) {
         throw CameraException(std::string("Failed to open camera: ") + e.what());
     }
 }
-
 
 void EmergentCamera::startStream() {
     if (!is_open_) {

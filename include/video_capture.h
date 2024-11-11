@@ -1,11 +1,31 @@
 #ifndef ORANGE_VIDEO_CAPTURE
 #define ORANGE_VIDEO_CAPTURE
-#include "thread.h"
-#include "camera.h"
+
+#include <cstdint>
+#include <string>
 #include <iostream>
 #include <fstream>
 #include "network_base.h"
 #include "camera_params.h"
+#include "ptp_manager.h"
+
+// Forward declarations
+struct CameraControl;
+struct CameraEachSelect;
+struct CameraParams;
+struct CameraEmergent;
+
+struct PTPParams {
+    unsigned long long ptp_global_time{0}; 
+    unsigned long long ptp_stop_time{0};
+    uint64_t ptp_counter{0};
+    uint64_t ptp_stop_counter{0};
+    bool network_sync{false};
+    bool ptp_start_reached{false};
+    bool ptp_stop_reached{false};
+    bool network_set_stop_ptp{false};
+    bool network_set_start_ptp{false};
+};
 
 enum PictureSaveState {
     State_Frame_Idle = 0, 
@@ -41,32 +61,10 @@ struct CameraState
     unsigned long long frame_count = 0;
 };
 
-struct PTPState 
-{
-    int ptp_offset;
-    int ptp_offset_sum=0;
-    int ptp_offset_prev=0;
-    unsigned int ptp_time_low;
-    unsigned int ptp_time_high;
-    unsigned int ptp_time_plus_delta_to_start_low;
-    unsigned int ptp_time_plus_delta_to_start_high;
-    unsigned long long ptp_time_delta_sum = 0;
-    unsigned long long ptp_time_delta;
-    unsigned long long ptp_time;
-    unsigned long long ptp_time_prev;
-    unsigned long long ptp_time_countdown;
-    unsigned long long frame_ts; 
-    unsigned long long frame_ts_prev;
-    unsigned long long frame_ts_delta;
-    unsigned long long frame_ts_delta_sum = 0;
-    unsigned long long ptp_time_plus_delta_to_start;
-    char ptp_status[100];
-    unsigned long ptp_status_sz_ret;
-    unsigned int ptp_time_plus_delta_to_start_uint;
-};
+// Function declarations
+void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff);
+void show_ptp_offset(evt::PTPState *ptp_state, CameraEmergent *ecam);
+void start_ptp_sync(evt::PTPState *ptp_state, PTPParams *ptp_params, CameraParams *camera_params, CameraEmergent *ecam, unsigned int delay_in_second);
+void grab_frames_after_countdown(evt::PTPState *ptp_state, CameraEmergent *ecam);
 
-void report_statistics(CameraParams *camera_params, CameraState *CameraState, double time_diff);
-void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam);
-void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, CameraParams *camera_params, CameraEmergent *ecam, unsigned int delay_in_second);
-void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam);
-#endif
+#endif // ORANGE_VIDEO_CAPTURE

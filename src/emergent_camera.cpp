@@ -1,4 +1,5 @@
 #include "emergent_camera.h"
+#include "NvEncoder/Logger.h"
 #include <iostream>
 #include <sstream>
 
@@ -460,11 +461,15 @@ void EmergentCamera::updateExposure(int exposure_value) {
         );
     }
 
+    logCurrentState("Before exposure update");
+    
     // Update exposure
     checkError(EVT_CameraSetUInt32Param(camera_.get(), "Exposure", exposure_value),
         "Setting exposure");
     
     params_.exposure = exposure_value;
+    
+    logCurrentState("After exposure update");
 }
 
 void EmergentCamera::updateGain(int gain_value) {
@@ -492,11 +497,15 @@ void EmergentCamera::updateGain(int gain_value) {
         );
     }
 
+    logCurrentState("Before gain update");
+
     // Update gain
     checkError(EVT_CameraSetUInt32Param(camera_.get(), "Gain", gain_value),
         "Setting gain");
     
     params_.gain = gain_value;
+
+    logCurrentState("After gain update");
 }
 
 void EmergentCamera::updateFrameRate(int frame_rate) {
@@ -524,11 +533,15 @@ void EmergentCamera::updateFrameRate(int frame_rate) {
         );
     }
 
+    logCurrentState("Before frame rate update");
+
     // Update frame rate
     checkError(EVT_CameraSetUInt32Param(camera_.get(), "FrameRate", frame_rate),
         "Setting frame rate");
     
     params_.frame_rate = frame_rate;
+
+    logCurrentState("After frame rate update");
 }
 
 void EmergentCamera::updateResolution(int width, int height) {
@@ -830,10 +843,14 @@ void EmergentCamera::updateIris(int iris_value) {
             );
         }
 
+        logCurrentState("Before iris update");
+
         // Update iris value
         checkError(EVT_CameraSetUInt32Param(camera_.get(), "Iris", iris_value),
             "Setting iris value");
         params_.iris = iris_value;
+
+        logCurrentState("After iris update");
 
         std::cout << "Iris value updated to " << iris_value << std::endl;
 
@@ -873,11 +890,15 @@ void EmergentCamera::updateFocus(int focus_value) {
             );
         }
 
+        logCurrentState("Before focus update");
+
         // Update focus
         checkError(EVT_CameraSetUInt32Param(camera_.get(), "Focus", focus_value),
             "Setting focus value");
         
         params_.focus = focus_value;
+
+        logCurrentState("After focus update");
 
     } catch (const std::exception& e) {
         throw CameraException(std::string("Failed to update focus: ") + e.what());
@@ -1037,6 +1058,157 @@ void EmergentCamera::close() {
         // Log error but don't throw - this allows destructor to continue cleanup
         std::cerr << "Error closing camera: " << e.what() << std::endl;
         is_open_ = false;  // Ensure flag is reset even if error occurs
+    }
+}
+
+evt::EmergentCamera::ParameterRange evt::EmergentCamera::getExposureRange() const {
+    ParameterRange range;
+    if (!is_open_) {
+        throw CameraException("Cannot get exposure range - camera not open");
+    }
+    
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Exposure", &range.max),
+        "Getting max exposure");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Exposure", &range.min),
+        "Getting min exposure");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Exposure", &range.increment),
+        "Getting exposure increment");
+        
+    return range;
+}
+
+evt::EmergentCamera::ParameterRange evt::EmergentCamera::getGainRange() const {
+    ParameterRange range;
+    if (!is_open_) {
+        throw CameraException("Cannot get gain range - camera not open");
+    }
+    
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Gain", &range.max),
+        "Getting max gain");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Gain", &range.min),
+        "Getting min gain");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Gain", &range.increment),
+        "Getting gain increment");
+        
+    return range;
+}
+
+evt::EmergentCamera::ParameterRange evt::EmergentCamera::getFrameRateRange() const {
+    ParameterRange range;
+    if (!is_open_) {
+        throw CameraException("Cannot get frame rate range - camera not open");
+    }
+    
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "FrameRate", &range.max),
+        "Getting max frame rate");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "FrameRate", &range.min),
+        "Getting min frame rate");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "FrameRate", &range.increment),
+        "Getting frame rate increment");
+        
+    return range;
+}
+
+evt::EmergentCamera::ParameterRange evt::EmergentCamera::getFocusRange() const {
+    ParameterRange range;
+    if (!is_open_) {
+        throw CameraException("Cannot get focus range - camera not open");
+    }
+    
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Focus", &range.max),
+        "Getting max focus");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Focus", &range.min),
+        "Getting min focus");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Focus", &range.increment),
+        "Getting focus increment");
+        
+    return range;
+}
+
+evt::EmergentCamera::ParameterRange evt::EmergentCamera::getIrisRange() const {
+    ParameterRange range;
+    if (!is_open_) {
+        throw CameraException("Cannot get iris range - camera not open");
+    }
+    
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Iris", &range.max),
+        "Getting max iris");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Iris", &range.min),
+        "Getting min iris");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Iris", &range.increment),
+        "Getting iris increment");
+        
+    return range;
+}
+
+evt::EmergentCamera::ResolutionRange evt::EmergentCamera::getResolutionRange() const {
+    ResolutionRange range;
+    if (!is_open_) {
+        throw CameraException("Cannot get resolution range - camera not open");
+    }
+    
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Width", &range.width_max),
+        "Getting max width");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Width", &range.width_min),
+        "Getting min width");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Width", &range.width_inc),
+        "Getting width increment");
+        
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Height", &range.height_max),
+        "Getting max height");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Height", &range.height_min),
+        "Getting min height");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Height", &range.height_inc),
+        "Getting height increment");
+        
+    return range;
+}
+
+evt::EmergentCamera::TemperatureRange evt::EmergentCamera::getTemperatureRange() const {
+    TemperatureRange range;
+    if (!is_open_) {
+        throw CameraException("Cannot get temperature range - camera not open");
+    }
+    
+    checkError(EVT_CameraGetInt32ParamMax(camera_.get(), "SensTemp", &range.max),
+        "Getting max temperature");
+    checkError(EVT_CameraGetInt32ParamMin(camera_.get(), "SensTemp", &range.min),
+        "Getting min temperature");
+        
+    return range;
+}
+
+EmergentCamera::CameraState EmergentCamera::getCurrentState() const {
+    if (!is_open_) {
+        throw CameraException("Cannot get camera state - camera not open");
+    }
+
+    CameraState state;
+    checkError(EVT_CameraGetUInt32Param(camera_.get(), "Exposure", 
+        reinterpret_cast<unsigned int*>(&state.exposure)), "Getting current exposure");
+    checkError(EVT_CameraGetUInt32Param(camera_.get(), "Gain", 
+        reinterpret_cast<unsigned int*>(&state.gain)), "Getting current gain");
+    checkError(EVT_CameraGetUInt32Param(camera_.get(), "FrameRate", 
+        reinterpret_cast<unsigned int*>(&state.frame_rate)), "Getting current frame rate");
+    checkError(EVT_CameraGetUInt32Param(camera_.get(), "Iris", 
+        reinterpret_cast<unsigned int*>(&state.iris)), "Getting current iris");
+    checkError(EVT_CameraGetUInt32Param(camera_.get(), "Focus", 
+        reinterpret_cast<unsigned int*>(&state.focus)), "Getting current focus");
+        
+    return state;
+}
+
+void EmergentCamera::logCurrentState(const std::string& context) const {
+    try {
+        auto state = getCurrentState();
+        LOG(INFO) << context << " - Camera state:"
+                  << "\n  Exposure: " << state.exposure
+                  << "\n  Gain: " << state.gain
+                  << "\n  Frame Rate: " << state.frame_rate
+                  << "\n  Iris: " << state.iris
+                  << "\n  Focus: " << state.focus;
+    } catch (const CameraException& e) {
+        LOG(ERROR) << "Failed to get camera state: " << e.what();
     }
 }
 

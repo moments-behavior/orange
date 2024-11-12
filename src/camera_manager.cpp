@@ -25,31 +25,31 @@ public:
     CameraManager() = default;
     ~CameraManager() = default;
 
-    // Initialize cameras based on selected devices
-    void initializeCameras(const std::vector<bool>& selected_cameras,
-                          const std::vector<GigEVisionDeviceInfo>& device_info,
-                          const std::vector<std::string>& config_files) {
-        cameras.clear();
-        cameras.reserve(device_info.size());  // Reserve space to avoid reallocation
+void initializeCameras(const std::vector<bool>& selected_cameras,
+                      const std::vector<GigEVisionDeviceInfo>& device_info,
+                      const std::vector<std::string>& config_files) {
+    cameras.clear();
+    cameras.reserve(device_info.size());  // Reserve space to avoid reallocation
+    
+    LOG(INFO) << "Starting camera initialization with " << device_info.size() << " devices";
+    
+    for (size_t i = 0; i < device_info.size(); ++i) {
+        CameraInstance instance;
         
-        for (size_t i = 0; i < device_info.size(); ++i) {
-            CameraInstance instance;
-            
-            // Initialize parameters with device info
-            instance.params = CameraParams{};
-            instance.params.camera_serial = device_info[i].serialNumber;
-            instance.params.camera_name = device_info[i].userDefinedName;
-            
-            // Load configuration if available
-            if (i < config_files.size() && !config_files[i].empty()) {
-                loadCameraConfig(instance, config_files[i], device_info[i]);
-            }
-            
-            // Create camera instance with parameters
-            instance.camera = std::make_unique<EmergentCamera>(instance.params);
-            cameras.push_back(std::move(instance));
-        }
+        // Initialize parameters with device info
+        instance.params = CameraParams{};
+        instance.params.camera_serial = device_info[i].serialNumber;
+        instance.params.camera_name = device_info[i].userDefinedName;
+        
+        // Create camera instance with parameters
+        instance.camera = std::make_unique<EmergentCamera>(instance.params);
+        cameras.push_back(std::move(instance));
+        
+        LOG(INFO) << "Created camera " << i << " (serial: " << device_info[i].serialNumber << ")";
     }
+    
+    LOG(INFO) << "Finished initialization, camera count: " << cameras.size();
+}
 
     // Start/stop streaming for specific camera
     void startStreaming(size_t camera_idx, bool enable_gpu = false) {

@@ -60,9 +60,28 @@ public:
         try {
             // Open the camera if not already open
             if (!instance.camera->isOpen()) {
-                instance.camera->open(nullptr); // You'll need to pass proper device info here
+                const GigEVisionDeviceInfo* device_info = nullptr;  // TODO: Pass proper device info
+                instance.camera->open(device_info);
+                
+                // Initialize camera with stored parameters
+                instance.camera->updateExposure(instance.params.exposure);
+                instance.camera->updateGain(instance.params.gain);
+                instance.camera->updateFrameRate(instance.params.frame_rate);
+                instance.camera->updateIris(instance.params.iris);
+                instance.camera->updateFocus(instance.params.focus);
+                
+                LOG(INFO) << "Camera initialized with:"
+                         << "\n  Exposure: " << instance.params.exposure
+                         << "\n  Gain: " << instance.params.gain
+                         << "\n  Frame Rate: " << instance.params.frame_rate
+                         << "\n  Iris: " << instance.params.iris
+                         << "\n  Focus: " << instance.params.focus;
             }
 
+            // Start the actual stream
+            instance.camera->startStream();
+
+            // Configure GPU if needed
             if (enable_gpu) {
                 // Configure GPU streaming
                 instance.config.enable_gpu_direct = true;
@@ -83,9 +102,10 @@ public:
             }
             
             instance.is_streaming = true;
+            LOG(INFO) << "Camera streaming started successfully";
         }
         catch (const CameraException& e) {
-            std::cerr << "Failed to start streaming: " << e.what() << std::endl;
+            LOG(ERROR) << "Failed to start streaming: " << e.what();
             throw;
         }
     }
@@ -189,6 +209,51 @@ public:
         cameras[camera_idx].camera->updateFrameRate(frame_rate);
     }
 
+    void updateIris(size_t camera_idx, int iris) {
+        if (camera_idx >= cameras.size()) return;
+        cameras[camera_idx].camera->updateIris(iris);
+    }
+
+    void updateFocus(size_t camera_idx, int focus) {
+        if (camera_idx >= cameras.size()) return;
+        cameras[camera_idx].camera->updateFocus(focus);
+    }
+
+    evt::EmergentCamera::ParameterRange getExposureRange(size_t camera_idx) const {
+        if (camera_idx >= cameras.size()) {
+            throw CameraException("Invalid camera index");
+        }
+        return cameras[camera_idx].camera->getExposureRange();
+    }
+    
+    evt::EmergentCamera::ParameterRange getGainRange(size_t camera_idx) const {
+        if (camera_idx >= cameras.size()) {
+            throw CameraException("Invalid camera index");
+        }
+        return cameras[camera_idx].camera->getGainRange();
+    }
+    
+    evt::EmergentCamera::ParameterRange getFrameRateRange(size_t camera_idx) const {
+        if (camera_idx >= cameras.size()) {
+            throw CameraException("Invalid camera index");
+        }
+        return cameras[camera_idx].camera->getFrameRateRange();
+    }
+
+    evt::EmergentCamera::ParameterRange getIrisRange(size_t camera_idx) const {
+        if (camera_idx >= cameras.size()) {
+            throw CameraException("Invalid camera index");
+        }
+        return cameras[camera_idx].camera->getIrisRange();
+    }
+    
+    evt::EmergentCamera::ParameterRange getFocusRange(size_t camera_idx) const {
+        if (camera_idx >= cameras.size()) {
+            throw CameraException("Invalid camera index");
+        }
+        return cameras[camera_idx].camera->getFocusRange();
+    }
+
     // Status queries
     size_t getCameraCount() const { return cameras.size(); }
     bool isStreaming(size_t camera_idx) const { 
@@ -197,8 +262,19 @@ public:
     bool isRecording() const { return recording_active; }
     
     // Access to camera instances for GUI
-    const CameraInstance& getCamera(size_t idx) const { return cameras[idx]; }
-    CameraInstance& getCamera(size_t idx) { return cameras[idx]; }
+    const CameraInstance& getCamera(size_t idx) const { 
+        if (idx >= cameras.size()) {
+            throw CameraException("Invalid camera index");
+        }
+        return cameras[idx]; 
+    }
+
+    CameraInstance& getCamera(size_t idx) { 
+        if (idx >= cameras.size()) {
+            throw CameraException("Invalid camera index");
+        }
+        return cameras[idx]; 
+    }
 
 private:
     std::vector<CameraInstance> cameras;

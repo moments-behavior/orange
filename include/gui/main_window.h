@@ -5,18 +5,13 @@
 #include "encoder_config.h"
 #include "camera_control_panel.h"
 #include "json.hpp"
+#include "camera_params.h"
 #include <memory>
 #include <vector>
 #include <string>
 
 // Forward declarations
 class CameraControlPanel;
-
-struct CameraConfig {
-    evt::CameraParams params;
-    std::string nic_port;
-    std::string name;
-};
 
 class MainWindow {
 public:
@@ -44,9 +39,8 @@ private:
     void renderMainMenu();
     void renderStatusBar();
 
-    // Add new methods
+    // Modify method signature
     void loadCameraConfigs(const std::string& config_path);
-    CameraConfig loadCameraConfig(const std::string& config_file);
 
     // Window context and graphics
     std::unique_ptr<gx_context> window_ctx_;
@@ -56,7 +50,7 @@ private:
     std::unique_ptr<evt::CameraManager> camera_manager_;
     std::vector<bool> selected_cameras_;
     std::vector<GigEVisionDeviceInfo> device_info_;
-    std::unordered_map<std::string, CameraConfig> known_cameras_;
+    std::unordered_map<std::string, evt::CameraParams> known_cameras_;
     
     // Add CameraControlPanel
     std::unique_ptr<CameraControlPanel> camera_control_panel_;

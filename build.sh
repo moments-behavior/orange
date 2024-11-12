@@ -82,27 +82,27 @@ fi
 # Build steps
 echo -e "${BLUE}Building Orange...${NC}"
 
-# 1. CUDA kernel with debug info
-echo -e "${BLUE}Compiling CUDA kernel...${NC}"
-nvcc -G -g -O0 -c src/kernel.cu -arch=sm_86 -o targets/kernel.o \
-    -I./include -I./src || error_exit "CUDA kernel compilation failed"
+# # 1. CUDA kernel with debug info
+# echo -e "${BLUE}Compiling CUDA kernel...${NC}"
+# nvcc -G -g -O0 -c src/kernel.cu -arch=sm_86 -o targets/kernel.o \
+#     -I./include -I./src || error_exit "CUDA kernel compilation failed"
 
-# 2. ImGui and dependencies
-echo -e "${BLUE}Compiling ImGui and dependencies...${NC}"
-for src in \
-    "$IMGUI_DIR/imgui.cpp" \
-    "$IMGUI_DIR/imgui_demo.cpp" \
-    "$IMGUI_DIR/imgui_draw.cpp" \
-    "$IMGUI_DIR/imgui_tables.cpp" \
-    "$IMGUI_DIR/imgui_widgets.cpp" \
-    "$IMGUI_DIR/backends/imgui_impl_glfw.cpp" \
-    "$IMGUI_DIR/backends/imgui_impl_opengl3.cpp" \
-    "$IMPLOT_DIR/implot.cpp" \
-    "$IMPLOT_DIR/implot_items.cpp"; do
-    echo -e "${BLUE}Compiling $(basename $src)...${NC}"
-    g++ -std=c++17 $COMPILER_FLAGS -fPIC -c "$src" -o "targets/$(basename ${src%.cpp}).o" $COMMON_INCLUDES || \
-        error_exit "Failed to compile $src"
-done
+# # 2. ImGui and dependencies
+# echo -e "${BLUE}Compiling ImGui and dependencies...${NC}"
+# for src in \
+#     "$IMGUI_DIR/imgui.cpp" \
+#     "$IMGUI_DIR/imgui_demo.cpp" \
+#     "$IMGUI_DIR/imgui_draw.cpp" \
+#     "$IMGUI_DIR/imgui_tables.cpp" \
+#     "$IMGUI_DIR/imgui_widgets.cpp" \
+#     "$IMGUI_DIR/backends/imgui_impl_glfw.cpp" \
+#     "$IMGUI_DIR/backends/imgui_impl_opengl3.cpp" \
+#     "$IMPLOT_DIR/implot.cpp" \
+#     "$IMPLOT_DIR/implot_items.cpp"; do
+#     echo -e "${BLUE}Compiling $(basename $src)...${NC}"
+#     g++ -std=c++17 $COMPILER_FLAGS -fPIC -c "$src" -o "targets/$(basename ${src%.cpp}).o" $COMMON_INCLUDES || \
+#         error_exit "Failed to compile $src"
+# done
 
 # 3. Compile core camera and streaming components
 echo -e "${BLUE}Compiling core components...${NC}"

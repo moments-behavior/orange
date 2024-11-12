@@ -122,6 +122,49 @@ public:
     // Debug/testing
     // void testGPIOToggle(); // TODO: Implement this
 
+    // Add these new methods
+    struct ParameterRange {
+        unsigned int min;
+        unsigned int max;
+        unsigned int increment;
+    };
+
+    ParameterRange getExposureRange() const;
+    ParameterRange getGainRange() const;
+    ParameterRange getFrameRateRange() const;
+    ParameterRange getFocusRange() const;
+    ParameterRange getIrisRange() const;
+    
+    struct ResolutionRange {
+        unsigned int width_min;
+        unsigned int width_max;
+        unsigned int width_inc;
+        unsigned int height_min;
+        unsigned int height_max;
+        unsigned int height_inc;
+    };
+    
+    ResolutionRange getResolutionRange() const;
+    
+    struct TemperatureRange {
+        int min;
+        int max;
+    };
+    
+    TemperatureRange getTemperatureRange() const;
+
+    // Add these new methods
+    struct CameraState {
+        int exposure;
+        int gain;
+        int frame_rate;
+        int iris;
+        int focus;
+    };
+
+    CameraState getCurrentState() const;
+    void logCurrentState(const std::string& context) const;
+
 private:
     void configureDefaults();
     // void validateResolution(int width, int height) const; // TODO: Implement this

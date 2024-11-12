@@ -7,14 +7,17 @@
 #include "NvEncoder/NvEncoderCuda.h"
 #include "NvEncoder/NvEncoderCLIOptions.h"
 #include "image_processing.h"
+#include "camera_params.h"
 #include <string>
 #include <vector>
 #include <fstream>
 
 #define ENCODER_ENTRIES_MAX 20
 
-// Forward declarations
-struct CameraParams;
+namespace evt {
+
+// Add this declaration with the other function declarations
+bool is_h264_codec(const std::string& encoder_str);
 
 // Define structs before using them in function declarations
 struct Writer {
@@ -35,19 +38,19 @@ struct EncoderContext {
 };
 
 // Function declarations
-bool validate_encoder_parameters(const CameraParams* params, const std::string& encoder_str);
+bool validate_encoder_parameters(const CameraParams* camera_params, const std::string& encoder_str);
 
-static inline void initialize_gpu_frame(FrameGPU* frame_original, const CameraParams* camera_params);
-static inline void initialize_gpu_debayer(Debayer* debayer, const CameraParams* camera_params);
-static inline void debayer_frame_gpu(const CameraParams* camera_params, FrameGPU* frame_original, Debayer* debayer);
-static inline void duplicate_channel_gpu(const CameraParams* camera_params, FrameGPU* frame_original, Debayer* debayer);
-static inline void initialize_encoder(EncoderContext* encoder, std::string encoder_str, const CameraParams* camera_params);
-static inline void initialize_writer(Writer* writer, const CameraParams* camera_params, std::string folder_name, std::string encoder_str);
+static inline void initialize_gpu_frame(FrameGPU* frame_original, const evt::CameraParams* camera_params);
+static inline void initialize_gpu_debayer(Debayer* debayer, const evt::CameraParams* camera_params);
+static inline void debayer_frame_gpu(const evt::CameraParams* camera_params, FrameGPU* frame_original, Debayer* debayer);
+static inline void duplicate_channel_gpu(const evt::CameraParams* camera_params, FrameGPU* frame_original, Debayer* debayer);
+static inline void initialize_encoder(EncoderContext* encoder, std::string encoder_str, const evt::CameraParams* camera_params);
+static inline void initialize_writer(Writer* writer, const evt::CameraParams* camera_params, std::string folder_name, std::string encoder_str);
 
 class GPUVideoEncoder : public CThreadWorker {
 public:
     GPUVideoEncoder(const char* name, 
-                   const CameraParams* camera_params,
+                   const evt::CameraParams* camera_params,
                    std::string encoder_setup, 
                    std::string folder_name, 
                    bool* encoder_ready_signal);
@@ -59,7 +62,7 @@ public:
     void ProcessOneFrame(void* f);
 
     bool* encoder_ready_signal;
-    const CameraParams* camera_params;
+    const evt::CameraParams* camera_params;
     unsigned char* display_buffer;
     FrameGPU frame_original;
     Debayer debayer;
@@ -76,5 +79,7 @@ private:
     WORKER_ENTRY* workerEntriesFreeQueue[ENCODER_ENTRIES_MAX];
     int workerEntriesFreeQueueCount;
 };
+
+} // namespace evt
 
 #endif

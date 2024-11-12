@@ -59,16 +59,30 @@ public:
     void updateOffset(int x, int y);
     void updatePixelFormat(const std::string& format);
     void updateIris(int iris_value);
+    void updateFocus(int focus_value);
 
     // PTP synchronization
     void enablePTPSync();
     void disablePTPSync();
+    uint64_t updatePTPGateTime(unsigned int high, unsigned int low);
+    void getPTPStatus(char* status, size_t size, unsigned long* ret_size) const;
+    int32_t getPTPOffset() const;
+    uint64_t getCurrentPTPTime() const;
 
     // Status and monitoring
     int getSensorTemperature() const;
     bool isOpen() const { return is_open_; }
     bool isStreaming() const { return is_streaming_; }
     const CameraParams& getParams() const { return params_; }
+
+    // Generic parameter setting interface
+    void setParameter(const std::string& param, const std::string& value);
+    void setParameter(const std::string& param, int value);
+    void setParameter(const std::string& param, uint32_t value);
+    void setParameter(const std::string& param, bool value);
+
+    template<typename T>
+    T getParameter(const std::string& param) const;
 
     // Debug/testing
     // void testGPIOToggle(); // TODO: Implement this
@@ -88,7 +102,6 @@ private:
 
 // // For any camera in an array
 // evt::EmergentCamera::printDeviceInfo(device_info_array, camera_idx);
-
 
     mutable CameraParams params_;  // Make params_ mutable to for caching in const functions
     std::unique_ptr<Emergent::CEmergentCamera> camera_;

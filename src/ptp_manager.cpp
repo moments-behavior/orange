@@ -1,17 +1,14 @@
-#pragma once
-
+// ptp_manager.cpp
 #include "ptp_manager.h"
 #include "emergent_camera.h"
 #include <chrono>
 #include <stdexcept>
 #include <iostream>
+#include <atomic>
 
 namespace evt {
 
-class PTPException : public std::runtime_error {
-public:
-    explicit PTPException(const std::string& msg) : std::runtime_error(msg) {}
-};
+PTPException::PTPException(const std::string& msg) : std::runtime_error(msg) {}
 
 PTPManager::PTPManager(EmergentCamera& camera) : camera_(camera) {
     if (!camera_.isOpen()) {
@@ -21,7 +18,12 @@ PTPManager::PTPManager(EmergentCamera& camera) : camera_(camera) {
 
 void PTPManager::enablePTP() {
     try {
-        camera_.enablePTPSync();
+        // Configure PTP triggering settings
+        camera_.setParameter("TriggerSource", "Software");
+        camera_.setParameter("AcquisitionMode", "MultiFrame");
+        camera_.setParameter("TriggerMode", "On");
+        camera_.setParameter("PtpMode", "TwoStep");
+        
         is_enabled_ = true;
         
         // Get initial offset values to verify PTP is working
@@ -37,7 +39,12 @@ void PTPManager::disablePTP() {
     }
 
     try {
-        camera_.disablePTPSync();
+        // Reset to default continuous mode settings
+        camera_.setParameter("AcquisitionMode", "Continuous");
+        camera_.setParameter("TriggerSelector", "AcquisitionStart");
+        camera_.setParameter("TriggerMode", "Off");
+        camera_.setParameter("TriggerSource", "Software");
+
         is_enabled_ = false;
     } catch (const std::exception& e) {
         throw PTPException(std::string("Failed to disable PTP: ") + e.what());
@@ -54,7 +61,7 @@ void PTPManager::updateOffset() {
 
     // Get multiple samples to average the offset
     for (int i = 0; i < SAMPLES;) {
-        int32_t new_offset = getCurrentOffset();
+        int32_t new_offset = camera_.getPTPOffset();
         
         if (new_offset != last_offset_) {
             offset_sum += new_offset;
@@ -134,40 +141,19 @@ bool PTPManager::synchronizeMultipleCameras(std::vector<PTPManager*>& cameras, u
 
 void PTPManager::setupGateTime(uint64_t global_time) {
     ptp_state_.ptp_time_plus_delta_to_start = global_time;
-    ptp_state_.ptp_time_plus_delta_to_start_uint = global_time;
     
     // Split into high/low 32-bit values
-    ptp_state_.ptp_time_plus_delta_to_start_low = (unsigned int)(global_time & 0xFFFFFFFF);
-    ptp_state_.ptp_time_plus_delta_to_start_high = (unsigned int)(global_time >> 32);
+    uint32_t high = static_cast<uint32_t>(global_time >> 32);
+    uint32_t low = static_cast<uint32_t>(global_time & 0xFFFFFFFF);
     
     // Set camera parameters
-    camera_.updatePTPGateTime(ptp_state_.ptp_time_plus_delta_to_start_high,
-                             ptp_state_.ptp_time_plus_delta_to_start_low);
+    camera_.setParameter("PtpAcquisitionGateTimeHigh", high);
+    camera_.setParameter("PtpAcquisitionGateTimeLow", low);
     
     std::cout << "PTP Gate time(ns): " << global_time << std::endl;
 }
 
-uint64_t EmergentCamera::updatePTPGateTime(unsigned int high, unsigned int low) {
-    checkError(EVT_CameraSetUInt32Param(camera_.get(), "PtpAcquisitionGateTimeHigh", high),
-        "Setting PTP gate time high");
-    checkError(EVT_CameraSetUInt32Param(camera_.get(), "PtpAcquisitionGateTimeLow", low),
-        "Setting PTP gate time low");
-    }
-
-void EmergentCamera::getPTPStatus(char* status, size_t size, unsigned long* ret_size) {
-    checkError(EVT_CameraGetEnumParam(camera_.get(), "PtpStatus", 
-            status, size, ret_size), "Getting PTP status");
-    }
-
-    int32_t getPTPOffset() const {
-        int32_t offset;
-    checkError(EVT_CameraGetInt32Param(camera_.get(), "PtpOffset", &offset),
-            "Getting PTP offset");
-        return offset;
-    }
-
 void PTPManager::waitForGateTime() {
-    // Implementation of grab_frames_after_countdown logic
     uint64_t current_time;
     uint64_t countdown_time = 0;
     

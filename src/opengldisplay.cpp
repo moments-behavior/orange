@@ -3,11 +3,15 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <cstdlib>
+#include <opencv2/opencv.hpp>
 #include "kernel.cuh"
 #include "opengldisplay.h"
+#include "camera_params.h"
 #include <cuda_runtime_api.h>
+#include <common.hpp>
 
-COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
+COpenGLDisplay::COpenGLDisplay(const char *name, evt::CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
     : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
@@ -26,9 +30,9 @@ void COpenGLDisplay::ThreadRunning()
 {
     ck(cudaSetDevice(camera_params->gpu_id));
     // innitialization
-    initalize_gpu_frame(&frame_original, camera_params);
-    initialize_gpu_debayer(&debayer, camera_params);
-    initialize_cpu_frame(&frame_cpu, camera_params);
+    initializeGPUFrame(&frame_original, camera_params);
+    initializeGPUDebayer(&debayer, camera_params);
+    initializeCPUFrame(&frame_cpu, camera_params);
 
     ck(cudaMalloc((void **)&d_convert, camera_params->width * camera_params->height * 3)); 
     
@@ -59,9 +63,9 @@ void COpenGLDisplay::ThreadRunning()
             ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
 
             if (camera_params->color){
-                debayer_frame_gpu(camera_params, &frame_original, &debayer);
+                debayerFrameGPU(camera_params, &frame_original, &debayer);
             } else {
-                duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+                duplicateChannelGPU(camera_params, &frame_original, &debayer);
             }
 
             if (camera_select->yolo) {

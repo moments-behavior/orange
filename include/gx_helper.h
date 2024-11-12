@@ -26,12 +26,12 @@ typedef struct gx_context
 } gx_context;
 
 
-static void gx_glfw_error_callback(int error, const char *description)
+static inline void gx_glfw_error_callback(int error, const char *description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-static void gx_glew_error_callback(GLenum glew_error)
+static inline void gx_glew_error_callback(GLenum glew_error)
 {
     if (GLEW_OK != glew_error)
     {
@@ -39,7 +39,7 @@ static void gx_glew_error_callback(GLenum glew_error)
     }
 }
 
-void gx_init(gx_context *context, GLFWwindow *render_target)
+static inline void gx_init(gx_context *context, GLFWwindow *render_target)
 {
     context->render_target = render_target;
     glfwMakeContextCurrent(render_target);
@@ -47,7 +47,7 @@ void gx_init(gx_context *context, GLFWwindow *render_target)
     glfwSwapInterval(1); // Enable vsync
 }
 
-GLFWwindow *gx_glfw_init_render_target(u32 marjor_version, u32 minor_version, u32 width, u32 height, const char *title, char *glsl_version)
+static inline GLFWwindow *gx_glfw_init_render_target(u32 marjor_version, u32 minor_version, u32 width, u32 height, const char *title, char *glsl_version)
 {
     // Setup window
     glfwSetErrorCallback(gx_glfw_error_callback);
@@ -73,7 +73,7 @@ GLFWwindow *gx_glfw_init_render_target(u32 marjor_version, u32 minor_version, u3
     return window;
 }
 
-void gx_imgui_init(gx_context *context)
+static inline void gx_imgui_init(gx_context *context)
 {
     // ************* Dear Imgui ********************//
     IMGUI_CHECKVERSION();
@@ -113,12 +113,12 @@ void gx_imgui_init(gx_context *context)
     // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
 }
 
-void gx_delete_buffer(GLuint *texture) 
+static inline void gx_delete_buffer(GLuint *texture) 
 {
 	glDeleteBuffers(1, texture);
 }
 
-static void create_texture(GLuint *texture, int image_width, int image_height)
+static inline void create_texture(GLuint *texture, int image_width, int image_height)
 {
     // Create a OpenGL texture identifier
     glGenTextures(1, texture);
@@ -132,17 +132,17 @@ static void create_texture(GLuint *texture, int image_width, int image_height)
     glEnable(GL_TEXTURE_2D);
 }
 
-static void bind_texture(GLuint *texture)
+static inline void bind_texture(GLuint *texture)
 {
     glBindTexture(GL_TEXTURE_2D, *texture);
 }
 
-static void unbind_texture()
+static inline void unbind_texture()
 {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-static void create_pbo(GLuint *pbo, int image_width, int img_height)
+static inline void create_pbo(GLuint *pbo, int image_width, int img_height)
 {
     glGenBuffers(1, pbo);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *pbo);
@@ -151,56 +151,56 @@ static void create_pbo(GLuint *pbo, int image_width, int img_height)
 }
 
 
-static void upload_image_pbo_to_texture(int image_width, int image_height)
+static inline void upload_image_pbo_to_texture(int image_width, int image_height)
 {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image_width, image_height, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 }
 
 
-static void bind_pbo(GLuint *pbo)
+static inline void bind_pbo(GLuint *pbo)
 {
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *pbo);
 }
 
-static void unbind_pbo()
+static inline void unbind_pbo()
 {
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
-static void register_pbo_to_cuda(GLuint *pbo, cudaGraphicsResource_t *cuda_resource)
+static inline void register_pbo_to_cuda(GLuint *pbo, cudaGraphicsResource_t *cuda_resource)
 {
     cudaGraphicsGLRegisterBuffer(cuda_resource, *pbo, cudaGraphicsRegisterFlagsNone);
 }
 
-void cuda_unregister_pbo(cudaGraphicsResource_t cuda_resource)
+static inline void cuda_unregister_pbo(cudaGraphicsResource_t cuda_resource)
 {
     cudaGraphicsUnregisterResource(cuda_resource);
 }
 
-static void map_cuda_resource(cudaGraphicsResource_t *cuda_resource, cudaStream_t stream)
+static inline void map_cuda_resource(cudaGraphicsResource_t *cuda_resource, cudaStream_t stream)
 {
     cudaGraphicsMapResources(1, cuda_resource, stream);
 }
 
-static void cuda_pointer_from_resource(unsigned char **cuda_buffer_p, size_t *size_p, cudaGraphicsResource_t *cuda_resource)
+static inline void cuda_pointer_from_resource(unsigned char **cuda_buffer_p, size_t *size_p, cudaGraphicsResource_t *cuda_resource)
 {
     cudaGraphicsResourceGetMappedPointer((void **)cuda_buffer_p, size_p, *cuda_resource);
 }
 
-static void unmap_cuda_resource(cudaGraphicsResource_t *cuda_resource)
+static inline void unmap_cuda_resource(cudaGraphicsResource_t *cuda_resource)
 {
     cudaGraphicsUnmapResources(1, cuda_resource);
 }
 
 
-void render_initialize_target(gx_context *window)
+static inline void render_initialize_target(gx_context *window)
 {
     GLFWwindow *render_target = gx_glfw_init_render_target(3, 3, window->width, window->height, "Orange", window->glsl_version);
     gx_init(window, render_target);
     gx_imgui_init(window);
 }
 
-void create_new_frame()
+static inline void create_new_frame()
 {
     glfwPollEvents();
     ImGui_ImplOpenGL3_NewFrame();
@@ -208,7 +208,7 @@ void create_new_frame()
     ImGui::NewFrame();
 }
 
-void render_a_frame(gx_context *window)
+static inline void render_a_frame(gx_context *window)
 {
     ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
 
@@ -235,7 +235,7 @@ void render_a_frame(gx_context *window)
     glfwSwapBuffers(window->render_target);
 }
 
-void gx_cleanup(gx_context *window)
+static inline void gx_cleanup(gx_context *window)
 {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();

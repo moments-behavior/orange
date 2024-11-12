@@ -10,6 +10,13 @@
 #include <vector>
 #include <numeric>
 
+#ifndef  EMERGENT_SDK
+#include <EmergentCameraAPIs.h>
+#include <emergentframe.h>
+#include <EvtParamAttribute.h>
+#include <gigevisiondeviceinfo.h>
+#endif
+
 std::string get_evt_error_string(EVT_ERROR error);
 
 #define check_camera_errors(err, camera_serial) __check_camera_errors(err, camera_serial, __FILE__, __LINE__)

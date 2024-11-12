@@ -42,7 +42,7 @@ public:
     bool isGPUDirectSupported(int device_id) const;
     
     // Get available GPU devices
-    std::vector<GPUDeviceInfo> getAvailableDevices() const;
+    const std::vector<GPUDeviceInfo>& getAvailableDevices() const { return available_devices_; }
     
     // Select and configure a specific GPU
     void selectDevice(int device_id);

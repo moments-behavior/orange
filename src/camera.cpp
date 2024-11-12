@@ -3,6 +3,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
+#include "emergent_camera.h"
 
 std::string get_evt_error_string(EVT_ERROR error)
 {

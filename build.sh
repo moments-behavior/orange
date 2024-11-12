@@ -137,7 +137,6 @@ g++ -std=c++17 $COMPILER_FLAGS \
     targets/*.o \
     src/network_base.cpp \
     src/FFmpegWriter.cpp \
-    src/video_capture.cpp \
     src/acquire_frames.cpp \
     src/offthreadmachine.cpp \
     src/opengldisplay.cpp \

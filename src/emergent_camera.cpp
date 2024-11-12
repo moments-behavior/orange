@@ -6,9 +6,43 @@ namespace evt {
 
 namespace {
     std::string getErrorString(EVT_ERROR error) {
-        // Implementation from get_evt_error_string()
+        std::string error_string;
+        switch (error) {
+            case EVT_SUCCESS:
+                return "Success";
+            case EVT_ERROR_DEVICE_CONNECTED_ALRD:
+                return "Camera has been opened.";
+            case EVT_ERROR_DEVICE_NOT_CONNECTED:
+                return "Camera has not been opened.";
+            case EVT_ERROR_DEVICE_LOST_CONNECTION:
+                return "Camera lost connection due to disconnected, powered off, crashing etc.";
+            case EVT_ERROR_GENICAM_ERROR:
+                return "Generic GeniCam error from GeniCam lib.";
+            case EVT_ERROR_GENICAM_NOT_MATCH:
+                return "Parameter not matched.";
+            case EVT_ERROR_GENICAM_OUT_OF_RANGE:
+                return "Parameter out of range.";
+            case EVT_ERROR_SOCK:
+                return "Socket operation failed.";
+            case EVT_ERROR_GVCP_ACK:
+                return "GVCP ACK error.";
+            case EVT_ERROR_GVSP_DATA_CORRUPT:
+                return "GVSP stream data corrupted, would cause block dropped.";
+            case EVT_ERROR_NIC_LIB_INIT:
+                return "Fail to initialize NIC's SDK library.";
+            case EVT_ERROR_OS_OBTAIN_ADAPTER:
+                return "Failed to get host adapter info.";
+            case EVT_ERROR_SDK:
+                return "SDK error, should not occur.";
+            default:
+                return "Unknown error: " + std::to_string(static_cast<int>(error));
+        }
     }
 } // anonymous namespace
+
+std::string get_evt_error_string(EVT_ERROR error) {
+    return getErrorString(error);
+}
 
 EmergentCamera::EmergentCamera(const CameraParams& params) 
     : params_(params),
@@ -106,7 +140,7 @@ void EmergentCamera::startStream() {
         EVT_ERROR stream_result = EVT_CameraOpenStream(camera_.get());
         if (stream_result != EVT_SUCCESS) {
             std::stringstream ss;
-            ss << "Failed to open camera stream (Error: " << get_evt_error_string(stream_result) << ")";
+            ss << "Failed to open camera stream (Error: " << evt::get_evt_error_string(stream_result) << ")";
             if (params_.gpu_direct) {
                 ss << " - Check GPU Direct compatibility";
             }
@@ -198,6 +232,85 @@ void EmergentCamera::stopStream() {
         // Log the error but don't throw - this allows destructor to continue cleanup
         std::cerr << "Error stopping stream: " << e.what() << std::endl;
         is_streaming_ = false; // Ensure flag is reset even if error occurs
+    }
+}
+
+void EmergentCamera::setParameter(const std::string& param, const std::string& value) {
+    if (!is_open_) {
+        throw CameraException("Camera not open");
+    }
+
+    try {
+        if (param == "TriggerSource" || param == "AcquisitionMode" || 
+            param == "TriggerMode" || param == "PtpMode" || 
+            param == "TriggerSelector" || param == "PixelFormat" ||
+            param == "ColorTemp") {
+            checkError(EVT_CameraSetEnumParam(camera_.get(), param.c_str(), value.c_str()),
+                      "Setting " + param);
+        } else {
+            throw CameraException("Unsupported string parameter: " + param);
+        }
+    } catch (const std::exception& e) {
+        throw CameraException(std::string("Failed to set parameter ") + param + ": " + e.what());
+    }
+}
+
+void EmergentCamera::setParameter(const std::string& param, int value) {
+    if (!is_open_) {
+        throw CameraException("Camera not open");
+    }
+
+    try {
+        if (param == "Gain") {
+            updateGain(value);
+        } else if (param == "Exposure") {
+            updateExposure(value);
+        } else if (param == "FrameRate") {
+            updateFrameRate(value);
+        } else if (param == "Focus") {
+            updateFocus(value);
+        } else if (param == "Width") {
+            updateResolution(value, params_.height);
+        } else if (param == "Height") {
+            updateResolution(params_.width, value);
+        } else if (param == "OffsetX" || param == "OffsetY") {
+            if (param == "OffsetX") {
+                updateOffset(value, params_.offsety);
+            } else {
+                updateOffset(params_.offsetx, value);
+            }
+        } else if (param == "PtpAcquisitionGateTimeHigh") {
+            checkError(EVT_CameraSetUInt32Param(camera_.get(), param.c_str(), 
+                static_cast<uint32_t>(value)), "Setting " + param);
+        } else if (param == "PtpAcquisitionGateTimeLow") {
+            checkError(EVT_CameraSetUInt32Param(camera_.get(), param.c_str(), 
+                static_cast<uint32_t>(value)), "Setting " + param);
+        } else {
+            throw CameraException("Unsupported integer parameter: " + param);
+        }
+    } catch (const std::exception& e) {
+        throw CameraException(std::string("Failed to set parameter ") + param + ": " + e.what());
+    }
+}
+
+void EmergentCamera::setParameter(const std::string& param, uint32_t value) {
+    setParameter(param, static_cast<int>(value));
+}
+
+void EmergentCamera::setParameter(const std::string& param, bool value) {
+    if (!is_open_) {
+        throw CameraException("Camera not open");
+    }
+
+    try {
+        if (param == "LUTEnable" || param == "AutoGain") {
+            checkError(EVT_CameraSetBoolParam(camera_.get(), param.c_str(), value),
+                      "Setting " + param);
+        } else {
+            throw CameraException("Unsupported boolean parameter: " + param);
+        }
+    } catch (const std::exception& e) {
+        throw CameraException(std::string("Failed to set parameter ") + param + ": " + e.what());
     }
 }
 
@@ -539,6 +652,25 @@ void EmergentCamera::disablePTPSync() {
     }
 }
 
+uint64_t EmergentCamera::updatePTPGateTime(unsigned int high, unsigned int low) {
+    checkError(EVT_CameraSetUInt32Param(camera_.get(), "PtpAcquisitionGateTimeHigh", high),
+        "Setting PTP gate time high");
+    checkError(EVT_CameraSetUInt32Param(camera_.get(), "PtpAcquisitionGateTimeLow", low),
+        "Setting PTP gate time low");
+    }
+
+void EmergentCamera::getPTPStatus(char* status, size_t size, unsigned long* ret_size) const {
+    checkError(EVT_CameraGetEnumParam(camera_.get(), "PtpStatus", 
+            status, size, ret_size), "Getting PTP status");
+    }
+
+int32_t EmergentCamera::getPTPOffset() const {
+    int32_t offset;
+    checkError(EVT_CameraGetInt32Param(camera_.get(), "PtpOffset", &offset),
+        "Getting PTP offset");
+    return offset;
+}
+
 uint64_t EmergentCamera::getCurrentPTPTime() const {
     if (!is_open_) {
         throw CameraException("Cannot get PTP time - camera not open");
@@ -710,6 +842,48 @@ void EmergentCamera::updateIris(int iris_value) {
     }
 }
 
+void EmergentCamera::updateFocus(int focus_value) {
+    if (!is_open_) {
+        throw CameraException("Cannot update focus - camera not open");
+    }
+
+    try {
+        // Get valid range for focus
+        unsigned int max_val, min_val, inc_val;
+        
+        checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Focus", &max_val),
+            "Getting max focus value");
+        checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Focus", &min_val),
+            "Getting min focus value");
+        checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Focus", &inc_val),
+            "Getting focus increment");
+
+        // Store in params for future reference
+        params_.focus_max = max_val;
+        params_.focus_min = min_val;
+        params_.focus_inc = inc_val;
+
+        // Validate focus value
+        if (focus_value < static_cast<int>(min_val) || 
+            focus_value > static_cast<int>(max_val)) {
+            throw CameraException(
+                "Focus value " + std::to_string(focus_value) + 
+                " outside valid range [" + std::to_string(min_val) + 
+                ", " + std::to_string(max_val) + "]"
+            );
+        }
+
+        // Update focus
+        checkError(EVT_CameraSetUInt32Param(camera_.get(), "Focus", focus_value),
+            "Setting focus value");
+        
+        params_.focus = focus_value;
+
+    } catch (const std::exception& e) {
+        throw CameraException(std::string("Failed to update focus: ") + e.what());
+    }
+}
+
 int EmergentCamera::getSensorTemperature() const {
     if (!is_open_) {
         throw CameraException("Cannot get sensor temperature - camera not open");
@@ -766,22 +940,6 @@ void EmergentCamera::printDeviceInfo(const GigEVisionDeviceInfo* device_info) co
     std::cout << "currentSubnetMask: " << device_info->currentSubnetMask << std::endl;
     std::cout << "defaultGateway: " << device_info->defaultGateway << std::endl;
     std::cout << "nic.ip4Address: " << device_info->nic.ip4Address << std::endl;
-}
-
-void EmergentCamera::printDeviceInfo(const GigEVisionDeviceInfo* device_info, int camera_idx) {
-    if (!device_info) {
-        throw CameraException("Cannot print device info - device_info is null");
-    }
-    
-    std::cout << "Camera: " << camera_idx << std::endl;
-    std::cout << "userDefinedName: " << device_info[camera_idx].userDefinedName << std::endl;
-    std::cout << "macAddress: " << device_info[camera_idx].macAddress << std::endl;
-    std::cout << "deviceMode: " << device_info[camera_idx].deviceMode << std::endl;
-    std::cout << "serialNumber: " << device_info[camera_idx].serialNumber << std::endl;
-    std::cout << "currentIp: " << device_info[camera_idx].currentIp << std::endl;
-    std::cout << "currentSubnetMask: " << device_info[camera_idx].currentSubnetMask << std::endl;
-    std::cout << "defaultGateway: " << device_info[camera_idx].defaultGateway << std::endl;
-    std::cout << "nic.ip4Address: " << device_info[camera_idx].nic.ip4Address << std::endl;
 }
 
 bool EmergentCamera::initializeGPUDirect() {
@@ -853,6 +1011,33 @@ void EmergentCamera::validateGPUConfiguration() const {
               << (selected_gpu.total_memory / 1024 / 1024) << "MB" << std::endl
               << "- Free Memory: "
               << (selected_gpu.free_memory / 1024 / 1024) << "MB" << std::endl;
+}
+
+void EmergentCamera::updatePixelFormat(const std::string& format) {
+    if (!is_open_) {
+        throw CameraException("Cannot update pixel format - camera not open");
+    }
+
+    checkError(EVT_CameraSetEnumParam(camera_.get(), "PixelFormat", format.c_str()),
+        "Setting pixel format");
+    
+    params_.pixel_format = format;
+}
+
+void EmergentCamera::close() {
+    if (!is_open_) {
+        return;  // Nothing to do if camera isn't open
+    }
+
+    try {
+        checkError(EVT_CameraClose(camera_.get()), "Closing camera");
+        is_open_ = false;
+        std::cout << "Camera " << params_.camera_serial << " closed successfully" << std::endl;
+    } catch (const std::exception& e) {
+        // Log error but don't throw - this allows destructor to continue cleanup
+        std::cerr << "Error closing camera: " << e.what() << std::endl;
+        is_open_ = false;  // Ensure flag is reset even if error occurs
+    }
 }
 
 } // namespace evt

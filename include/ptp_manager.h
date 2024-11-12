@@ -1,45 +1,57 @@
 #pragma once
 
-#include "emergent_camera.h"
-#include "video_capture.h"
 #include <vector>
 #include <cstdint>
+#include <string>
+#include <stdexcept>
 
 namespace evt {
 
-struct PTPState {
-    int ptp_offset{0};
-    int ptp_offset_sum{0};
-    int ptp_offset_prev{0};
-    unsigned int ptp_time_low{0};
-    unsigned int ptp_time_high{0};
-    unsigned int ptp_time_plus_delta_to_start_low{0};
-    unsigned int ptp_time_plus_delta_to_start_high{0};
-    unsigned long long ptp_time_delta_sum{0};
-    unsigned long long ptp_time_delta{0};
-    unsigned long long ptp_time{0};
-    unsigned long long ptp_time_prev{0};
-    unsigned long long ptp_time_countdown{0};
-    unsigned long long frame_ts{0};
-    unsigned long long frame_ts_prev{0};
-    unsigned long long frame_ts_delta{0};
-    unsigned long long frame_ts_delta_sum{0};
-    unsigned long long ptp_time_plus_delta_to_start{0};
-    char ptp_status[100];
-    unsigned long ptp_status_sz_ret{0};
-    unsigned int ptp_time_plus_delta_to_start_uint{0};
+// Forward declarations
+class EmergentCamera;
+struct CameraParams;
+
+// External structs we need to include
+struct PTPParams {
+    uint64_t ptp_global_time{0}; 
+    uint64_t ptp_stop_time{0};
+    uint64_t ptp_counter{0};
+    uint64_t ptp_stop_counter{0};
+    bool network_sync{false};
+    bool ptp_start_reached{false};
+    bool ptp_stop_reached{false};
+    bool network_set_stop_ptp{false};
+    bool network_set_start_ptp{false};
 };
 
-struct PTPParams{
-    unsigned long long ptp_global_time; 
-    unsigned long long ptp_stop_time;
-    uint64_t ptp_counter;
-    uint64_t ptp_stop_counter;
-    bool network_sync = false;
-    bool ptp_start_reached = false;
-    bool ptp_stop_reached = false;
-    bool network_set_stop_ptp = false;
-    bool network_set_start_ptp = false;
+// Exception class for PTP-related errors
+class PTPException : public std::runtime_error {
+public:
+    explicit PTPException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+// PTP State structure
+struct PTPState {
+    int32_t ptp_offset{0};
+    int32_t ptp_offset_sum{0};
+    int32_t ptp_offset_prev{0};
+    uint32_t ptp_time_low{0};
+    uint32_t ptp_time_high{0};
+    uint32_t ptp_time_plus_delta_to_start_low{0};
+    uint32_t ptp_time_plus_delta_to_start_high{0};
+    uint64_t ptp_time_delta_sum{0};
+    uint64_t ptp_time_delta{0};
+    uint64_t ptp_time{0};
+    uint64_t ptp_time_prev{0};
+    uint64_t ptp_time_countdown{0};
+    uint64_t frame_ts{0};
+    uint64_t frame_ts_prev{0};
+    uint64_t frame_ts_delta{0};
+    uint64_t frame_ts_delta_sum{0};
+    uint64_t ptp_time_plus_delta_to_start{0};
+    char ptp_status[100];
+    uint32_t ptp_status_sz_ret{0};
+    uint32_t ptp_time_plus_delta_to_start_uint{0};
 };
 
 class PTPManager {
@@ -62,8 +74,6 @@ public:
     void waitForTimestamp(uint64_t target_time);
     void setupGateTime(uint64_t global_time);
     void waitForGateTime();
-    uint64_t getCurrentPTPTime() const;
-    uint64_t updatePTPGateTime();
 
     // Getter for internal state
     const PTPState& getState() const { return ptp_state_; }
@@ -80,10 +90,20 @@ private:
     int32_t current_offset_{0};
     int32_t last_offset_{0};
     PTPState ptp_state_;
-    void updateGateTimeRegisters(uint64_t time);
     
     // Maximum allowable offset between cameras for synchronization (100 microseconds)
     static constexpr int32_t MAX_SYNC_OFFSET_NS = 100000;
 };
+
+// Free function declarations
+void showPTPOffset(PTPState* ptp_state, EmergentCamera* camera);
+
+void startPTPSync(PTPState* ptp_state, 
+                 PTPParams* ptp_params, 
+                 CameraParams* camera_params, 
+                 EmergentCamera* camera, 
+                 unsigned int delay_in_second);
+
+void grabFramesAfterCountdown(PTPState* ptp_state, EmergentCamera* camera);
 
 } // namespace evt

@@ -5,10 +5,32 @@
 #include <string.h>
 #include "kernel.cuh"
 #include "gpu_video_encoder.h"
+#include "image_processing.h"
 #include <cuda_runtime_api.h>
 
 // Maximum practical dimensions supported by H.264
 const int H264_MAX_DIMENSION = 2048;
+
+namespace evt {
+
+bool is_h264_codec(const std::string& encoder_str) {
+    return encoder_str.find("h264") != std::string::npos;
+}
+
+bool validate_encoder_parameters(const CameraParams* camera_params, const std::string& encoder_str) {
+    // Only validate H.264
+    if (!is_h264_codec(encoder_str)) {
+        return true;
+    }
+
+    // Check if dimensions exceed H.264 limits
+    if (camera_params->width > H264_MAX_DIMENSION || 
+        camera_params->height > H264_MAX_DIMENSION) {
+        return false;
+    }
+
+    return true;
+}
 
 template <class EncoderClass>
 void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, NV_ENC_BUFFER_FORMAT eFormat)
@@ -182,7 +204,7 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
 
 
 GPUVideoEncoder::GPUVideoEncoder(const char* name, 
-                               const CameraParams* camera_params,  // Made const
+                               const CameraParams* camera_params,
                                std::string encoder_setup, 
                                std::string folder_name, 
                                bool* encoder_ready_signal)
@@ -213,9 +235,9 @@ void GPUVideoEncoder::ProcessOneFrame(void* f)
     ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
 
     if (camera_params->color){
-        debayer_frame_gpu(camera_params, &frame_original, &debayer);
+        debayerFrameGPU(camera_params, &frame_original, &debayer);
     } else {
-        duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+        duplicateChannelGPU(camera_params, &frame_original, &debayer);
     }
 
     encode_frame(&encoder, writer.video, &debayer);
@@ -226,8 +248,8 @@ void GPUVideoEncoder::ThreadRunning()
 {
     ck(cudaSetDevice(camera_params->gpu_id));
     // innitialization
-    initalize_gpu_frame(&frame_original, camera_params);
-    initialize_gpu_debayer(&debayer, camera_params);
+    initializeGPUFrame(&frame_original, camera_params);
+    initializeGPUDebayer(&debayer, camera_params);
 
     initialize_encoder(&encoder, encoder_setup, camera_params);
     initialize_writer(&writer, camera_params, folder_name, encoder_setup);
@@ -305,21 +327,4 @@ bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize, int width
     return false;
 }
 
-bool is_h264_codec(const std::string& encoder_str) {
-    return encoder_str.find("h264") != std::string::npos;
-}
-
-bool validate_encoder_parameters(CameraParams* camera_params, const std::string& encoder_str) {
-    // Only validate H.264
-    if (!is_h264_codec(encoder_str)) {
-        return true;
-    }
-
-    // Check if dimensions exceed H.264 limits
-    if (camera_params->width > H264_MAX_DIMENSION || 
-        camera_params->height > H264_MAX_DIMENSION) {
-        return false;
-    }
-
-    return true;
-}
+} // namespace evt

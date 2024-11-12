@@ -6,8 +6,8 @@
 #include "emergent_camera.h"
 #include "frame_streaming.h"
 #include "gpu_streaming.h"
-#include "camera_params.h"  
 #include "camera.h"         // For GigEVisionDeviceInfo
+#include "camera_params.h"  // Make sure this include comes before we use CameraParams
 
 namespace evt {
 
@@ -36,8 +36,8 @@ public:
             if (selected_cameras[i]) {
                 CameraInstance instance;
                 
-                // Create new camera with default parameters
-                instance.params = CameraParams{}; // Initialize with defaults
+                // Initialize with defaults
+                instance.params = CameraParams{};  // Now CameraParams is properly initialized
                 instance.camera = std::make_unique<EmergentCamera>(instance.params);
                 
                 // Load configuration if available
@@ -45,7 +45,6 @@ public:
                     loadCameraConfig(instance, config_files[i], device_info[i]);
                 }
                 
-                // Store camera instance
                 cameras.push_back(std::move(instance));
             }
         }

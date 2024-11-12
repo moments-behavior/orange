@@ -268,8 +268,9 @@ int main(int argc, char **args)
                     }
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                        evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
+                        evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                         &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);
+                    
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -358,14 +359,22 @@ int main(int argc, char **args)
             }
             delete[] tex;
 
-
             for (auto &t : camera_threads)
                 t.join();
-            
-            for (int i = 0; i < num_cameras; i++)
-            {
-                camera_threads.pop_back();
+            camera_threads.clear();
+
+            if (sync_detection->number_of_sync_cams > 0) {
+                detection3d_thread.join();
+                sync_detection->cam_ids.clear();
+                sync_detection->frame_ready.clear();
+                sync_detection->frame_unread.clear();
+                sync_detection->m_frames.clear();
             }
+
+            for (auto &t : detection_threads)
+                t.join();
+            detection_threads.clear();
+
             for (int i = 0; i < num_cameras; i++)
             {
                 destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);

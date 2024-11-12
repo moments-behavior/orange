@@ -64,10 +64,8 @@ public:
             funcInit = *pfuncInit;
         }
 
-        // Use lambda function to avoid ambiguity with std::tolower
-        std::transform(strParam.begin(), strParam.end(), strParam.begin(), 
-                       [](unsigned char c) { return std::tolower(c); });
-
+      std::transform(strParam.begin(), strParam.end(), strParam.begin(), 
+               [](unsigned char c) { return std::tolower(static_cast<unsigned char>(c)); });
         std::istringstream ss(strParam);
         tokens = std::vector<std::string> {
             std::istream_iterator<std::string>(ss),

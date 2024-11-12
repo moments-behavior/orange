@@ -3,7 +3,11 @@
 #include <string>
 #include <memory>
 #include <stdexcept>
-#include "camera.h"
+#include <unistd.h>
+#include <string>
+#include <algorithm>
+#include <vector>
+#include <numeric>
 #include "camera_params.h"
 #include "gpu_manager.h"
 
@@ -12,10 +16,17 @@
 #include <emergentframe.h>
 #include <EvtParamAttribute.h>
 #include <gigevisiondeviceinfo.h>
+#include <emergentcameradef.h>
+#include <emergentgigevisiondef.h>
+#include <EvtParamAttribute.h>
 #endif
 
 namespace evt {
 
+// Utility function to get human-readable error messages
+std::string get_evt_error_string(EVT_ERROR error);
+
+// Camera-specific exception class
 class CameraException : public std::runtime_error {
 public:
     explicit CameraException(const std::string& msg, EVT_ERROR code = EVT_GENERAL_ERROR) 
@@ -24,6 +35,30 @@ public:
 private:
     EVT_ERROR error_code;
 };
+
+// Private implementation struct for Emergent camera hardware
+struct CameraEmergent {
+    Emergent::CEmergentCamera camera;
+    Emergent::CEmergentFrame* evt_frame;
+    Emergent::CEmergentFrame frame_recv;
+    Emergent::CEmergentFrame frame_reorder;
+};
+
+// Helper function for error checking
+inline void check_camera_errors(EVT_ERROR err, const char* camera_serial, 
+                              const char* file, int line) {
+    if (EVT_SUCCESS != err) {
+        std::string error_string = get_evt_error_string(err);
+        const char* errorStr = error_string.c_str();
+        throw CameraException(
+            std::string(camera_serial) + " error " + std::to_string(err) + 
+            " (" + errorStr + ") at " + file + ":" + std::to_string(line)
+        );
+    }
+}
+
+#define CHECK_CAMERA_ERROR(err, camera_serial) \
+    check_camera_errors(err, camera_serial, __FILE__, __LINE__)
 
 class EmergentCamera {
 public:

@@ -7,6 +7,13 @@
 
 namespace fs_utils {
 
+/**
+ * @brief Gets the user's home directory path
+ * @return Path to the user's home directory
+ * @throws std::runtime_error if home directory cannot be determined
+ */
+std::filesystem::path get_home_directory();
+
 bool initialize_directories();
 
 // Standard permission constants
@@ -55,5 +62,12 @@ bool create_dir_with_ownership(const std::string& path, uid_t uid, gid_t gid,
 bool set_recursive_ownership(const std::string& path, uid_t uid, gid_t gid,
                            mode_t dir_perms = DIR_PERMS,
                            mode_t file_perms = FILE_PERMS);
+
+/**
+ * @brief Gets the real username, even when running under sudo
+ * @return String containing username
+ * @throws std::runtime_error if username cannot be determined
+ */
+std::string get_real_user();
 
 } // namespace fs_utils

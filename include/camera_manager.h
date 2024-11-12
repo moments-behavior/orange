@@ -7,7 +7,6 @@
 #include "frame_streaming.h"
 #include "gpu_streaming.h"
 #include "camera_params.h"
-#include "camera.h"         // For GigEVisionDeviceInfo
 
 namespace evt {
 

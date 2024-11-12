@@ -7,8 +7,45 @@
 
 namespace fs_utils {
 
+std::filesystem::path get_home_directory() {
+    const char* home = getenv("HOME");
+    if (!home) {
+        struct passwd* pwd = getpwuid(getuid());
+        if (pwd)
+            home = pwd->pw_dir;
+    }
+    if (!home)
+        throw std::runtime_error("Could not determine home directory");
+    return std::filesystem::path(home);
+}
+
+std::string get_real_user() {
+    // Check for SUDO_USER first (when running under sudo)
+    const char* sudo_user = getenv("SUDO_USER");
+    if (sudo_user) return sudo_user;
+    
+    // Otherwise use normal USER env var
+    const char* user = getenv("USER");
+    if (user) return user;
+    
+    // Fallback to looking up current UID
+    struct passwd* pw = getpwuid(getuid());
+    if (pw) return pw->pw_name;
+    
+    throw std::runtime_error("Could not determine real user");
+}
+
 bool initialize_directories() {
     try {
+        // Get real user info first
+        std::string username = get_real_user();
+        uid_t uid;
+        gid_t gid;
+        if (!get_user_ids(username, uid, gid)) {
+            std::cerr << "Failed to get user IDs for " << username << std::endl;
+            return false;
+        }
+
         std::vector<std::string> required_dirs = {
             "recordings",
             "config",
@@ -20,10 +57,25 @@ bool initialize_directories() {
             "pictures"
         };
 
-        // Get current working directory or specify base directory
-        std::filesystem::path base_dir = std::filesystem::current_path();
+        // Get home directory and create base orange_data directory
+        std::filesystem::path base_dir = get_home_directory() / "orange_data";
         
-        // Create each required directory
+        // Create the base directory first
+        if (!std::filesystem::exists(base_dir)) {
+            if (!std::filesystem::create_directory(base_dir)) {
+                std::cerr << "Failed to create base directory: " << base_dir << std::endl;
+                return false;
+            }
+            std::cout << "Created base directory: " << base_dir << std::endl;
+        }
+        
+        // Set ownership of base directory
+        if (!set_ownership_and_perms(base_dir.string(), uid, gid, DIR_PERMS)) {
+            std::cerr << "Failed to set ownership of base directory" << std::endl;
+            return false;
+        }
+        
+        // Create each required subdirectory
         for (const auto& dir : required_dirs) {
             std::filesystem::path dir_path = base_dir / dir;
             if (!std::filesystem::exists(dir_path)) {
@@ -33,6 +85,11 @@ bool initialize_directories() {
                     std::cerr << "Failed to create directory: " << dir_path << std::endl;
                     return false;
                 }
+            }
+            // Set ownership of each directory
+            if (!set_ownership_and_perms(dir_path.string(), uid, gid, DIR_PERMS)) {
+                std::cerr << "Failed to set ownership of: " << dir_path << std::endl;
+                return false;
             }
         }
 

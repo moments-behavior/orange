@@ -6,8 +6,7 @@
 #include "emergent_camera.h"
 #include "frame_streaming.h"
 #include "gpu_streaming.h"
-#include "camera.h"         // For GigEVisionDeviceInfo
-#include "camera_params.h"  // Make sure this include comes before we use CameraParams
+#include "camera_params.h"
 
 namespace evt {
 
@@ -31,22 +30,24 @@ public:
                           const std::vector<GigEVisionDeviceInfo>& device_info,
                           const std::vector<std::string>& config_files) {
         cameras.clear();
+        cameras.reserve(device_info.size());  // Reserve space to avoid reallocation
         
-        for (size_t i = 0; i < selected_cameras.size(); ++i) {
-            if (selected_cameras[i]) {
-                CameraInstance instance;
-                
-                // Initialize with defaults
-                instance.params = CameraParams{};  // Now CameraParams is properly initialized
-                instance.camera = std::make_unique<EmergentCamera>(instance.params);
-                
-                // Load configuration if available
-                if (i < config_files.size()) {
-                    loadCameraConfig(instance, config_files[i], device_info[i]);
-                }
-                
-                cameras.push_back(std::move(instance));
+        for (size_t i = 0; i < device_info.size(); ++i) {
+            CameraInstance instance;
+            
+            // Initialize parameters with device info
+            instance.params = CameraParams{};
+            instance.params.camera_serial = device_info[i].serialNumber;
+            instance.params.camera_name = device_info[i].userDefinedName;
+            
+            // Load configuration if available
+            if (i < config_files.size() && !config_files[i].empty()) {
+                loadCameraConfig(instance, config_files[i], device_info[i]);
             }
+            
+            // Create camera instance with parameters
+            instance.camera = std::make_unique<EmergentCamera>(instance.params);
+            cameras.push_back(std::move(instance));
         }
     }
 
@@ -199,6 +200,15 @@ public:
     // Access to camera instances for GUI
     const CameraInstance& getCamera(size_t idx) const { return cameras[idx]; }
     CameraInstance& getCamera(size_t idx) { return cameras[idx]; }
+
+    // Add a safe method to get camera parameters
+    const CameraParams& getCameraParams(size_t idx) const {
+        if (idx >= cameras.size() || !cameras[idx].camera) {
+            static const CameraParams default_params;
+            return default_params;
+        }
+        return cameras[idx].params;
+    }
 
 private:
     std::vector<CameraInstance> cameras;

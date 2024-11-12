@@ -33,7 +33,7 @@ namespace {
             case EVT_ERROR_OS_OBTAIN_ADAPTER:
                 return "Failed to get host adapter info.";
             case EVT_ERROR_SDK:
-                return "SDK error, should not occur.";
+                return "SDK error.";
             default:
                 return "Unknown error: " + std::to_string(static_cast<int>(error));
         }

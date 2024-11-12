@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include "json.hpp"
 
 namespace evt {
 
@@ -55,6 +56,42 @@ struct CameraParams {
     int sens_temp_max{0};
     int sens_temp_min{0};
     int sens_temp{0};
+
+    // Add JSON conversion
+    static CameraParams from_json(const nlohmann::json& j) {
+        CameraParams params;
+        
+        // Basic parameters
+        params.width = j.value("width", 0);
+        params.height = j.value("height", 0);
+        params.gain = j.value("gain", 0);
+        params.exposure = j.value("exposure", 0);
+        params.frame_rate = j.value("frame_rate", 0);
+        params.focus = j.value("focus", 0);
+        params.gpu_id = j.value("gpu_id", 0);
+        params.gpu_direct = j.value("gpu_direct", false);
+        params.color = j.value("color", false);
+        
+        // Strings
+        params.pixel_format = j.value("pixel_format", "");
+        params.color_temp = j.value("color_temp", "");
+        params.camera_name = j.value("name", "");
+        params.camera_serial = j.value("device_serial_number", "");
+
+        // Min/max ranges
+        params.width_min = j.value("width_min", 0);
+        params.width_max = j.value("width_max", 0);
+        params.height_min = j.value("height_min", 0);
+        params.height_max = j.value("height_max", 0);
+        params.offsetx = j.value("offset_x", 0);
+        params.offsety = j.value("offset_y", 0);
+        params.iris = j.value("iris", 0);
+        params.iris_max = j.value("iris_max", 0);
+        params.iris_min = j.value("iris_min", 0);
+        params.sens_temp = j.value("sens_temp", 0);
+        
+        return params;
+    }
 };
 
 } // namespace evt

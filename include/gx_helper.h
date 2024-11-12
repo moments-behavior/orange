@@ -22,7 +22,7 @@ typedef struct gx_context
     u32 height;
     GLFWwindow *render_target;
     char *render_target_title;
-    char *glsl_version;
+    char glsl_version[32];
 } gx_context;
 
 
@@ -39,58 +39,79 @@ static inline void gx_glew_error_callback(GLenum glew_error)
     }
 }
 
-static inline void gx_init(gx_context *context, GLFWwindow *render_target)
+static inline GLFWwindow *gx_glfw_init_render_target(u32 major_version, u32 minor_version, 
+    u32 width, u32 height, const char *title, char *glsl_version)
 {
+    // GLFW should already be initialized in main()
+    
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, major_version);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minor_version);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    
+    // Create window with graphics context
+    GLFWwindow *window = glfwCreateWindow(width, height, title, NULL, NULL);
+    if (!window) {
+        const char* error_msg;
+        glfwGetError(&error_msg);
+        fprintf(stderr, "Failed to create GLFW window: %s\n", error_msg ? error_msg : "Unknown error");
+        return nullptr;
+    }
+    
+    glfwMakeContextCurrent(window);
+    
+    // Initialize GLEW
+    GLenum err = glewInit();
+    if (err != GLEW_OK) {
+        fprintf(stderr, "GLEW initialization failed: %s\n", glewGetErrorString(err));
+        glfwDestroyWindow(window);
+        return nullptr;
+    }
+    
+    // Copy GLSL version if pointer is valid
+    if (glsl_version) {
+        strncpy(glsl_version, "#version 130", 31);
+        glsl_version[31] = '\0';
+    }
+    
+    return window;
+}
+
+static inline bool gx_init(gx_context *context, GLFWwindow *render_target)
+{
+    if (!context || !render_target) {
+        return false;
+    }
+    
     context->render_target = render_target;
     glfwMakeContextCurrent(render_target);
     gx_glew_error_callback(glewInit());
     glfwSwapInterval(1); // Enable vsync
+    
+    return true;
 }
 
-static inline GLFWwindow *gx_glfw_init_render_target(u32 marjor_version, u32 minor_version, u32 width, u32 height, const char *title, char *glsl_version)
+static inline bool gx_imgui_init(gx_context *context)
 {
-    // Setup window
-    glfwSetErrorCallback(gx_glfw_error_callback);
-    if (!glfwInit())
-    {
-        printf("Could not initialize glfw!");
-        exit(EXIT_FAILURE);
+    if (!context || !context->render_target) {
+        return false;
     }
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    // local_glsl_version = "#version 330";
-    strcpy(glsl_version, "#version 130");
 
-    // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(1920, 1080, title, NULL, NULL);
-    if (!window)
-    {
-        printf("Could not initialize window!");
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    };
-
-    return window;
-}
-
-static inline void gx_imgui_init(gx_context *context)
-{
     // ************* Dear Imgui ********************//
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImPlotContext *implotCtx = ImPlot::CreateContext();
+    if (!implotCtx) {
+        return false;
+    }
 
     ImGuiIO &io = ImGui::GetIO();
     (void)io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
-    // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsClassic();
 
-    // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+    // When viewports are enabled we tweak WindowRounding/WindowBg
     ImGuiStyle &style = ImGui::GetStyle();
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
@@ -99,18 +120,33 @@ static inline void gx_imgui_init(gx_context *context)
     }
 
     // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(context->render_target, true);
-    ImGui_ImplOpenGL3_Init(context->glsl_version);
+    bool glfw_init_ok = ImGui_ImplGlfw_InitForOpenGL(context->render_target, true);
+    bool gl3_init_ok = ImGui_ImplOpenGL3_Init(context->glsl_version);
+    
+    if (!glfw_init_ok || !gl3_init_ok) {
+        return false;
+    }
 
-    // Load a nice font
-    io.Fonts->AddFontFromFileTTF("fonts/Roboto-Regular.ttf", 15.0f);
-    // merge in icons from Font Awesome
-    static const ImWchar icons_ranges[] = {ICON_MIN_FK, ICON_MAX_16_FK, 0};
-    ImFontConfig icons_config;
-    icons_config.MergeMode = true;
-    icons_config.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF("fonts/forkawesome-webfont.ttf", 15.0f, &icons_config, icons_ranges);
-    // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
+    // Load fonts
+    try {
+        if (!io.Fonts->AddFontFromFileTTF("fonts/Roboto-Regular.ttf", 15.0f)) {
+            return false;
+        }
+        
+        // merge in icons from Font Awesome
+        static const ImWchar icons_ranges[] = {ICON_MIN_FK, ICON_MAX_16_FK, 0};
+        ImFontConfig icons_config;
+        icons_config.MergeMode = true;
+        icons_config.PixelSnapH = true;
+        if (!io.Fonts->AddFontFromFileTTF("fonts/forkawesome-webfont.ttf", 15.0f, 
+                                         &icons_config, icons_ranges)) {
+            return false;
+        }
+    } catch (...) {
+        return false;
+    }
+
+    return true;
 }
 
 static inline void gx_delete_buffer(GLuint *texture) 

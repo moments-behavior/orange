@@ -268,7 +268,7 @@ int main(int argc, char **args)
                     }
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                        evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
+                        evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                         &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);
                     camera_control->subscribe = true;
                 }
@@ -659,7 +659,7 @@ int main(int argc, char **args)
                     delete[] tex;
 
                     stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras, 
-                        evt_buffer_size, ptp_params);
+                        evt_buffer_size, ptp_params, detection_data, sync_detection, detection_threads, detection3d_thread);
                 }
             }
 
@@ -755,7 +755,7 @@ int main(int argc, char **args)
                         }
                     }
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                        evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
+                        evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                         &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);                   
                     camera_control->subscribe = true;                    
                 } else {
@@ -785,7 +785,7 @@ int main(int argc, char **args)
                     delete[] tex;
 
                     stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras, 
-                        evt_buffer_size, ptp_params);
+                        evt_buffer_size, ptp_params, detection_data, sync_detection, detection_threads, detection3d_thread);
                     camera_control->record_video = false;
                 }
             }

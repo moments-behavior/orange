@@ -188,7 +188,7 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
 
     while(camera_control->subscribe) {
         // wait for frame ready
-        while (!sync_detection->frame_ready[idx]) {
+        while (!sync_detection->frame_ready[idx] && camera_control->subscribe) {
             usleep(10);
         }
         

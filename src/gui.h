@@ -76,8 +76,9 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
             sync_count++;
         }
     }
+    sync_detection->number_of_sync_cams = sync_count;
 
-    if (sync_count > 0) {
+    if (sync_detection->number_of_sync_cams > 0) {
         detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control, cameras_select, detection_data, num_cameras);
     }
     
@@ -88,15 +89,26 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
 }
 
 void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, CameraParams* cameras_params, 
-    CameraEachSelect *cameras_select, int num_cameras, int evt_buffer_size, PTPParams* ptp_params)
+    CameraEachSelect *cameras_select, int num_cameras, int evt_buffer_size, PTPParams* ptp_params, DetectionData* detection_data,
+    SyncDetection* sync_detection, std::vector<std::thread>& detection_threads, std::thread& detection3d_thread)
 {
     for (auto &t : camera_threads)
         t.join();
-    
-    for (int i = 0; i < num_cameras; i++)
-    {
-        camera_threads.pop_back();
+    camera_threads.clear();
+
+    std::cout << "join 3d detection thread" << std::endl;
+    if (sync_detection->number_of_sync_cams > 0) {
+        detection3d_thread.join();
+        sync_detection->cam_ids.clear();
+        sync_detection->frame_ready.clear();
+        sync_detection->frame_unread.clear();
+        sync_detection->m_frames.clear();
     }
+
+    std::cout << "join 2d detection thread" << std::endl;
+    for (auto &t : detection_threads)
+        t.join();
+    detection_threads.clear();
 
     for (int i = 0; i < num_cameras; i++)
     {

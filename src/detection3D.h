@@ -30,6 +30,7 @@ struct SyncDetection {
     std::vector<int> cam_ids;
     std::condition_variable m_cond;
     std::mutex m_mutex;
+    int number_of_sync_cams;
     std::vector<bool> frame_unread;
     std::vector<bool> frame_ready;
     std::vector<CameraEntry*> m_frames;

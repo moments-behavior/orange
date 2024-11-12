@@ -96,7 +96,6 @@ void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraContr
         t.join();
     camera_threads.clear();
 
-    std::cout << "join 3d detection thread" << std::endl;
     if (sync_detection->number_of_sync_cams > 0) {
         detection3d_thread.join();
         sync_detection->cam_ids.clear();
@@ -105,7 +104,6 @@ void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraContr
         sync_detection->m_frames.clear();
     }
 
-    std::cout << "join 2d detection thread" << std::endl;
     for (auto &t : detection_threads)
         t.join();
     detection_threads.clear();

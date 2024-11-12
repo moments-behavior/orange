@@ -253,6 +253,6 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
         }
         
         // sleep longer since don't need to update too often
-        usleep(1000);
+        usleep(2000);
     }
 }

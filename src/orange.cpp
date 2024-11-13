@@ -246,6 +246,8 @@ int main(int argc, char **args)
             if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if(ImGui::Button("Clients start camera threads")) {
+                    camera_control->subscribe = true;
+
                     encoder_config->encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                     make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
                     ptp_params->network_sync = true;
@@ -271,7 +273,6 @@ int main(int argc, char **args)
                         evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                         &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);
                     
-                    camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
             }
@@ -737,6 +738,8 @@ int main(int argc, char **args)
                 (camera_control->stop_record) = !(camera_control->stop_record);
                 if (camera_control->stop_record)
                 {
+                    // subscribe need to be true first, otherwise detect deadlock, need ot figure out why
+                    camera_control->subscribe = true;
                     encoder_config->encoder_setup= "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                     camera_control->record_video = true;
                     make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
@@ -766,7 +769,6 @@ int main(int argc, char **args)
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                         evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                         &indigo_signal_builder, detection_data, sync_detection, detection_threads, detection3d_thread);                   
-                    camera_control->subscribe = true;                    
                 } else {
                     camera_control->subscribe = false;
                     

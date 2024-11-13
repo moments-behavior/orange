@@ -159,7 +159,6 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
 {
 
     CameraParams* camera_params = &cameras_params[idx];
-
     ck(cudaSetDevice(camera_params->gpu_id));
     
     // innitialization

@@ -77,7 +77,6 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
         }
     }
     sync_detection->number_of_sync_cams = sync_count;
-
     if (sync_detection->number_of_sync_cams > 0) {
         detection3d_thread = std::thread(&detection3d_proc, sync_detection, camera_control, cameras_select, detection_data, num_cameras);
     }

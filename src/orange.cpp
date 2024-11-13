@@ -223,10 +223,12 @@ int main(int argc, char **args)
                         }
 
                         for (int i =0; i < num_cameras; i++) {
+                            cameras_select[i].sync_detect = true;
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name.compare("Cam16") == 0) {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
+                                cameras_select[i].yolo = false;
+                                cameras_select[i].sync_detect = false;
                             }
                         }
 

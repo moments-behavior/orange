@@ -71,6 +71,33 @@ bool find_marker3d(TriangulatePoints* aruco_marker_2d, std::vector<CameraCalibRe
     return true;
 }
 
+bool find_ball3d(TriangulatePoints* ball_2d, std::vector<CameraCalibResults*>& calib_results, Ball3d* ball3d)
+{
+    int num_detected_cams = ball_2d->detected_cameras.size();
+    if (num_detected_cams >= 2) {
+        // triangulate
+        std::vector<CameraCalibResults*> calib_results_all; 
+        for (size_t i = 0; i < num_detected_cams; i++) {
+            calib_results_all.push_back(calib_results[ball_2d->detected_cameras[i]]);
+        }
+ 
+        std::vector<cv::Point2f> image_points_all;
+        for (size_t j = 0; j < num_detected_cams; j++) {
+            image_points_all.push_back(ball_2d->detected_points[j][0]);
+        }
+        cv::Mat output3d = triangulate_points(image_points_all, calib_results_all); 
+        cv::Point3f pts3d = cv::Point3d(output3d);
+        // cv::Point3f(output3d.at<float>(0), output3d.at<float>(1), output3d.at<float>(2));
+        ball3d->center = pts3d;
+        std::cout << "Ball: " << ball3d->center << std::endl;
+        
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
 
 void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_control, CameraEachSelect *cameras_select, DetectionData* detection_data, int num_cameras)
 {
@@ -80,6 +107,7 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
         calib_results.push_back(&detection_data->detect_per_cam[sync_detection->cam_ids[i]].camera_calib);
     }
     TriangulatePoints marker2d_all_cams;
+    TriangulatePoints ball2d_all_cams;
     while(camera_control->subscribe) {
         bool frame_unread = std::all_of(sync_detection->frame_unread.begin(), sync_detection->frame_unread.end(), [](bool v) { return v;});
         // std::cout << frame_unread << "frame_unread" << std::endl;
@@ -102,7 +130,6 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
                 }
                 sync_detection->detection_ready = false;
                 // std::cout << "triangulation start" << std::endl;
-
             }
 
             if (!marker2d_all_cams.detected_cameras.empty()) {
@@ -110,9 +137,13 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
                 marker2d_all_cams.detected_points.clear();
             }
 
+            if (!ball2d_all_cams.detected_cameras.empty()) {
+                ball2d_all_cams.detected_cameras.clear();
+                ball2d_all_cams.detected_points.clear();
+            }
+
             // triangulation calculation
             for (int j=0; j<sync_detection->m_frames.size(); j++) {
-                // only detect 0 marker for now, need to make this general
                 if (detection_data->detect_per_cam[j].marker2d.find_marker) {
                     std::vector<cv::Point2f> corners;
                     for (size_t i = 0; i < 4; i++) {
@@ -121,9 +152,18 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
                     marker2d_all_cams.detected_points.push_back(corners);
                     marker2d_all_cams.detected_cameras.push_back(j);
                 }
+
+                if (detection_data->detect_per_cam[j].ball2d.find_ball) {
+                    std::vector<cv::Point2f> corners;
+                    corners.push_back(detection_data->detect_per_cam[j].ball2d.center[0]);
+                    ball2d_all_cams.detected_points.push_back(corners);
+                    ball2d_all_cams.detected_cameras.push_back(j);
+                }
             }
 
             detection_data->marker3d.new_detection = find_marker3d(&marker2d_all_cams, calib_results, &detection_data->marker3d);
+            detection_data->ball3d.new_detection = find_ball3d(&ball2d_all_cams, calib_results, &detection_data->ball3d);
+
             // project onto streaming cameras
             if (detection_data->marker3d.new_detection) {
                 for (int i=0; i<num_cameras; i++) {
@@ -146,6 +186,26 @@ void detection3d_proc(SyncDetection* sync_detection, CameraControl* camera_contr
                     }
                 }
             }
+
+            if (detection_data->ball3d.new_detection) {
+                for (int i=0; i<num_cameras; i++) {
+                    
+                    if (cameras_select[i].stream_on && detection_data->detect_per_cam[i].have_calibration_results) {
+
+                        cv::Mat image_pts;
+                        CameraCalibResults* cam_calib = &detection_data->detect_per_cam[i].camera_calib;
+
+                        std::vector<cv::Point3f> points3d;
+                        points3d.push_back(detection_data->ball3d.center);
+
+                        cv::projectPoints(points3d, cam_calib->rvec, cam_calib->tvec, cam_calib->k, cam_calib->dist_coeffs, image_pts);
+                        std::cout << image_pts.at<float>(0, 0) << ", " <<  image_pts.at<float>(0, 1) << std::endl;
+                        detection_data->detect_per_cam[i].ball2d.proj_center[0].x = image_pts.at<float>(0, 0);
+                        detection_data->detect_per_cam[i].ball2d.proj_center[0].y = image_pts.at<float>(0, 1);
+                    }
+                }
+            }
+
 
             for (int i =0; i < sync_detection->frame_unread.size(); i++) {
                 sync_detection->frame_unread[i] = false;
@@ -179,6 +239,17 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
     // d_gray_size.width = camera_params->width;
     // d_gray_size.height = camera_params->height;
 
+    // for ball detection
+    unsigned char *d_rgb;
+    cudaMalloc((void **)&d_rgb, size_of_picture);
+
+    const std::string engine_file_path = detection_data->detect_per_cam[camera_params->used_cams_idx].yolo_model;
+    YOLOv8* yolov8 = new YOLOv8(engine_file_path, camera_params->width, camera_params->height);
+    yolov8->make_pipe(true);
+    std::vector<Object> objs;
+
+
+
     if (!camera_params->gpu_direct) {
         initalize_gpu_frame(&frame_original, camera_params);
     }
@@ -211,6 +282,19 @@ void detection_proc(SyncDetection* sync_detection, CameraControl* camera_control
         rgba2bgr_convert(d_bgr, debayer.d_debayer, camera_params->width, camera_params->height, 0);
         ck(cudaMemcpy2D(cpu_frame, camera_params->width*3, d_bgr, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
         cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, cpu_frame).reshape(3, camera_params->height);
+
+        rgba2rgb_convert(d_rgb, debayer.d_debayer, camera_params->width, camera_params->height, 0);
+        yolov8->preprocess_gpu(d_rgb);
+        yolov8->infer();
+        yolov8->postprocess(objs);
+    
+        if (objs.size() > 0) {
+            f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
+            f32 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
+
+            detection_data->detect_per_cam[idx].ball2d.find_ball = true;
+            detection_data->detect_per_cam[idx].ball2d.center[0] = {bbox_center_x, bbox_center_y};
+        }
 
         // // convert rgba to grayscale, need to compare opencv marker detection and the package used, which is better, https://sourceforge.net/projects/aruco/ 
         // // const NppStatus npp_result = nppiRGBToGray_8u_AC4C1R(debayer.d_debayer, camera_params->width*4, d_gray, camera_params->width, d_gray_size);

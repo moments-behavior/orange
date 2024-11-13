@@ -298,6 +298,17 @@ void draw_aruco_markers(Aruco2d* aruco_marker)
 
     ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
     ImPlot::PlotLine("Aruco", x, y, 5); 
+
+}
+
+void draw_ball_center(Ball2d* ball2d)
+{
+    ImVec4 node_color = (ImVec4)ImColor::HSV(0.1, 0.9f, 0.9f);
+    float pt_size = 6.0f;
+
+    double ball_center_x = (double)ball2d->proj_center[0].x;
+    double ball_center_y = (double)2200 - (double)ball2d->proj_center[0].y;
+    ImPlot::DragPoint(0, &ball_center_x, &ball_center_y, node_color, pt_size, ImPlotDragToolFlags_None);
 }
 
 #endif

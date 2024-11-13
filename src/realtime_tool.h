@@ -11,6 +11,7 @@
 #include <map>
 #include <iostream>
 #include <atomic>
+#include "yolov8_det.h"
 
 #define PI 3.14159265
 
@@ -31,12 +32,20 @@ struct Aruco2d {
     cv::Point2f proj_corners[4];
 };
 
+struct Ball2d {
+    int frame_number;
+    bool find_ball;
+    cv::Point2f center[1];
+    cv::Point2f proj_center[1];
+};
+
 struct DetectionDataPerCam {
     bool have_calibration_results;
     std::string yolo_model;
     std::string calibration_file;
     CameraCalibResults camera_calib;
     Aruco2d marker2d;
+    Ball2d ball2d;
 };
 
 struct Aruco3d
@@ -49,6 +58,12 @@ struct Aruco3d
     std::atomic_bool new_detection;
 };
 
+struct Ball3d
+{
+    cv::Point3f center;
+    std::atomic_bool new_detection;
+};
+
 struct DetectionData {
     std::string yolo_model_folder; 
     std::string yolo_model; // TODO: remove this for the future? 
@@ -56,6 +71,7 @@ struct DetectionData {
     std::atomic_bool trigger_ball_drop;
     std::vector<cv::Point3d> points3d;
     Aruco3d marker3d;
+    Ball3d ball3d;
     DetectionDataPerCam* detect_per_cam;
 };
 

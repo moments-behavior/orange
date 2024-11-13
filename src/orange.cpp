@@ -835,7 +835,13 @@ int main(int argc, char **args)
                         
                         if (detection_data->detect_per_cam[i].have_calibration_results) {
                             gui_plot_world_coordinates(&detection_data->detect_per_cam[i].camera_calib, &cameras_params[i]);
-                            draw_aruco_markers(&detection_data->detect_per_cam[i].marker2d);
+                            
+                            if (detection_data->marker3d.new_detection) {
+                                draw_aruco_markers(&detection_data->detect_per_cam[i].marker2d);
+                            }
+                            if (detection_data->ball3d.new_detection) {
+                                draw_ball_center(&detection_data->detect_per_cam[i].ball2d);
+                            }
                         }
                         
                         ImPlot::EndPlot();

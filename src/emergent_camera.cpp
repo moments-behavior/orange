@@ -69,24 +69,14 @@ void EmergentCamera::open(const GigEVisionDeviceInfo* device_info) {
             throw CameraException("Camera already open");
         }
 
+        // Just open the camera - don't configure anything yet
         checkError(EVT_CameraOpen(camera_.get(), device_info), "Opening camera");
         is_open_ = true;
 
+        // Only set the absolute minimum required settings
         configureDefaults();
-        
-        // Configure initial camera settings
-        updateResolution(params_.width, params_.height);
-        updateOffset(0, 0);
-        updatePixelFormat(params_.pixel_format);
-        
-        if (params_.color) {
-            checkError(EVT_CameraSetEnumParam(camera_.get(), "ColorTemp", 
-                params_.color_temp.c_str()), "Setting color temperature");
-        }
 
-        updateGain(params_.gain);
-        updateExposure(params_.exposure);
-        updateFrameRate(params_.frame_rate);
+        LOG(INFO) << "Camera opened successfully";
 
     } catch (const std::exception& e) {
         is_open_ = false;
@@ -160,15 +150,17 @@ void EmergentCamera::startStream() {
 }
 
 void EmergentCamera::configureDefaults() {
-    // Implementation of configure_factory_defaults
-    checkError(EVT_CameraSetUInt32Param(camera_.get(), "OffsetX", 0), "Setting default OffsetX");
-    checkError(EVT_CameraSetUInt32Param(camera_.get(), "OffsetY", 0), "Setting default OffsetY");
+    // Only set the absolute minimum required for initialization
+    // Do not set any resolution, exposure, gain etc. here
     
     checkError(EVT_CameraSetEnumParam(camera_.get(), "AcquisitionMode", "Continuous"), 
         "Setting acquisition mode");
     checkError(EVT_CameraSetUInt32Param(camera_.get(), "AcquisitionFrameCount", 1),
         "Setting frame count");
-    // TODO: additional default settings
+        
+    // Add any other essential initialization settings that don't depend on ranges
+    
+    LOG(INFO) << "Camera defaults configured";
 }
 
 void EmergentCamera::checkError(EVT_ERROR err, const std::string& operation) const {
@@ -1209,6 +1201,132 @@ void EmergentCamera::logCurrentState(const std::string& context) const {
                   << "\n  Focus: " << state.focus;
     } catch (const CameraException& e) {
         LOG(ERROR) << "Failed to get camera state: " << e.what();
+    }
+}
+
+void evt::EmergentCamera::updateCameraRanges() {
+    if (!is_open_) {
+        throw CameraException("Cannot update ranges - camera not open");
+    }
+
+    // Width ranges
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Width", &params_.width_max),
+        "Getting width max");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Width", &params_.width_min),
+        "Getting width min");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Width", &params_.width_inc),
+        "Getting width increment");
+
+    // Height ranges
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Height", &params_.height_max),
+        "Getting height max");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Height", &params_.height_min),
+        "Getting height min");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Height", &params_.height_inc),
+        "Getting height increment");
+
+    // Exposure ranges
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Exposure", &params_.exposure_max),
+        "Getting exposure max");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Exposure", &params_.exposure_min),
+        "Getting exposure min");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Exposure", &params_.exposure_inc),
+        "Getting exposure increment");
+
+    // Gain ranges
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Gain", &params_.gain_max),
+        "Getting gain max");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Gain", &params_.gain_min),
+        "Getting gain min");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Gain", &params_.gain_inc),
+        "Getting gain increment");
+
+    // Frame rate ranges
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "FrameRate", &params_.frame_rate_max),
+        "Getting frame rate max");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "FrameRate", &params_.frame_rate_min),
+        "Getting frame rate min");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "FrameRate", &params_.frame_rate_inc),
+        "Getting frame rate increment");
+
+    // Focus ranges
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Focus", &params_.focus_max),
+        "Getting focus max");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Focus", &params_.focus_min),
+        "Getting focus min");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Focus", &params_.focus_inc),
+        "Getting focus increment");
+
+    // Iris ranges
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Iris", &params_.iris_max),
+        "Getting iris max");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Iris", &params_.iris_min),
+        "Getting iris min");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Iris", &params_.iris_inc),
+        "Getting iris increment");
+
+    // Temperature ranges
+    checkError(EVT_CameraGetInt32ParamMax(camera_.get(), "SensTemp", &params_.sens_temp_max),
+        "Getting temperature max");
+    checkError(EVT_CameraGetInt32ParamMin(camera_.get(), "SensTemp", &params_.sens_temp_min),
+        "Getting temperature min");
+
+    LOG(INFO) << "Updated camera parameter ranges:"
+              << "\nWidth: " << params_.width_min << " - " << params_.width_max
+              << "\nHeight: " << params_.height_min << " - " << params_.height_max
+              << "\nExposure: " << params_.exposure_min << " - " << params_.exposure_max
+              << "\nGain: " << params_.gain_min << " - " << params_.gain_max
+              << "\nFrame Rate: " << params_.frame_rate_min << " - " << params_.frame_rate_max;
+}
+
+void evt::EmergentCamera::updateExposureAndFrameRate(int exposure_value, int frame_rate_value) {
+    if (!is_open_) {
+        throw CameraException("Cannot update exposure/frame rate - camera not open");
+    }
+
+    // First update exposure as it affects valid frame rate range
+    if (exposure_value >= params_.exposure_min && exposure_value <= params_.exposure_max) {
+        // Validate exposure increment
+        if ((exposure_value - params_.exposure_min) % params_.exposure_inc != 0) {
+            exposure_value = params_.exposure_min + 
+                ((exposure_value - params_.exposure_min) / params_.exposure_inc * params_.exposure_inc);
+        }
+        
+        checkError(EVT_CameraSetUInt32Param(camera_.get(), "Exposure", exposure_value),
+            "Setting exposure");
+        params_.exposure = exposure_value;
+
+        // After exposure change, get new frame rate limits
+        checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "FrameRate", &params_.frame_rate_max),
+            "Getting frame rate max after exposure change");
+        checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "FrameRate", &params_.frame_rate_min),
+            "Getting frame rate min after exposure change");
+
+        // Adjust frame rate to be within new valid range
+        frame_rate_value = std::max(static_cast<int>(params_.frame_rate_min),
+            std::min(frame_rate_value, static_cast<int>(params_.frame_rate_max)));
+
+        // Validate frame rate increment
+        if ((frame_rate_value - params_.frame_rate_min) % params_.frame_rate_inc != 0) {
+            frame_rate_value = params_.frame_rate_min + 
+                ((frame_rate_value - params_.frame_rate_min) / params_.frame_rate_inc * params_.frame_rate_inc);
+        }
+
+        checkError(EVT_CameraSetUInt32Param(camera_.get(), "FrameRate", frame_rate_value),
+            "Setting frame rate after exposure change");
+        params_.frame_rate = frame_rate_value;
+
+        LOG(INFO) << "Updated exposure/frame rate:"
+                  << "\nExposure: " << exposure_value
+                  << "\nFrame Rate: " << frame_rate_value
+                  << "\nValid frame rate range: " << params_.frame_rate_min 
+                  << " - " << params_.frame_rate_max;
+    } else {
+        throw CameraException(
+            "Exposure value " + std::to_string(exposure_value) + 
+            " outside valid range [" + std::to_string(params_.exposure_min) + 
+            ", " + std::to_string(params_.exposure_max) + "]"
+        );
     }
 }
 

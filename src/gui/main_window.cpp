@@ -199,7 +199,7 @@ void MainWindow::initializeCameras() {
         
         // Resize our vectors
         device_info_.resize(actual_num);
-        selected_cameras_.resize(actual_num, false);
+        selected_cameras_.resize(actual_num, true);  // Initially select all cameras
 
         // Copy device info and initialize cameras
         for (size_t i = 0; i < actual_num; i++) {
@@ -207,18 +207,14 @@ void MainWindow::initializeCameras() {
             
             // Check if we have a config for this camera
             std::string serial(device_info_[i].serialNumber);
-            LOG(INFO) << "Checking camera serial '" << serial << "' against known configs:";
-            
-            for (const auto& config : known_cameras_) {
-                LOG(INFO) << "  - Comparing with config serial '" << config.first << "'";
-            }
+            LOG(INFO) << "Checking camera serial '" << serial << "' against known configs";
             
             if (known_cameras_.find(serial) != known_cameras_.end()) {
                 LOG(INFO) << "Found configured camera: \n"
                          << "  Name: " << device_info_[i].userDefinedName << "\n"
                          << "  Serial: " << serial << "\n"
-                         << "  IP: " << device_info_[i].currentIp << "\n"
-                         << "  Serial: " << device_info_[i].serialNumber;
+                         << "  IP: " << device_info_[i].currentIp;
+                selected_cameras_[i] = true;  // Ensure camera is selected
             }
         }
 
@@ -226,7 +222,7 @@ void MainWindow::initializeCameras() {
         if (!device_info_.empty()) {
             std::vector<std::string> config_files(device_info_.size());
             camera_manager_->initializeCameras(selected_cameras_, device_info_, config_files);
-            LOG(INFO) << "Camera manager initialized with " << device_info_.size() << " cameras";
+            LOG(INFO) << "Camera manager initialized with " << camera_manager_->getCameraCount() << " active cameras";
         }
         
     } catch (const std::exception& e) {

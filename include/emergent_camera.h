@@ -165,6 +165,10 @@ public:
     CameraState getCurrentState() const;
     void logCurrentState(const std::string& context) const;
 
+    // Just keep the declarations
+    void updateCameraRanges();
+    void updateExposureAndFrameRate(int exposure_value, int frame_rate_value);
+
 private:
     void configureDefaults();
     // void validateResolution(int width, int height) const; // TODO: Implement this

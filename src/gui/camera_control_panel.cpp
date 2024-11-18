@@ -75,7 +75,7 @@ void CameraControlPanel::renderCameraList() {
 void CameraControlPanel::renderCameraSettings() {
     // Validate all required pointers
     if (!device_info || !selected_cameras || !known_cameras_) {
-        LOG(INFO) << "Early return: Missing required pointers";
+        LOG(ERROR) << "Missing required pointers for camera settings";
         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), 
             "Camera info not initialized");
         return;
@@ -83,9 +83,9 @@ void CameraControlPanel::renderCameraSettings() {
 
     // Early validation of camera manager state
     if (camera_manager.getCameraCount() == 0) {
-        LOG(INFO) << "Early return: No cameras in manager";
+        LOG(WARNING) << "No active cameras in manager";
         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), 
-            "No cameras initialized");
+            "No active cameras - please select and initialize cameras");
         return;
     }
 
@@ -128,45 +128,33 @@ void CameraControlPanel::renderCameraSettings() {
                               std::string("Cam") + std::to_string(i+1) : serial;
             
             if (ImGui::BeginTabItem(label.c_str())) {
-                // Initialize ranges with defaults
+                // Only try to get ranges if the camera is open
                 evt::EmergentCamera::ParameterRange exposure_range{0, 1000000, 1};
                 evt::EmergentCamera::ParameterRange gain_range{0, 100, 1};
                 evt::EmergentCamera::ParameterRange frame_rate_range{1, 120, 1};
                 evt::EmergentCamera::ParameterRange iris_range{0, 100, 1};
                 evt::EmergentCamera::ParameterRange focus_range{0, 100, 1};
 
-                // Try to get actual ranges from camera
-                try {
-                    LOG(INFO) << "Getting parameter ranges for camera " << serial;
-                    
-                    exposure_range = camera_manager.getExposureRange(i);
-                    LOG(INFO) << "Exposure range: " << exposure_range.min 
-                            << " - " << exposure_range.max 
-                            << " (increment: " << exposure_range.increment << ")";
-                    
-                    gain_range = camera_manager.getGainRange(i);
-                    LOG(INFO) << "Gain range: " << gain_range.min 
-                            << " - " << gain_range.max
-                            << " (increment: " << gain_range.increment << ")";
-                    
-                    frame_rate_range = camera_manager.getFrameRateRange(i);
-                    LOG(INFO) << "Frame rate range: " << frame_rate_range.min 
-                            << " - " << frame_rate_range.max
-                            << " (increment: " << frame_rate_range.increment << ")";
-                    
-                    iris_range = camera_manager.getIrisRange(i);
-                    LOG(INFO) << "Iris range: " << iris_range.min 
-                            << " - " << iris_range.max
-                            << " (increment: " << iris_range.increment << ")";
-                    
-                    focus_range = camera_manager.getFocusRange(i);
-                    LOG(INFO) << "Focus range: " << focus_range.min 
-                            << " - " << focus_range.max
-                            << " (increment: " << focus_range.increment << ")";
-                    
-                } catch (const evt::CameraException& e) {
-                    LOG(WARNING) << "Could not get camera ranges: " << e.what();
-                    // Continue with default ranges
+                if (camera_instance.camera->isOpen()) {
+                    try {
+                        exposure_range = camera_manager.getExposureRange(i);
+                        gain_range = camera_manager.getGainRange(i);
+                        frame_rate_range = camera_manager.getFrameRateRange(i);
+                        iris_range = camera_manager.getIrisRange(i);
+                        focus_range = camera_manager.getFocusRange(i);
+                    }
+                    catch (const evt::CameraException& e) {
+                        LOG(WARNING) << "Could not get camera ranges: " << e.what();
+                        // Continue with default ranges
+                    }
+                } else {
+                    // Try to open the camera if it's not open
+                    try {
+                        camera_instance.camera->open(&(*device_info)[i]);
+                    }
+                    catch (const evt::CameraException& e) {
+                        LOG(ERROR) << "Failed to open camera: " << e.what();
+                    }
                 }
 
                 // Camera Info section in a table

@@ -1,10 +1,16 @@
 #pragma once
 #include <string>
 #include "json.hpp"
+#ifndef  EMERGENT_SDK
+#include <gigevisiondeviceinfo.h>  // Add this include
+#endif
 
 namespace evt {
 
 struct CameraParams {
+    // Add device info storage
+    GigEVisionDeviceInfo device_info{};  // Add this field
+    
     int width{0};
     int height{0};
     int gain{0};
@@ -24,16 +30,16 @@ struct CameraParams {
 
     // Add max/min ranges for parameters
     unsigned int width_max{0};
-    unsigned int width_min{0};
+    unsigned int width_min{8};
     unsigned int width_inc{0};
     unsigned int height_max{0};
-    unsigned int height_min{0};
+    unsigned int height_min{16};
     unsigned int height_inc{0};
     unsigned int gain_max{0};
-    unsigned int gain_min{0};
+    unsigned int gain_min{8};
     unsigned int gain_inc{0};
     unsigned int exposure_max{0};
-    unsigned int exposure_min{0};
+    unsigned int exposure_min{1};
     unsigned int exposure_inc{0};
     unsigned int frame_rate_max{0};
     unsigned int frame_rate_min{0};

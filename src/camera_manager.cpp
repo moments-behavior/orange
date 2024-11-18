@@ -29,26 +29,41 @@ void initializeCameras(const std::vector<bool>& selected_cameras,
                       const std::vector<GigEVisionDeviceInfo>& device_info,
                       const std::vector<std::string>& config_files) {
     cameras.clear();
-    cameras.reserve(device_info.size());  // Reserve space to avoid reallocation
+    cameras.reserve(device_info.size());
     
     LOG(INFO) << "Starting camera initialization with " << device_info.size() << " devices";
     
     for (size_t i = 0; i < device_info.size(); ++i) {
+        // Only initialize selected cameras
+        if (!selected_cameras[i]) {
+            LOG(INFO) << "Camera " << i << " not selected, skipping";
+            continue;
+        }
+
+        LOG(INFO) << "Initializing camera " << i << " (serial: " << device_info[i].serialNumber << ")";
+        
         CameraInstance instance;
         
-        // Initialize parameters with device info
-        instance.params = CameraParams{};
+        // Set up camera parameters
         instance.params.camera_serial = device_info[i].serialNumber;
         instance.params.camera_name = device_info[i].userDefinedName;
         
-        // Create camera instance with parameters
-        instance.camera = std::make_unique<EmergentCamera>(instance.params);
-        cameras.push_back(std::move(instance));
-        
-        LOG(INFO) << "Created camera " << i << " (serial: " << device_info[i].serialNumber << ")";
+        // Create camera instance
+        try {
+            instance.camera = std::make_unique<EmergentCamera>(instance.params);
+            
+            // Open the camera with device info
+            instance.camera->open(&device_info[i]);
+            
+            cameras.push_back(std::move(instance));
+            LOG(INFO) << "Successfully initialized camera " << i;
+        }
+        catch (const evt::CameraException& e) {
+            LOG(ERROR) << "Failed to initialize camera " << i << ": " << e.what();
+        }
     }
     
-    LOG(INFO) << "Finished initialization, camera count: " << cameras.size();
+    LOG(INFO) << "Finished initialization, active camera count: " << cameras.size();
 }
 
     // Start/stop streaming for specific camera

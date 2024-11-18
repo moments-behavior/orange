@@ -3,6 +3,8 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <cstdint>
+#include <algorithm>
 #include "emergent_camera.h"
 #include "frame_streaming.h"
 #include "gpu_streaming.h"
@@ -30,24 +32,82 @@ public:
                           const std::vector<GigEVisionDeviceInfo>& device_info,
                           const std::vector<std::string>& config_files) {
         cameras.clear();
+        cameras.reserve(device_info.size());
         
-        for (size_t i = 0; i < selected_cameras.size(); ++i) {
-            if (selected_cameras[i]) {
-                CameraInstance instance;
-                
-                // Create new camera with default parameters
-                instance.params = CameraParams{}; // Initialize with defaults
+        LOG(INFO) << "Starting camera initialization with " << device_info.size() << " devices";
+        
+        for (size_t i = 0; i < device_info.size(); ++i) {
+            if (!selected_cameras[i]) {
+                LOG(INFO) << "Camera " << i << " not selected, skipping";
+                continue;
+            }
+
+            std::string serial(device_info[i].serialNumber);
+            LOG(INFO) << "Initializing camera " << i << " (serial: " << serial << ")";
+            
+            CameraInstance instance;
+            
+            // 1. Set only the essential identification parameters
+            instance.params.device_info = device_info[i];
+            instance.params.camera_serial = serial;
+            instance.params.camera_name = device_info[i].userDefinedName;
+            
+            // 2. Create camera with minimal params and open it
+            try {
                 instance.camera = std::make_unique<EmergentCamera>(instance.params);
+                LOG(INFO) << "Camera instance created for " << serial;
                 
-                // Load configuration if available
-                if (i < config_files.size()) {
-                    loadCameraConfig(instance, config_files[i], device_info[i]);
+                instance.camera->open(&device_info[i]);
+                LOG(INFO) << "Camera " << serial << " opened successfully";
+                
+                // 3. Get valid parameter ranges first
+                instance.camera->updateCameraRanges();
+                auto ranges = instance.camera->getResolutionRange();
+                LOG(INFO) << "Got camera ranges - Resolution: " 
+                         << ranges.width_min << "x" << ranges.height_min 
+                         << " to " << ranges.width_max << "x" << ranges.height_max;
+
+                // 4. Load configuration or use defaults
+                if (auto config_it = known_cameras_.find(serial); config_it != known_cameras_.end()) {
+                    LOG(INFO) << "Found configuration for camera " << serial;
+                    // Validate and clamp the loaded config values against actual camera ranges
+                    instance.params = config_it->second;
+                    instance.params.width = std::clamp(instance.params.width, 
+                        static_cast<int>(ranges.width_min), 
+                        static_cast<int>(ranges.width_max));
+                    instance.params.height = std::clamp(instance.params.height,
+                        static_cast<int>(ranges.height_min), 
+                        static_cast<int>(ranges.height_max));
+                } else {
+                    LOG(INFO) << "No configuration found for camera " << serial << ", using safe defaults";
+                    // Use minimum supported resolution as safe defaults
+                    instance.params.width = ranges.width_min;
+                    instance.params.height = ranges.height_min;
+                    instance.params.exposure = 10000;  // Conservative default
+                    instance.params.gain = 0;         // Minimum gain
+                    instance.params.frame_rate = 30;  // Standard frame rate
+                    instance.params.pixel_format = "Mono8";
                 }
+
+                // 5. Apply validated configuration
+                LOG(INFO) << "Applying configuration - Resolution: " 
+                         << instance.params.width << "x" << instance.params.height;
                 
-                // Store camera instance
+                instance.camera->updateResolution(instance.params.width, instance.params.height);
+                instance.camera->updateExposure(instance.params.exposure);
+                instance.camera->updateGain(instance.params.gain);
+                instance.camera->updateFrameRate(instance.params.frame_rate);
+                instance.camera->updatePixelFormat(instance.params.pixel_format);
+                
                 cameras.push_back(std::move(instance));
+                LOG(INFO) << "Successfully initialized camera " << serial;
+                
+            } catch (const evt::CameraException& e) {
+                LOG(ERROR) << "Failed to initialize camera " << serial << ": " << e.what();
             }
         }
+        
+        LOG(INFO) << "Finished initialization, active camera count: " << cameras.size();
     }
 
     // Start/stop streaming for specific camera
@@ -60,7 +120,7 @@ public:
         try {
             // Open the camera if not already open
             if (!instance.camera->isOpen()) {
-                const GigEVisionDeviceInfo* device_info = nullptr;  // TODO: Pass proper device info
+                const GigEVisionDeviceInfo* device_info = nullptr;
                 instance.camera->open(device_info);
                 
                 // Initialize camera with stored parameters
@@ -276,9 +336,13 @@ public:
         return cameras[idx]; 
     }
 
+    void setKnownCameras(const std::unordered_map<std::string, CameraParams>& configs) {
+        known_cameras_ = configs;
+    }
 private:
     std::vector<CameraInstance> cameras;
     bool recording_active{false};
+    std::unordered_map<std::string, CameraParams> known_cameras_;
     
     void loadCameraConfig(CameraInstance& instance, 
                          const std::string& config_file,

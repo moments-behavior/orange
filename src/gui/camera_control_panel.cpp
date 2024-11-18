@@ -75,7 +75,6 @@ void CameraControlPanel::renderCameraList() {
 void CameraControlPanel::renderCameraSettings() {
     // Validate all required pointers
     if (!device_info || !selected_cameras || !known_cameras_) {
-        LOG(ERROR) << "Missing required pointers for camera settings";
         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), 
             "Camera info not initialized");
         return;
@@ -83,77 +82,93 @@ void CameraControlPanel::renderCameraSettings() {
 
     // Early validation of camera manager state
     if (camera_manager.getCameraCount() == 0) {
-        LOG(WARNING) << "No active cameras in manager";
         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), 
-            "No active cameras - please select and initialize cameras");
+            "No cameras initialized");
         return;
     }
 
-    LOG(INFO) << "Starting to render camera settings tabs";
-    
+    static bool debug_rendering = false;  // Add debug toggle
+    if (ImGui::Checkbox("Debug Rendering", &debug_rendering)) {
+        LOG(INFO) << "Rendering debug " << (debug_rendering ? "enabled" : "disabled");
+    }
+
     // Create tabs for each selected camera
     if (ImGui::BeginTabBar("CameraSettingsTabs")) {
-        LOG(INFO) << "Beginning tab bar";
-        
         for (size_t i = 0; i < device_info->size(); i++) {
-            LOG(INFO) << "Checking camera " << i << " (selected: " << (*selected_cameras)[i] << ")";
-            
-            if (!(*selected_cameras)[i]) {
-                LOG(INFO) << "Camera " << i << " not selected, skipping";
-                continue;
-            }
+            if (!(*selected_cameras)[i]) continue;
 
             // Get camera serial and lookup config
             std::string serial((*device_info)[i].serialNumber);
-            LOG(INFO) << "Processing camera " << serial;
-            
             auto config_it = known_cameras_->find(serial);
-            if (config_it == known_cameras_->end()) {
-                LOG(INFO) << "No config found for camera " << serial << ", skipping";
-                continue;
-            }
+            if (config_it == known_cameras_->end()) continue;
             
+            if (debug_rendering) {
+                LOG(INFO) << "Processing camera " << serial;
+            }
+
             // Validate camera instance exists and is accessible
             const auto& camera_instance = camera_manager.getCamera(i);
             if (!camera_instance.camera) {
-                LOG(INFO) << "Camera instance invalid for " << serial;
                 ImGui::EndTabBar();
                 return;
             }
-
-            LOG(INFO) << "Starting tab for camera " << serial;
 
             // Create tab label
             std::string label = config_it != known_cameras_->end() ? 
                               std::string("Cam") + std::to_string(i+1) : serial;
             
             if (ImGui::BeginTabItem(label.c_str())) {
-                // Only try to get ranges if the camera is open
+                if (debug_rendering) {
+                    LOG(INFO) << "Starting tab for camera " << serial;
+                }
+
+                // Initialize ranges with defaults
                 evt::EmergentCamera::ParameterRange exposure_range{0, 1000000, 1};
                 evt::EmergentCamera::ParameterRange gain_range{0, 100, 1};
                 evt::EmergentCamera::ParameterRange frame_rate_range{1, 120, 1};
                 evt::EmergentCamera::ParameterRange iris_range{0, 100, 1};
                 evt::EmergentCamera::ParameterRange focus_range{0, 100, 1};
 
-                if (camera_instance.camera->isOpen()) {
-                    try {
-                        exposure_range = camera_manager.getExposureRange(i);
-                        gain_range = camera_manager.getGainRange(i);
-                        frame_rate_range = camera_manager.getFrameRateRange(i);
-                        iris_range = camera_manager.getIrisRange(i);
-                        focus_range = camera_manager.getFocusRange(i);
-                    }
-                    catch (const evt::CameraException& e) {
-                        LOG(WARNING) << "Could not get camera ranges: " << e.what();
-                        // Continue with default ranges
-                    }
-                } else {
-                    // Try to open the camera if it's not open
+                // Try to open the camera if it's not open
+                bool camera_ready = false;
+                if (!camera_instance.camera->isOpen()) {
                     try {
                         camera_instance.camera->open(&(*device_info)[i]);
+                        camera_ready = true;
                     }
                     catch (const evt::CameraException& e) {
                         LOG(ERROR) << "Failed to open camera: " << e.what();
+                    }
+                } else {
+                    camera_ready = true;
+                }
+
+                // Only try to access ranges if camera is ready
+                if (camera_ready) {
+                    try {
+                        // Get ranges from stored params instead of querying camera
+                        const auto& camera_params = config_it->second;
+                        exposure_range = {camera_params.exposure_min, camera_params.exposure_max, camera_params.exposure_inc};
+                        gain_range = {camera_params.gain_min, camera_params.gain_max, camera_params.gain_inc};
+                        frame_rate_range = {camera_params.frame_rate_min, camera_params.frame_rate_max, camera_params.frame_rate_inc};
+                        iris_range = {camera_params.iris_min, camera_params.iris_max, camera_params.iris_inc};
+                        focus_range = {camera_params.focus_min, camera_params.focus_max, camera_params.focus_inc};
+                        
+                        if (debug_rendering) {
+                            // Log ranges only once when tab is opened or when debug is enabled
+                            static bool ranges_logged = false;
+                            if (!ranges_logged) {
+                                LOG(INFO) << "\n╭── STORED PARAMETER RANGES ──────────────\n"
+                                        << "  │ Frame Rate: " << frame_rate_range.min << " - " 
+                                        << frame_rate_range.max << " FPS (inc: " << frame_rate_range.increment << ")\n"
+                                        << "  │ Exposure: " << exposure_range.min << " - "
+                                        << exposure_range.max << " μs (inc: " << exposure_range.increment << ")\n"
+                                        << "  ╰────────────────────────────────";
+                                ranges_logged = true;
+                            }
+                        }
+                    } catch (const evt::CameraException& e) {
+                        LOG(WARNING) << "Could not access camera ranges: " << e.what();
                     }
                 }
 
@@ -187,8 +202,8 @@ void CameraControlPanel::renderCameraSettings() {
 
                 ImGui::Spacing();
 
-                // Camera Settings in a table
-                if (config_it != known_cameras_->end()) {
+                // Only show camera settings if camera is ready
+                if (camera_ready && config_it != known_cameras_->end()) {
                     // Need to cast away const to modify the params
                     auto& params = const_cast<evt::CameraParams&>(config_it->second);
                     

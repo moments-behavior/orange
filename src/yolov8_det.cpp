@@ -25,28 +25,28 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 
     assert(this->context != nullptr);
     cudaStreamCreate(&this->stream);
-    this->num_bindings = this->engine->getNbBindings();
+    this->num_bindings = this->engine->getNbIOTensors();
 
     for (int i = 0; i < this->num_bindings; ++i) {
         Binding            binding;
         nvinfer1::Dims     dims;
-        nvinfer1::DataType dtype = this->engine->getBindingDataType(i);
-        std::string        name  = this->engine->getBindingName(i);
+        const char*        name  = this->engine->getIOTensorName(i);
+        nvinfer1::DataType dtype = this->engine->getTensorDataType(this->engine->getIOTensorName(i));
         binding.name             = name;
         binding.dsize            = type_to_size(dtype);
 
-        bool IsInput = engine->bindingIsInput(i);
-        if (IsInput) {
+        nvinfer1::TensorIOMode ioMode = this->engine->getTensorIOMode(name);
+        if (ioMode == nvinfer1::TensorIOMode::kINPUT) {
             this->num_inputs += 1;
-            dims         = this->engine->getProfileDimensions(i, 0, nvinfer1::OptProfileSelector::kMAX);
+            dims         = this->engine->getProfileShape(name, 0, nvinfer1::OptProfileSelector::kMAX);
             binding.size = get_size_by_dims(dims);
             binding.dims = dims;
             this->input_bindings.push_back(binding);
             // set max opt shape
-            this->context->setBindingDimensions(i, dims);
+            this->context->setInputShape(name, dims);
         }
-        else {
-            dims         = this->context->getBindingDimensions(i);
+        else if (ioMode == nvinfer1::TensorIOMode::kOUTPUT) {
+            dims         = this->context->getTensorShape(name);
             binding.size = get_size_by_dims(dims);
             binding.dims = dims;
             this->output_bindings.push_back(binding);
@@ -71,10 +71,21 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 
 YOLOv8::~YOLOv8()
 {
-    this->context->destroy();
-    this->engine->destroy();
-    this->runtime->destroy();
-    cudaStreamDestroy(this->stream);
+    // Assuming context, engine, and runtime are all pointers:
+    if (this->context) {
+        delete this->context;  // Use delete to call the destructor for `context`.
+    }
+
+    if (this->engine) {
+        delete this->engine;  // Use delete to call the destructor for `engine`.
+    }
+
+    if (this->runtime) {
+        delete this->runtime;  // Use delete to call the destructor for `runtime`.
+    }
+
+    cudaStreamDestroy(this->stream);  // CUDA streams still need to be destroyed explicitly.
+
     for (auto& ptr : this->device_ptrs) {
         CHECK(cudaFree(ptr));
     }
@@ -83,6 +94,7 @@ YOLOv8::~YOLOv8()
         CHECK(cudaFreeHost(ptr));
     }
 }
+
 void YOLOv8::make_pipe(bool warmup)
 {
     // allocate device resources for initialization
@@ -221,7 +233,7 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
     this->pparam.height = height;
     this->pparam.width  = width;
 
-    this->context->setBindingDimensions(0, nvinfer1::Dims{4, {1, 3, inp_w_int, inp_w_int}});
+    this->context->setInputShape(0, nvinfer1::Dims{4, {1, 3, inp_w_int, inp_w_int}});
     CHECK(cudaMemcpyAsync(this->device_ptrs[0], d_planar, inp_w_int*inp_w_int*sizeof(float3), cudaMemcpyDeviceToDevice, this->stream));
 }
 
@@ -292,7 +304,7 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
 void YOLOv8::infer()
 {
 
-    this->context->enqueueV2(this->device_ptrs.data(), this->stream, nullptr);
+    this->context->enqueueV3(this->stream);
     for (int i = 0; i < this->num_outputs; i++) {
         size_t osize = this->output_bindings[i].size * this->output_bindings[i].dsize;
         CHECK(cudaMemcpyAsync(

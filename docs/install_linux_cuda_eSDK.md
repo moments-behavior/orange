@@ -13,12 +13,12 @@ here is the overview of the steps -- detailed instructions for each are in the s
 -----------------------------------------------------------------------------------------------------------
 ### initial set-up before installing linux
 
-0. create a [bootable linux USB](https://ubuntu.com/tutorials/create-a-usb-stick-on-ubuntu#1-overview) for an [ubuntu 22.04.5 ISO](https://releases.ubuntu.com/jammy/) 
+0. create a [bootable linux USB](https://ubuntu.com/tutorials/create-a-usb-stick-on-ubuntu#1-overview) for an [ubuntu 22.04.4 ISO](https://old-releases.ubuntu.com/releases/22.04/): `ubuntu-22.04.4-desktop-amd64.iso`. The default kernel is 6.5. 
 	- alternatively, you can use [balenaEtcher](https://etcher.balena.io/) to make a bootable linux USB
 1. ensure the following on PC:
     - an existing video card that displays existing OS or BIOS screen on a monitor -- no need to worry about graphics driver for now
     - at least 3 USB ports that work when you enter BIOS/installation  (mice/keyboard/linux USB) 
-    - disable any wired/wireless network connections during the install.
+    - **disable any wired/wireless network connections during the install**, otherwise it will automatically upgrade to kernel 6.8. 
 2. plug the bootable linux USB into one of the active ports and boot up the PC.
 3. if the PC does not directly boot into the linux USB, you may have to change the `Boot settings` in  BIOS to boot from the linux USB
 	- enter BIOS by pressing F2 or DEL (unlikely, but it could be a different key for some motherboards)

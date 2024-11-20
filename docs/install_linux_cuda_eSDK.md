@@ -292,3 +292,24 @@ here is the overview of the steps -- detailed instructions for each are in the s
     source ~/.bashrc
     nvcc --version
     ```
+
+### Enable GPU-Direct 
+**0. Enable PCIE Above 4G Decoding and Resizable Bar** 
+- In BIOS, you should enable "PCIE Above 4G Decoding" and "Resizable Bar". You can try upgrade the BIOS if 
+  the current BIOS doesn't support them.
+
+**1. Load nvidia-peer-memory module** 
+- Activate init script start-nvidia-peermem so the system will load the module on boot. Run:
+  ```
+  sudo update-rc.d start-nvidia-peermem defaults
+  sudo /etc/init.d/start-nvidia-peermem start  
+  ```
+  Verify the module is loaded:
+  ```
+  lsmod | grep nvidia_peermem
+  ```
+  should show:
+  ```
+  nvidia_peermem         16384  0
+  ``` 
+ 

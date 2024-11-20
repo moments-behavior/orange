@@ -34,6 +34,7 @@ sudo apt-get install git make nasm pkg-config libx264-dev libxext-dev libxfixes-
 This is for using ffmpeg API
 
 ```
+cd ~/nvidia/ffmpeg
 git checkout release/4.4
 ```
 

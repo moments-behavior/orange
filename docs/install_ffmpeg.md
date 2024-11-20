@@ -40,28 +40,19 @@ git checkout release/4.4
 
 Rebuild the ffmpeg following above instruction. If you have trouble compiling it, it is likely that the gpu architecture is too low. Check config.log
 
-```
-vim ffbuild/config.log
-```
-
-
-Change config script 
-```
-vim configure 
-```
-
-Chnage the nvccflags using more recent gpu architecture, `compute_75`
-
-```
-nvccflags_default="-gencode arch=compute_75,code=sm_75 -O2"
-
-nvccflags_default="--cuda-gpu-arch=sm_75 -O2"
-```
 
 ### Build ffmpeg 4.4.1
 
+Legacy 
 ```
-./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64
+./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64 --nvccflags="-gencode arch=compute_75,code=sm_75 -O2"
 ```
+
+or 
+
+```
+./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64 --nvccflags="-gencode arch=compute_90,code=sm_90 -O2"
+```
+
 
 If you followed the above steps, FFmpeg should be installed at `$HOME/nvidia/ffmpeg`

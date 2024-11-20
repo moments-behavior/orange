@@ -2,7 +2,17 @@
 
 1. Download and upzip `opencv-4.8.0.zip` and `opencv_contrib-4.8.0.zip`. Unzip the folders to `~/build/`, for instance. 
 
-2. To build OpenCV with opencv sfm, please follow instructions from: https://docs.opencv.org/4.x/db/db8/tutorial_sfm_installation.html first to install sfm dependency. Ceres solver is optional. If you wish to install ceres solver, a more detailed installation instruction can be found at: http://ceres-solver.org/installation.html#linux. At the time of test, one need to set CMake flag USE_CUDA=OFF for ceres.  
+2. To build OpenCV with opencv sfm, please follow instructions from: https://docs.opencv.org/4.x/db/db8/tutorial_sfm_installation.html first to install sfm dependency. Ceres solver is optional. If you wish to install ceres solver, a more detailed installation instruction can be found at: http://ceres-solver.org/installation.html#linux. For simplicity, turns off CUDA as follow,
+   
+```
+git clone https://ceres-solver.googlesource.com/ceres-solver
+cd ceres-solver
+mkdir build && cd build
+cmake -DUSE_CUDA=OFF ..
+make -j4
+make test
+sudo make install
+```
 
 3. Build OpenCV using 
 

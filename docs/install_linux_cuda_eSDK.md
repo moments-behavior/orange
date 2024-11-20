@@ -100,7 +100,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
       ``` 
   2. install some required packages
       ```
-      sudo apt-get install net-tools pkg-config make gcc libglvnd-dev git 
+      sudo apt-get install net-tools pkg-config make gcc libglvnd-dev git curl
       ```
   3. setup ssh client and server
       ```
@@ -121,7 +121,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
 
 **1. download files from emergent ftp server** 
 - I've note the versions that have currently worked for us
-- eSDK: [eSDK 2.55.02 Linux Ubuntu 22.04 Kernel 6.5.0](https://emergentvisiontec.com/esdk/)
+- eSDK: eSDK_2_55_02_eCap_2_11_04_Ubuntu_22_04_6_5_0_x64.zip
 - (optional) -- rivermax license file: (`rivermax.lic`)
 
 
@@ -137,18 +137,11 @@ here is the overview of the steps -- detailed instructions for each are in the s
 - if it ran successfully, you will see the following once the commands have run.
 
     ```
-    Installing dependency drivers...
-
-    Installing EVT NIC device driver...
-    Building EVT NIC driver. Log file: /tmp/evt_nic_log.8jYtsgjy1
-    EVT NIC driver was built successfully.
-
     Emergent eSDK & eCapture have been installed successfully.
     ```
 
-**3. (optional) --  copy the license file to `/opt/mellanox`**
+**3. (optional) --  acquire a license file from emergent vision and copy it to `/opt/mellanox`**
     ```
-    cd /home/$USER/setup_files
     sudo cp rivermax.lic /opt/mellanox
     ```
 

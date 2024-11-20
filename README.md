@@ -12,7 +12,7 @@ Please see this [link](https://youtu.be/ahceluqBYj8) for a video demo of the app
 1. Multiple cameras streaming 
 2. PTP synchronization 
 3. GPU accelerated encoding (h264, h265)
-3. Support 7MP, 65MP, 100G, mono or color Emergent cameras
+3. Support mono and color Emergent cameras
 4. Multiple servers communication
 
 ## Benchmark

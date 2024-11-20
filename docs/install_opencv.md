@@ -35,7 +35,7 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D OPENCV_PC_FILE_NAME=opencv.pc \
 -D OPENCV_ENABLE_NONFREE=ON \
 -D OPENCV_EXTRA_MODULES_PATH=~/build/opencv_contrib-4.8.0/modules \
--D INSTALL_PYTHON_EXAMPLES=OFF \
+-D INSTALL_PYTHON_EXAMPLES=OFF ..
 ```
 
 This instruction assumes the `opencv_contrib-4.8.0` is at `~/Build/opencv_contrib-4.8.0`. This will install OpenCV at `/usr/local`. 

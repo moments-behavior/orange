@@ -98,7 +98,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
       ```
       sudo apt-get update
       ``` 
-  2. install some required packages (TODO -- add a more comprehensive list)
+  2. install some required packages
       ```
       sudo apt-get install net-tools pkg-config make gcc libglvnd-dev git 
       ```
@@ -129,11 +129,11 @@ here is the overview of the steps -- detailed instructions for each are in the s
 - the instructions assume that the files above have been downloaded/moved to `/home/$USER/setup_files`
     ```
     cd /home/$USER/setup_files
-    unzip eSDK_2_51_01_eCap_2_11_02_Ubuntu_22_04_6_5_0_x64.zip -d eSDK_2_51_01
-    cd eSDK_2_51_01
-    sudo ./install_eSdk.sh -i EVT
+    unzip eSDK_2_55_02_eCap_2_11_04_Ubuntu_22_04_6_5_0_x64.zip -d emergent
+    cd emergent
+    sudo ./install_eSdk.sh -i Mellanox
     ```
--  the install script will download and install necessary dependencies and the driver for emergent quad port NIC
+-  the install script will download and install necessary dependencies and the driver for Mellanox NIC
 - if it ran successfully, you will see the following once the commands have run.
 
     ```
@@ -146,7 +146,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
     Emergent eSDK & eCapture have been installed successfully.
     ```
 
-**3. (optional for phields team, I think) --  copy the license file to `/opt/mellanox`**
+**3. (optional) --  copy the license file to `/opt/mellanox`**
     ```
     cd /home/$USER/setup_files
     sudo cp rivermax.lic /opt/mellanox

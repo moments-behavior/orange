@@ -92,13 +92,13 @@ here is the overview of the steps -- detailed instructions for each are in the s
       sudo apt-get install net-tools pkg-config make gcc libglvnd-dev git 
       ```
   3. setup ssh client and server
-    ```
-    sudo apt-get install openssh-client openssh-server
-    sudo systemctl enable ssh
-    sudo ufw allow ssh  
-    ```
-  4. (optional) setup `grub-customizer` to show only the required kernel if you end up with multiple kernels
-  5. let's also make following directories for convenience
+      ```
+      sudo apt-get install openssh-client openssh-server
+      sudo systemctl enable ssh
+      sudo ufw allow ssh
+      ```
+  5. (optional) setup `grub-customizer` to show only the required kernel if you end up with multiple kernels
+  6. let's also make following directories for convenience
       - `/home/$USER/setup_files` -- we will download drivers, installation files, etc to here
       - `/home/$USER/nvidia` -- we will build all dependencies to here
       - `/home/$USER/src` -- we will clone source codes/repos to here

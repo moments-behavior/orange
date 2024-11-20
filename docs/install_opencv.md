@@ -9,7 +9,7 @@ git clone https://ceres-solver.googlesource.com/ceres-solver
 cd ceres-solver
 mkdir build && cd build
 cmake -DUSE_CUDA=OFF ..
-make -j4
+make -j $(nproc)
 make test
 sudo make install
 ```

@@ -55,4 +55,21 @@ or
 ```
 
 
+Compile it, execute
+```
+make -j $(nproc)
+```
+
+Verify executable
+```
+ls -l ffmpeg  
+./ffmpeg
+```
+
+install 
+```
+sudo make install 
+```
+
+
 If you followed the above steps, FFmpeg should be installed at `$HOME/nvidia/ffmpeg`

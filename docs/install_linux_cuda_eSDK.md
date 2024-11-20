@@ -205,14 +205,14 @@ here is the overview of the steps -- detailed instructions for each are in the s
 ### install NVIDIA driver 
 
 **0. Download the driver setup file**
-- To download NVIDIA linux drivers, go to [this page](https://www.nvidia.com/en-us/drivers/unix/linux-amd64-display-archive/) and search for a particular version that you want.  
+- To download NVIDIA linux drivers, go to [this page](https://www.nvidia.com/en-us/drivers/unix/linux-amd64-display-archive/) and search for a particular version that you want.
+  - `535.183.06` for linux kernel 6.5
   - `525.105.17` seems to work well with A6000 GPU or a PC with both A16 and A6000. 
   - `550.90.07` also works well with multiple A16
-  - TODO -- compile versions that work well
 - click on the driver to download it, or you can download it to say, the `setup_file` folder using 
   ``` 
   cd /home/$USER/setup_files
-  wget https://us.download.nvidia.com/XFree86/Linux-x86_64/525.105.17/NVIDIA-Linux-x86_64-525.105.17.run
+  wget https://us.download.nvidia.com/XFree86/Linux-x86_64/535.183.06/NVIDIA-Linux-x86_64-535.183.06.run
   ```
 
 **1. run the installation file**
@@ -220,8 +220,8 @@ here is the overview of the steps -- detailed instructions for each are in the s
 - it is highly recommended that you boot into the secure mode first and then run the installation file
   ```
   cd /home/$USER/setup_files
-  chmod +x NVIDIA-Linux-x86_64-525.105.17.run 
-  sudo ./NVIDIA-Linux-x86_64-525.105.17.run 
+  chmod +x NVIDIA-Linux-x86_64-535.183.06.run 
+  sudo ./NVIDIA-Linux-x86_64-535.183.06.run 
   ```
 - in the prompts that appear, use the following options
 
@@ -241,7 +241,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
   - **`gcc` version mismatch**: sometimes the installer maybe expecting a different version of `gcc` -- this would show up in the log file. In that case, install the necessary `gcc` version and run the nvidia-driver-install command by setting `CC` environment variable to the desired version. for example:
     ```
     sudo apt-get install gcc-12
-    sudo CC="/usr/bin/gcc-12" ./NVIDIA-Linux-x86_64-525.105.17.run 
+    sudo CC="/usr/bin/gcc-12" ./NVIDIA-Linux-x86_64-535.183.06.run 
     ```
 
   - **missing dependencies/packages** : you maybe missing packages such as `pkg-config`, `libglvnd`, etc (usually these are mentioned in the error messages or in the log file). Install these packages and re-run the installer -- you may have to do this multiple times as the installer only checks for one package at a time

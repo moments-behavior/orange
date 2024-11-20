@@ -41,6 +41,6 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE \
 This instruction assumes the `opencv_contrib-4.8.0` is at `~/Build/opencv_contrib-4.8.0`. This will install OpenCV at `/usr/local`. 
 
 ```
-make -j8 
+make -j $(nproc)
 sudo make install
 ```

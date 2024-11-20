@@ -120,9 +120,8 @@ here is the overview of the steps -- detailed instructions for each are in the s
 **0. ensure that emergent quad port nic is plugged in to the the PCIe slot**
 
 **1. download files from emergent ftp server** 
-- I've note the versions that have currently worked for us
-- eSDK: eSDK_2_55_02_eCap_2_11_04_Ubuntu_22_04_6_5_0_x64.zip
-- (optional) -- rivermax license file: (`rivermax.lic`)
+- eSDK: Dowload [eSDK_2_55_02_eCap_2_11_04_Ubuntu_22_04_6_5_0_x64.zip](https://emergentvisiontec.com/downloads/)
+- rivermax license file: (`rivermax.lic`)
 
 
 **2. unzip and install the eSDK** 
@@ -133,16 +132,15 @@ here is the overview of the steps -- detailed instructions for each are in the s
     cd emergent
     sudo ./install_eSdk.sh -i Mellanox
     ```
--  the install script will download and install necessary dependencies and the driver for Mellanox NIC
+- the install script will download and install necessary dependencies and the driver for Mellanox NIC
 - if it ran successfully, you will see the following once the commands have run.
-
     ```
     Emergent eSDK & eCapture have been installed successfully.
     ```
 
-**3. (optional) --  acquire a license file from emergent vision and copy it to `/opt/mellanox`**
+**3. acquire a license file from emergent vision and copy it to `/opt/mellanox`**
     ```
-    sudo cp rivermax.lic /opt/mellanox
+    sudo cp rivermax.lic /opt/mellanox/rivermax.lic.
     ```
 
 **4. launch `ecapture`** 

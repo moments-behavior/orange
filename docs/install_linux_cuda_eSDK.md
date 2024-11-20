@@ -210,13 +210,9 @@ here is the overview of the steps -- detailed instructions for each are in the s
   - `525.105.17` seems to work well with A6000 GPU or a PC with both A16 and A6000. 
   - `550.90.07` also works well with multiple A16
 - click on the driver to download it, or you can download it to say, the `setup_file` folder using 
-  ``` 
-  cd /home/$USER/setup_files
-  wget https://us.download.nvidia.com/XFree86/Linux-x86_64/535.183.06/NVIDIA-Linux-x86_64-535.183.06.run
-  ```
 
 **1. run the installation file**
-- you can try running the downloaded installation file from a terminal in the Desktop environment, but in our experience it almost often fails or has issues (because the existing graphics driver is running?).
+- you can try running the downloaded installation file from a terminal in the Desktop environment, but in our experience it almost often fails or has issues, because X driver is running.
 - it is highly recommended that you boot into the secure mode first and then run the installation file
   ```
   cd /home/$USER/setup_files

@@ -49,6 +49,17 @@ here is the overview of the steps -- detailed instructions for each are in the s
     lsb_release -a
     uname -r
     ```
+
+   Output should be:
+   ```
+   Distributor ID:	Ubuntu
+   Description:	Ubuntu 22.04.4 LTS
+   Release:	22.04
+   Codename:	jammy
+   ```
+   ```
+   6.5.0-18-generic
+   ``` 
 -----------------------------------------------------------------------------------------------------------
 
 ### post installation -- change grub configuration

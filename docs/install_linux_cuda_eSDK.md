@@ -18,7 +18,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
 1. ensure the following on PC:
     - an existing video card that displays existing OS or BIOS screen on a monitor -- no need to worry about graphics driver for now
     - at least 3 USB ports that work when you enter BIOS/installation  (mice/keyboard/linux USB) 
-    - <em>Important:</em> disable any wired/wireless network connections during the install, otherwise it will automatically upgrade to kernel 6.8. 
+    - <em>Important:</em> disable any wired/wireless network connections during the install, otherwise it will automatically upgrade to kernel 6.8. As the date of written, emergent eSDK only supports up to kernel 6.5. 
 2. plug the bootable linux USB into one of the active ports and boot up the PC.
 3. if the PC does not directly boot into the linux USB, you may have to change the `Boot settings` in  BIOS to boot from the linux USB
 	- enter BIOS by pressing F2 or DEL (unlikely, but it could be a different key for some motherboards)

@@ -257,11 +257,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
 
 ### install CUDA (depends on nvidia driver installation)
 **0. download installation file**
-- you can directly download the version we use (cuda `12.0` with driver `525.105.17`)
-  ```
-  cd /home/$USER/setup_files
-  wget https://developer.download.nvidia.com/compute/cuda/12.0.0/local_installers/cuda_12.0.0_525.60.13_linux.run
-  ```
+- you can directly download the version we use (cuda `12.2` with driver `535.104.05`)
 - (optional/alternative) you can also download a different version from [this page](https://developer.nvidia.com/cuda-toolkit-archive) -- we find it better to use the `runfile (local)` type installer
 
 
@@ -269,14 +265,14 @@ here is the overview of the steps -- detailed instructions for each are in the s
 - command:
     ```
     cd /home/$USER/setup_files
-    sudo cuda_12.0.0_525.60.13_linux.run
+    sudo cuda_12.2.2_535.104.05_linux.run
     ```
 - make sure to :
   - uncheck `Driver` under the `CUDA Installer` menu -- we do not want to reinstall a different driver
   - check `CUDA Toolkit 12.X`
   - start installation using `Install` -- follow prompts as needed
   - <details> 
-      <summary> install menu (cuda 11.7 shown) -- click to expand </summary>
+      <summary> install menu -- click to expand </summary>
       <img src="../images/cuda_install.png" alt="My Image">      
     </details>
   - note the output at the end of the installation to see the path to which `cuda` has been installed to (usually `/usr/local/cuda`) -- it will also have instructions for the step below

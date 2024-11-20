@@ -68,8 +68,7 @@ ls -l ffmpeg
 
 install 
 ```
-sudo make install 
+make install 
 ```
-
 
 If you followed the above steps, FFmpeg should be installed at `$HOME/nvidia/ffmpeg`

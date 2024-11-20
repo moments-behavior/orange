@@ -110,8 +110,8 @@ here is the overview of the steps -- detailed instructions for each are in the s
 
 **1. download files from emergent ftp server** 
 - I've note the versions that have currently worked for us
-- eSDK :  eSDK_2_51_01_eCap_2_11_02_Ubuntu_22_04_6_5_0_x64.izip
-- (optional for phields team) -- rivermax license file: (`rivermax.lic`)
+- eSDK: [eSDK 2.55.02 Linux Ubuntu 22.04 Kernel 6.5.0](https://emergentvisiontec.com/esdk/)
+- (optional) -- rivermax license file: (`rivermax.lic`)
 
 
 **2. unzip and install the eSDK** 

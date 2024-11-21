@@ -14,17 +14,14 @@ public:
     ~YOLOv8();
 
     void make_pipe(bool warmup = true);
-    // void copy_from_Mat(const cv::Mat &image);
-    // void copy_from_Mat(const cv::Mat &image, cv::Size &size);
     void preprocess_gpu(unsigned char *d_rgb);
-    // void letterbox(const cv::Mat &image, cv::Mat &out, cv::Size &size);
     void infer();
     void postprocess(std::vector<Object> &objs);
-    static void          draw_objects(const cv::Mat&                                image,
-                                      cv::Mat&                                      res,
-                                      const std::vector<Object>&                    objs,
-                                      const std::vector<std::string>&               CLASS_NAMES,
-                                      const std::vector<std::vector<unsigned int>>& COLORS);
+    static void draw_objects(const cv::Mat&                                image,
+                           cv::Mat&                                      res,
+                           const std::vector<Object>&                    objs,
+                           const std::vector<std::string>&               CLASS_NAMES,
+                           const std::vector<std::vector<unsigned int>>& COLORS);
 
     void copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs);
     

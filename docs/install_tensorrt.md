@@ -4,7 +4,7 @@
 this is based on [these instructions](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html#installing-tar) (has more details if needed)
 
 **0. download and extract tensor-rt installation file**
-  - we use `TensorRT-8.6.1.6` with `cuda 12.0`  -- you can directly download this (or from this page). But if you are using `cuda 12.2`, please use TensorRT 10, for instance `TensorRT-10.6.0.26.Linux.x86_64-gnu.cuda-12.6`. The installation steps are similar.
+  - we use `TensorRT-8.6.1.6` with `cuda 12.0`  -- you can directly download this (or from this page). But if you are using `cuda 12.2` and above, please use TensorRT 10, for instance `TensorRT-10.6.0.26.Linux.x86_64-gnu.cuda-12.6`. The installation steps are similar.
     ```
     cd /home/$USER/nvidia
     wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-12.0.tar.gz

@@ -76,6 +76,7 @@ make install
 If you followed the above steps, FFmpeg should be installed at `$HOME/nvidia/ffmpeg`. Add ffmpeg to the path in `.bashrc` file, `vim .bashrc`
 
 ```
-export PATH=/usr/local/cuda/bin:/home/user/nvidia/ffmpeg/build/bin:$PATH
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/home/user/nvidia/ffmpeg/build/lib:LD_LIBRARY_PATH
+export PATH=/usr/local/cuda/bin:/home/$USER/nvidia/ffmpeg/build/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/home/$USER/nvidia/ffmpeg/build/lib:LD_LIBRARY_PATH
+
 ```

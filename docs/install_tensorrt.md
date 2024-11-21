@@ -14,22 +14,23 @@ this is based on [these instructions](https://docs.nvidia.com/deeplearning/tenso
     ```
     bin  data  doc  include  lib  python  samples  targets
     ```
+  - rename the folder `TensorRT`.
 
 **1. add tensor-rt path in bashrc**
   - Add the absolute path to the TensorRT lib directory to the environment variable `LD_LIBRARY_PATH`:
     ```
-    export LD_LIBRARY_PATH=/home/$USER/nvidia/TensorRT-8.6.1.6/lib:$LD_LIBRARY_PATH 
+    export LD_LIBRARY_PATH=/home/$USER/nvidia/TensorRT/lib:$LD_LIBRARY_PATH 
     source ~/.bashrc
     ```
 **2. verify installation**
   - try to build one of the sample programs (say, `trtexec`) to verify installation
     ```
-    cd /home/$USER/nvidia/TensorRT-8.6.1.6/samples/trtexec
+    cd /home/$USER/nvidia/TensorRT/samples/trtexec
     make
     ```
   - run the program built above
     ```
-    cd home/$USER/nvidia/TensorRT-8.6.1.6/bin/
+    cd home/$USER/nvidia/TensorRT/bin/
     ./trtexec
     ```
 

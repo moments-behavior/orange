@@ -53,7 +53,7 @@ Refer to [`docs/install_opencv.md`](docs/install_opencv.md) for detailed instruc
 The repo has been tested with TensorRT-8.6.1.6. Followings instruction: [`docs/install_tensorrt.md`](docs/install_tensorrt.md). The project build assumes TensorRT installed at `$HOME/nvidia/TensorRT-8.6.1.6`. If you installed in at a different location, please change the [`build.sh`](build.sh) `DIR_TENSORRT` to match your install directory.
 
 6. Install ENET
-Follow instruction: http://enet.bespin.org/Installation.html. 
+Follow instruction: http://enet.bespin.org/Installation.html. You might need to run `sudo ldconfig` in terminal after installation, or simply reboot your computer. 
 
 7. Clone the repo and submodules
 

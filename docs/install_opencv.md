@@ -5,7 +5,7 @@
 2. To build OpenCV with opencv sfm, please follow instructions from: https://docs.opencv.org/4.x/db/db8/tutorial_sfm_installation.html first to install sfm dependency. Ceres solver is optional. If you wish to install ceres solver, a more detailed installation instruction can be found at: http://ceres-solver.org/installation.html#linux. For simplicity, turns off CUDA as follow,
    
 ```
-git clone https://ceres-solver.googlesource.com/ceres-solver
+git clone --recurse-submodules https://github.com/ceres-solver/ceres-solver
 cd ceres-solver
 mkdir build && cd build
 cmake -DUSE_CUDA=OFF ..

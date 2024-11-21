@@ -36,6 +36,7 @@ This is for using ffmpeg API
 ```
 cd ~/nvidia/ffmpeg
 git checkout release/4.4
+mkdir build
 ```
 
 Rebuild the ffmpeg following above instruction. If you have trouble compiling it, it is likely that the gpu architecture is too low. Check config.log
@@ -43,7 +44,8 @@ Rebuild the ffmpeg following above instruction. If you have trouble compiling it
 
 ### Build ffmpeg 4.4.1
 
-Legacy 
+Depends on [nv-codec-headers version](https://github.com/FFmpeg/nv-codec-headers)
+
 ```
 ./configure --prefix=$(pwd)/build --disable-static --enable-shared --enable-nonfree --enable-cuda-nvcc --enable-libnpp --extra-cflags=-I/usr/local/cuda/include --extra-ldflags=-L/usr/local/cuda/lib64 --nvccflags="-gencode arch=compute_75,code=sm_75 -O2"
 ```

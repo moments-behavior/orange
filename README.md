@@ -126,6 +126,10 @@ One can network multiple PCs to scale up to more cameras.
 
 The recorded videos are saved at `orange_data/exp/unsorted` by default. But it can be easily changed while using the app. 
 
+### PTP setting
+Please refer to [`docs/ptp.md`](docs/ptp.md) for detailed instruction for configure PTP. 
+
+
 ## Contribute
 
 Please open an issue for bug fix or feature request. If you wish to make changes to the source code, you can fork the repo. To contribute to the project, please create a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).

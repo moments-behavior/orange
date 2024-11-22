@@ -15,8 +15,12 @@
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
+#define display_gpu_id 0
+
 int main(int argc, char **args)
 {
+    ck(cudaSetDevice(display_gpu_id));
+
     gx_context *window = (gx_context *)malloc(sizeof(gx_context));
     *window = (gx_context){
         .swap_interval = 1, // use vsync
@@ -248,6 +252,7 @@ int main(int argc, char **args)
 
                     std::string encoder_setup_for_recording = encoder_config->encoder_setup + std::to_string(cameras_params[0].frame_rate);
                     
+                    cudaSetDevice(display_gpu_id);
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -349,6 +354,7 @@ int main(int argc, char **args)
                     gx_delete_buffer(&tex[i].pbo);
                     unmap_cuda_resource(&tex[i].cuda_resource);
                     cuda_unregister_pbo(tex[i].cuda_resource);
+                    cudaStreamDestroy(tex[i].streams); 
                 }
             }
             delete[] tex;
@@ -691,6 +697,7 @@ int main(int argc, char **args)
                     (camera_control->subscribe) = !(camera_control->subscribe);
                     if (camera_control->subscribe)
                     {   
+                        cudaSetDevice(display_gpu_id);
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
@@ -728,6 +735,7 @@ int main(int argc, char **args)
                                 gx_delete_buffer(&tex[i].pbo);
                                 unmap_cuda_resource(&tex[i].cuda_resource);
                                 cuda_unregister_pbo(tex[i].cuda_resource);
+                                cudaStreamDestroy(tex[i].streams); 
                             }
                         }
                         delete[] tex;
@@ -843,6 +851,7 @@ int main(int argc, char **args)
                                     gx_delete_buffer(&tex[i].pbo);
                                     unmap_cuda_resource(&tex[i].cuda_resource);
                                     cuda_unregister_pbo(tex[i].cuda_resource);
+                                    cudaStreamDestroy(tex[i].streams); 
                                 }
                             }
                             delete[] tex;
@@ -865,6 +874,7 @@ int main(int argc, char **args)
                         // frame rate are the same
                         std::string encoder_setup_for_recording = encoder_config->encoder_setup + std::to_string(cameras_params[0].frame_rate);
 
+                        cudaSetDevice(display_gpu_id);
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
@@ -905,6 +915,7 @@ int main(int argc, char **args)
                                 gx_delete_buffer(&tex[i].pbo);
                                 unmap_cuda_resource(&tex[i].cuda_resource);
                                 cuda_unregister_pbo(tex[i].cuda_resource);
+                                cudaStreamDestroy(tex[i].streams); 
                             }
                         }
                         delete[] tex;

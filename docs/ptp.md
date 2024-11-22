@@ -9,6 +9,7 @@ sudo apt install linuxptp
 ```
 
 1. set boundary clock 
+
 If you don't have to `ptp4l.conf` file, create it first `/etc/ptp4l.conf`, and edit the file
 
 ```

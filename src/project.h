@@ -145,6 +145,7 @@ void load_camera_json_config_files(std::string file_name, CameraParams* camera_p
     camera_params->gpu_direct = camera_config["gpu_direct"];
     camera_params->color = camera_config["color"];
     camera_params->focus = camera_config["focus"];
+    camera_params->iris = camera_config["iris"];
 }
 
 // Get current date/time, format is YYYY_MM_DD_HH_mm_ss
@@ -195,6 +196,7 @@ void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int nu
     camera_params->gpu_direct = false;
     camera_params->need_reorder = false;
     camera_params->color = true;
+    camera_params->iris = 0;
 }
 
 
@@ -215,6 +217,7 @@ void init_65MP_camera_params_mono(CameraParams* camera_params, int camera_id, in
     camera_params->focus = 4311;
     camera_params->camera_id = camera_id;
     camera_params->color = false;
+    camera_params->iris = 0;
 }
 
 
@@ -234,6 +237,7 @@ void init_65MP_camera_params_color(CameraParams* camera_params, int camera_id, i
     camera_params->camera_id = camera_id;
     camera_params->color = true;
     camera_params->color_temp = "CT_3000K";
+    camera_params->iris = 0;
 }
 
 
@@ -253,6 +257,7 @@ void init_7MP_camera_params_color(CameraParams* camera_params, int camera_id, in
     camera_params->focus = 345;
     camera_params->camera_id = camera_id;
     camera_params->color = true;
+    camera_params->iris = 0;
 }
 
 
@@ -272,6 +277,7 @@ void init_7MP_camera_params_mono(CameraParams* camera_params, int camera_id, int
     camera_params->focus = 4700;
     camera_params->camera_id = camera_id;
     camera_params->color = false;
+    camera_params->iris = 0;
 }
 
 bool make_folder_for_recording(std::string& folder_name, std::string input_folder, const char* subfix_buf)
@@ -349,7 +355,7 @@ bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device
             int gpu_id = 0;
             init_7MP_camera_params_mono(camera_params, camera_idx, num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
         } else {
-            printf("Camera not supported...Exit");
+            printf("Please set config files for your cameras. \n");
             return false;
         }
     } else {

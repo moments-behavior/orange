@@ -4,6 +4,7 @@
     "height": 2200,
     "frame_rate": 30,
     "gain": 1500,
+    "iris": 0,
     "focus": 345,
     "exposure": 2500,
     "pixel_format": "BayerRG8",

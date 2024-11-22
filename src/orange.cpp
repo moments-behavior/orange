@@ -635,27 +635,35 @@ int main(int argc, char **args)
                                 selected_cameras.push_back(i);
                             }
                         }
+                        
+                        bool recognize_camera = true;
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
-                        }
-
-                        for (int i =0; i < num_cameras; i++) {
-                            cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
-                                cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
+                            if (!set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras)) {
+                                recognize_camera = false;
+                                break;
                             }
                         }
-                        
-                        ecams = new CameraEmergent[num_cameras];
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
-                        }
-                        realtime_plot_data = new ScrollingBuffer[num_cameras];
-                    }
 
+                        if (recognize_camera) {
+                            for (int i =0; i < num_cameras; i++) {
+                                cameras_select[i].stream_on = false;
+                                if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
+                                    cameras_select[i].stream_on = true;
+                                    cameras_select[i].yolo = true;
+                                }
+                            }
+                            
+                            ecams = new CameraEmergent[num_cameras];
+                            for (int i = 0; i < num_cameras; i++)
+                            {
+                                open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
+                            }
+                            realtime_plot_data = new ScrollingBuffer[num_cameras];
+                        } else {
+                            camera_control->open = false;
+                        }
+                    }
                 } else {
                     camera_control->open = false;
                     for (int i = 0; i < num_cameras; i++)

@@ -176,6 +176,19 @@ void update_focus_value(Emergent::CEmergentCamera *camera, int focus_value, Came
     }
 }
 
+void update_iris_value(Emergent::CEmergentCamera *camera, int iris_value, CameraParams *camera_params)
+{
+    EVT_CameraGetUInt32ParamMax(camera, "Iris", &camera_params->iris_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Iris", &camera_params->iris_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Iris", &camera_params->iris_inc);
+    if (iris_value >= camera_params->iris_min && iris_value <= camera_params->iris_max)
+    {
+        EVT_CameraSetUInt32Param(camera, "Iris", iris_value);
+        camera_params->iris = iris_value;
+    }
+}
+
+
 void update_width_value(Emergent::CEmergentCamera *camera, int width_val, CameraParams *camera_params)
 {
     EVT_CameraGetUInt32ParamMax(camera, "Width", &camera_params->width_max);
@@ -337,6 +350,7 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
     // printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
     update_frame_rate_value(camera, camera_params->frame_rate, camera_params);
     update_focus_value(camera, camera_params->focus, camera_params);
+    update_iris_value(camera, camera_params->iris, camera_params);
 }
 
 // **********************************************sync*****************************************************

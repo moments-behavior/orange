@@ -7,3 +7,15 @@ An Ubuntu image is available with preinstalled `orange` and the labeling app `re
 3. [Restore disk image](https://clonezilla.org//fine-print-live-doc.php?path=clonezilla-live/doc/02_Restore_disk_image)
 
 After successfully restoring the image, in BIOS, enable **PCIE Above 4G Decoding** and **Resizable Bar**. You can try upgrade the BIOS if the current BIOS doesn't support them.
+
+Here is the system stack of this image,
+```
+ubuntu_version: 22.04.4
+kernel_version: 6.5.0-44-generic
+nvidia_driver_version: 535.183.06
+esdk_version: 2.55.02
+cuda_version: 12.2
+ffmpeg_version: 4.4
+opencv_version: 4.10
+tensorrt_version: 10.0.1.6
+```

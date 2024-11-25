@@ -31,6 +31,8 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 8. ENET
 
 ## Build instructions 
+0. If you wish to skip the build process, an Ubuntu image is availalbe which has preinstalled 'orange' and the labeling app 'red'. Please contact the developer for accessing the image and follow instructions [here](docs/clonezilla_image.md). 
+
 1. Install CUDA (the software has been tested with version 12.x) and Emergent camera SDK. Follow instructions in [`docs/install_linux_cuda_eSDK.md`](docs/install_linux_cuda_eSDK.md). Make sure you can stream all cameras individually with Emergent `eCapture`.  
 
 2. Install FFmpeg 4.4
@@ -50,7 +52,7 @@ sudo apt-get install libglew-dev
 Refer to [`docs/install_opencv.md`](docs/install_opencv.md) for detailed instruction for building OpenCV. 
 
 5. Install TensorRT 
-The repo has been tested with TensorRT-8.6.1.6. Followings instruction: [`docs/install_tensorrt.md`](docs/install_tensorrt.md). The project build assumes TensorRT installed at `$HOME/nvidia/TensorRT-8.6.1.6`. If you installed in at a different location, please change the [`build.sh`](build.sh) `DIR_TENSORRT` to match your install directory.
+Followings instruction: [`docs/install_tensorrt.md`](docs/install_tensorrt.md). The project build assumes TensorRT installed at `$HOME/nvidia/TensorRT`. If you installed in at a different location, please change the [`build.sh`](build.sh) `DIR_TENSORRT` to match your install directory.
 
 6. Install ENET
 Follow instruction: http://enet.bespin.org/Installation.html. You might need to run `sudo ldconfig` in terminal after installation, or simply reboot your computer. 

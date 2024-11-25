@@ -31,7 +31,7 @@ Encoding performance using GPU A6000 with 7MP Emergent camera
 8. ENET
 
 ## Build instructions 
-0. If you wish to skip the build process, an Ubuntu image is availalbe which has preinstalled `orange` and the labeling app `red`. Please contact the developer for accessing the image and follow instructions [here](docs/clonezilla_image.md). 
+0. If you wish to skip the build process, an Ubuntu image is available with preinstalled `orange` and the labeling app `red`. Please contact the developer for accessing the image and follow instructions [here](docs/clonezilla_image.md). 
 
 1. Install CUDA (the software has been tested with version 12.x) and Emergent camera SDK. Follow instructions in [`docs/install_linux_cuda_eSDK.md`](docs/install_linux_cuda_eSDK.md). Make sure you can stream all cameras individually with Emergent `eCapture`.  
 

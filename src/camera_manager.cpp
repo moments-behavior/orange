@@ -45,9 +45,31 @@ public:
             std::string serial(device_info[i].serialNumber);
             auto config_it = known_configs.find(serial);
             if (config_it != known_configs.end()) {
-                // Use the loaded configuration
+                LOG(INFO) << "Found configuration for camera " << serial;
                 instance.params = config_it->second;
-                LOG(INFO) << "Using loaded config for camera " << serial;
+                
+                // Create and open camera first to get valid ranges
+                instance.camera = std::make_unique<EmergentCamera>(instance.params);
+                instance.camera->open(&device_info[i]);
+                
+                // Get ranges after opening camera
+                instance.camera->updateCameraRanges();
+                const auto& ranges = instance.camera->getResolutionRange();
+                
+                // Now validate and clamp the loaded config values
+                instance.params.width = std::clamp(instance.params.width, 
+                    static_cast<int>(ranges.width_min), 
+                    static_cast<int>(ranges.width_max));
+                instance.params.height = std::clamp(instance.params.height,
+                    static_cast<int>(ranges.height_min), 
+                    static_cast<int>(ranges.height_max));
+                    
+                LOG(INFO) << "Verified camera settings:"
+                        << "\n  Width: " << instance.params.width
+                        << "\n  Height: " << instance.params.height
+                        << "\n  Exposure: " << instance.params.exposure
+                        << "\n  Frame Rate: " << instance.params.frame_rate
+                        << "\n  Gain: " << instance.params.gain;
             } else {
                 // Fall back to defaults
                 instance.params.camera_serial = serial;
@@ -55,15 +77,10 @@ public:
                 LOG(INFO) << "No config found for camera " << serial << ", using defaults";
             }
             
-            try {
-                instance.camera = std::make_unique<EmergentCamera>(instance.params);
-                instance.camera->open(&device_info[i]);
-                cameras.push_back(std::move(instance));
-                LOG(INFO) << "Successfully initialized camera " << i;
-            }
-            catch (const evt::CameraException& e) {
-                LOG(ERROR) << "Failed to initialize camera " << i << ": " << e.what();
-            }
+            // Always log the current camera state
+            instance.camera->logCurrentState("Initial camera state");
+            cameras.push_back(std::move(instance));
+            LOG(INFO) << "Successfully initialized camera " << i;
         }
     }
 

@@ -169,6 +169,20 @@ public:
     void updateCameraRanges();
     void updateExposureAndFrameRate(int exposure_value, int frame_rate_value);
 
+    // Add new method
+    void updateParamsFromCurrentState(CameraParams& params) const {
+        if (!is_open_) {
+            throw CameraException("Cannot update params - camera not open");
+        }
+
+        auto state = getCurrentState();
+        params.exposure = state.exposure;
+        params.gain = state.gain;
+        params.frame_rate = state.frame_rate;
+        params.iris = state.iris;
+        params.focus = state.focus;
+    }
+
 private:
     void configureDefaults();
     // void validateResolution(int width, int height) const; // TODO: Implement this

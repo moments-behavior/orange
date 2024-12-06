@@ -40,7 +40,7 @@ private:
     void renderStatusBar();
 
     // Modify method signature
-    void loadCameraConfigs(const std::string& config_path);
+    void loadCameraConfigs(const std::string& config_path); // Move to private
 
     // Window context and graphics
     std::unique_ptr<gx_context> window_ctx_;

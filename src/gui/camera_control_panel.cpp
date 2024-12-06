@@ -126,56 +126,15 @@ void CameraControlPanel::renderCameraSettings() {
                     LOG(INFO) << "Starting tab for camera " << serial;
                 }
 
-                // Initialize ranges with defaults
-                evt::EmergentCamera::ParameterRange exposure_range{0, 1000000, 1};
-                evt::EmergentCamera::ParameterRange gain_range{0, 100, 1};
-                evt::EmergentCamera::ParameterRange frame_rate_range{1, 120, 1};
-                evt::EmergentCamera::ParameterRange iris_range{0, 100, 1};
-                evt::EmergentCamera::ParameterRange focus_range{0, 100, 1};
+                bool camera_ready = camera_instance.camera && camera_instance.camera->isOpen();
 
-                // Try to open the camera if it's not open
-                bool camera_ready = false;
-                if (!camera_instance.camera->isOpen()) {
-                    try {
-                        camera_instance.camera->open(&(*device_info)[i]);
-                        camera_ready = true;
-                    }
-                    catch (const evt::CameraException& e) {
-                        LOG(ERROR) << "Failed to open camera: " << e.what();
-                    }
-                } else {
-                    camera_ready = true;
-                }
-
-                // Only try to access ranges if camera is ready
-                if (camera_ready) {
-                    try {
-                        // Get ranges from stored params instead of querying camera
-                        const auto& camera_params = config_it->second;
-                        exposure_range = {camera_params.exposure_min, camera_params.exposure_max, camera_params.exposure_inc};
-                        gain_range = {camera_params.gain_min, camera_params.gain_max, camera_params.gain_inc};
-                        frame_rate_range = {camera_params.frame_rate_min, camera_params.frame_rate_max, camera_params.frame_rate_inc};
-                        iris_range = {camera_params.iris_min, camera_params.iris_max, camera_params.iris_inc};
-                        focus_range = {camera_params.focus_min, camera_params.focus_max, camera_params.focus_inc};
-                        
-                        if (debug_rendering) {
-                            // Log ranges only once when tab is opened or when debug is enabled
-                            static bool ranges_logged = false;
-                            if (!ranges_logged) {
-                                LOG(INFO) << "\n╭── STORED PARAMETER RANGES ──────────────\n"
-                                        << "  │ Frame Rate: " << frame_rate_range.min << " - " 
-                                        << frame_rate_range.max << " FPS (inc: " << frame_rate_range.increment << ")\n"
-                                        << "  │ Exposure: " << exposure_range.min << " - "
-                                        << exposure_range.max << " μs (inc: " << exposure_range.increment << ")\n"
-                                        << "  ╰────────────────────────────────";
-                                ranges_logged = true;
-                            }
-                        }
-                    } catch (const evt::CameraException& e) {
-                        LOG(WARNING) << "Could not access camera ranges: " << e.what();
-                    }
-                }
-
+                // Get actual ranges from camera instead of config
+                evt::EmergentCamera::ParameterRange exposure_range = camera_manager.getExposureRange(i);
+                evt::EmergentCamera::ParameterRange gain_range = camera_manager.getGainRange(i);
+                evt::EmergentCamera::ParameterRange frame_rate_range = camera_manager.getFrameRateRange(i);
+                evt::EmergentCamera::ParameterRange iris_range = camera_manager.getIrisRange(i);
+                evt::EmergentCamera::ParameterRange focus_range = camera_manager.getFocusRange(i);
+                
                 // Camera Info section in a table
                 if (ImGui::BeginTable("CameraInfo", 2, 
                     ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
@@ -210,12 +169,40 @@ void CameraControlPanel::renderCameraSettings() {
                 if (camera_ready && config_it != known_cameras_->end()) {
                     // Need to cast away const to modify the params
                     auto& params = const_cast<evt::CameraParams&>(config_it->second);
+
+                    // Clamp all values to valid ranges before displaying
+                    params.exposure = std::clamp(static_cast<int>(params.exposure), 
+                        static_cast<int>(exposure_range.min), 
+                        static_cast<int>(exposure_range.max));
+                    params.gain = std::clamp(static_cast<int>(params.gain),
+                        static_cast<int>(gain_range.min),
+                        static_cast<int>(gain_range.max));
+                    params.frame_rate = std::clamp(static_cast<int>(params.frame_rate),
+                        static_cast<int>(frame_rate_range.min),
+                        static_cast<int>(frame_rate_range.max));
+                    params.iris = std::clamp(static_cast<int>(params.iris),
+                        static_cast<int>(iris_range.min),
+                        static_cast<int>(iris_range.max));
+                    params.focus = std::clamp(static_cast<int>(params.focus),
+                        static_cast<int>(focus_range.min),
+                        static_cast<int>(focus_range.max));
+
+                    // Get current camera state before rendering controls
+                    auto current_state = camera_instance.camera->getCurrentState();
                     
-                    if (ImGui::BeginTable("CameraSettings", 3, 
+                    // Update params with actual camera values
+                    params.exposure = current_state.exposure;
+                    params.gain = current_state.gain;
+                    params.frame_rate = current_state.frame_rate;
+                    params.iris = current_state.iris;
+                    params.focus = current_state.focus;
+
+                    if (ImGui::BeginTable("CameraSettings", 4,  // Changed from 3 to 4 columns 
                         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
                         
                         ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthFixed, 120.0f);
                         ImGui::TableSetupColumn("Value");
+                        ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthFixed, 100.0f);  // New column
                         ImGui::TableSetupColumn("Range", ImGuiTableColumnFlags_WidthFixed, 150.0f);
 
                         // Exposure row
@@ -223,47 +210,39 @@ void CameraControlPanel::renderCameraSettings() {
                         ImGui::TableNextColumn();
                         ImGui::Text("Exposure");
                         ImGui::TableNextColumn();
-                        int exposure = params.exposure;
-                        if (ImGui::SliderInt("##exposure", &exposure, 
+                        int exposure = current_state.exposure;
+                        if (ImGui::SliderInt("##exposure_slider", &exposure, 
                             exposure_range.min, exposure_range.max)) 
                         {
-                            try {
-                                LOG(INFO) << "Attempting to update exposure to " << exposure;
-                                camera_manager.getCamera(i).camera->logCurrentState("Before exposure change");
-                                
-                                camera_manager.updateExposure(i, exposure);
-                                params.exposure = exposure;
-                                
-                                camera_manager.getCamera(i).camera->logCurrentState("After exposure change");
-                                LOG(INFO) << "Updated camera " << serial << " exposure to " << exposure;
-                            } catch (const evt::CameraException& e) {
-                                LOG(ERROR) << "Failed to update exposure: " << e.what();
-                            }
+                            updateCameraParameter(i, serial, "exposure", exposure, params);
+                        }
+                        ImGui::TableNextColumn();
+                        if (ImGui::InputInt("##exposure_input", &exposure, 0)) {
+                            exposure = std::clamp(exposure, 
+                                static_cast<int>(exposure_range.min), 
+                                static_cast<int>(exposure_range.max));
+                            updateCameraParameter(i, serial, "exposure", exposure, params);
                         }
                         ImGui::TableNextColumn();
                         ImGui::Text("%d - %d μs", exposure_range.min, exposure_range.max);
 
-                        // Gain row
+                        // Gain row with same pattern
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
                         ImGui::Text("Gain");
                         ImGui::TableNextColumn();
-                        int gain = params.gain;
-                        if (ImGui::SliderInt("##gain", &gain, 
+                        int gain = current_state.gain;
+                        if (ImGui::SliderInt("##gain_slider", &gain, 
                             gain_range.min, gain_range.max)) 
                         {
-                            try {
-                                LOG(INFO) << "Attempting to update gain to " << gain;
-                                camera_manager.getCamera(i).camera->logCurrentState("Before gain change");
-                                
-                                camera_manager.updateGain(i, gain);
-                                params.gain = gain;  // Update stored value
-                                
-                                camera_manager.getCamera(i).camera->logCurrentState("After gain change");
-                                LOG(INFO) << "Updated camera " << serial << " gain to " << gain;
-                            } catch (const evt::CameraException& e) {
-                                LOG(ERROR) << "Failed to update gain: " << e.what();
-                            }
+                            updateCameraParameter(i, serial, "gain", gain, params);
+                        }
+                        ImGui::TableNextColumn();
+                        if (ImGui::InputInt("##gain_input", &gain, 0)) {
+                            gain = std::clamp(gain, 
+                                static_cast<int>(gain_range.min), 
+                                static_cast<int>(gain_range.max));
+                            updateCameraParameter(i, serial, "gain", gain, params);
                         }
                         ImGui::TableNextColumn();
                         ImGui::Text("%d - %d", gain_range.min, gain_range.max);
@@ -273,22 +252,18 @@ void CameraControlPanel::renderCameraSettings() {
                         ImGui::TableNextColumn();
                         ImGui::Text("Frame Rate");
                         ImGui::TableNextColumn();
-                        int frame_rate = params.frame_rate;
+                        int frame_rate = current_state.frame_rate;
                         if (ImGui::SliderInt("##framerate", &frame_rate,
                             frame_rate_range.min, frame_rate_range.max))
                         {
-                            try {
-                                LOG(INFO) << "Attempting to update frame rate to " << frame_rate;
-                                camera_manager.getCamera(i).camera->logCurrentState("Before frame rate change");
-                                
-                                camera_manager.updateFrameRate(i, frame_rate);
-                                params.frame_rate = frame_rate;  // Update stored value
-                                
-                                camera_manager.getCamera(i).camera->logCurrentState("After frame rate change");
-                                LOG(INFO) << "Updated camera " << serial << " frame rate to " << frame_rate;
-                            } catch (const evt::CameraException& e) {
-                                LOG(ERROR) << "Failed to update frame rate: " << e.what();
-                            }
+                            updateCameraParameter(i, serial, "frame_rate", frame_rate, params);
+                        }
+                        ImGui::TableNextColumn();
+                        if (ImGui::InputInt("##framerate_input", &frame_rate, 0)) {
+                            frame_rate = std::clamp(frame_rate, 
+                                static_cast<int>(frame_rate_range.min), 
+                                static_cast<int>(frame_rate_range.max));
+                            updateCameraParameter(i, serial, "frame_rate", frame_rate, params);
                         }
                         ImGui::TableNextColumn();
                         ImGui::Text("%d - %d fps", frame_rate_range.min, frame_rate_range.max);
@@ -298,22 +273,18 @@ void CameraControlPanel::renderCameraSettings() {
                         ImGui::TableNextColumn();
                         ImGui::Text("Iris");
                         ImGui::TableNextColumn();
-                        int iris = params.iris;
+                        int iris = current_state.iris;
                         if (ImGui::SliderInt("##iris", &iris, 
                             iris_range.min, iris_range.max)) 
                         {
-                            try {
-                                LOG(INFO) << "Attempting to update iris to " << iris;
-                                camera_manager.getCamera(i).camera->logCurrentState("Before iris change");
-                                
-                                camera_manager.updateIris(i, iris);
-                                params.iris = iris;  // Update stored value
-                                
-                                camera_manager.getCamera(i).camera->logCurrentState("After iris change");
-                                LOG(INFO) << "Updated camera " << serial << " iris to " << iris;
-                            } catch (const evt::CameraException& e) {
-                                LOG(ERROR) << "Failed to update iris: " << e.what();
-                            }
+                            updateCameraParameter(i, serial, "iris", iris, params);
+                        }
+                        ImGui::TableNextColumn();
+                        if (ImGui::InputInt("##iris_input", &iris, 0)) {
+                            iris = std::clamp(iris, 
+                                static_cast<int>(iris_range.min), 
+                                static_cast<int>(iris_range.max));
+                            updateCameraParameter(i, serial, "iris", iris, params);
                         }
                         ImGui::TableNextColumn();
                         ImGui::Text("%d - %d", iris_range.min, iris_range.max);
@@ -323,22 +294,18 @@ void CameraControlPanel::renderCameraSettings() {
                         ImGui::TableNextColumn();
                         ImGui::Text("Focus");
                         ImGui::TableNextColumn();
-                        int focus = params.focus;
+                        int focus = current_state.focus;
                         if (ImGui::SliderInt("##focus", &focus, 
                             focus_range.min, focus_range.max)) 
                         {
-                            try {
-                                LOG(INFO) << "Attempting to update focus to " << focus;
-                                camera_manager.getCamera(i).camera->logCurrentState("Before focus change");
-                                
-                                camera_manager.updateFocus(i, focus);
-                                params.focus = focus;  // Update stored value
-                                
-                                camera_manager.getCamera(i).camera->logCurrentState("After focus change");
-                                LOG(INFO) << "Updated camera " << serial << " focus to " << focus;
-                            } catch (const evt::CameraException& e) {
-                                LOG(ERROR) << "Failed to update focus: " << e.what();
-                            }
+                            updateCameraParameter(i, serial, "focus", focus, params);
+                        }
+                        ImGui::TableNextColumn();
+                        if (ImGui::InputInt("##focus_input", &focus, 0)) {
+                            focus = std::clamp(focus, 
+                                static_cast<int>(focus_range.min), 
+                                static_cast<int>(focus_range.max));
+                            updateCameraParameter(i, serial, "focus", focus, params);
                         }
                         ImGui::TableNextColumn();
                         ImGui::Text("%d - %d", focus_range.min, focus_range.max);
@@ -393,5 +360,36 @@ void CameraControlPanel::renderRecordingControls(
         } catch (const evt::CameraException& e) {
             // Handle error
         }
+    }
+}
+
+void CameraControlPanel::updateCameraParameter(size_t camera_idx, const std::string& serial, 
+                             const std::string& param_name, int value, 
+                             evt::CameraParams& params) {
+    try {
+        LOG(INFO) << "Attempting to update " << param_name << " to " << value;
+        camera_manager.getCamera(camera_idx).camera->logCurrentState("Before " + param_name + " change");
+        
+        if (param_name == "exposure") {
+            camera_manager.updateExposure(camera_idx, value);
+            params.exposure = value;
+        } else if (param_name == "gain") {
+            camera_manager.updateGain(camera_idx, value);
+            params.gain = value;
+        } else if (param_name == "frame_rate") {
+            camera_manager.updateFrameRate(camera_idx, value);
+            params.frame_rate = value;
+        } else if (param_name == "iris") {
+            camera_manager.updateIris(camera_idx, value);
+            params.iris = value;
+        } else if (param_name == "focus") {
+            camera_manager.updateFocus(camera_idx, value);
+            params.focus = value;
+        }
+        
+        camera_manager.getCamera(camera_idx).camera->logCurrentState("After " + param_name + " change");
+        LOG(INFO) << "Updated camera " << serial << " " << param_name << " to " << value;
+    } catch (const evt::CameraException& e) {
+        LOG(ERROR) << "Failed to update " << param_name << ": " << e.what();
     }
 }

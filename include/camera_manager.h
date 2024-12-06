@@ -31,7 +31,7 @@ public:
     void initializeCameras(const std::vector<bool>& selected_cameras,
                           const std::vector<GigEVisionDeviceInfo>& device_info,
                           const std::vector<std::string>& config_files,
-                          std::unordered_map<std::string, CameraParams>& known_configs) {
+                          std::unordered_map<std::string, CameraParams>& known_cameras) {
         cameras.clear();
         cameras.reserve(device_info.size());
         
@@ -48,12 +48,11 @@ public:
             
             CameraInstance instance;
             
-            // 1. Set only the essential identification parameters
+            // Set identification parameters
             instance.params.device_info = device_info[i];
             instance.params.camera_serial = serial;
             instance.params.camera_name = device_info[i].userDefinedName;
             
-            // 2. Create camera with minimal params and open it
             try {
                 instance.camera = std::make_unique<EmergentCamera>(instance.params);
                 LOG(INFO) << "Camera instance created for " << serial;
@@ -61,45 +60,44 @@ public:
                 instance.camera->open(&device_info[i]);
                 LOG(INFO) << "Camera " << serial << " opened successfully";
                 
-                // 3. Get valid parameter ranges first
-                instance.camera->updateCameraRanges();
-                auto ranges = instance.camera->getResolutionRange();
-                LOG(INFO) << "Got camera ranges - Resolution: " 
-                         << ranges.width_min << "x" << ranges.height_min 
-                         << " to " << ranges.width_max << "x" << ranges.height_max;
+                // First get current camera state
+                instance.camera->updateParamsFromCurrentState(instance.params);
+                instance.camera->logCurrentState("Initial camera state");
+                
+                LOG(INFO) << "Current camera settings:"
+                         << "\n  Exposure: " << instance.params.exposure
+                         << "\n  Gain: " << instance.params.gain
+                         << "\n  Frame Rate: " << instance.params.frame_rate
+                         << "\n  Iris: " << instance.params.iris
+                         << "\n  Focus: " << instance.params.focus;
 
-                // 4. Load configuration or use defaults
-                if (auto config_it = known_cameras_.find(serial); config_it != known_cameras_.end()) {
-                    LOG(INFO) << "Found configuration for camera " << serial;
-                    // Validate and clamp the loaded config values against actual camera ranges
-                    instance.params = config_it->second;
-                    instance.params.width = std::clamp(instance.params.width, 
-                        static_cast<int>(ranges.width_min), 
-                        static_cast<int>(ranges.width_max));
-                    instance.params.height = std::clamp(instance.params.height,
-                        static_cast<int>(ranges.height_min), 
-                        static_cast<int>(ranges.height_max));
-                } else {
-                    LOG(INFO) << "No configuration found for camera " << serial << ", using safe defaults";
-                    // Use minimum supported resolution as safe defaults
-                    instance.params.width = ranges.width_min;
-                    instance.params.height = ranges.height_min;
-                    instance.params.exposure = 10000;  // Conservative default
-                    instance.params.gain = 0;         // Minimum gain
-                    instance.params.frame_rate = 30;  // Standard frame rate
-                    instance.params.pixel_format = "Mono8";
+                // Now apply user config if it exists
+                auto config_it = known_cameras.find(serial);
+                if (config_it != known_cameras.end()) {
+                    LOG(INFO) << "Applying user configuration for camera " << serial;
+                    
+                    // Apply each parameter with logging
+                    if (config_it->second.exposure != instance.params.exposure) {
+                        instance.camera->updateExposure(config_it->second.exposure);
+                    }
+                    if (config_it->second.gain != instance.params.gain) {
+                        instance.camera->updateGain(config_it->second.gain);
+                    }
+                    if (config_it->second.frame_rate != instance.params.frame_rate) {
+                        instance.camera->updateFrameRate(config_it->second.frame_rate);
+                    }
+                    if (config_it->second.iris != instance.params.iris) {
+                        instance.camera->updateIris(config_it->second.iris);
+                    }
+                    if (config_it->second.focus != instance.params.focus) {
+                        instance.camera->updateFocus(config_it->second.focus);
+                    }
+
+                    // Get final state after applying config
+                    instance.camera->updateParamsFromCurrentState(instance.params);
+                    instance.camera->logCurrentState("After applying user config");
                 }
 
-                // 5. Apply validated configuration
-                LOG(INFO) << "Applying configuration - Resolution: " 
-                         << instance.params.width << "x" << instance.params.height;
-                
-                instance.camera->updateResolution(instance.params.width, instance.params.height);
-                instance.camera->updateExposure(instance.params.exposure);
-                instance.camera->updateGain(instance.params.gain);
-                instance.camera->updateFrameRate(instance.params.frame_rate);
-                instance.camera->updatePixelFormat(instance.params.pixel_format);
-                
                 cameras.push_back(std::move(instance));
                 LOG(INFO) << "Successfully initialized camera " << serial;
                 

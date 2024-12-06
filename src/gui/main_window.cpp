@@ -62,14 +62,14 @@ MainWindow::MainWindow() {
         
         LOG(INFO) << "Window context created successfully";
         
-        // Create camera manager with explicit success check
+        // Create camera manager 
         camera_manager_ = std::make_unique<evt::CameraManager>();
         if (!camera_manager_) {
             throw std::runtime_error("Failed to create camera manager");
         }
         LOG(INFO) << "Camera manager created successfully";
         
-        // Load camera configs 
+        // Load camera configs - Store but don't initialize cameras yet
         loadCameraConfigs((fs_utils::get_home_directory() / "orange_data" / "config/local").string());
         LOG(INFO) << "Loaded " << known_cameras_.size() << " camera configurations";
 
@@ -293,11 +293,9 @@ void MainWindow::initialize() {
         initializeWindow();
         setupStyle();
         
-        // Load camera configurations first
-        loadCameraConfigs((fs_utils::get_home_directory() / "orange_data" / "config/local").string());
-        LOG(INFO) << "Loaded " << known_cameras_.size() << " camera configurations";
-        
-        // Initialize cameras with configs
+        // Use the configs already loaded in constructor
+        // Initialize cameras with loaded configs
+        camera_manager_->setKnownCameras(known_cameras_);
         initializeCameras();
         LOG(INFO) << "Initialized " << device_info_.size() << " cameras";
         

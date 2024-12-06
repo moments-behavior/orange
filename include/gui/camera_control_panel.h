@@ -64,6 +64,13 @@ private:
     bool ensureValidCameraState() const;
     void updateCameraStatus(size_t index, bool is_selected);
 
+    // Add this method declaration
+    void updateCameraParameter(size_t camera_idx, 
+                             const std::string& serial,
+                             const std::string& param_name, 
+                             int value,
+                             evt::CameraParams& params);
+
     // Data members for the panel
     evt::CameraManager& camera_manager;
     const std::vector<GigEVisionDeviceInfo>* device_info{nullptr};

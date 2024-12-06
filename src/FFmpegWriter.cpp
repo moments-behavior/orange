@@ -10,12 +10,29 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps
     }
 
     // Set format on oc
-    AVOutputFormat *fmt = av_guess_format("mpegts", NULL, NULL);
+    AVOutputFormat *fmt = av_guess_format("mp4", NULL, NULL);  // Changed from mpegts to mp4
     if (!fmt) {
         printf("Invalid format");
         return;
     }
-    fmt->video_codec = eCodecId;
+
+    // Set codec to use NVENC
+    if (eCodecId == AV_CODEC_ID_H264) {
+        fmt->video_codec = AV_CODEC_ID_H264;
+        const AVCodec *codec = avcodec_find_encoder_by_name("h264_nvenc");
+        if (!codec) {
+            printf("Could not find h264_nvenc encoder\n");
+            return;
+        }
+    } else if (eCodecId == AV_CODEC_ID_HEVC) {
+        fmt->video_codec = AV_CODEC_ID_HEVC;
+        const AVCodec *codec = avcodec_find_encoder_by_name("hevc_nvenc");
+        if (!codec) {
+            printf("Could not find hevc_nvenc encoder\n");
+            return;
+        }
+    }
+    
     oc->oformat = fmt;
 
     // Add video stream to oc
@@ -53,6 +70,14 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps
     //     return;
     // }
     // *metadata << "frame_id, keyframe\n";
+
+    // Initialize CUDA buffers
+    buffer_size = nWidth * nHeight * 4;  // Assuming 4 bytes per pixel
+    cudaStreamCreate(&cuda_stream);
+    
+    for(int i = 0; i < NUM_CUDA_BUFFERS; i++) {
+        cudaMalloc(&d_buffers[i], buffer_size);
+    }
 }
 
 FFmpegWriter::~FFmpegWriter()
@@ -62,22 +87,40 @@ FFmpegWriter::~FFmpegWriter()
         avio_close(oc->pb);
         avformat_free_context(oc);
     }
-    // metadata->close();
+    
+    // Cleanup CUDA resources
+    cudaStreamSynchronize(cuda_stream);
+    cudaStreamDestroy(cuda_stream);
+    
+    for(int i = 0; i < NUM_CUDA_BUFFERS; i++) {
+        if(d_buffers[i]) {
+            cudaFree(d_buffers[i]);
+        }
+    }
 }
 
 void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
 {
+    // Copy to current GPU buffer
+    cudaMemcpyAsync(d_buffers[current_buffer], pData, nBytes, cudaMemcpyDeviceToDevice, cuda_stream);
+    
     AVPacket *pkt = av_packet_alloc();
     if (av_new_packet(pkt, nBytes) < 0) {
         std::cout << "Error, av_new_packet..." << std::endl;
         return;
     }
-    memcpy(pkt->data, pData, nBytes);   
+    
+    // Copy from GPU buffer to packet
+    cudaMemcpyAsync(pkt->data, d_buffers[current_buffer], nBytes, cudaMemcpyDeviceToHost, cuda_stream);
+    cudaStreamSynchronize(cuda_stream);  // Ensure copy is complete
+    
+    current_buffer = (current_buffer + 1) % NUM_CUDA_BUFFERS;
+    
     pkt->pts = av_rescale_q(nPts++, AVRational {1, nFps}, vs->time_base);
     // No B-frames
     pkt->dts = pkt->pts;
     pkt->stream_index = vs->index;    
-    if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
+    if(!memcmp(pkt->data, "\x00\x00\x00\x01\x67", 5)) {
         pkt->flags |= AV_PKT_FLAG_KEY;
     }
     m_queue.push(pkt);

@@ -12,6 +12,7 @@ extern "C"
 #include <fstream>
 #include <thread>
 #include "thread.h"
+#include <cuda_runtime.h>
 
 class FFmpegWriter
 {
@@ -24,6 +25,7 @@ public:
     void quit_thread();
     void join_thread();
     void write_one_pkt(AVPacket* pkt); 
+
 private:
     AVFormatContext *oc = NULL;
     AVStream *vs = NULL;
@@ -34,4 +36,11 @@ private:
     std::thread m_thread;
     bool m_quitting;
     void write_thread();
+
+    // CUDA memory management
+    static const int NUM_CUDA_BUFFERS = 3;  // Triple buffering
+    uint8_t* d_buffers[NUM_CUDA_BUFFERS];   // Device buffers
+    int current_buffer = 0;
+    size_t buffer_size = 0;
+    cudaStream_t cuda_stream;
 };

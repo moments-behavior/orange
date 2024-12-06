@@ -488,7 +488,7 @@ int main(int argc, char **args)
             }
 
             {
-                const char* items[] = { "p1", "p3", "p5", "p7"};
+                const char* items[] = { "p1", "p2", "p3", "p4", "p5", "p6", "p7" };
                 static int item_current = 0;
                 ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
                 encoder_config->encoder_preset = items[item_current];

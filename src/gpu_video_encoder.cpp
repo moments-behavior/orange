@@ -15,8 +15,20 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
     initializeParams.encodeConfig = &encodeConfig;
     pEnc->CreateDefaultEncoderParams(&initializeParams, encodeCLIOptions.GetEncodeGUID(), encodeCLIOptions.GetPresetGUID(), encodeCLIOptions.GetTuningInfo());
-    encodeCLIOptions.SetInitParams(&initializeParams, eFormat);
+    
+    // For HEVC, set additional parameters for fastest possible encoding
+    if (encodeCLIOptions.GetEncodeGUID() == NV_ENC_CODEC_HEVC_GUID) {
+        encodeConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CONSTQP;
+        encodeConfig.rcParams.constQP = { 28, 31, 33 }; // QP values for I, P and B frames
+        encodeConfig.rcParams.enableMinQP = 1;
+        encodeConfig.rcParams.enableMaxQP = 1;
+        encodeConfig.rcParams.minQP = { 28, 31, 33 };
+        encodeConfig.rcParams.maxQP = { 28, 31, 33 };
+        encodeConfig.frameIntervalP = 1; // Use only I and P frames
+        encodeConfig.gopLength = 60; // Longer GOP for better compression
+    }
 
+    encodeCLIOptions.SetInitParams(&initializeParams, eFormat);
     pEnc->CreateEncoder(&initializeParams);
 }
 
@@ -52,8 +64,6 @@ static inline void write_meatadata(std::ofstream *metadata, unsigned long long f
 
 static inline void initialize_writer(Writer *writer, CameraParams *camera_params, std::string folder_name, std::string encoder_str)
 {
-    // writer->video_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + ".mp4";
-    // writer->metadata_file = folder_name + "/Cam" + std::to_string(camera_params->camera_id) + "_meta.csv";
     writer->video_file = folder_name + "/Cam" + camera_params->camera_serial + ".mp4";
     writer->metadata_file = folder_name + "/Cam" + camera_params->camera_serial + "_meta.csv";
     writer->keyframe_file = folder_name + "/Cam" + camera_params->camera_serial + "_keyframe.csv";

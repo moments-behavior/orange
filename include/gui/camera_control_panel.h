@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "camera_manager.h"
 #include "camera_params.h"
+#include "camera_preview_window.h"  // Changed from forward declaration to include
 
 struct GigEVisionDeviceInfo;
 
@@ -52,6 +53,9 @@ public:
         return validateCameraAccess(index) && (*selected_cameras)[index];
     }
 
+    // Add preview window reference
+    void setPreviewWindow(CameraPreviewWindow* preview) { preview_window_ = preview; }
+
 private:
     void renderCameraList();
     void renderCameraSettings();
@@ -78,4 +82,5 @@ private:
     const std::unordered_map<std::string, evt::CameraParams>* known_cameras_{nullptr};
     bool show_settings{false};
     bool show_temperature{false};
+    CameraPreviewWindow* preview_window_{nullptr};
 };

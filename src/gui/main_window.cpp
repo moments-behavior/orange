@@ -254,9 +254,9 @@ void MainWindow::render() {
     ImGui::Columns(2);
     
     // Left column: Camera feeds
-    ImGui::BeginChild("Camera Feeds", ImVec2(0, -5)); // Small padding at bottom
-    // TODO: Render camera preview windows
-    ImGui::EndChild();
+    if (preview_window_) {
+        preview_window_->render();
+    }
     
     ImGui::NextColumn();
     
@@ -321,6 +321,12 @@ void MainWindow::initialize() {
         } else {
             LOG(WARNING) << "No cameras found - control panel will be limited";
         }
+
+        // Initialize preview window after camera manager
+        preview_window_ = std::make_unique<CameraPreviewWindow>(*camera_manager_);
+        
+        // Link preview window to control panel
+        camera_control_panel_->setPreviewWindow(preview_window_.get());
 
         LOG(INFO) << "MainWindow initialization completed successfully";
     } catch (const std::exception& e) {

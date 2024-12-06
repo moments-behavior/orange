@@ -1,17 +1,20 @@
 #pragma once
 
-#include "camera_manager.h"
-#include "gx_helper.h"
-#include "encoder_config.h"
-#include "camera_control_panel.h"
-#include "json.hpp"
-#include "camera_params.h"
+// First include all third-party and standard headers
 #include <memory>
 #include <vector>
 #include <string>
 
-// Forward declarations
-class CameraControlPanel;
+// Then include our core dependencies
+#include "camera_manager.h"
+#include "gx_helper.h"
+#include "encoder_config.h"
+#include "json.hpp"
+#include "camera_params.h"
+
+// Finally include our complete class definitions
+#include "camera_preview_window.h"  // Must come before camera_control_panel.h
+#include "camera_control_panel.h"
 
 class MainWindow {
 public:
@@ -55,6 +58,9 @@ private:
     // Add CameraControlPanel
     std::unique_ptr<CameraControlPanel> camera_control_panel_;
     
+    // Add preview window member
+    std::unique_ptr<CameraPreviewWindow> preview_window_;  // Now CameraPreviewWindow is fully defined
+
     // Configuration and settings
     EncoderConfig encoder_config_;
     std::string recording_folder_;

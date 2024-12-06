@@ -123,6 +123,7 @@ done
 echo -e "${BLUE}Compiling GUI components...${NC}"
 GUI_SOURCES="\
     src/gui/camera_control_panel.cpp \
+    src/gui/camera_preview_window.cpp \
     src/gui/main_window.cpp"
 
 for src in $GUI_SOURCES; do

@@ -1,4 +1,5 @@
 #include "camera_control_panel.h"
+#include "camera_preview_window.h"
 #include <sstream>
 
 CameraControlPanel::CameraControlPanel(evt::CameraManager& camera_mgr)
@@ -328,10 +329,13 @@ void CameraControlPanel::renderStreamingControls() {
 
     for (size_t i = 0; i < camera_manager.getCameraCount(); i++) {
         const auto& camera = camera_manager.getCamera(i);
-        std::string label = "Stream Camera " + std::to_string(i);
+        std::string label = "Camera " + std::to_string(i);
         
+        ImGui::BeginGroup();
         bool is_streaming = camera_manager.isStreaming(i);
-        if (ImGui::Checkbox(label.c_str(), &is_streaming)) {
+        
+        // Stream toggle
+        if (ImGui::Checkbox(("Stream ##" + std::to_string(i)).c_str(), &is_streaming)) {
             try {
                 if (is_streaming) {
                     camera_manager.startStreaming(i, true); // Enable GPU
@@ -339,9 +343,22 @@ void CameraControlPanel::renderStreamingControls() {
                     camera_manager.stopStreaming(i);
                 }
             } catch (const evt::CameraException& e) {
-                // Handle error
+                LOG(ERROR) << "Streaming error: " << e.what();
             }
         }
+        
+        // Preview toggle - only enabled if streaming
+        ImGui::SameLine();
+        if (preview_window_) {
+            bool preview_enabled = preview_window_->isPreviewEnabled(i);
+            ImGui::BeginDisabled(!is_streaming);
+            if (ImGui::Checkbox(("Preview ##" + std::to_string(i)).c_str(), &preview_enabled)) {
+                preview_window_->setPreviewEnabled(i, preview_enabled);
+            }
+            ImGui::EndDisabled();
+        }
+        
+        ImGui::EndGroup();
     }
 }
 

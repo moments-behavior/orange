@@ -30,7 +30,8 @@ public:
     // Initialize cameras based on selected devices
     void initializeCameras(const std::vector<bool>& selected_cameras,
                           const std::vector<GigEVisionDeviceInfo>& device_info,
-                          const std::vector<std::string>& config_files) {
+                          const std::vector<std::string>& config_files,
+                          std::unordered_map<std::string, CameraParams>& known_configs) {
         cameras.clear();
         cameras.reserve(device_info.size());
         

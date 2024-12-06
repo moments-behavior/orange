@@ -37,13 +37,17 @@ void CameraControlPanel::renderCameraList() {
     // Create a table to display camera information
     if (ImGui::BeginTable("CameraList", 4, 
         ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY | 
-        ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) {
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders,
+        ImVec2(0, 100))) {
         
+        // Set fixed widths for each column
         ImGui::TableSetupColumn("Select", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-        ImGui::TableSetupColumn("Name");
-        ImGui::TableSetupColumn("Serial");
-        ImGui::TableSetupColumn("IP Address");
-        ImGui::TableHeadersRow();
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn("Serial", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("IP Address", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+
+        // Set table height
+        ImGui::TableSetupScrollFreeze(0, 1);  // Freeze header row
 
         for (size_t i = 0; i < device_info->size(); i++) {
             ImGui::TableNextRow();

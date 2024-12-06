@@ -87,7 +87,7 @@ echo -e "${BLUE}Building Orange...${NC}"
 # nvcc -G -g -O0 -c src/kernel.cu -arch=sm_86 -o targets/kernel.o \
 #     -I./include -I./src || error_exit "CUDA kernel compilation failed"
 
-# # 2. ImGui and dependencies
+# # # 2. ImGui and dependencies
 # echo -e "${BLUE}Compiling ImGui and dependencies...${NC}"
 # for src in \
 #     "$IMGUI_DIR/imgui.cpp" \

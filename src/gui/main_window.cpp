@@ -221,7 +221,7 @@ void MainWindow::initializeCameras() {
         // Initialize camera manager with found devices
         if (!device_info_.empty()) {
             std::vector<std::string> config_files(device_info_.size());
-            camera_manager_->initializeCameras(selected_cameras_, device_info_, config_files);
+            camera_manager_->initializeCameras(selected_cameras_, device_info_, config_files, known_cameras_);
             LOG(INFO) << "Camera manager initialized with " << camera_manager_->getCameraCount() << " active cameras";
         }
         
@@ -232,14 +232,15 @@ void MainWindow::initializeCameras() {
 
 void MainWindow::render() {
     create_new_frame();
-
-    // Calculate status bar height for proper layout
-    float status_bar_height = ImGui::GetFrameHeight();
     
     // Create main window that takes up full screen minus status bar height
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    float menu_bar_height = ImGui::GetFrameHeight();
+    float status_bar_height = ImGui::GetFrameHeight();
+    
+    ImGui::SetNextWindowPos(ImVec2(0, menu_bar_height));
     ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, 
-        ImGui::GetIO().DisplaySize.y - status_bar_height));
+        ImGui::GetIO().DisplaySize.y - menu_bar_height - status_bar_height));
+
     ImGui::Begin("Main Window", nullptr, 
         ImGuiWindowFlags_NoTitleBar | 
         ImGuiWindowFlags_NoResize | 

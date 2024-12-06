@@ -436,42 +436,45 @@ void EmergentCamera::updateExposure(int exposure_value) {
         throw CameraException("Cannot update exposure - camera not open");
     }
 
-    try {
-        LOG(INFO) << "\n╭── EXPOSURE UPDATE ──────────────\n"
-                  << "  │ New Value: " << exposure_value;
+    unsigned int max_val, min_val, inc_val;
+    
+    // Get valid range for exposure
+    checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "Exposure", &max_val),
+        "Getting max exposure");
+    checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "Exposure", &min_val),
+        "Getting min exposure");
+    checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "Exposure", &inc_val),
+        "Getting exposure increment");
 
-        // Store current frame rate before making changes
-        unsigned int current_frame_rate;
-        checkError(EVT_CameraGetUInt32Param(camera_.get(), "FrameRate", &current_frame_rate),
-            "Getting current frame rate");
-
-        logCurrentState("Before Change");
-        
-        // Update exposure
-        checkError(EVT_CameraSetUInt32Param(camera_.get(), "Exposure", exposure_value),
-            "Setting exposure");
-        
-        params_.exposure = exposure_value;
-
-        // Verify if frame rate was changed and restore if necessary
-        unsigned int new_frame_rate;
-        checkError(EVT_CameraGetUInt32Param(camera_.get(), "FrameRate", &new_frame_rate),
-            "Getting new frame rate");
-            
-        if (new_frame_rate != current_frame_rate) {
-            LOG(WARNING) << "  │ Frame rate changed from " << current_frame_rate 
-                        << " to " << new_frame_rate << " - restoring original value";
-                     
-            checkError(EVT_CameraSetUInt32Param(camera_.get(), "FrameRate", current_frame_rate),
-                "Restoring frame rate");
-        }
-        
-        logCurrentState("After Change");
-        LOG(INFO) << "╰────────────────────────────────";
-    } catch (const std::exception& e) {
-        LOG(ERROR) << "Failed to update exposure: " << e.what();
-        throw;
+    // Validate exposure value
+    if (exposure_value < static_cast<int>(min_val) || 
+        exposure_value > static_cast<int>(max_val)) {
+        throw CameraException(
+            "Exposure value " + std::to_string(exposure_value) + 
+            " outside valid range [" + std::to_string(min_val) + 
+            ", " + std::to_string(max_val) + "]"
+        );
     }
+
+    logCurrentState("Before exposure update");
+    
+    // Update exposure
+    checkError(EVT_CameraSetUInt32Param(camera_.get(), "Exposure", exposure_value),
+        "Setting exposure");
+    
+    params_.exposure = exposure_value;
+    
+    // After exposure update, get new frame rate limits as they're linked
+    ParameterRange new_frame_rate_range = getFrameRateRange();
+    
+    // Adjust current frame rate if it exceeds new maximum
+    if (params_.frame_rate > new_frame_rate_range.max) {
+        LOG(INFO) << "Adjusting frame rate from " << params_.frame_rate 
+                 << " to " << new_frame_rate_range.max << " due to exposure change";
+        updateFrameRate(new_frame_rate_range.max);
+    }
+    
+    logCurrentState("After exposure change");
 }
 
 void EmergentCamera::updateGain(int gain_value) {
@@ -515,56 +518,27 @@ void EmergentCamera::updateFrameRate(int frame_rate) {
         throw CameraException("Cannot update frame rate - camera not open");
     }
 
-    try {
-        // Store current exposure before making changes
-        unsigned int current_exposure;
-        checkError(EVT_CameraGetUInt32Param(camera_.get(), "Exposure", &current_exposure),
-            "Getting current exposure");
+    auto range = getFrameRateRange();  // Get current valid range
 
-        // Get valid range for frame rate
-        unsigned int max_val, min_val, inc_val;
-        checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "FrameRate", &max_val),
-            "Getting max frame rate");
-        checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "FrameRate", &min_val),
-            "Getting min frame rate");
-        checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "FrameRate", &inc_val),
-            "Getting frame rate increment");
-
-        // Validate frame rate
-        if (frame_rate < static_cast<int>(min_val) || 
-            frame_rate > static_cast<int>(max_val)) {
-            throw CameraException(
-                "Frame rate " + std::to_string(frame_rate) + 
-                " outside valid range [" + std::to_string(min_val) + 
-                ", " + std::to_string(max_val) + "]"
-            );
-        }
-
-        logCurrentState("Before frame rate update");
-
-        // Update frame rate
-        checkError(EVT_CameraSetUInt32Param(camera_.get(), "FrameRate", frame_rate),
-            "Setting frame rate");
-        
-        params_.frame_rate = frame_rate;
-
-        // Verify if exposure was changed and restore if necessary
-        unsigned int new_exposure;
-        checkError(EVT_CameraGetUInt32Param(camera_.get(), "Exposure", &new_exposure),
-            "Getting new exposure");
-            
-        if (new_exposure != current_exposure) {
-            LOG(INFO) << "Exposure changed from " << current_exposure 
-                     << " to " << new_exposure << " - restoring original value";
-                     
-            checkError(EVT_CameraSetUInt32Param(camera_.get(), "Exposure", current_exposure),
-                "Restoring exposure");
-        }
-
-        logCurrentState("After frame rate update");
-    } catch (const std::exception& e) {
-        throw CameraException(std::string("Failed to update frame rate: ") + e.what());
+    // Validate frame rate
+    if (frame_rate < static_cast<int>(range.min) || 
+        frame_rate > static_cast<int>(range.max)) {
+        throw CameraException(
+            "Frame rate " + std::to_string(frame_rate) + 
+            " outside valid range [" + std::to_string(range.min) + 
+            ", " + std::to_string(range.max) + "]"
+        );
     }
+
+    logCurrentState("Before frame rate update");
+
+    // Update frame rate
+    checkError(EVT_CameraSetUInt32Param(camera_.get(), "FrameRate", frame_rate),
+        "Setting frame rate");
+    
+    params_.frame_rate = frame_rate;
+
+    logCurrentState("After frame rate update");
 }
 
 void EmergentCamera::updateResolution(int width, int height) {
@@ -1116,35 +1090,18 @@ evt::EmergentCamera::ParameterRange evt::EmergentCamera::getGainRange() const {
     return range;
 }
 
-evt::EmergentCamera::ParameterRange evt::EmergentCamera::getFrameRateRange() const {
+EmergentCamera::ParameterRange EmergentCamera::getFrameRateRange() const {
     ParameterRange range;
     if (!is_open_) {
         throw CameraException("Cannot get frame rate range - camera not open");
     }
     
-    // Get current exposure first
-    unsigned int current_exposure;
-    checkError(EVT_CameraGetUInt32Param(camera_.get(), "Exposure", &current_exposure),
-        "Getting current exposure");
-        
-    // Get frame rate range
     checkError(EVT_CameraGetUInt32ParamMax(camera_.get(), "FrameRate", &range.max),
         "Getting max frame rate");
     checkError(EVT_CameraGetUInt32ParamMin(camera_.get(), "FrameRate", &range.min),
         "Getting min frame rate");
     checkError(EVT_CameraGetUInt32ParamInc(camera_.get(), "FrameRate", &range.increment),
         "Getting frame rate increment");
-        
-    // Calculate theoretical max frame rate based on exposure
-    float min_frame_period_us = static_cast<float>(current_exposure);
-    float theoretical_max_fps = 1000000.0f / min_frame_period_us;
-    
-    LOG(INFO) << "\n╭── FRAME RATE CALCULATION ──────────────\n"
-              << "  │ Raw Max Frame Rate: " << range.max << " FPS\n"
-              << "  │ Current Exposure: " << current_exposure << " μs\n"
-              << "  │ Theoretical Max FPS: " << theoretical_max_fps << "\n"
-              << "  │ Frame Period: " << min_frame_period_us << " μs\n"
-              << "  ╰────────────────────────────────";
         
     return range;
 }

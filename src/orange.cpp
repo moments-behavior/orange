@@ -47,9 +47,8 @@ int main(int argc, char **args)
 
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
     std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
-    std::string picture_save_folder = orange_root_dir_str + "/pictures";
 
-    bool check[cam_count] {0};
+    bool check[cam_count]{0};
     CameraParams *cameras_params;
     CameraEachSelect *cameras_select;
     CameraEmergent *ecams;
@@ -59,64 +58,66 @@ int main(int argc, char **args)
 
     CameraControl *camera_control = new CameraControl{false, false, false, false};
 
-    int evt_buffer_size {100};
-    PTPParams* ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
+    int evt_buffer_size{100};
+    PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
 
-    EncoderConfig* encoder_config = new EncoderConfig {
+    EncoderConfig *encoder_config = new EncoderConfig{
         "-codec h264 -preset p1 -fps ",
         "h264",
-        "p1"
-    };
+        "p1"};
     std::vector<std::string> camera_config_files;
 
-    ScrollingBuffer* realtime_plot_data;
+    ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
-    
-    flatbuffers::FlatBufferBuilder* fb_builder = new flatbuffers::FlatBufferBuilder(1024);
+
+    flatbuffers::FlatBufferBuilder *fb_builder = new flatbuffers::FlatBufferBuilder(1024);
 
     EnetContext server;
-    if (enet_initialize(&server, 3333, 5)) {
+    if (enet_initialize(&server, 3333, 5))
+    {
         printf("Server Initiated\n");
     }
-    ConnectedServer my_servers[2] ;
+    ConnectedServer my_servers[2];
     intialize_servers(my_servers);
 
     INDIGOSignalBuilder indigo_signal_builder;
-    indigo_signal_builder = {.builder = fb_builder, 
-        .server = &server,
-        .indigo_connection = NULL};
+    indigo_signal_builder = {.builder = fb_builder,
+                             .server = &server,
+                             .indigo_connection = NULL};
 
     std::vector<std::string> network_config_folders;
     std::string network_start_folder_name = orange_root_dir_str + "/config/network";
-    for (const auto & entry : std::filesystem::directory_iterator(network_start_folder_name)) {
+    for (const auto &entry : std::filesystem::directory_iterator(network_start_folder_name))
+    {
         network_config_folders.push_back(entry.path().string());
     }
     int network_config_select = 0;
 
     std::vector<std::string> local_config_folders;
     std::string local_start_folder_name = orange_root_dir_str + "/config/local";
-    for (const auto & entry : std::filesystem::directory_iterator(local_start_folder_name)) {
+    for (const auto &entry : std::filesystem::directory_iterator(local_start_folder_name))
+    {
         local_config_folders.push_back(entry.path().string());
     }
 
     int local_config_select = 0;
     bool select_all_cameras = false;
-    char* subfix_buf = (char*)malloc(64);
+    char *subfix_buf = (char *)malloc(64);
     *subfix_buf = '\0';
-    char* temp_string = (char*)malloc(64);
+    char *temp_string = (char *)malloc(64);
     *temp_string = '\0';
     bool save_image_all_ready = true;
     bool quite_enet = false;
-    
+
     std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder, &quite_enet);
 
     while (!glfwWindowShouldClose(window->render_target))
     {
         create_new_frame();
-        if (ImGui::Begin("Network")) 
+        if (ImGui::Begin("Network"))
         {
-            
+
             if (ImGui::BeginTable("##Local Apps", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
                 ImGui::TableNextRow();
@@ -126,15 +127,16 @@ int main(int argc, char **args)
                 ImGui::Text("Indigo");
                 ImGui::TableNextColumn();
                 sprintf(temp_string, "Not connected");
-                if (indigo_signal_builder.indigo_connection != nullptr) {
-                    if (indigo_signal_builder.indigo_connection->state == ENET_PEER_STATE_CONNECTED) {
+                if (indigo_signal_builder.indigo_connection != nullptr)
+                {
+                    if (indigo_signal_builder.indigo_connection->state == ENET_PEER_STATE_CONNECTED)
+                    {
                         sprintf(temp_string, "Connected");
-                    } 
+                    }
                 }
                 ImGui::Text("%s", temp_string);
                 ImGui::EndTable();
             }
-
 
             if (ImGui::BeginTable("Servers", 4, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
             {
@@ -146,52 +148,64 @@ int main(int argc, char **args)
                     ImGui::Text("%s", my_servers[i].name);
                     ImGui::TableNextColumn();
 
-                    if (my_servers[i].peer != nullptr) {
-                        if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED) {
+                    if (my_servers[i].peer != nullptr)
+                    {
+                        if (my_servers[i].peer->state == ENET_PEER_STATE_CONNECTED)
+                        {
                             my_servers[i].connected = true;
                         }
-                    } else {
+                    }
+                    else
+                    {
                         my_servers[i].connected = false;
                     }
-                    
-                    if (ImGui::Button(my_servers[i].connected ? "Disconnect":"Connect"))
-                    {   
-                        if (my_servers[i].connected) { 
+
+                    if (ImGui::Button(my_servers[i].connected ? "Disconnect" : "Connect"))
+                    {
+                        if (my_servers[i].connected)
+                        {
                             enet_peer_disconnect(my_servers[i].peer, 0);
-                        } else {
-                            my_servers[i].peer = connect_peer(&server, 
-                                my_servers[i].ip_add[0], 
-                                my_servers[i].ip_add[1], 
-                                my_servers[i].ip_add[2], 
-                                my_servers[i].ip_add[3],
-                                my_servers[i].port);
+                        }
+                        else
+                        {
+                            my_servers[i].peer = connect_peer(&server,
+                                                              my_servers[i].ip_add[0],
+                                                              my_servers[i].ip_add[1],
+                                                              my_servers[i].ip_add[2],
+                                                              my_servers[i].ip_add[3],
+                                                              my_servers[i].port);
                         }
                     }
                     ImGui::TableNextColumn();
                     ImGui::Text("%s", std::to_string(my_servers[i].num_cameras).c_str());
                     ImGui::TableNextColumn();
 
-                    if (my_servers[i].connected) {
+                    if (my_servers[i].connected)
+                    {
                         ImGui::Text("%s", FetchGame::EnumNamesManagerState()[my_servers[i].server_state]);
-                    } else {
+                    }
+                    else
+                    {
                         ImGui::Text("%s", "Not connected");
                     }
                 }
                 ImGui::EndTable();
             }
-            
+
             for (int i = 0; i < network_config_folders.size(); i++)
             {
                 std::vector<std::string> folder_token = string_split(network_config_folders[i].c_str(), "/");
                 sprintf(temp_string, folder_token.back().c_str());
-                ImGui::RadioButton(temp_string, &network_config_select, i); 
-                if (i != network_config_folders.size()-1)
+                ImGui::RadioButton(temp_string, &network_config_select, i);
+                if (i != network_config_folders.size() - 1)
                     ImGui::SameLine();
             }
-            
-            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE && my_servers[0].connected && my_servers[1].connected) {
+
+            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE && my_servers[0].connected && my_servers[1].connected)
+            {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if(ImGui::Button("Open Cameras")) {
+                if (ImGui::Button("Open Cameras"))
+                {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
                     select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
                     host_broadcast_open_cameras(fb_builder, &server, network_config_folders[network_config_select]);
@@ -204,14 +218,16 @@ int main(int argc, char **args)
                             num_cameras++;
                         }
                     }
-                    if (num_cameras > 0) {
+                    if (num_cameras > 0)
+                    {
                         cameras_params = new CameraParams[num_cameras];
                         cameras_select = new CameraEachSelect[num_cameras];
-                        
+
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++)
                         {
-                            if (check[i]) {
+                            if (check[i])
+                            {
                                 selected_cameras.push_back(i);
                             }
                         }
@@ -220,9 +236,11 @@ int main(int argc, char **args)
                             set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras);
                         }
 
-                        for (int i =0; i < num_cameras; i++) {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
                             cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name.compare("Cam16") == 0) {
+                            if (cameras_params[i].camera_name.compare("Cam16") == 0)
+                            {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = true;
                             }
@@ -241,22 +259,26 @@ int main(int argc, char **args)
                 ImGui::PopStyleColor(1);
             }
 
-            if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
+            if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD)
+            {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if(ImGui::Button("Clients start camera threads")) {
-                    encoder_config->encoder_setup= "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
-                    make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
+                if (ImGui::Button("Clients start camera threads"))
+                {
+                    encoder_config->encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
+                    std::string folder_string = get_current_date_time();
+                    make_folder(encoder_config->folder_name, input_folder + "/" + folder_string, subfix_buf);
                     ptp_params->network_sync = true;
                     host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_config->encoder_setup);
                     camera_control->record_video = true;
 
                     std::string encoder_setup_for_recording = encoder_config->encoder_setup + std::to_string(cameras_params[0].frame_rate);
-                    
+
                     cudaSetDevice(display_gpu_id);
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++)
                     {
-                        if (cameras_select[i].stream_on) {
+                        if (cameras_select[i].stream_on)
+                        {
                             cudaStreamCreate(&tex[i].streams);
                             create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
                             register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
@@ -267,20 +289,23 @@ int main(int argc, char **args)
                     }
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                        evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder, yolo_model, picture_save_folder);
+                                           evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
+                                           &indigo_signal_builder, yolo_model);
 
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
             }
 
-            if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTART && my_servers[1].server_state == FetchGame::ManagerState_WAITSTART) {
+            if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTART && my_servers[1].server_state == FetchGame::ManagerState_WAITSTART)
+            {
                 // check network servers are ready as well as local computer
-                if (ptp_params->ptp_counter==num_cameras) {
+                if (ptp_params->ptp_counter == num_cameras)
+                {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                    if (ImGui::Button("Start Recording")) {
-                        // get the host ready, and then set global ptp time to start recording  
+                    if (ImGui::Button("Start Recording"))
+                    {
+                        // get the host ready, and then set global ptp time to start recording
                         unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                         int delay_in_second = 3;
                         ptp_params->ptp_global_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
@@ -291,9 +316,11 @@ int main(int argc, char **args)
                 }
             }
 
-            if (ptp_params->ptp_start_reached && my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP) {
+            if (ptp_params->ptp_start_reached && my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP)
+            {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if (ImGui::Button("Stop Recording")) {
+                if (ImGui::Button("Stop Recording"))
+                {
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                     int delay_in_second = 3;
                     ptp_params->ptp_stop_time = ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
@@ -306,15 +333,17 @@ int main(int argc, char **args)
                     fb_builder->Finish(my_server);
                     uint8_t *server_buffer = fb_builder->GetBufferPointer();
                     int server_buf_size = fb_builder->GetSize();
-                    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+                    ENetPacket *enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
                 }
                 ImGui::PopStyleColor(1);
             }
 
-            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
-                if(ImGui::Button("Clients close")) {
+            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE)
+            {
+                if (ImGui::Button("Clients close"))
+                {
                     // broadcast data
                     fb_builder->Clear();
                     FetchGame::ServerBuilder server_builder(*fb_builder);
@@ -323,24 +352,26 @@ int main(int argc, char **args)
                     fb_builder->Finish(my_server);
                     uint8_t *server_buffer = fb_builder->GetBufferPointer();
                     int server_buf_size = fb_builder->GetSize();
-                    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+                    ENetPacket *enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                 }
-            }    
+            }
         }
         ImGui::End();
 
-        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) 
+        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached)
         {
-            
+
             ptp_params->network_set_stop_ptp = false;
 
-            for (int i =0; i < num_cameras; i++) {
+            for (int i = 0; i < num_cameras; i++)
+            {
                 int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
                 cudaMemset(tex[i].cuda_buffer, 0, size_pic);
             }
 
-            for (int i=0; i< num_cameras; i++) {
+            for (int i = 0; i < num_cameras; i++)
+            {
                 bind_pbo(&tex[i].pbo);
                 bind_texture(&tex[i].texture);
                 upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
@@ -350,19 +381,19 @@ int main(int argc, char **args)
 
             for (int i = 0; i < num_cameras; i++)
             {
-                if (cameras_select[i].stream_on) {
+                if (cameras_select[i].stream_on)
+                {
                     gx_delete_buffer(&tex[i].pbo);
                     unmap_cuda_resource(&tex[i].cuda_resource);
                     cuda_unregister_pbo(tex[i].cuda_resource);
-                    cudaStreamDestroy(tex[i].streams); 
+                    cudaStreamDestroy(tex[i].streams);
                 }
             }
             delete[] tex;
 
-
             for (auto &t : camera_threads)
                 t.join();
-            
+
             for (int i = 0; i < num_cameras; i++)
             {
                 camera_threads.pop_back();
@@ -373,7 +404,7 @@ int main(int argc, char **args)
                 delete[] ecams[i].evt_frame;
                 check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
             }
-            
+
             for (int i = 0; i < num_cameras; i++)
             {
                 ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
@@ -397,7 +428,8 @@ int main(int argc, char **args)
 
             camera_control->open = false;
 
-            for (int i=0; i<cam_count; i++) {
+            for (int i = 0; i < cam_count; i++)
+            {
                 check[i] = 0;
             }
         }
@@ -407,7 +439,8 @@ int main(int argc, char **args)
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-            if (camera_control->open) {
+            if (camera_control->open)
+            {
                 ImGui::BeginDisabled();
             }
 
@@ -428,28 +461,32 @@ int main(int argc, char **args)
                 ImGui::EndTable();
             }
 
-
-            if (ImGui::Button(select_all_cameras ? "Clear all": "Select all")) {
-                select_all_cameras  = !select_all_cameras;
-                if (select_all_cameras) {
+            if (ImGui::Button(select_all_cameras ? "Clear all" : "Select all"))
+            {
+                select_all_cameras = !select_all_cameras;
+                if (select_all_cameras)
+                {
                     for (int i = 0; i < cam_count; i++)
                     {
                         check[i] = true;
                     }
-                } else {
+                }
+                else
+                {
                     for (int i = 0; i < cam_count; i++)
                     {
                         check[i] = false;
                     }
                 }
-                
             }
 
-            if (camera_control->open) {
+            if (camera_control->open)
+            {
                 ImGui::EndDisabled();
             }
 
-            if (camera_control->subscribe) {
+            if (camera_control->subscribe)
+            {
                 ImGui::BeginDisabled();
             }
 
@@ -462,16 +499,18 @@ int main(int argc, char **args)
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
                 config.path = yolo_model_folder;
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".engine", config);
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseYOLOFile", "Choose File", ".engine", config);
             }
             ImGui::SameLine();
             ImGui::Text("%s", yolo_model.c_str());
 
-            if (camera_control->subscribe) {
+            if (camera_control->subscribe)
+            {
                 ImGui::EndDisabled();
-            } 
+            }
 
-            if (camera_control->record_video) {
+            if (camera_control->record_video)
+            {
                 ImGui::BeginDisabled();
             }
 
@@ -480,58 +519,63 @@ int main(int argc, char **args)
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
                 config.path = input_folder;
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseDirDlgKey", "Choose a Directory", nullptr, config);
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir", "Choose a Directory", nullptr, config);
             }
             ImGui::SameLine();
             ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, input_folder.c_str());
-            
+
             ImGui::InputText("subfix", subfix_buf, 64);
             {
-                const char* items[] = { "h264", "hevc"};
+                const char *items[] = {"h264", "hevc"};
                 static int item_current = 0;
                 ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
                 encoder_config->encoder_codec = items[item_current];
             }
 
             {
-                const char* items[] = { "p1", "p3", "p5", "p7"};
+                const char *items[] = {"p1", "p3", "p5", "p7"};
                 static int item_current = 0;
                 ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
                 encoder_config->encoder_preset = items[item_current];
             }
-            
-            if (camera_control->record_video) {
+
+            if (camera_control->record_video)
+            {
                 ImGui::EndDisabled();
             }
 
-            if (camera_control->open) {
-            
-                if (camera_control->record_video) {
+            if (camera_control->open)
+            {
+
+                if (camera_control->record_video)
+                {
                     ImGui::BeginDisabled();
                 }
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
 
                 set_camera_properties(ecams, cameras_params, num_cameras);
-                
-                if (camera_control->record_video) {
+
+                if (camera_control->record_video)
+                {
                     ImGui::EndDisabled();
                 }
 
-                if (camera_control->subscribe) {
+                if (camera_control->subscribe)
+                {
                     ImGui::BeginDisabled();
                 }
 
                 if (ImGui::BeginTable("Camera Control Setting", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
                 {
-                    
+
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::Text("name"); 
+                    ImGui::Text("name");
                     ImGui::TableNextColumn();
                     ImGui::Text("stream");
                     ImGui::TableNextColumn();
-                    ImGui::Text("yolo"); 
+                    ImGui::Text("yolo");
 
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -548,7 +592,8 @@ int main(int argc, char **args)
                     ImGui::EndTable();
                 }
 
-                if (camera_control->subscribe) {
+                if (camera_control->subscribe)
+                {
                     ImGui::EndDisabled();
                 }
             }
@@ -556,7 +601,7 @@ int main(int argc, char **args)
         ImGui::End();
 
         // file explorer display
-        if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey"))
+        if (ImGuiFileDialog::Instance()->Display("ChooseYOLOFile"))
         { // => will show a dialog
             if (ImGuiFileDialog::Instance()->IsOk())
             { // action if OK
@@ -566,7 +611,7 @@ int main(int argc, char **args)
             ImGuiFileDialog::Instance()->Close();
         }
 
-        if (ImGuiFileDialog::Instance()->Display("ChooseDirDlgKey"))
+        if (ImGuiFileDialog::Instance()->Display("ChooseRecordingDir"))
         { // => will show a dialog
             if (ImGuiFileDialog::Instance()->IsOk())
             { // action if OK
@@ -577,22 +622,11 @@ int main(int argc, char **args)
             ImGuiFileDialog::Instance()->Close();
         }
 
-        if (ImGuiFileDialog::Instance()->Display("ChoosePictureDir"))
-        { // => will show a dialog
-            if (ImGuiFileDialog::Instance()->IsOk())
-            { // action if OK
-                auto selected_folder = ImGuiFileDialog::Instance()->GetSelection();
-                picture_save_folder = ImGuiFileDialog::Instance()->GetCurrentPath();
-            }
-            // close
-            ImGuiFileDialog::Instance()->Close();
-        }
-
-
         if (ImGui::Begin("Local"))
         {
 
-            if (camera_control->open) {
+            if (camera_control->open)
+            {
                 ImGui::BeginDisabled();
             }
 
@@ -605,18 +639,22 @@ int main(int argc, char **args)
             }
             ImGui::RadioButton("Null", &local_config_select, local_config_folders.size());
 
-            if (camera_control->open) {
+            if (camera_control->open)
+            {
                 ImGui::EndDisabled();
             }
 
-            if (camera_control->subscribe) {
+            if (camera_control->subscribe)
+            {
                 ImGui::BeginDisabled();
             }
 
-            if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
-                if (!camera_control->open) 
+            if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera"))
+            {
+                if (!camera_control->open)
                 {
-                    if (local_config_select < local_config_folders.size()) {
+                    if (local_config_select < local_config_folders.size())
+                    {
                         update_camera_configs(camera_config_files, local_config_folders[local_config_select]);
                         select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
                     }
@@ -629,7 +667,8 @@ int main(int argc, char **args)
                             num_cameras++;
                         }
                     }
-                    if (num_cameras > 0) {
+                    if (num_cameras > 0)
+                    {
                         camera_control->open = true;
                         cameras_params = new CameraParams[num_cameras];
                         cameras_select = new CameraEachSelect[num_cameras];
@@ -637,40 +676,49 @@ int main(int argc, char **args)
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++)
                         {
-                            if (check[i]) {
+                            if (check[i])
+                            {
                                 selected_cameras.push_back(i);
                             }
                         }
-                        
+
                         bool recognize_camera = true;
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            if (!set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras)) {
+                            if (!set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]], camera_config_files, selected_cameras[i], num_cameras))
+                            {
                                 recognize_camera = false;
                                 break;
                             }
                         }
 
-                        if (recognize_camera) {
-                            for (int i =0; i < num_cameras; i++) {
+                        if (recognize_camera)
+                        {
+                            for (int i = 0; i < num_cameras; i++)
+                            {
                                 cameras_select[i].stream_on = false;
-                                if (cameras_params[i].camera_name.compare("ceiling_center") == 0) {
+                                if (cameras_params[i].camera_name.compare("ceiling_center") == 0)
+                                {
                                     cameras_select[i].stream_on = true;
                                     cameras_select[i].yolo = true;
                                 }
                             }
-                            
+
                             ecams = new CameraEmergent[num_cameras];
                             for (int i = 0; i < num_cameras; i++)
                             {
                                 open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id], &cameras_params[i]);
                             }
                             realtime_plot_data = new ScrollingBuffer[num_cameras];
-                        } else {
+                        }
+                        else
+                        {
                             camera_control->open = false;
                         }
                     }
-                } else {
+                }
+                else
+                {
                     camera_control->open = false;
                     for (int i = 0; i < num_cameras; i++)
                     {
@@ -680,28 +728,34 @@ int main(int argc, char **args)
                     delete[] ecams;
                 }
             }
-            if (camera_control->subscribe) {
+            if (camera_control->subscribe)
+            {
                 ImGui::EndDisabled();
-            }  
+            }
 
-            if (!camera_control->record_video && camera_control->open) {
-                if (camera_control->subscribe) {
+            if (!camera_control->record_video && camera_control->open)
+            {
+                if (camera_control->subscribe)
+                {
                     ImGui::BeginDisabled();
                 }
-                ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync); ImGui::SameLine();
-                if (camera_control->subscribe) {
+                ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync);
+                ImGui::SameLine();
+                if (camera_control->subscribe)
+                {
                     ImGui::EndDisabled();
-                }                
+                }
                 if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming"))
                 {
                     (camera_control->subscribe) = !(camera_control->subscribe);
                     if (camera_control->subscribe)
-                    {   
+                    {
                         cudaSetDevice(display_gpu_id);
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            if (cameras_select[i].stream_on) {
+                            if (cameras_select[i].stream_on)
+                            {
                                 cudaStreamCreate(&tex[i].streams);
                                 create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
                                 register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
@@ -712,16 +766,20 @@ int main(int argc, char **args)
                         }
 
                         start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                            evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder, yolo_model, picture_save_folder);
-                    } else {
-                        
-                        for (int i =0; i < num_cameras; i++) {
+                                               evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup, encoder_config->folder_name, ptp_params,
+                                               &indigo_signal_builder, yolo_model);
+                    }
+                    else
+                    {
+
+                        for (int i = 0; i < num_cameras; i++)
+                        {
                             int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
                             cudaMemset(tex[i].cuda_buffer, 0, size_pic);
                         }
 
-                        for (int i=0; i< num_cameras; i++) {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
                             bind_pbo(&tex[i].pbo);
                             bind_texture(&tex[i].texture);
                             upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
@@ -731,88 +789,85 @@ int main(int argc, char **args)
 
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            if (cameras_select[i].stream_on) {
+                            if (cameras_select[i].stream_on)
+                            {
                                 gx_delete_buffer(&tex[i].pbo);
                                 unmap_cuda_resource(&tex[i].cuda_resource);
                                 cuda_unregister_pbo(tex[i].cuda_resource);
-                                cudaStreamDestroy(tex[i].streams); 
+                                cudaStreamDestroy(tex[i].streams);
                             }
                         }
                         delete[] tex;
 
-                        stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras, 
-                            evt_buffer_size, ptp_params);
+                        stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras,
+                                              evt_buffer_size, ptp_params);
                     }
                 }
             }
-            
 
             save_image_all_ready = true;
             if (camera_control->subscribe == true)
             {
-                for (int i=0; i < num_cameras; i++)
+                for (int i = 0; i < num_cameras; i++)
                 {
-                    if (cameras_select[i].stream_on) {
-                        if (cameras_select[i].frame_save_state != State_Frame_Idle) {
+                    if (cameras_select[i].stream_on)
+                    {
+                        if (cameras_select[i].frame_save_state != State_Frame_Idle)
+                        {
                             save_image_all_ready = false;
                             break;
                         }
                     }
                 }
 
-                if (ImGui::Button("Frame save to"))
-                {
-                    IGFD::FileDialogConfig config;
-                    config.countSelectionMax = 1;
-                    config.path = picture_save_folder;
-                    ImGuiFileDialog::Instance()->OpenDialog("ChoosePictureDir", "Choose a Directory", nullptr, config);
-                }
-                ImGui::SameLine();
-                ImGui::Text("%s", picture_save_folder.c_str());
-
-                ImGui::Text("Save image index:");
                 for (int i = 0; i < num_cameras; i++)
                 {
-                    if (cameras_select[i].stream_on) {
-                        sprintf(temp_string, "save_image_index%d", i);
-                        ImGui::InputInt(temp_string, &cameras_select[i].frame_save_idx);
-                    }
-                }
-
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    if (cameras_select[i].stream_on) {
+                    if (cameras_select[i].stream_on)
+                    {
                         std::string label_save_input_checkbox;
                         label_save_input_checkbox = "s_" + cameras_params[i].camera_name;
                         ImGui::Checkbox(label_save_input_checkbox.c_str(), &cameras_select[i].selected_to_save);
                         ImGui::SameLine();
                     }
                 }
-                
-                if (save_image_all_ready) {
+
+                if (save_image_all_ready)
+                {
                     if (ImGui::Button("Save selected"))
                     {
+                        std::string picture_save_folder;
+                        std::string folder_string = get_current_date();
+                        make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
+                        std::string frame_save_name = get_current_time_milliseconds();
                         for (int i = 0; i < num_cameras; i++)
                         {
+                            cameras_select[i].frame_save_name = frame_save_name;
+                            cameras_select[i].picture_save_folder = picture_save_folder;
                             if (cameras_select[i].selected_to_save)
                             {
                                 cameras_select[i].frame_save_state = State_Write_New_Frame;
                             }
                         }
                     }
-                    
+
                     if (ImGui::Button("Save images all"))
                     {
+                        std::string picture_save_folder;
+                        std::string folder_string = get_current_date();
+                        make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
+                        std::string frame_save_name = get_current_time_milliseconds();
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            if (cameras_select[i].stream_on) {
+                            cameras_select[i].frame_save_name = frame_save_name;
+                            cameras_select[i].picture_save_folder = picture_save_folder;
+                            if (cameras_select[i].stream_on)
+                            {
                                 cameras_select[i].frame_save_state = State_Write_New_Frame;
                             }
                         }
                     }
                 }
             }
-
 
             if (camera_control->stop_record)
             {
@@ -823,21 +878,25 @@ int main(int argc, char **args)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
             }
 
-            if (camera_control->open) {
+            if (camera_control->open)
+            {
                 if (ImGui::Button(camera_control->stop_record ? ICON_FK_PAUSE : ICON_FK_PLAY))
                 {
                     (camera_control->stop_record) = !(camera_control->stop_record);
                     if (camera_control->stop_record)
                     {
-                        if (camera_control->subscribe) {
+                        if (camera_control->subscribe)
+                        {
                             camera_control->subscribe = false;
                             // already streaming, turn the camera off
-                            for (int i =0; i < num_cameras; i++) {
+                            for (int i = 0; i < num_cameras; i++)
+                            {
                                 int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
                                 cudaMemset(tex[i].cuda_buffer, 0, size_pic);
                             }
 
-                            for (int i=0; i< num_cameras; i++) {
+                            for (int i = 0; i < num_cameras; i++)
+                            {
                                 bind_pbo(&tex[i].pbo);
                                 bind_texture(&tex[i].texture);
                                 upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
@@ -847,28 +906,32 @@ int main(int argc, char **args)
 
                             for (int i = 0; i < num_cameras; i++)
                             {
-                                if (cameras_select[i].stream_on) {
+                                if (cameras_select[i].stream_on)
+                                {
                                     gx_delete_buffer(&tex[i].pbo);
                                     unmap_cuda_resource(&tex[i].cuda_resource);
                                     cuda_unregister_pbo(tex[i].cuda_resource);
-                                    cudaStreamDestroy(tex[i].streams); 
+                                    cudaStreamDestroy(tex[i].streams);
                                 }
                             }
                             delete[] tex;
 
-                            stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras, 
-                                evt_buffer_size, ptp_params);
+                            stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras,
+                                                  evt_buffer_size, ptp_params);
                         }
 
-                        encoder_config->encoder_setup= "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
+                        encoder_config->encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                         camera_control->record_video = true;
-                        make_folder_for_recording(encoder_config->folder_name, input_folder, subfix_buf);
+                        std::string folder_string = get_current_date_time();
+                        make_folder(encoder_config->folder_name, input_folder + "/" + folder_string, subfix_buf);
 
-                        bool ptp_sync_for_recording;
-                        if (num_cameras > 1) {
-                            ptp_sync_for_recording = true;
-                        } else {
-                            ptp_sync_for_recording = false;
+                        if (num_cameras > 1)
+                        {
+                            ptp_stream_sync = true;
+                        }
+                        else
+                        {
+                            ptp_stream_sync = false;
                         }
 
                         // frame rate are the same
@@ -878,7 +941,8 @@ int main(int argc, char **args)
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            if (cameras_select[i].stream_on) {
+                            if (cameras_select[i].stream_on)
+                            {
                                 cudaStreamCreate(&tex[i].streams);
                                 create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
                                 register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
@@ -889,19 +953,24 @@ int main(int argc, char **args)
                         }
 
                         start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
-                            evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder, yolo_model, picture_save_folder);
+                                               evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
+                                               &indigo_signal_builder, yolo_model);
 
-                        camera_control->subscribe = true;                    
-                    } else {
+                        camera_control->subscribe = true;
+                    }
+                    else
+                    {
                         camera_control->subscribe = false;
-                        
-                        for (int i =0; i < num_cameras; i++) {
+                        ptp_stream_sync = false;
+
+                        for (int i = 0; i < num_cameras; i++)
+                        {
                             int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
                             cudaMemset(tex[i].cuda_buffer, 0, size_pic);
                         }
 
-                        for (int i=0; i< num_cameras; i++) {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
                             bind_pbo(&tex[i].pbo);
                             bind_texture(&tex[i].texture);
                             upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
@@ -911,17 +980,18 @@ int main(int argc, char **args)
 
                         for (int i = 0; i < num_cameras; i++)
                         {
-                            if (cameras_select[i].stream_on) {
+                            if (cameras_select[i].stream_on)
+                            {
                                 gx_delete_buffer(&tex[i].pbo);
                                 unmap_cuda_resource(&tex[i].cuda_resource);
                                 cuda_unregister_pbo(tex[i].cuda_resource);
-                                cudaStreamDestroy(tex[i].streams); 
+                                cudaStreamDestroy(tex[i].streams);
                             }
                         }
                         delete[] tex;
 
-                        stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras, 
-                            evt_buffer_size, ptp_params);
+                        stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras,
+                                              evt_buffer_size, ptp_params);
                         camera_control->record_video = false;
                     }
                 }
@@ -935,7 +1005,8 @@ int main(int argc, char **args)
         {
             for (int i = 0; i < num_cameras; i++)
             {
-                if (cameras_select[i].stream_on) {
+                if (cameras_select[i].stream_on)
+                {
                     bind_pbo(&tex[i].pbo);
                     bind_texture(&tex[i].texture);
                     upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height); // Needs no arguments because texture and PBO are bound
@@ -943,56 +1014,61 @@ int main(int argc, char **args)
                     unbind_texture();
                 }
             }
-            
+
             for (int i = 0; i < num_cameras; i++)
             {
-                if (cameras_select[i].stream_on) {
+                if (cameras_select[i].stream_on)
+                {
                     std::string window_name = cameras_params[i].camera_name;
                     ImGui::Begin(window_name.c_str());
                     ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-                    static ImVec2 bmin(0,0);
-                    static ImVec2 uv0(0,0);
-                    static ImVec2 uv1(1,1);
-                    static ImVec4 tint(1,1,1,1);
+                    static ImVec2 bmin(0, 0);
+                    static ImVec2 uv0(0, 0);
+                    static ImVec2 uv1(1, 1);
+                    static ImVec4 tint(1, 1, 1, 1);
 
                     // ImGui::Image((void*)(intptr_t)texture[i], avail_size);
                     if (ImPlot::BeginPlot("##no_plot_name", avail_size, ImPlotFlags_Equal | ImPlotAxisFlags_AutoFit))
                     {
                         ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
-                        ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));                    
+                        ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
                         ImPlot::EndPlot();
                     }
                     ImGui::End();
                 }
-
             }
         }
-        
-        if (camera_control->open && show_realtime_plot) { 
-            ImGui::Begin("Realtime Plots"); {                              
+
+        if (camera_control->open && show_realtime_plot)
+        {
+            ImGui::Begin("Realtime Plots");
+            {
                 static float t = 0;
                 t += ImGui::GetIO().DeltaTime;
-                for (int i = 0; i < num_cameras; i++) {
+                for (int i = 0; i < num_cameras; i++)
+                {
                     get_senstemp_value(&ecams[i].camera, &cameras_params[i]);
                     realtime_plot_data[i].AddPoint(t, cameras_params[i].sens_temp);
                 }
-            
+
                 static float history = 10.0f;
-                ImGui::SliderFloat("History",&history,1,30,"%.1f s");
+                ImGui::SliderFloat("History", &history, 1, 30, "%.1f s");
 
                 static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickMarks;
                 ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-                if (ImPlot::BeginPlot("Camera Sensor Temperature", avail_size)) {
+                if (ImPlot::BeginPlot("Camera Sensor Temperature", avail_size))
+                {
                     ImPlot::SetupAxes(nullptr, nullptr, flags, flags);
-                    ImPlot::SetupAxisLimits(ImAxis_X1,t - history, t, ImGuiCond_Always);
-                    ImPlot::SetupAxisLimits(ImAxis_Y1,30,90);
-                    ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL,0.5f);
+                    ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
+                    ImPlot::SetupAxisLimits(ImAxis_Y1, 30, 90);
+                    ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.5f);
 
-                    for (int i = 0; i < num_cameras; i++) {
+                    for (int i = 0; i < num_cameras; i++)
+                    {
                         std::string line_name = std::string(cameras_params[i].camera_serial);
-                        ImPlot::PlotLine(line_name.c_str(), &realtime_plot_data[i].Data[0].x, &realtime_plot_data[i].Data[0].y, realtime_plot_data[i].Data.size(), 0, realtime_plot_data[i].Offset, 2*sizeof(float));
+                        ImPlot::PlotLine(line_name.c_str(), &realtime_plot_data[i].Data[0].x, &realtime_plot_data[i].Data[0].y, realtime_plot_data[i].Data.size(), 0, realtime_plot_data[i].Offset, 2 * sizeof(float));
                     }
                     ImPlot::EndPlot();
                 }
@@ -1003,7 +1079,8 @@ int main(int argc, char **args)
         render_a_frame(window);
     }
 
-    if (camera_control->open) {
+    if (camera_control->open)
+    {
         for (int i = 0; i < num_cameras; i++)
         {
             close_camera(&ecams[i].camera, &cameras_params[i]);

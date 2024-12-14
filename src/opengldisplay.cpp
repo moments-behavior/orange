@@ -102,10 +102,8 @@ void COpenGLDisplay::ThreadRunning()
                 cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
                 cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
                 
-                std::string picture_save_folder(camera_select->picture_save_folder);
-                std::string image_name = picture_save_folder + "/" + camera_params->camera_serial + "_" + std::to_string(camera_select->frame_save_idx) + ".tiff";
+                std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + ".tiff";
                 cv::imwrite(image_name, view);
-                camera_select->frame_save_idx++;
                 camera_select->frame_save_state = State_Frame_Idle;
             }          
 

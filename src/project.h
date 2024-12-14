@@ -148,37 +148,49 @@ void load_camera_json_config_files(std::string file_name, CameraParams* camera_p
     camera_params->iris = camera_config["iris"];
 }
 
+std::string get_current_time_milliseconds() {
+    // Get the current time
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    auto time = std::chrono::system_clock::to_time_t(now);
+    auto tm = *std::localtime(&time);
+
+    // Format the time
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%H_%M_%S_") << std::setfill('0') << std::setw(3) << ms.count();
+
+    return oss.str();
+}
+
+std::string get_current_date() {
+    // Get the current time
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+
+    // Convert to local time
+    std::tm local_time = *std::localtime(&time_t_now);
+
+    // Format the date as year_month_day
+    std::ostringstream oss;
+    oss << std::put_time(&local_time, "%Y_%m_%d");
+
+    return oss.str();
+}
+
 // Get current date/time, format is YYYY_MM_DD_HH_mm_ss
-const std::string current_date_time() {
-    time_t     now = time(0);
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&now);
-    strftime(buf, sizeof(buf), "%Y:%m:%d:%X", &tstruct);
-    
-    std::string delimiter = ":";
+std::string get_current_date_time() {
+    // Get the current time
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
 
-    std::string s(buf);
-    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
-    std::string token;
-    std::vector<std::string> res;
+    // Convert to local time
+    std::tm local_time = *std::localtime(&time_t_now);
 
-    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
-        token = s.substr (pos_start, pos_end - pos_start);
-        pos_start = pos_end + delim_len;
-        res.push_back (token);
-    }
+    // Format the date and time as YYYY_MM_DD_HH_mm_ss
+    std::ostringstream oss;
+    oss << std::put_time(&local_time, "%Y_%m_%d_%H_%M_%S");
 
-    res.push_back (s.substr (pos_start));
-    std::string final_string;
-
-    for (int i = 0; i < res.size(); i++) {
-        if (i!=0) {
-            final_string += "_";
-        }
-        final_string += res[i];
-    }
-    return final_string.c_str();
+    return oss.str();
 }
 
 void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure) 
@@ -280,23 +292,20 @@ void init_7MP_camera_params_mono(CameraParams* camera_params, int camera_id, int
     camera_params->iris = 0;
 }
 
-bool make_folder_for_recording(std::string& folder_name, std::string input_folder, const char* subfix_buf)
+bool make_folder(std::string& folder_name, std::string input_folder, const char* subfix_buf)
 {
-    std::string folder_string = current_date_time();
     std::string folder_subfix(subfix_buf);
-    if (folder_subfix.empty()) {
-        folder_name = input_folder + "/" + folder_string;
+    if (!folder_subfix.empty()) {
+        folder_name = input_folder + "_" + folder_subfix;
     } else {
-        folder_name = input_folder + "/" + folder_string + "_" + folder_subfix;
+        folder_name = input_folder;
     }
-    if (mkdir(folder_name.c_str(), 0777) == -1)
+    if (!std::filesystem::exists(folder_name))
     {
-        std::cerr << "Error :  " << std::strerror(errno) << std::endl;
+        if(!std::filesystem::create_directories(folder_name)) {
+            std::cerr << "Error creating folder: " << folder_name << std::endl;
+        }
         return false;
-    }
-    else
-    {
-        std::cout << "Recorded video saves to : " << folder_name << std::endl;
     }
     return true;
 }
@@ -347,7 +356,7 @@ bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device
             init_65MP_camera_params_mono(camera_params, camera_idx, num_cameras, 2000, 1000, gpu_id, 400); //458 
         } else if (strcmp(device_info->modelName, "HB-7000SC")==0) {
             int gpu_id = 0;
-            init_7MP_camera_params_color(camera_params, camera_idx, num_cameras, 1500, 2000, gpu_id, 30); // 2000, 3000
+            init_7MP_camera_params_color(camera_params, camera_idx, num_cameras, 1500, 3000, gpu_id, 30); // 2000, 3000
         } else if (strcmp(device_info->modelName, "HB-65000GC")==0) {
             int gpu_id = 0;
             init_65MP_camera_params_color(camera_params, camera_idx, num_cameras, 2000, 28000, gpu_id, 10); 

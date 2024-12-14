@@ -25,9 +25,9 @@ struct CameraEachSelect
     bool stream_on = true;
     bool yolo = false;
     PictureSaveState frame_save_state = State_Frame_Idle;
-    int frame_save_idx = 0; 
+    std::string frame_save_name; 
     bool selected_to_save = false;
-    const char* picture_save_folder;
+    std::string picture_save_folder;
     const char* yolo_model;
 };
 

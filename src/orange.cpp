@@ -596,6 +596,76 @@ int main(int argc, char **args)
                 {
                     ImGui::EndDisabled();
                 }
+
+                if (ImGui::TreeNode("Save images from streaming cameras")) 
+                {
+                    save_image_all_ready = true;
+                    if (camera_control->subscribe == true)
+                    {
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            if (cameras_select[i].stream_on)
+                            {
+                                if (cameras_select[i].frame_save_state != State_Frame_Idle)
+                                {
+                                    save_image_all_ready = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        int number_of_streamed_cams = 0;
+                        for (int i = 0; i < num_cameras; i++)
+                        {
+                            if (cameras_select[i].stream_on)
+                            {
+                                ImGui::Checkbox(cameras_params[i].camera_name.c_str(), &cameras_select[i].selected_to_save);
+                                ImGui::SameLine();
+                                number_of_streamed_cams++;
+                            }
+                        }
+
+                        if (save_image_all_ready && number_of_streamed_cams)
+                        {
+                            if (ImGui::Button("Save selected"))
+                            {
+                                std::string picture_save_folder;
+                                std::string folder_string = get_current_date();
+                                make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
+                                std::string frame_save_name = get_current_time_milliseconds();
+                                for (int i = 0; i < num_cameras; i++)
+                                {
+                                    cameras_select[i].frame_save_name = frame_save_name;
+                                    cameras_select[i].picture_save_folder = picture_save_folder;
+                                    if (cameras_select[i].selected_to_save)
+                                    {
+                                        cameras_select[i].frame_save_state = State_Write_New_Frame;
+                                    }
+                                }
+                            }
+                            
+                            if (number_of_streamed_cams > 1) {
+                                if (ImGui::Button("Save images all"))
+                                {
+                                    std::string picture_save_folder;
+                                    std::string folder_string = get_current_date();
+                                    make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
+                                    std::string frame_save_name = get_current_time_milliseconds();
+                                    for (int i = 0; i < num_cameras; i++)
+                                    {
+                                        cameras_select[i].frame_save_name = frame_save_name;
+                                        cameras_select[i].picture_save_folder = picture_save_folder;
+                                        if (cameras_select[i].stream_on)
+                                        {
+                                            cameras_select[i].frame_save_state = State_Write_New_Frame;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ImGui::TreePop();
+                }
             }
         }
         ImGui::End();
@@ -802,74 +872,6 @@ int main(int argc, char **args)
                         stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, num_cameras,
                                               evt_buffer_size, ptp_params);
                     }
-                }
-            }
-
-            save_image_all_ready = true;
-            if (camera_control->subscribe == true)
-            {
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    if (cameras_select[i].stream_on)
-                    {
-                        if (cameras_select[i].frame_save_state != State_Frame_Idle)
-                        {
-                            save_image_all_ready = false;
-                            break;
-                        }
-                    }
-                }
-
-                int number_of_streamed_cams = 0;
-                ImGui::Text("%s", "Save images from streaming cameras");
-                for (int i = 0; i < num_cameras; i++)
-                {
-                    if (cameras_select[i].stream_on)
-                    {
-                        ImGui::Checkbox(cameras_params[i].camera_name.c_str(), &cameras_select[i].selected_to_save);
-                        ImGui::SameLine();
-                        number_of_streamed_cams++;
-                    }
-                }
-
-                if (save_image_all_ready && number_of_streamed_cams)
-                {
-                    if (ImGui::Button("Save selected"))
-                    {
-                        std::string picture_save_folder;
-                        std::string folder_string = get_current_date();
-                        make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
-                        std::string frame_save_name = get_current_time_milliseconds();
-                        for (int i = 0; i < num_cameras; i++)
-                        {
-                            cameras_select[i].frame_save_name = frame_save_name;
-                            cameras_select[i].picture_save_folder = picture_save_folder;
-                            if (cameras_select[i].selected_to_save)
-                            {
-                                cameras_select[i].frame_save_state = State_Write_New_Frame;
-                            }
-                        }
-                    }
-                    
-                    if (number_of_streamed_cams > 1) {
-                        if (ImGui::Button("Save images all"))
-                        {
-                            std::string picture_save_folder;
-                            std::string folder_string = get_current_date();
-                            make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
-                            std::string frame_save_name = get_current_time_milliseconds();
-                            for (int i = 0; i < num_cameras; i++)
-                            {
-                                cameras_select[i].frame_save_name = frame_save_name;
-                                cameras_select[i].picture_save_folder = picture_save_folder;
-                                if (cameras_select[i].stream_on)
-                                {
-                                    cameras_select[i].frame_save_state = State_Write_New_Frame;
-                                }
-                            }
-                        }
-                    }
-
                 }
             }
 

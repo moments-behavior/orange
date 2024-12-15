@@ -24,10 +24,10 @@ struct GL_Texture {
 };
 
 
-void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, 
-    CameraParams* cameras_params, CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras, int evt_buffer_size, bool ptp_stream_sync, 
-    std::string encoder_setup, std::string folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder, 
-    std::string& yolo_model)
+inline void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams,
+                                   CameraParams* cameras_params, CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras, int evt_buffer_size, bool ptp_stream_sync,
+                                   const std::string& encoder_setup, const std::string& folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder,
+                                   const std::string& yolo_model)
 {
     for (int i = 0; i < num_cameras; i++)
     {               
@@ -56,12 +56,12 @@ void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraCont
 
     for (int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, indigo_signal_builder));
+        camera_threads.emplace_back(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, indigo_signal_builder);
     }
 }
 
-void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, CameraParams* cameras_params, 
-    CameraEachSelect *cameras_select, int num_cameras, int evt_buffer_size, PTPParams* ptp_params)
+inline void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, CameraParams* cameras_params,
+                                  CameraEachSelect *cameras_select, const int num_cameras, const int evt_buffer_size, PTPParams* ptp_params)
 {
     for (auto &t : camera_threads)
         t.join();
@@ -89,7 +89,7 @@ void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraContr
     }
 }
 
-static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, int num_cameras)
+static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, const int num_cameras)
 {
     if (ImGui::TreeNode("Camera Property"))
     {
@@ -98,15 +98,16 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
 
         for (int n = 0; n < num_cameras; n++)
         {
-            if (ImGui::Selectable(cameras_params[n].camera_serial.c_str(), selected_camera == n))
+            if (ImGui::Selectable(cameras_params[n].camera_serial.c_str(), selected_camera == n)) {
                 selected_camera = n;
-                slider_gain = cameras_params[selected_camera].gain;
-                slider_iris = cameras_params[selected_camera].iris;                
-                slider_focus = cameras_params[selected_camera].focus;
-                slider_width = cameras_params[selected_camera].width;
-                slider_height = cameras_params[selected_camera].height;
-                slider_exposure = cameras_params[selected_camera].exposure;
-                slider_frame_rate = cameras_params[selected_camera].frame_rate; 
+            }
+            slider_gain = cameras_params[selected_camera].gain;
+            slider_iris = cameras_params[selected_camera].iris;
+            slider_focus = cameras_params[selected_camera].focus;
+            slider_width = cameras_params[selected_camera].width;
+            slider_height = cameras_params[selected_camera].height;
+            slider_exposure = cameras_params[selected_camera].exposure;
+            slider_frame_rate = cameras_params[selected_camera].frame_rate;
         }
     
 

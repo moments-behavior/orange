@@ -193,6 +193,19 @@ std::string get_current_date_time() {
     return oss.str();
 }
 
+std::string format_elapsed_time(std::chrono::seconds elapsed_seconds) {
+    int hours = static_cast<int>(elapsed_seconds.count() / 3600);
+    int minutes = static_cast<int>((elapsed_seconds.count() % 3600) / 60);
+    int seconds = static_cast<int>(elapsed_seconds.count() % 60);
+
+    std::ostringstream oss;
+    oss << std::setfill('0') << std::setw(2) << hours << ":"
+        << std::setfill('0') << std::setw(2) << minutes << ":"
+        << std::setfill('0') << std::setw(2) << seconds;
+
+    return oss.str();
+}
+
 void init_galvo_camera_params(CameraParams* camera_params, int camera_id, int num_cameras, int gain, int exposure) 
 {
     camera_params->width = 1280;

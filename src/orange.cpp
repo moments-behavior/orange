@@ -107,6 +107,8 @@ int main(int argc, char **args)
     *temp_string = '\0';
     bool save_image_all_ready = true;
     bool quite_enet = false;
+    auto record_start_time = std::chrono::steady_clock::now();
+    std::string elapsed_time;
 
     std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder, &quite_enet);
 
@@ -289,7 +291,7 @@ int main(int argc, char **args)
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                                            evt_buffer_size, true, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                                            &indigo_signal_builder, yolo_model);
-
+                    record_start_time = std::chrono::steady_clock::now();
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -303,6 +305,7 @@ int main(int argc, char **args)
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                     if (ImGui::Button("Start Recording"))
                     {
+                        record_start_time = std::chrono::steady_clock::now();
                         // get the host ready, and then set global ptp time to start recording
                         unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                         int delay_in_second = 3;
@@ -520,7 +523,7 @@ int main(int argc, char **args)
                 ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir", "Choose a Directory", nullptr, config);
             }
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, input_folder.c_str());
+            ImGui::TextColored(ImVec4{1.0, 0.0f, 1.0f, 1.0f}, "%s", input_folder.c_str());
 
             {
                 const char *items[] = {"h264", "hevc"};
@@ -955,7 +958,7 @@ int main(int argc, char **args)
                         start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex, num_cameras,
                                                evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording, encoder_config->folder_name, ptp_params,
                                                &indigo_signal_builder, yolo_model);
-
+                        record_start_time = std::chrono::steady_clock::now();
                         camera_control->subscribe = true;
                     }
                     else
@@ -1015,12 +1018,24 @@ int main(int argc, char **args)
                 }
             }
 
+            if (camera_control->record_video)
+            {
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - record_start_time);
+                elapsed_time = format_elapsed_time(elapsed);
+            }
+
             for (int i = 0; i < num_cameras; i++)
             {
                 if (cameras_select[i].stream_on)
                 {
                     std::string window_name = cameras_params[i].camera_name;
                     ImGui::Begin(window_name.c_str());
+                    if (camera_control->record_video)
+                    {            
+                        ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, "Elapsed Time: %s", elapsed_time.c_str());
+                    }
+
                     ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
                     static ImVec2 bmin(0, 0);
@@ -1029,10 +1044,14 @@ int main(int argc, char **args)
                     static ImVec4 tint(1, 1, 1, 1);
 
                     // ImGui::Image((void*)(intptr_t)texture[i], avail_size);
+                    ImPlotAxisFlags axisFlags = ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoGridLines;
                     if (ImPlot::BeginPlot("##no_plot_name", avail_size, ImPlotFlags_Equal | ImPlotAxisFlags_AutoFit))
                     {
                         ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
+                        ImPlot::SetupAxis(ImAxis_X1, nullptr, axisFlags); // X-axis
+                        ImPlot::SetupAxis(ImAxis_Y1, nullptr, axisFlags); // Y-axis
                         ImPlot::PlotImage("##no_image_name", (void *)(intptr_t)tex[i].texture, ImVec2(0, 0), ImVec2(cameras_params[i].width, cameras_params[i].height));
+
                         ImPlot::EndPlot();
                     }
                     ImGui::End();

@@ -32,6 +32,9 @@
 *.app
 
 # Build artifacts
+.idea/
+build/
+cmake-build-debug/
 /targets/*
 /targets2/*
 /external/targets_nvenc

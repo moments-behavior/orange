@@ -54,7 +54,7 @@ int main(int argc, char **args)
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
     GL_Texture *tex;
-    u32 num_cameras = 0;
+    int num_cameras = 0;
 
     CameraControl *camera_control = new CameraControl{false, false, false, false};
 
@@ -81,10 +81,11 @@ int main(int argc, char **args)
     ConnectedServer my_servers[2];
     intialize_servers(my_servers);
 
-    INDIGOSignalBuilder indigo_signal_builder;
+    INDIGOSignalBuilder indigo_signal_builder{};
     indigo_signal_builder = {.builder = fb_builder,
                              .server = &server,
-                             .indigo_connection = NULL};
+                             .indigo_connection = nullptr
+    };
 
     std::vector<std::string> network_config_folders;
     std::string network_start_folder_name = orange_root_dir_str + "/config/network";
@@ -194,14 +195,14 @@ int main(int argc, char **args)
 
             for (int i = 0; i < network_config_folders.size(); i++)
             {
-                std::vector<std::string> folder_token = string_split(network_config_folders[i].c_str(), "/");
+                std::vector<std::string> folder_token = string_split(network_config_folders[i], "/");
                 sprintf(temp_string, folder_token.back().c_str());
                 ImGui::RadioButton(temp_string, &network_config_select, i);
                 if (i != network_config_folders.size() - 1)
                     ImGui::SameLine();
             }
 
-            if (my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE && my_servers[0].connected && my_servers[1].connected)
+            if (!camera_control->open && my_servers[0].server_state == FetchGame::ManagerState_IDLE && my_servers[1].server_state == FetchGame::ManagerState_IDLE && my_servers[0].connected && my_servers[1].connected)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Open Cameras"))
@@ -239,7 +240,7 @@ int main(int argc, char **args)
                         for (int i = 0; i < num_cameras; i++)
                         {
                             cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name.compare("Cam16") == 0)
+                            if (cameras_params[i].camera_name == "Cam16")
                             {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = true;
@@ -259,7 +260,7 @@ int main(int argc, char **args)
                 ImGui::PopStyleColor(1);
             }
 
-            if (my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD)
+            if (!camera_control->subscribe && my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD && my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Clients start camera threads"))
@@ -317,7 +318,7 @@ int main(int argc, char **args)
                 }
             }
 
-            if (ptp_params->ptp_start_reached && my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP)
+            if (!ptp_params->network_set_stop_ptp && ptp_params->ptp_start_reached && my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording"))
@@ -333,7 +334,7 @@ int main(int argc, char **args)
                     auto my_server = server_builder.Finish();
                     fb_builder->Finish(my_server);
                     uint8_t *server_buffer = fb_builder->GetBufferPointer();
-                    int server_buf_size = fb_builder->GetSize();
+                    size_t server_buf_size = fb_builder->GetSize();
                     ENetPacket *enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
@@ -352,7 +353,7 @@ int main(int argc, char **args)
                     auto my_server = server_builder.Finish();
                     fb_builder->Finish(my_server);
                     uint8_t *server_buffer = fb_builder->GetBufferPointer();
-                    int server_buf_size = fb_builder->GetSize();
+                    size_t server_buf_size = fb_builder->GetSize();
                     ENetPacket *enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                 }
@@ -435,7 +436,7 @@ int main(int argc, char **args)
             }
         }
 
-        if (ImGui::Begin("Orange", NULL, ImGuiWindowFlags_MenuBar))
+        if (ImGui::Begin("Orange", nullptr, ImGuiWindowFlags_MenuBar))
         {
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -700,7 +701,7 @@ int main(int argc, char **args)
 
             for (int i = 0; i < local_config_folders.size(); i++)
             {
-                std::vector<std::string> folder_token = string_split(local_config_folders[i].c_str(), "/");
+                std::vector<std::string> folder_token = string_split(local_config_folders[i], "/");
                 sprintf(temp_string, folder_token.back().c_str());
                 ImGui::RadioButton(temp_string, &local_config_select, i);
                 ImGui::SameLine();
@@ -765,7 +766,7 @@ int main(int argc, char **args)
                             for (int i = 0; i < num_cameras; i++)
                             {
                                 cameras_select[i].stream_on = false;
-                                if (cameras_params[i].camera_name.compare("ceiling_center") == 0)
+                                if (cameras_params[i].camera_name == "ceiling_center")
                                 {
                                     cameras_select[i].stream_on = true;
                                     cameras_select[i].yolo = true;

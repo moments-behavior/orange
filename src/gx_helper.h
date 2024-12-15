@@ -2,7 +2,6 @@
 #define GX_HELPER
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <cstdio>
 #include <GL/glew.h>
 #include <cuda_gl_interop.h>

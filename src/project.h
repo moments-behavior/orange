@@ -292,14 +292,8 @@ void init_7MP_camera_params_mono(CameraParams* camera_params, int camera_id, int
     camera_params->iris = 0;
 }
 
-bool make_folder(std::string& folder_name, std::string input_folder, const char* subfix_buf)
+bool make_folder(std::string folder_name)
 {
-    std::string folder_subfix(subfix_buf);
-    if (!folder_subfix.empty()) {
-        folder_name = input_folder + "_" + folder_subfix;
-    } else {
-        folder_name = input_folder;
-    }
     if (!std::filesystem::exists(folder_name))
     {
         if(!std::filesystem::create_directories(folder_name)) {

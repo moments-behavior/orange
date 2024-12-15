@@ -103,8 +103,6 @@ int main(int argc, char **args)
 
     int local_config_select = 0;
     bool select_all_cameras = false;
-    char *subfix_buf = (char *)malloc(64);
-    *subfix_buf = '\0';
     char *temp_string = (char *)malloc(64);
     *temp_string = '\0';
     bool save_image_all_ready = true;
@@ -265,8 +263,8 @@ int main(int argc, char **args)
                 if (ImGui::Button("Clients start camera threads"))
                 {
                     encoder_config->encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
-                    std::string folder_string = get_current_date_time();
-                    make_folder(encoder_config->folder_name, input_folder + "/" + folder_string, subfix_buf);
+                    encoder_config->folder_name = input_folder + "/" +  get_current_date_time();
+                    make_folder(encoder_config->folder_name);
                     ptp_params->network_sync = true;
                     host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_config->encoder_setup);
                     camera_control->record_video = true;
@@ -524,7 +522,6 @@ int main(int argc, char **args)
             ImGui::SameLine();
             ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, input_folder.c_str());
 
-            ImGui::InputText("subfix", subfix_buf, 64);
             {
                 const char *items[] = {"h264", "hevc"};
                 static int item_current = 0;
@@ -597,11 +594,11 @@ int main(int argc, char **args)
                     ImGui::EndDisabled();
                 }
 
-                if (ImGui::TreeNode("Save images from streaming cameras")) 
+                if (camera_control->subscribe == true)
                 {
-                    save_image_all_ready = true;
-                    if (camera_control->subscribe == true)
+                    if (ImGui::TreeNode("Save images from streaming cameras")) 
                     {
+                        save_image_all_ready = true;
                         for (int i = 0; i < num_cameras; i++)
                         {
                             if (cameras_select[i].stream_on)
@@ -629,9 +626,8 @@ int main(int argc, char **args)
                         {
                             if (ImGui::Button("Save selected"))
                             {
-                                std::string picture_save_folder;
-                                std::string folder_string = get_current_date();
-                                make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
+                                std::string picture_save_folder = orange_root_dir_str + "/pictures/" + get_current_date();
+                                make_folder(picture_save_folder);
                                 std::string frame_save_name = get_current_time_milliseconds();
                                 for (int i = 0; i < num_cameras; i++)
                                 {
@@ -647,9 +643,8 @@ int main(int argc, char **args)
                             if (number_of_streamed_cams > 1) {
                                 if (ImGui::Button("Save images all"))
                                 {
-                                    std::string picture_save_folder;
-                                    std::string folder_string = get_current_date();
-                                    make_folder(picture_save_folder, orange_root_dir_str + "/pictures/" + folder_string, "");
+                                    std::string picture_save_folder = orange_root_dir_str + "/pictures/" + get_current_date();
+                                    make_folder(picture_save_folder);
                                     std::string frame_save_name = get_current_time_milliseconds();
                                     for (int i = 0; i < num_cameras; i++)
                                     {
@@ -663,8 +658,8 @@ int main(int argc, char **args)
                                 }
                             }
                         }
+                        ImGui::TreePop();
                     }
-                    ImGui::TreePop();
                 }
             }
         }
@@ -928,9 +923,8 @@ int main(int argc, char **args)
 
                         encoder_config->encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                         camera_control->record_video = true;
-                        std::string folder_string = get_current_date_time();
-                        make_folder(encoder_config->folder_name, input_folder + "/" + folder_string, subfix_buf);
-
+                        encoder_config->folder_name = input_folder + "/" +  get_current_date_time();
+                        make_folder(encoder_config->folder_name);
                         if (num_cameras > 1)
                         {
                             ptp_stream_sync = true;

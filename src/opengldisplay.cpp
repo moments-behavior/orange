@@ -104,6 +104,7 @@ void COpenGLDisplay::ThreadRunning()
                 
                 std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + ".tiff";
                 cv::imwrite(image_name, view);
+                camera_select->pictures_counter++;
                 camera_select->frame_save_state = State_Frame_Idle;
             }          
 

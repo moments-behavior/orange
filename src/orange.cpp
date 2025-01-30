@@ -221,6 +221,10 @@ int main(int argc, char **args) {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = true;
                             }
+                            if (cameras_params[i].camera_name == "shelter") {
+                                cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo = true;
+                            }
                         }
 
                         ecams = new CameraEmergent[num_cameras];

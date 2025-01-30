@@ -508,12 +508,14 @@ int main(int argc, char **args) {
                     ImGui::BeginDisabled();
                 }
 
-                if (ImGui::BeginTable("Camera Control Setting", 3,
+                if (ImGui::BeginTable("Camera Control Setting", 4,
                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings |
                                       ImGuiTableFlags_Borders)) {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     ImGui::Text("name");
+                    ImGui::TableNextColumn();
+                    ImGui::Text("serial");
                     ImGui::TableNextColumn();
                     ImGui::Text("stream");
                     ImGui::TableNextColumn();
@@ -523,6 +525,8 @@ int main(int argc, char **args) {
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
                         ImGui::Text("%s", cameras_params[i].camera_name.c_str());
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%s", device_info[i].serialNumber);
                         ImGui::TableNextColumn();
                         sprintf(temp_string, "##checkbox_control%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].stream_on);
@@ -724,6 +728,11 @@ int main(int argc, char **args) {
                                     cameras_select[i].stream_on = true;
                                     cameras_select[i].yolo = true;
                                 }
+
+                                if (cameras_params[i].camera_name == "shelter") {
+                                    cameras_select[i].stream_on = true;
+                                }
+
                             }
 
                             ecams = new CameraEmergent[num_cameras];

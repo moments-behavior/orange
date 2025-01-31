@@ -223,7 +223,7 @@ int main(int argc, char **args) {
                             }
                             if (cameras_params[i].camera_name == "shelter") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
+                                cameras_select[i].yolo = false;
                             }
                         }
 
@@ -530,7 +530,7 @@ int main(int argc, char **args) {
                         ImGui::TableNextColumn();
                         ImGui::Text("%s", cameras_params[i].camera_name.c_str());
                         ImGui::TableNextColumn();
-                        ImGui::Text("%s", device_info[i].serialNumber);
+                        ImGui::Text("%s", cameras_params[i].camera_serial.c_str());
                         ImGui::TableNextColumn();
                         sprintf(temp_string, "##checkbox_control%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].stream_on);

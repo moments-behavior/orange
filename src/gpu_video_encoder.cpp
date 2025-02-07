@@ -23,7 +23,8 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 static inline void initialize_encoder(EncoderContext *encoder, std::string encoder_str, CameraParams *camera_params)
 {
     encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
-    encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str.c_str());
+    std::string encoder_str_with_fps = encoder_str + std::to_string(camera_params->frame_rate);
+    encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str_with_fps.c_str());
     CUdevice cuDevice;
     ck(cuDeviceGet(&cuDevice, camera_params->gpu_id));
     encoder->cuContext = NULL;

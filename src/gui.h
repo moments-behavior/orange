@@ -7,8 +7,7 @@
 #include "acquire_frames.h"
 
 struct EncoderConfig {
-    std::string encoder_setup;
-    std::string encoder_codec; 
+    std::string encoder_codec;
     std::string encoder_preset;
     std::string folder_name;
 }; 

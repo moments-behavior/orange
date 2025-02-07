@@ -244,18 +244,14 @@ int main(int argc, char **args) {
                 my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Clients start camera threads")) {
-                    encoder_config->encoder_setup =
+                    std::string encoder_setup =
                             "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset +
                             " -fps ";
                     encoder_config->folder_name = input_folder + "/" + get_current_date_time();
                     make_folder(encoder_config->folder_name);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name,
-                                                 encoder_config->encoder_setup);
+                    host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_setup);
                     camera_control->record_video = true;
-
-                    std::string encoder_setup_for_recording = encoder_config->encoder_setup + std::to_string(
-                                                                  cameras_params[0].frame_rate);
 
                     cudaSetDevice(display_gpu_id);
                     tex = new GL_Texture[num_cameras];
@@ -272,8 +268,7 @@ int main(int argc, char **args) {
                     }
 
                     start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex,
-                                           num_cameras,
-                                           evt_buffer_size, true, encoder_setup_for_recording,
+                                           num_cameras, evt_buffer_size, true, encoder_setup,
                                            encoder_config->folder_name, ptp_params,
                                            &indigo_signal_builder, yolo_model);
                     record_start_time = std::chrono::steady_clock::now();
@@ -790,7 +785,7 @@ int main(int argc, char **args) {
 
                         start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
                                                tex, num_cameras,
-                                               evt_buffer_size, ptp_stream_sync, encoder_config->encoder_setup,
+                                               evt_buffer_size, ptp_stream_sync, "",
                                                encoder_config->folder_name, ptp_params,
                                                &indigo_signal_builder, yolo_model);
                     } else {
@@ -869,9 +864,7 @@ int main(int argc, char **args) {
                                                   evt_buffer_size, ptp_params);
                         }
 
-                        encoder_config->encoder_setup =
-                                "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset
-                                + " -fps ";
+                        std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset+ " -fps ";
                         camera_control->record_video = true;
                         encoder_config->folder_name = input_folder + "/" + get_current_date_time();
                         make_folder(encoder_config->folder_name);
@@ -880,10 +873,6 @@ int main(int argc, char **args) {
                         } else {
                             ptp_stream_sync = false;
                         }
-
-                        // frame rate are the same
-                        std::string encoder_setup_for_recording = encoder_config->encoder_setup + std::to_string(
-                                                                      cameras_params[0].frame_rate);
 
                         cudaSetDevice(display_gpu_id);
                         tex = new GL_Texture[num_cameras];
@@ -900,8 +889,7 @@ int main(int argc, char **args) {
                         }
 
                         start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
-                                               tex, num_cameras,
-                                               evt_buffer_size, ptp_stream_sync, encoder_setup_for_recording,
+                                               tex, num_cameras, evt_buffer_size, ptp_stream_sync, encoder_setup,
                                                encoder_config->folder_name, ptp_params,
                                                &indigo_signal_builder, yolo_model);
                         record_start_time = std::chrono::steady_clock::now();

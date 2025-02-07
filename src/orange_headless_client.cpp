@@ -83,8 +83,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
 
     for (int i = 0; i < num_cameras; i++)
     {
-        std::string encoder_setup = encoder_basic_setup + std::to_string(cameras_params[i].frame_rate);
-        camera_threads.push_back(std::thread(&acquire_frames_headless, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, encoder_setup, record_folder, ptp_params));
+        camera_threads.push_back(std::thread(&acquire_frames_headless, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, encoder_basic_setup, record_folder, ptp_params));
     }
 
     // wait for all camera ready

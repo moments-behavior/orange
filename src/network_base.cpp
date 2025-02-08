@@ -137,3 +137,16 @@ void send_indigo_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
     enet_peer_send(indigo_connection, 0, enet_packet);
 }
+
+void send_indigo_next_pose_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *indigo_connection)
+{
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
+    server_builder.add_signal_type(FetchGame::SignalType_CalibrationNextPose);
+    auto server_fb = server_builder.Finish();
+    builder->Finish(server_fb);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
+    ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_peer_send(indigo_connection, 0, enet_packet);
+}

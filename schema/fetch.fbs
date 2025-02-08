@@ -13,7 +13,9 @@ enum SignalType: byte {
     ClientBringup,
     ClientStateUpdate,
     INDIGO,
-    INDIGO_TRIAL_TRIGGER
+    INDIGO_TRIAL_TRIGGER,
+    CalibrationNextPose,
+    CalibrationPoseReached
 }
 
 enum ManagerState: byte {

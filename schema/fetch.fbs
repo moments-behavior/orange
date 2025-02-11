@@ -15,7 +15,8 @@ enum SignalType: byte {
     INDIGO,
     INDIGO_TRIAL_TRIGGER,
     CalibrationNextPose,
-    CalibrationPoseReached
+    CalibrationPoseReached,
+    CalibrationDone
 }
 
 enum ManagerState: byte {

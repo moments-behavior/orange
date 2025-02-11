@@ -37,6 +37,6 @@ void enet_release(EnetContext* enet_context);
 ENetPeer* connect_peer(EnetContext* enet_context, uint8_t ip_part1, uint8_t ip_part2, uint8_t ip_part3, uint8_t ip_part4, uint16_t port_number);
 void enqueue_packet(EnetContext* enet_context, ENetPeer* peer, PacketTransportType transport_type, void* packet_data, size_t data_length);
 void service_network(EnetContext* enet_context, float dt, std::function<void(const ENetEvent&)> callback);
-void send_indigo_ball_drop_trigger_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *indigo_connection);
-void send_indigo_next_pose_signal(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *indigo_connection);
+void send_indigo_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder,
+                        ENetPeer* indigo_connection, FetchGame::SignalType signal_type);
 #endif

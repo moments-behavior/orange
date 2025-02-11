@@ -70,37 +70,40 @@ enum SignalType : int8_t {
   SignalType_INDIGO_TRIAL_TRIGGER = 3,
   SignalType_CalibrationNextPose = 4,
   SignalType_CalibrationPoseReached = 5,
+  SignalType_CalibrationDone = 6,
   SignalType_MIN = SignalType_ClientBringup,
-  SignalType_MAX = SignalType_CalibrationPoseReached
+  SignalType_MAX = SignalType_CalibrationDone
 };
 
-inline const SignalType (&EnumValuesSignalType())[6] {
+inline const SignalType (&EnumValuesSignalType())[7] {
   static const SignalType values[] = {
     SignalType_ClientBringup,
     SignalType_ClientStateUpdate,
     SignalType_INDIGO,
     SignalType_INDIGO_TRIAL_TRIGGER,
     SignalType_CalibrationNextPose,
-    SignalType_CalibrationPoseReached
+    SignalType_CalibrationPoseReached,
+    SignalType_CalibrationDone
   };
   return values;
 }
 
 inline const char * const *EnumNamesSignalType() {
-  static const char * const names[7] = {
+  static const char * const names[8] = {
     "ClientBringup",
     "ClientStateUpdate",
     "INDIGO",
     "INDIGO_TRIAL_TRIGGER",
     "CalibrationNextPose",
     "CalibrationPoseReached",
+    "CalibrationDone",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameSignalType(SignalType e) {
-  if (::flatbuffers::IsOutRange(e, SignalType_ClientBringup, SignalType_CalibrationPoseReached)) return "";
+  if (::flatbuffers::IsOutRange(e, SignalType_ClientBringup, SignalType_CalibrationDone)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesSignalType()[index];
 }

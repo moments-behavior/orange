@@ -117,12 +117,10 @@ int main(int argc, char **args) {
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
         if (ImGui::Begin("Network")) {
-            if (ImGui::BeginTable("##Local Apps", 3,
+            if (ImGui::BeginTable("##Local Apps", 2,
                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings |
                                   ImGuiTableFlags_Borders)) {
                 ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::Text("App");
                 ImGui::TableNextColumn();
                 ImGui::Text("Indigo");
                 ImGui::TableNextColumn();
@@ -133,6 +131,15 @@ int main(int argc, char **args) {
                     }
                 }
                 ImGui::Text("%s", temp_string);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("Calibraton");
+                ImGui::TableNextColumn();
+                if (indigo_signal_builder.indigo_connection != nullptr) {
+                    ImGui::Text("%s", enum_names_calib_state()[calib_state]);
+                } else {
+                    ImGui::Text("%s", "Not connected");
+                }
                 ImGui::EndTable();
             }
 
@@ -636,7 +643,7 @@ int main(int argc, char **args) {
                             }
                         } else if (calib_state == CalibSavePictures) {
                             if (ImGui::Button("Calib next pose")) {
-                                send_indigo_next_pose_signal(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection);
+                                send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
                                 calib_state = CalibNextPose;
                             }
                         }

@@ -32,9 +32,13 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                     } else if (server_control->signal_type() == FetchGame::SignalType_INDIGO) {
                         indigo_signal_builder->indigo_connection = evnt.peer;
                     } else if (server_control->signal_type() == FetchGame::SignalType_CalibrationPoseReached) {
-                        std::cout << "From Indigo: Calibration pose reached" << std::endl;
+                        std::cout << "From Indigo: Calibration pose reached." << std::endl;
                         calib_state = CalibPoseReached;
-                    } else {
+                    } else if (server_control->signal_type() == FetchGame::SignalType_CalibrationDone) {
+                        std::cout << "From Indigo: Calibration done." << std::endl;
+                        calib_state = CalibIdle;
+                    }
+                    else {
                         for (int i = 0; i < 2; i++) {
                             if (my_servers[i].peer == evnt.peer) {
                                 auto server_state = server_control->server_state();

@@ -353,6 +353,26 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
     update_iris_value(camera, camera_params->iris, camera_params);
 }
 
+void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInfo *device_info, CameraParams *camera_params, int camera_id, int num_cameras)
+{
+    std::cout << "update camera params" << std::endl;
+    camera_params->gpu_direct= false;
+    camera_params->gpu_id = 0;
+    check_camera_errors(EVT_CameraOpen(camera, device_info), camera_params->camera_serial.c_str());
+    configure_factory_defaults(camera, camera_params);
+    unsigned int width_max, height_max;
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max), camera_params->camera_serial.c_str());
+    printf("Resolution: \t\t%d x %d\n", width_max, height_max);
+    camera_params->width = width_max;
+    camera_params->height = height_max;
+    unsigned int test_device;
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "Gain", &test_device), camera_params->camera_serial.c_str());
+    printf("Test query: %d\n.", test_device);
+    camera_params->num_cameras = num_cameras;
+    camera_params->camera_id = camera_id;
+}
+
 // **********************************************sync*****************************************************
 void ptp_camera_sync(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
 {

@@ -371,7 +371,7 @@ bool set_camera_params(CameraParams* camera_params, GigEVisionDeviceInfo* device
             int gpu_id = 0;
             init_7MP_camera_params_mono(camera_params, camera_idx, num_cameras, 1000, 3000, gpu_id, 30); // 2000, 3000
         } else {
-            printf("Please set config files for your cameras. \n");
+            printf("Use default parameters. \n");
             return false;
         }
     } else {

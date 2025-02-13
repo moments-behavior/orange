@@ -109,6 +109,7 @@ void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_id
 void configure_factory_defaults(Emergent::CEmergentCamera* camera, CameraParams *camera_params);
 void close_camera(Emergent::CEmergentCamera* camera, CameraParams *camera_params);
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams* camera_params);
+void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInfo *device_info, CameraParams *camera_params, int camera_id, int num_cameras);
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params, int buffer_size);
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size, CameraParams *camera_params);

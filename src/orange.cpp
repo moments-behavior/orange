@@ -711,38 +711,44 @@ int main(int argc, char **args) {
                             }
                         }
 
-                        bool recognize_camera = true;
+                        std::vector<bool> skip_setting_params;
+                        skip_setting_params.resize(num_cameras);
                         for (int i = 0; i < num_cameras; i++) {
                             if (!set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]],
                                                    camera_config_files, selected_cameras[i], num_cameras)) {
-                                recognize_camera = false;
-                                break;
+                                skip_setting_params[i] = true;
+                            } else {
+                                skip_setting_params[i] = false;
                             }
                         }
 
-                        if (recognize_camera) {
-                            for (int i = 0; i < num_cameras; i++) {
-                                cameras_select[i].stream_on = false;
-                                if (cameras_params[i].camera_name == "ceiling_center") {
-                                    cameras_select[i].stream_on = true;
-                                    cameras_select[i].yolo = true;
-                                }
-
-                                if (cameras_params[i].camera_name == "shelter") {
-                                    cameras_select[i].stream_on = true;
-                                }
-
+                        
+                        for (int i = 0; i < num_cameras; i++) {
+                            cameras_select[i].stream_on = false;
+                            if (cameras_params[i].camera_name == "ceiling_center") {
+                                cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo = true;
                             }
 
-                            ecams = new CameraEmergent[num_cameras];
-                            for (int i = 0; i < num_cameras; i++) {
+                            if (cameras_params[i].camera_name == "shelter") {
+                                cameras_select[i].stream_on = true;
+                            }
+
+                        }
+
+                        ecams = new CameraEmergent[num_cameras];
+                        for (int i = 0; i < num_cameras; i++) {
+                            if (!skip_setting_params[i]) {
                                 open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
-                                                        &cameras_params[i]);
+                                                    &cameras_params[i]);                                
+                            } else {
+                                update_camera_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
+                                                    &cameras_params[i], selected_cameras[i], num_cameras);
                             }
-                            realtime_plot_data = new ScrollingBuffer[num_cameras];
-                        } else {
-                            camera_control->open = false;
+
                         }
+                        realtime_plot_data = new ScrollingBuffer[num_cameras];
+                        
                     }
                 } else {
                     camera_control->open = false;

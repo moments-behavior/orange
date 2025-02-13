@@ -10,6 +10,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "enet_thread.h"
+#include "global.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -116,12 +117,10 @@ int main(int argc, char **args) {
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
         if (ImGui::Begin("Network")) {
-            if (ImGui::BeginTable("##Local Apps", 3,
+            if (ImGui::BeginTable("##Local Apps", 2,
                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings |
                                   ImGuiTableFlags_Borders)) {
                 ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::Text("App");
                 ImGui::TableNextColumn();
                 ImGui::Text("Indigo");
                 ImGui::TableNextColumn();
@@ -132,6 +131,15 @@ int main(int argc, char **args) {
                     }
                 }
                 ImGui::Text("%s", temp_string);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("Calibraton");
+                ImGui::TableNextColumn();
+                if (indigo_signal_builder.indigo_connection != nullptr) {
+                    ImGui::Text("%s", enum_names_calib_state()[calib_state]);
+                } else {
+                    ImGui::Text("%s", "Not connected");
+                }
                 ImGui::EndTable();
             }
 
@@ -616,6 +624,27 @@ int main(int argc, char **args) {
                                 if (cameras_select[i].stream_on) {
                                     cameras_select[i].frame_save_state = State_Write_New_Frame;
                                 }
+                            }
+                        }
+
+
+                        if (calib_state == CalibPoseReached) {
+                            if (ImGui::Button("Calib save all")) {
+                                make_folder(picture_save_folder);
+                                std::string frame_save_name = get_current_time_milliseconds();
+                                for (int i = 0; i < num_cameras; i++) {
+                                    cameras_select[i].frame_save_name = frame_save_name;
+                                    cameras_select[i].picture_save_folder = picture_save_folder;
+                                    if (cameras_select[i].stream_on) {
+                                        cameras_select[i].frame_save_state = State_Write_New_Frame;
+                                    }
+                                }
+                                calib_state = CalibSavePictures;
+                            }
+                        } else if (calib_state == CalibSavePictures) {
+                            if (ImGui::Button("Calib next pose")) {
+                                send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
+                                calib_state = CalibNextPose;
                             }
                         }
 

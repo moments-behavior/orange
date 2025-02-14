@@ -107,6 +107,8 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
             slider_height = cameras_params[selected_camera].height;
             slider_exposure = cameras_params[selected_camera].exposure;
             slider_frame_rate = cameras_params[selected_camera].frame_rate;
+            OffsetX = cameras_params[selected_camera].offsetx;
+            OffsetY = cameras_params[selected_camera].offsety;
         }
     
 

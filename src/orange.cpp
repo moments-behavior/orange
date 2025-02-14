@@ -209,8 +209,8 @@ int main(int argc, char **args) {
                         }
                     }
                     if (num_cameras > 0) {
-                        cameras_params = new CameraParams[num_cameras];
-                        cameras_select = new CameraEachSelect[num_cameras];
+                        cameras_params = new CameraParams[num_cameras]();
+                        cameras_select = new CameraEachSelect[num_cameras]();
 
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++) {
@@ -746,8 +746,11 @@ int main(int argc, char **args) {
                             if (!set_camera_params(&cameras_params[i], &device_info[selected_cameras[i]],
                                                    camera_config_files, selected_cameras[i], num_cameras)) {
                                 skip_setting_params[i] = true;
+                                cameras_params[i].camera_id = selected_cameras[i];
+                                cameras_params[i].num_cameras = num_cameras;
                             } else {
                                 skip_setting_params[i] = false;
+
                             }
                         }
 
@@ -772,7 +775,7 @@ int main(int argc, char **args) {
                                                     &cameras_params[i]);                                
                             } else {
                                 update_camera_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
-                                                    &cameras_params[i], selected_cameras[i], num_cameras);
+                                                    &cameras_params[i]);
                             }
 
                         }

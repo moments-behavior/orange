@@ -281,6 +281,7 @@ void update_offsetX_value(Emergent::CEmergentCamera *camera, int OFFSET_X_VAL, C
     if (OFFSET_X_VAL >= camera_params->offsetx_min && OFFSET_X_VAL <= camera_params->offsetx_max)
     {
         EVT_CameraSetUInt32Param(camera, "OffsetX", OFFSET_X_VAL);
+        camera_params->offsetx = OFFSET_X_VAL;
         printf("OffsetX Set: \t\t%d\n", OFFSET_X_VAL);
     }
 }
@@ -298,6 +299,7 @@ void update_offsetY_value(Emergent::CEmergentCamera *camera, int OFFSET_Y_VAL, C
     if (OFFSET_Y_VAL >= camera_params->offsety_min && OFFSET_Y_VAL <= camera_params->offsety_max)
     {
         EVT_CameraSetUInt32Param(camera, "OffsetY", OFFSET_Y_VAL);
+        camera_params->offsety = OFFSET_Y_VAL;
         printf("OffsetX Set: \t\t%d\n", OFFSET_Y_VAL);
     }
 }
@@ -353,24 +355,77 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
     update_iris_value(camera, camera_params->iris, camera_params);
 }
 
-void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInfo *device_info, CameraParams *camera_params, int camera_id, int num_cameras)
+void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInfo *device_info, CameraParams *camera_params)
 {
-    std::cout << "update camera params" << std::endl;
     camera_params->gpu_direct= false;
     camera_params->gpu_id = 0;
     check_camera_errors(EVT_CameraOpen(camera, device_info), camera_params->camera_serial.c_str());
     configure_factory_defaults(camera, camera_params);
     unsigned int width_max, height_max;
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max), camera_params->camera_serial.c_str());
+    EVT_CameraGetUInt32ParamMax(camera, "Height", &camera_params->height_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Height", &camera_params->height_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Height", &camera_params->height_inc);
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Width", &width_max), camera_params->camera_serial.c_str());
+    EVT_CameraGetUInt32ParamMax(camera, "Width", &camera_params->width_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Width", &camera_params->width_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Width", &camera_params->width_inc);
     printf("Resolution: \t\t%d x %d\n", width_max, height_max);
     camera_params->width = width_max;
     camera_params->height = height_max;
-    unsigned int test_device;
-    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "Gain", &test_device), camera_params->camera_serial.c_str());
-    printf("Test query: %d\n.", test_device);
-    camera_params->num_cameras = num_cameras;
-    camera_params->camera_id = camera_id;
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "FrameRate", &camera_params->frame_rate), camera_params->camera_serial.c_str());
+    EVT_CameraGetUInt32ParamMax(camera, "FrameRate", &camera_params->frame_rate_max);
+    EVT_CameraGetUInt32ParamMin(camera, "FrameRate", &camera_params->frame_rate_min);
+    EVT_CameraGetUInt32ParamInc(camera, "FrameRate", &camera_params->frame_rate_inc);
+
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "Exposure", &camera_params->exposure), camera_params->camera_serial.c_str());
+    EVT_CameraGetUInt32ParamMax(camera, "Exposure", &camera_params->exposure_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Exposure", &camera_params->exposure_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Exposure", &camera_params->exposure_inc);
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "Gain", &camera_params->gain), camera_params->camera_serial.c_str());
+    std::cout << "Gain: " << camera_params->gain << std::endl;
+    EVT_CameraGetUInt32ParamMax(camera, "Gain", &camera_params->gain_max);
+    std::cout << "Gain max: " << camera_params->gain_max << std::endl;
+    EVT_CameraGetUInt32ParamMin(camera, "Gain", &camera_params->gain_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Gain", &camera_params->gain_inc);
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "Iris", &camera_params->iris), camera_params->camera_serial.c_str());
+    std::cout << "Iris: " << camera_params->iris << std::endl;
+    EVT_CameraGetUInt32ParamMax(camera, "Iris", &camera_params->iris_max);
+    std::cout << "Iris max: " << camera_params->iris_max << std::endl;
+    EVT_CameraGetUInt32ParamMin(camera, "Iris", &camera_params->iris_min);
+    std::cout << "Iris min: " << camera_params->iris_min << std::endl;
+    EVT_CameraGetUInt32ParamInc(camera, "Iris", &camera_params->iris_inc);
+    std::cout << "Iris inc: " << camera_params->iris_inc << std::endl;
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "Focus", &camera_params->focus), camera_params->camera_serial.c_str());
+    EVT_CameraGetUInt32ParamMax(camera, "Focus", &camera_params->focus_max);
+    EVT_CameraGetUInt32ParamMin(camera, "Focus", &camera_params->focus_min);
+    EVT_CameraGetUInt32ParamInc(camera, "Focus", &camera_params->focus_inc);
+
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "OffsetY", &camera_params->offsety), camera_params->camera_serial.c_str());
+    EVT_CameraGetUInt32ParamMax(camera, "OffsetY", &camera_params->offsety_max);
+    EVT_CameraGetUInt32ParamMin(camera, "OffsetY", &camera_params->offsety_min);
+    EVT_CameraGetUInt32ParamInc(camera, "OffsetY", &camera_params->offsety_inc);
+
+    check_camera_errors(Emergent::EVT_CameraGetUInt32Param(camera, "OffsetX", &camera_params->offsetx), camera_params->camera_serial.c_str());
+    EVT_CameraGetUInt32ParamMax(camera, "OffsetX", &camera_params->offsetx_max);
+    EVT_CameraGetUInt32ParamMin(camera, "OffsetX", &camera_params->offsetx_min);
+    EVT_CameraGetUInt32ParamInc(camera, "OffsetX", &camera_params->offsetx_inc);
+
+    const unsigned long enum_buffer_size = 1000;
+    unsigned long enum_buffer_size_return = 0;
+    char enumBuffer[enum_buffer_size];
+
+    //Order is important as param max/mins get updated.
+    EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enum_buffer_size, &enum_buffer_size_return);
+    std::cout << "PixelFormat: " << enumBuffer << std::endl;
+    char* enum_member = strtok_s(enumBuffer, ",", &next_token);
+    camera_params->pixel_format = std::string(enum_member);
+
+    if (camera_params->pixel_format == "Mono8") {
+        camera_params->color = false;
+    } else {
+        camera_params->color = true;
+    }
 }
 
 // **********************************************sync*****************************************************

@@ -52,6 +52,8 @@ struct CameraParams{
     unsigned int height_max; 
     unsigned int height_min;
     unsigned int height_inc;
+    unsigned int offsetx;
+    unsigned int offsety;
     unsigned int offsetx_max; 
     unsigned int offsetx_min;
     unsigned int offsetx_inc;
@@ -109,14 +111,13 @@ void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_id
 void configure_factory_defaults(Emergent::CEmergentCamera* camera, CameraParams *camera_params);
 void close_camera(Emergent::CEmergentCamera* camera, CameraParams *camera_params);
 void open_camera_with_params(Emergent::CEmergentCamera* camera, GigEVisionDeviceInfo* device_info, CameraParams* camera_params);
-void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInfo *device_info, CameraParams *camera_params, int camera_id, int num_cameras);
+void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInfo *device_info, CameraParams *camera_params);
 void allocate_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params, int buffer_size);
 void set_frame_buffer(Emergent::CEmergentFrame* evt_frame, CameraParams* camera_params);
 void destroy_frame_buffer(Emergent::CEmergentCamera* camera, Emergent::CEmergentFrame* evt_frame, int buffer_size, CameraParams *camera_params);
 void ptp_camera_sync(Emergent::CEmergentCamera* camera, CameraParams *camera_params);
 void ptp_sync_off(Emergent::CEmergentCamera *camera, CameraParams *camera_params);
 void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
-void print_camera_device_struct(GigEVisionDeviceInfo* device_info, int camera_idx);
 unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera);
 void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera);
 void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip, CameraParams *camera_params);

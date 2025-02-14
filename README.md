@@ -60,9 +60,7 @@ Follow instruction: http://enet.bespin.org/Installation.html. You might need to 
 7. Clone the repo and submodules
 
 ```
-git clone https://github.com/JohnsonLabJanelia/orange.git
-git submodule init
-git submodule update
+git clone --recursive https://github.com/JohnsonLabJanelia/orange.git
 ```
 
 8. If you are building the project for the first time, uncomment [`line 15 ~ line 25`](https://github.com/JohnsonLabJanelia/orange/blob/5d7a1b9ec4738f8075895a2a0b27cff556aca834/build.sh#L15) for building `ImGui` and `ImPlot` object files. Run

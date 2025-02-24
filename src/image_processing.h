@@ -6,11 +6,11 @@
 #include "video_capture.h"
 
 typedef struct {
-	void* imagePtr; // source image buffer
-	size_t bufferSize; // size of imagePtr in bytes
-	int width;
-	int height;
-	int pixelFormat;
+    void* imagePtr; // source image buffer
+    size_t bufferSize; // size of imagePtr in bytes
+    int width;
+    int height;
+    int pixelFormat;
     unsigned long long timestamp;
     unsigned long long frame_id;
     uint64_t timestamp_sys;
@@ -52,25 +52,33 @@ static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *c
 
 static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera_params)
 {
-    int output_channels = 4;
+    int output_channels;
+    if (camera_params->color) {
+        output_channels = 4;
+    } else {
+        output_channels = 2; 
+    }
+    
     int size_pic = camera_params->width * camera_params->height * sizeof(unsigned char) * output_channels;
     cudaMalloc((void **)&debayer->d_debayer, size_pic);
-    cudaMemset(debayer->d_debayer, 0xFF, size_pic);
+    cudaMemset(debayer->d_debayer, 128, size_pic);
 
-    debayer->size.width = camera_params->width;
-    debayer->size.height = camera_params->height;
-    debayer->nAlpha = 255;
-    debayer->roi.x = 0;
-    debayer->roi.y = 0;
-    debayer->roi.width = camera_params->width;
-    debayer->roi.height = camera_params->height;
-    if (camera_params->need_reorder) {
-        // 100G camera 
-        debayer->grid = NPPI_BAYER_GRBG;
-    } else if (camera_params->pixel_format.compare("BayerRG8")==0) {
-        debayer->grid = NPPI_BAYER_RGGB;
-    } else {
-        debayer->grid = NPPI_BAYER_GBRG;
+    if (camera_params->color) {
+        debayer->size.width = camera_params->width;
+        debayer->size.height = camera_params->height;
+        debayer->nAlpha = 255;
+        debayer->roi.x = 0;
+        debayer->roi.y = 0;
+        debayer->roi.width = camera_params->width;
+        debayer->roi.height = camera_params->height;
+        if (camera_params->need_reorder) {
+            // 100G camera 
+            debayer->grid = NPPI_BAYER_GRBG;
+        } else if (camera_params->pixel_format.compare("BayerRG8")==0) {
+            debayer->grid = NPPI_BAYER_RGGB;
+        } else {
+            debayer->grid = NPPI_BAYER_GBRG;
+        }
     }
 }
 
@@ -92,6 +100,7 @@ static inline void debayer_frame_gpu(CameraParams *camera_params, FrameGPU *fram
     }
 }
 
+ 
 static inline void duplicate_channel_gpu(CameraParams *camera_params, FrameGPU *frame_original, Debayer *debayer)
 {
     const NppStatus npp_result = nppiDup_8u_C1AC4R(
@@ -107,6 +116,5 @@ static inline void duplicate_channel_gpu(CameraParams *camera_params, FrameGPU *
                   << npp_result << std::endl;
     }
 }
-
 
 #endif

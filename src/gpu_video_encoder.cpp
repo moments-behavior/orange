@@ -22,7 +22,12 @@ void InitializeEncoder(EncoderClass &pEnc, NvEncoderInitParam encodeCLIOptions, 
 
 static inline void initialize_encoder(EncoderContext *encoder, std::string encoder_str, CameraParams *camera_params)
 {
-    encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
+    if (camera_params->color) {
+
+        encoder->eFormat = NV_ENC_BUFFER_FORMAT_ABGR;
+    } else {
+        encoder->eFormat = NV_ENC_BUFFER_FORMAT_NV12;
+    }
     std::string encoder_str_with_fps = encoder_str + std::to_string(camera_params->frame_rate);
     encoder->encodeCLIOptions = NvEncoderInitParam(encoder_str_with_fps.c_str());
     CUdevice cuDevice;
@@ -132,12 +137,18 @@ void GPUVideoEncoder::ProcessOneFrame(void* f)
     PutObjectToQueueOut(f);
     
     // copy frame from cpu to gpu
-    ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
-
+    if (!camera_params->gpu_direct) {
+        ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+    } else {
+        ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyDeviceToDevice));
+    }
     if (camera_params->color){
         debayer_frame_gpu(camera_params, &frame_original, &debayer);
     } else {
-        duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+        // coopy Y
+        ck(cudaMemcpy2D(debayer.d_debayer, camera_params->width, frame_original.d_orig,
+                        camera_params->width, camera_params->width, camera_params->height,
+                        cudaMemcpyDeviceToDevice));
     }
 
     encode_frame(&encoder, writer.video, &debayer);

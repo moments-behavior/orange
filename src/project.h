@@ -72,11 +72,11 @@ void intialize_servers(ConnectedServer* my_servers)
     my_servers[0].peer = nullptr;
     my_servers[0].ip_add[0] = 192;
     my_servers[0].ip_add[1] = 168;
-    my_servers[0].ip_add[2] = 20;
-    my_servers[0].ip_add[3] = 60;
+    my_servers[0].ip_add[2] = 1;
+    my_servers[0].ip_add[3] = 100;
     my_servers[0].port = 3333;
     my_servers[0].connected = false;
-    strcpy(my_servers[0].name, "waffle-0");
+    strcpy(my_servers[0].name, "dosa-0");
 
 
     my_servers[1].server_state = FetchGame::ManagerState_IDLE;
@@ -84,11 +84,11 @@ void intialize_servers(ConnectedServer* my_servers)
     my_servers[1].peer = nullptr;
     my_servers[1].ip_add[0] = 192;
     my_servers[1].ip_add[1] = 168;
-    my_servers[1].ip_add[2] = 20;
-    my_servers[1].ip_add[3] = 61;
+    my_servers[1].ip_add[2] = 1;
+    my_servers[1].ip_add[3] = 101;
     my_servers[1].port = 3333;
     my_servers[1].connected = false;
-    strcpy(my_servers[1].name, "waffle-1");
+    strcpy(my_servers[1].name, "dosa-1");
 }
 
 std::vector<std::string> string_split(std::string s, std::string delimiter) {

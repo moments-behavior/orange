@@ -114,8 +114,27 @@ void gx_imgui_init(gx_context *context)
 
 void gx_delete_buffer(GLuint *texture) 
 {
-	glDeleteBuffers(1, texture);
+    glDeleteBuffers(1, texture);
 }
+
+static void create_texture_gray(GLuint *texture, int image_width, int image_height)
+{
+    // Create a OpenGL texture identifier
+    glGenTextures(1, texture);
+    glBindTexture(GL_TEXTURE_2D, *texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, image_width, image_height, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    GLint swizzleMask[] = { GL_RED, GL_RED, GL_RED, GL_ONE };
+    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glEnable(GL_TEXTURE_2D);
+}
+
 
 static void create_texture(GLuint *texture, int image_width, int image_height)
 {
@@ -141,6 +160,16 @@ static void unbind_texture()
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+
+static void create_pbo_gray(GLuint *pbo, int image_width, int img_height)
+{
+    glGenBuffers(1, pbo);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *pbo);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, image_width * img_height * sizeof(unsigned char), 0, GL_DYNAMIC_COPY);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+}
+
+
 static void create_pbo(GLuint *pbo, int image_width, int img_height)
 {
     glGenBuffers(1, pbo);
@@ -155,6 +184,10 @@ static void upload_image_pbo_to_texture(int image_width, int image_height)
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image_width, image_height, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 }
 
+static void upload_image_pbo_to_texture_gray(int image_width, int image_height)
+{
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image_width, image_height, GL_RED, GL_UNSIGNED_BYTE, 0);
+}
 
 static void bind_pbo(GLuint *pbo)
 {

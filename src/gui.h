@@ -19,7 +19,6 @@ struct GL_Texture {
     unsigned char* cuda_buffer;
     size_t cuda_pbo_storage_buffer_size;
     cudaStream_t streams;
-    int num_channels;
 };
 
 
@@ -110,7 +109,9 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
             OffsetX = cameras_params[selected_camera].offsetx;
             OffsetY = cameras_params[selected_camera].offsety;
         }
-    
+
+        ImGui::Checkbox("gpu_direct", &cameras_params[selected_camera].gpu_direct);
+        ImGui::Checkbox("color", &cameras_params[selected_camera].color);
 
         if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[selected_camera].width_max, "%d"))
         {

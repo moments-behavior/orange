@@ -56,12 +56,34 @@ void COpenGLDisplay::ThreadRunning()
             PutObjectToQueueOut(f);
             
             // copy frame from cpu to gpu
-            ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width, entry.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            if (!camera_params->gpu_direct) {
+                ck(cudaMemcpy2D(frame_original.d_orig,
+                                camera_params->width,
+                                entry.imagePtr,
+                                camera_params->width,
+                                camera_params->width,
+                                camera_params->height,
+                                cudaMemcpyHostToDevice));
+            } else {
+                ck(cudaMemcpy2D(frame_original.d_orig,
+                                camera_params->width,
+                                entry.imagePtr,
+                                camera_params->width,
+                                camera_params->width,
+                                camera_params->height,
+                                cudaMemcpyDeviceToDevice));
+            }
 
             if (camera_params->color){
                 debayer_frame_gpu(camera_params, &frame_original, &debayer);
             } else {
-                duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+                ck(cudaMemcpy2D(debayer.d_debayer,
+                                camera_params->width,
+                                frame_original.d_orig,
+                                camera_params->width,
+                                camera_params->width,
+                                camera_params->height,
+                                cudaMemcpyDeviceToDevice));
             }
 
             if (camera_select->yolo) {
@@ -92,8 +114,27 @@ void COpenGLDisplay::ThreadRunning()
             }
 
             // probably reduandant copy
-            ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
 
+            if (camera_params->color) {
+                ck(cudaMemcpy2D(display_buffer,
+                                camera_params->width * 4,
+                                debayer.d_debayer,
+                                camera_params->width * 4,
+                                camera_params->width * 4,
+                                camera_params->height,
+                                cudaMemcpyDeviceToDevice));
+            } else {
+                ck(cudaMemcpy2D(display_buffer,
+                                camera_params->width,
+                                debayer.d_debayer,
+                                camera_params->width,
+                                camera_params->width,
+                                camera_params->height,
+                                cudaMemcpyDeviceToDevice));
+                //cudaMemset(display_buffer, 128, 3208 * 2200);
+
+            }
+            
             if (camera_select->frame_save_state==State_Write_New_Frame) {
                 // yolo code goes here
                 rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);

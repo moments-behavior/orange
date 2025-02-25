@@ -266,12 +266,21 @@ int main(int argc, char **args) {
                     for (int i = 0; i < num_cameras; i++) {
                         if (cameras_select[i].stream_on) {
                             cudaStreamCreate(&tex[i].streams);
-                            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                            if (cameras_params[i].color) {
+                                create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                            } else {
+                                create_pbo_gray(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                            }
                             register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
                             map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
                             cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
                                                        &tex[i].cuda_resource);
-                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+
+                            if (cameras_params[i].color) {
+                                create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                            } else {
+                                create_texture_gray(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                            }
                         }
                     }
 
@@ -355,7 +364,11 @@ int main(int argc, char **args) {
             for (int i = 0; i < num_cameras; i++) {
                 bind_pbo(&tex[i].pbo);
                 bind_texture(&tex[i].texture);
-                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
+                if (cameras_params[i].color) {
+                    upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
+                } else {
+                    upload_image_pbo_to_texture_gray(cameras_params[i].width, cameras_params[i].height);
+                }
                 // Needs no arguments because texture and PBO are bound
                 unbind_pbo();
                 unbind_texture();
@@ -812,12 +825,21 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 cudaStreamCreate(&tex[i].streams);
-                                create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                                if (cameras_params[i].color) {
+                                    create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                                } else {
+                                    create_pbo_gray(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                                }
                                 register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
                                 map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
                                 cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
                                                            &tex[i].cuda_resource);
-                                create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+
+                                if (cameras_params[i].color) {
+                                    create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                } else {
+                                    create_texture_gray(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                }
                             }
                         }
 
@@ -836,8 +858,11 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             bind_pbo(&tex[i].pbo);
                             bind_texture(&tex[i].texture);
-                            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                            // Needs no arguments because texture and PBO are bound
+                            if (cameras_params[i].color) {
+                                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
+                            } else {
+                                upload_image_pbo_to_texture_gray(cameras_params[i].width, cameras_params[i].height);
+                            }
                             unbind_pbo();
                             unbind_texture();
                         }
@@ -881,8 +906,11 @@ int main(int argc, char **args) {
                             for (int i = 0; i < num_cameras; i++) {
                                 bind_pbo(&tex[i].pbo);
                                 bind_texture(&tex[i].texture);
-                                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                                // Needs no arguments because texture and PBO are bound
+                                if (cameras_params[i].color) {
+                                    upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
+                                } else {
+                                    upload_image_pbo_to_texture_gray(cameras_params[i].width, cameras_params[i].height);
+                                }
                                 unbind_pbo();
                                 unbind_texture();
                             }
@@ -917,12 +945,21 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 cudaStreamCreate(&tex[i].streams);
-                                create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                                if (cameras_params[i].color) {
+                                    create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                                } else {
+                                    create_pbo_gray(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
+                                }
                                 register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
                                 map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
                                 cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
                                                            &tex[i].cuda_resource);
-                                create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+
+                                if (cameras_params[i].color) {
+                                    create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                } else {
+                                    create_texture_gray(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                }
                             }
                         }
 
@@ -945,8 +982,11 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             bind_pbo(&tex[i].pbo);
                             bind_texture(&tex[i].texture);
-                            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                            // Needs no arguments because texture and PBO are bound
+                            if (cameras_params[i].color) {
+                                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
+                            } else {
+                                upload_image_pbo_to_texture_gray(cameras_params[i].width, cameras_params[i].height);
+                            }
                             unbind_pbo();
                             unbind_texture();
                         }
@@ -978,8 +1018,11 @@ int main(int argc, char **args) {
                 if (cameras_select[i].stream_on) {
                     bind_pbo(&tex[i].pbo);
                     bind_texture(&tex[i].texture);
-                    upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                    // Needs no arguments because texture and PBO are bound
+                    if (cameras_params[i].color) {
+                        upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
+                    } else {
+                        upload_image_pbo_to_texture_gray(cameras_params[i].width, cameras_params[i].height);
+                    }
                     unbind_pbo();
                     unbind_texture();
                 }

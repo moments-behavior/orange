@@ -40,7 +40,7 @@ void COpenGLDisplay::ThreadRunning()
         yolov8 = new YOLOv8(engine_file_path, camera_params->width, camera_params->height);
         yolov8->make_pipe(true);
 
-        cudaMalloc((void **)&d_points, sizeof(float) * 8);
+        cudaMalloc((void **)&d_points, sizeof(float) * 16);
         cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
         CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8, cudaMemcpyHostToDevice));
     }
@@ -69,26 +69,38 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->preprocess_gpu(d_convert);
                 yolov8->infer();
                 yolov8->postprocess(objs);
-                yolov8->copy_keypoints_gpu(d_points, objs);
 
-                if (objs.size() > 0) {
-                    // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
-                    // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
-                    // std::cout << bbox_center_x << std::endl;
-                    // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
-                    // if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
-                    if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
-                        // std::cout << "trigger ball drop" << std::endl;
-                        if (indigo_signal_builder->indigo_connection != NULL) {
-                            send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
-                        }
+                std::cout << objs.size() << " objects detected; plotted " ;
+                if (objs.size()>0)
+                {
+
+                    for (int ii = 0; ii< objs.size(); ii++){
+                        
+                        yolov8->copy_keypoints_gpu(d_points, objs[ii]);
+                        gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream);
+                        std::cout<< " obj " << ii;
                     }
-                    objs_last_frame.push_back(objs[0]);
-                } else {
-                    objs_last_frame.clear();
                 }
+                std::cout << " " <<std::endl;
+
+                // if (objs.size() > 0) {
+                //     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
+                //     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
+                //     // std::cout << bbox_center_x << std::endl;
+                //     // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
+                //     // if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
+                //     if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
+                //         // std::cout << "trigger ball drop" << std::endl;
+                //         if (indigo_signal_builder->indigo_connection != NULL) {
+                //             send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
+                //         }
+                //     }
+                //     objs_last_frame.push_back(objs[0]);
+                // } else {
+                //     objs_last_frame.clear();
+                // }
                     
-                gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream);
+                
             }
 
             // probably reduandant copy

@@ -68,19 +68,21 @@ enum SignalType : int8_t {
   SignalType_ClientStateUpdate = 1,
   SignalType_INDIGO = 2,
   SignalType_INDIGO_TRIAL_TRIGGER = 3,
-  SignalType_CalibrationNextPose = 4,
-  SignalType_CalibrationPoseReached = 5,
-  SignalType_CalibrationDone = 6,
+  SignalType_INDIGO_TRIAL_SUCCESS = 4,
+  SignalType_CalibrationNextPose = 5,
+  SignalType_CalibrationPoseReached = 6,
+  SignalType_CalibrationDone = 7,
   SignalType_MIN = SignalType_ClientBringup,
   SignalType_MAX = SignalType_CalibrationDone
 };
 
-inline const SignalType (&EnumValuesSignalType())[7] {
+inline const SignalType (&EnumValuesSignalType())[8] {
   static const SignalType values[] = {
     SignalType_ClientBringup,
     SignalType_ClientStateUpdate,
     SignalType_INDIGO,
     SignalType_INDIGO_TRIAL_TRIGGER,
+    SignalType_INDIGO_TRIAL_SUCCESS,
     SignalType_CalibrationNextPose,
     SignalType_CalibrationPoseReached,
     SignalType_CalibrationDone
@@ -89,11 +91,12 @@ inline const SignalType (&EnumValuesSignalType())[7] {
 }
 
 inline const char * const *EnumNamesSignalType() {
-  static const char * const names[8] = {
+  static const char * const names[9] = {
     "ClientBringup",
     "ClientStateUpdate",
     "INDIGO",
     "INDIGO_TRIAL_TRIGGER",
+    "INDIGO_TRIAL_SUCCESS",
     "CalibrationNextPose",
     "CalibrationPoseReached",
     "CalibrationDone",
@@ -177,8 +180,14 @@ struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *server_name() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SERVER_NAME);
   }
+  ::flatbuffers::String *mutable_server_name() {
+    return GetPointer<::flatbuffers::String *>(VT_SERVER_NAME);
+  }
   int16_t num_cameras() const {
     return GetField<int16_t>(VT_NUM_CAMERAS, 0);
+  }
+  bool mutate_num_cameras(int16_t _num_cameras = 0) {
+    return SetField<int16_t>(VT_NUM_CAMERAS, _num_cameras, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -246,26 +255,50 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   FetchGame::SignalType signal_type() const {
     return static_cast<FetchGame::SignalType>(GetField<int8_t>(VT_SIGNAL_TYPE, 0));
   }
+  bool mutate_signal_type(FetchGame::SignalType _signal_type = static_cast<FetchGame::SignalType>(0)) {
+    return SetField<int8_t>(VT_SIGNAL_TYPE, static_cast<int8_t>(_signal_type), 0);
+  }
   FetchGame::ServerControl control() const {
     return static_cast<FetchGame::ServerControl>(GetField<int8_t>(VT_CONTROL, 0));
+  }
+  bool mutate_control(FetchGame::ServerControl _control = static_cast<FetchGame::ServerControl>(0)) {
+    return SetField<int8_t>(VT_CONTROL, static_cast<int8_t>(_control), 0);
   }
   const FetchGame::bring_up_message *server_mesg() const {
     return GetPointer<const FetchGame::bring_up_message *>(VT_SERVER_MESG);
   }
+  FetchGame::bring_up_message *mutable_server_mesg() {
+    return GetPointer<FetchGame::bring_up_message *>(VT_SERVER_MESG);
+  }
   const ::flatbuffers::String *config_folder() const {
     return GetPointer<const ::flatbuffers::String *>(VT_CONFIG_FOLDER);
+  }
+  ::flatbuffers::String *mutable_config_folder() {
+    return GetPointer<::flatbuffers::String *>(VT_CONFIG_FOLDER);
   }
   const ::flatbuffers::String *record_folder() const {
     return GetPointer<const ::flatbuffers::String *>(VT_RECORD_FOLDER);
   }
+  ::flatbuffers::String *mutable_record_folder() {
+    return GetPointer<::flatbuffers::String *>(VT_RECORD_FOLDER);
+  }
   const ::flatbuffers::String *encoder_setup() const {
     return GetPointer<const ::flatbuffers::String *>(VT_ENCODER_SETUP);
+  }
+  ::flatbuffers::String *mutable_encoder_setup() {
+    return GetPointer<::flatbuffers::String *>(VT_ENCODER_SETUP);
   }
   uint64_t ptp_global_time() const {
     return GetField<uint64_t>(VT_PTP_GLOBAL_TIME, 0);
   }
+  bool mutate_ptp_global_time(uint64_t _ptp_global_time = 0) {
+    return SetField<uint64_t>(VT_PTP_GLOBAL_TIME, _ptp_global_time, 0);
+  }
   FetchGame::ManagerState server_state() const {
     return static_cast<FetchGame::ManagerState>(GetField<int8_t>(VT_SERVER_STATE, 0));
+  }
+  bool mutate_server_state(FetchGame::ManagerState _server_state = static_cast<FetchGame::ManagerState>(0)) {
+    return SetField<int8_t>(VT_SERVER_STATE, static_cast<int8_t>(_server_state), 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -377,6 +410,14 @@ inline const FetchGame::Server *GetServer(const void *buf) {
 
 inline const FetchGame::Server *GetSizePrefixedServer(const void *buf) {
   return ::flatbuffers::GetSizePrefixedRoot<FetchGame::Server>(buf);
+}
+
+inline Server *GetMutableServer(void *buf) {
+  return ::flatbuffers::GetMutableRoot<Server>(buf);
+}
+
+inline FetchGame::Server *GetMutableSizePrefixedServer(void *buf) {
+  return ::flatbuffers::GetMutableSizePrefixedRoot<FetchGame::Server>(buf);
 }
 
 inline bool VerifyServerBuffer(

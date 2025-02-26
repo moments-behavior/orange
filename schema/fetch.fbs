@@ -14,6 +14,7 @@ enum SignalType: byte {
     ClientStateUpdate,
     INDIGO,
     INDIGO_TRIAL_TRIGGER,
+    INDIGO_TRIAL_SUCCESS,
     CalibrationNextPose,
     CalibrationPoseReached,
     CalibrationDone

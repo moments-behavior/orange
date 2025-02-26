@@ -3,6 +3,7 @@ mkdir -p targets;
 rm -f targets/orange;
 nvcc -c src/kernel.cu -arch=sm_80 -o targets/kernel.o
 
+# adjust based on system
 DIR_FFMPEG=$HOME/build/FFmpeg
 DIR_TENSORRT=$HOME/build/TensorRT-10.6.0.26
 

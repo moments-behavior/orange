@@ -3,6 +3,7 @@ mkdir -p targets2;
 rm -f targets2/*;
 nvcc -c src/kernel.cu -arch=sm_80 -o targets2/kernel.o
 
+# adjust based on system
 DIR_FFMPEG=$HOME/build/FFmpeg
 
 g++ -Ofast -ffast-math -std=c++17 targets2/*.o \

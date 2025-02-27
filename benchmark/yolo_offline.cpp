@@ -60,16 +60,25 @@ int main(int argc, char** argv)
     cv::Mat final_view;
     while (cap.read(image)) {
 
+        auto start = std::chrono::high_resolution_clock::now();
         CHECK(cudaMemcpy(d_frame,
                          (uint8_t *)image.data,
                          frame_size,
                          cudaMemcpyHostToDevice));
+        cudaDeviceSynchronize();
+        auto stop = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> elapsed = stop - start;
+        std::cout << "copy frame from cpu to gpu:  " << elapsed.count() << " ms" << std::endl;
 
-    
+        start = std::chrono::high_resolution_clock::now();
         yolov8->preprocess_gpu(d_frame);
         yolov8->infer();
         yolov8->postprocess(objs);
         yolov8->copy_keypoints_gpu(d_points, objs);
+        cudaDeviceSynchronize();
+        stop = std::chrono::high_resolution_clock::now();
+        elapsed = stop - start;
+        std::cout << "yolo pre/infer/post time:  " << elapsed.count() << " ms" << std::endl;
 
         gpu_draw_rat_pose(d_frame, camera_width, camera_height, d_points, d_skeleton, yolov8->stream, 3);
         // copy frame back for opencv visualization
@@ -81,7 +90,7 @@ int main(int argc, char** argv)
         int   output_h = std::round(camera_height * r);
         cv::resize(view, final_view, cv::Size(output_w, output_h));
 
-        cv::imshow("result", final_view);
+        cv::imshow(engine_file_path.c_str(), final_view);
         if (cv::waitKey(10) == 'q') {
             break;
         }

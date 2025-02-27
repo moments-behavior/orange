@@ -140,3 +140,22 @@ void send_indigo_message(EnetContext* enet_context, flatbuffers::FlatBufferBuild
 
     enet_peer_send(indigo_connection, 0, enet_packet);
 }
+
+void send_indigo_obj_pose2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder,
+                        ENetPeer* indigo_connection)
+{
+    uint8_t *pose_msg_buffer = builder->GetBufferPointer();
+    int pose_msg_buffer_size = builder->GetSize();
+    ENetPacket* enet_packet = enet_packet_create(pose_msg_buffer, pose_msg_buffer_size,0);
+    enet_peer_send(indigo_connection,0,enet_packet);
+
+}
+
+void initialize_obj_pose_message(flatbuffers::FlatBufferBuilder* builder)
+{
+    auto obj_mouse = ObjPose::Createpose2d(*builder, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    auto obj_ball = ObjPose::Createpose2d(*builder, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    auto obj_pose_msg = ObjPose::Createobj_pose_msg(*builder, obj_mouse, obj_ball);
+    builder->Finish(obj_pose_msg);    
+}
+

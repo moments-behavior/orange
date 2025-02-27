@@ -72,6 +72,8 @@ int main(int argc, char **args) {
     bool ptp_stream_sync = false;
 
     flatbuffers::FlatBufferBuilder *fb_builder = new flatbuffers::FlatBufferBuilder(1024);
+    flatbuffers::FlatBufferBuilder *fb_builder_pose = new flatbuffers::FlatBufferBuilder(1024);
+
 
     EnetContext server;
     if (enet_initialize(&server, 3333, 5)) {
@@ -80,12 +82,23 @@ int main(int argc, char **args) {
     ConnectedServer my_servers[2];
     intialize_servers(my_servers);
 
-    INDIGOSignalBuilder indigo_signal_builder{};
+    INDIGOSignalBuilder indigo_signal_builder{};    // for signals
     indigo_signal_builder = {
         .builder = fb_builder,
         .server = &server,
         .indigo_connection = nullptr
     };
+
+    // INDIGOSignalBuilder indigo_pose_builder{};       // for pose
+    // indigo_signal_builder = {
+    //     .builder = fb_builder_pose,
+    //     .server = &server,
+    //     .indigo_connection = nullptr
+    // };
+    
+    // initialize_obj_pose_message(indigo_pose_builder.builder);
+    // uint8_t *pose_msg_buffer = indigo_pose_builder.builder->GetBufferPointer();
+    // auto pose_msg_copy = ObjPose::Getobj_pose_msg(pose_msg_buffer);
 
     std::vector<std::string> network_config_folders;
     std::string network_start_folder_name = orange_root_dir_str + "/config/network";
@@ -116,6 +129,23 @@ int main(int argc, char **args) {
 
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
+
+        // if(ImGui::Begin("Debug"))
+        // {
+        //     auto ball_x = pose_msg_copy->ball()->x();
+        //     auto ball_y = pose_msg_copy->ball()->y();
+        //     auto ball_prob = pose_msg_copy->ball()->prob();
+        //     auto ball_label = pose_msg_copy->ball()->label();
+
+        //     auto mouse_x = pose_msg_copy->mouse()->x();
+        //     auto mouse_y = pose_msg_copy->mouse()->y();
+        //     auto mouse_prob = pose_msg_copy->mouse()->prob();
+        //     auto mouse_label = pose_msg_copy->mouse()->label();
+
+
+        // }
+
+
         if (ImGui::Begin("Network")) {
             if (ImGui::BeginTable("##Local Apps", 2,
                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings |

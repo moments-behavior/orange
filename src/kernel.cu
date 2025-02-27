@@ -128,10 +128,10 @@ __global__ void gpu_draw_cicles(unsigned char* src, const int width, const int h
         for (int i= 0; i < num_points; i++) {
             if ((powf(x - d_points[i*2], 2) + powf(y - d_points[i*2+1], 2)) < (radius * radius))
             {
-                *(src + ((y * width * 4) + (x * 4)))  = 255;
+                *(src + ((y * width * 4) + (x * 4)))  = 100;
                 *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;
                 *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
-                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;   
+                *(src + ((y * width * 4) + (x * 4)) + 3)  = 10;   
             }
         }
     } 
@@ -143,6 +143,48 @@ void gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points,
     dim3 threads_per_block(32, 32);
     dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
     gpu_draw_cicles <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, num_points, 5);
+}
+
+
+__global__ void gpu_draw_ring(unsigned char* src, const int width, const int height, float* d_points, float scale)
+{
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    float d_bound = 0.5*100*scale*1.414; //bbox_width * scale * sqrt(2)
+
+    if( (x < width) && (y < height) ) 
+    {
+        // if ((powf(x - 0.5*(d_points[0]+d_points[4]), 2) + powf(y - 0.5*(d_points[1]+d_points[3]), 2)) < powf(d_bound,2) )
+        // {
+        //     *(src + ((y * width * 4) + (x * 4)))  = 255;
+        //     *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;
+        //     *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
+        //     *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;   
+        // }
+
+            float dx = x - 0.5*(d_points[0]+d_points[4]);
+            float dy = y - 0.5*(d_points[1]+d_points[3]);
+            float distSq = powf(dx, 2) + powf(dy, 2);
+            float outer = d_bound * d_bound;
+            float inner = (d_bound - 10) * (d_bound - 10);
+            if (distSq >= inner && distSq <= outer) {
+                //ss int idx = (y * width + x) * 4;
+                *(src + ((y * width * 4) + (x * 4)))  = 255;
+                *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;
+                *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
+                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;    //(set transparency as needed)
+            }
+    
+    } 
+}
+
+
+void gpu_draw_ring(unsigned char* src, int width, int height, float* d_points, float scale, cudaStream_t stream)
+{
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
+    gpu_draw_ring <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, scale);
 }
 
 

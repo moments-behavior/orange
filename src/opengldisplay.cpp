@@ -7,7 +7,12 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 
-COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
+COpenGLDisplay::COpenGLDisplay( const char *name, 
+                                CameraParams *camera_params, 
+                                CameraEachSelect *camera_select, 
+                                unsigned char *display_buffer, 
+                                INDIGOSignalBuilder* indigo_signal_builder
+                                )
     : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)
 {
     memset(workerEntries, 0, sizeof(workerEntries));
@@ -70,6 +75,124 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->infer();
                 yolov8->postprocess(objs);
 
+                // place holder for pose message
+                float x_center, x_mouse,x_ball,w_mouse = -1.0;
+                float y_center, y_mouse,y_ball,h_mouse = -1.0;
+                float width = -1.0;
+                float height = -1.0;
+                float theta = -999.0;
+                float prob = -1;
+                float label = -1;
+
+
+
+                // //  messages and their defaults
+                
+                // uint8_t *buffer_pointer = indigo_signal_builder->builder->GetBufferPointer();
+                // auto pose_msg_mutable = ObjPose::GetMutableobj_pose_msg(buffer_pointer);                
+                
+                // pose_msg_mutable->mutable_ball()->mutate_x(float(x_center));
+                // pose_msg_mutable->mutable_ball()->mutate_y(float(y_center));
+                // pose_msg_mutable->mutable_ball()->mutate_theta(float(theta));
+                // pose_msg_mutable->mutable_ball()->mutate_prob(float(prob));
+                // pose_msg_mutable->mutable_ball()->mutate_label(float(label));
+
+                // pose_msg_mutable->mutable_mouse()->mutate_x(float(x_center));
+                // pose_msg_mutable->mutable_mouse()->mutate_y(float(y_center));
+                // pose_msg_mutable->mutable_mouse()->mutate_theta(float(theta));
+                // pose_msg_mutable->mutable_mouse()->mutate_prob(float(prob));
+                // pose_msg_mutable->mutable_mouse()->mutate_label(float(label));
+                        
+
+                for (auto obj : objs ){
+                    x_center = obj.rect.x + obj.rect.width/2;
+                    y_center = obj.rect.y + obj.rect.height/2;
+                    prob = obj.prob;
+                    label = obj.label;
+                    
+                    if(obj.label==0) {//mouse
+                        std::cout <<"ball at (x,y) = (" ;
+                    }
+                    else { //ball
+                        std::cout <<"ball at (x,y) = (" ;
+                    }
+
+                    std::cout <<x_center << "," << y_center << ")" << std::endl; 
+                }
+
+                // extract object IDs
+                int id_mouse = -1;
+                int id_ball = -1;
+                for (int ii =0 ; ii<objs.size(); ii++) {
+
+                    
+
+                    if(objs[ii].prob >0.65)  { // only check for confident detections
+                        switch(objs[ii].label) {
+                            case 0: 
+                                //bbox level checks for mouse
+                                if( (max(objs[ii].rect.width, objs[ii].rect.height) <= 300 ) &&
+                                    (min(objs[ii].rect.width, objs[ii].rect.height) >= 50  ) )  {
+                                        
+                                        x_mouse =  objs[ii].rect.x + objs[ii].rect.width/2;;
+                                        y_mouse =  objs[ii].rect.y + objs[ii].rect.height/2;
+                                        h_mouse = objs[ii].rect.height;
+                                        w_mouse = objs[ii].rect.width;
+                                        id_mouse=0; 
+
+                                    }
+                                    
+                                break;
+                            case 1:
+                                if( (max(objs[ii].rect.width, objs[ii].rect.height) <= 300 ) &&
+                                    (min(objs[ii].rect.width, objs[ii].rect.height) >= 50  ) )  {
+
+                                        x_ball =  objs[ii].rect.x + objs[ii].rect.width/2;;
+                                        y_ball =  objs[ii].rect.y + objs[ii].rect.height/2;
+                                        id_ball=1;
+                                }
+
+                                break;
+                        }
+
+                    }
+                }
+                // check if bounding boxes
+                if(id_mouse>-1 && id_ball > -1){
+                    float dx = std::min( abs(x_mouse - x_ball), 
+                                     abs(x_mouse + w_mouse - x_ball));
+
+                    float dy = std::min( abs(y_mouse - y_ball), 
+                                        abs(y_mouse + h_mouse - y_ball));
+                                    
+                    float d_ball_center_to_mouse_corner  = pow(dx*dx + dy*dy,0.5);
+                    float r_cutoff =  1.414*1.25*100; // sqrt(2)*scale*ball_size_px
+
+                    if(d_ball_center_to_mouse_corner - r_cutoff*r_cutoff <=0)
+                        std::cout << "trigger reward" << std::endl;
+
+                    
+                    
+
+                }
+                
+                
+
+                    
+
+                // if (indigo_signal_builder->indigo_connection != NULL) {
+                //         send_indigo_obj_pose2d(indigo_signal_builder->server,
+                //         )
+                // }
+                
+
+                // if (indigo_signal_builder->indigo_connection != NULL) {
+                //     send_indigo_obj_pose2d( indigo_signal_builder->server,
+                //                             )
+                //             send_indigo_obj(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
+                // }
+                
+                // draw objects
                 std::cout << objs.size() << " objects detected; plotted " ;
                 if (objs.size()>0)
                 {
@@ -77,11 +200,21 @@ void COpenGLDisplay::ThreadRunning()
                     for (int ii = 0; ii< objs.size(); ii++){
                         
                         yolov8->copy_keypoints_gpu(d_points, objs[ii]);
-                        gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream);
+                        if(objs[ii].label==0){
+                            gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream);
+
+                        }
+                        else {
+                            gpu_draw_ring(debayer.d_debayer, camera_params->width, camera_params->height, d_points, 1.25, yolov8->stream);
+                            //  gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points, int num_points, cudaStream_t stream)
+
+                        }
                         std::cout<< " obj " << ii;
                     }
                 }
                 std::cout << " " <<std::endl;
+
+                
 
                 // if (objs.size() > 0) {
                 //     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;

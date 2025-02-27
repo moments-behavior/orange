@@ -4,6 +4,7 @@
 #include <functional>
 #include <enet/enet.h>
 #include "fetch_generated.h"
+#include "objpose_generated.h"
 
 enum PacketTransportType
 {
@@ -39,4 +40,9 @@ void enqueue_packet(EnetContext* enet_context, ENetPeer* peer, PacketTransportTy
 void service_network(EnetContext* enet_context, float dt, std::function<void(const ENetEvent&)> callback);
 void send_indigo_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder,
                         ENetPeer* indigo_connection, FetchGame::SignalType signal_type);
+void send_indigo_obj_pose2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder,
+                        ENetPeer* indigo_connection);
+
+void initialize_obj_pose_message(flatbuffers::FlatBufferBuilder* builder);
+
 #endif

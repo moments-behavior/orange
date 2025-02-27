@@ -88,7 +88,7 @@ void COpenGLDisplay::ThreadRunning()
                     objs_last_frame.clear();
                 }
                     
-                gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream);
+                gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream, 4);
             }
 
             // probably reduandant copy

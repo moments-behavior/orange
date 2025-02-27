@@ -29,6 +29,26 @@ file(GLOB ORANGE_SOURCES
 
 list(REMOVE_ITEM ORANGE_SOURCES ${SRC_DIR}/orange_headless_client.cpp)
 
+file(GLOB NVENCODER_SOURCES ${PROJECT_SOURCE_DIR}/src/NvEncoder/*.cpp)
+# Add sourc files for orange_client
+set(ORANGE_CLIENT_SOURCES
+    src/orange_headless_client.cpp
+    src/network_base.cpp
+    src/FFmpegWriter.cpp
+    src/camera.cpp
+    src/video_capture.cpp
+    src/offthreadmachine.cpp
+    src/acquire_frames_headless.cpp
+    src/threadworker.cpp
+    src/gpu_video_encoder.cpp
+    ${NVENCODER_SOURCES}
+)
+
+set(YOLO_OFFLINE_SOURCES
+    benchmark/yolo_offline.cpp
+    src/yolov8_det.cpp
+)
+
 # ImGui Sources
 set(IMGUI_SOURCES
     ${DIR_IMGUI}/imgui.cpp
@@ -92,6 +112,16 @@ add_executable(orange
     ${CUDA_SOURCES}
 )
 
+add_executable(orange_client
+    ${ORANGE_CLIENT_SOURCES}
+    ${CUDA_SOURCES}
+)
+
+add_executable(yolo_offline
+    ${YOLO_OFFLINE_SOURCES}
+    ${CUDA_SOURCES}
+)
+
 # Link libraries
 target_link_libraries(orange
     pthread
@@ -124,6 +154,47 @@ target_link_libraries(orange
     glfw
 )
 
+# Link libraries
+target_link_libraries(orange_client
+    EmergentCamera
+    EmergentGenICam
+    EmergentGigEVision
+    pthread
+    enet
+    cudart
+    cuda
+    nppicc
+    nppidei
+    nvidia-encode
+    nppc
+    avformat
+    swscale
+    swresample
+    avutil
+    avcodec
+    m
+)
+
+
+target_link_libraries(yolo_offline
+    opencv_sfm
+    opencv_core
+    opencv_imgproc
+    opencv_videoio
+    opencv_highgui
+    opencv_video
+    nvinfer
+    nvinfer_plugin
+    cudart
+    cuda
+    nppicc
+    nppidei
+    nvidia-encode
+    nppc
+    nppig
+    nppial
+)
+
 # Link pkg-config libraries
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLFW3 REQUIRED glfw3)
@@ -131,4 +202,5 @@ target_include_directories(orange PRIVATE ${GLFW3_INCLUDE_DIRS})
 target_link_libraries(orange ${GLFW3_LIBRARIES})
 
 # Add output directory
-set_target_properties(orange PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/targets)
+#set_target_properties(orange PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/targets)
+#set_target_properties(orange PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/targets)

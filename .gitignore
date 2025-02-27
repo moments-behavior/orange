@@ -35,7 +35,7 @@
 .idea/
 build/
 cmake-build-debug/
-/targets*
+targets*/
 /external/targets_nvenc
 .vscode
 

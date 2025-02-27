@@ -1,7 +1,0 @@
-sudo vim /etc/ptp4l.conf
-
-[global]
-verbose 1
-boundary_clock_jbod 1 
-
-sudo ptp4l -i enp1s0f0 -i enp1s0f1 -f /etc/ptp4l.conf

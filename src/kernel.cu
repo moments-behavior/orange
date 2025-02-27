@@ -82,8 +82,8 @@ void Mono8ToRGBMono(unsigned char* dest, const unsigned char* src, int width, in
 __global__ void rgba2rgb_kernel(unsigned char* dest, unsigned char* src, int width, int height)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-	int y = blockIdx.y * blockDim.y + threadIdx.y;
-	if ((x < width) && (y < height)) {
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if ((x < width) && (y < height)) {
         *(dest + ((y * width * 3) + (x * 3))) = *(src + ((y * width * 4) + (x * 4)));            
         *(dest + ((y * width * 3) + (x * 3)) + 1) = *(src + ((y * width * 4) + (x * 4)) + 1);
         *(dest + ((y * width * 3) + (x * 3)) + 2) = *(src + ((y * width * 4) + (x * 4)) + 2);
@@ -103,8 +103,8 @@ void rgba2rgb_convert(unsigned char* dest, unsigned char* src, int width, int he
 __global__ void rgba2bgr_kernel(unsigned char* dest, unsigned char* src, int width, int height)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-	int y = blockIdx.y * blockDim.y + threadIdx.y;
-	if ((x < width) && (y < height)) {
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if ((x < width) && (y < height)) {
         *(dest + ((y * width * 3) + (x * 3))) = *(src + ((y * width * 4) + (x * 4)) + 2);            
         *(dest + ((y * width * 3) + (x * 3)) + 1) = *(src + ((y * width * 4) + (x * 4)) + 1);
         *(dest + ((y * width * 3) + (x * 3)) + 2) = *(src + ((y * width * 4) + (x * 4)));
@@ -182,7 +182,7 @@ void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, cu
 }
 
 
-__global__ void gpu_draw_rat_pose(unsigned char* src, const int width, const int height, float* d_points, unsigned int* d_skeleton)
+__global__ void gpu_draw_rat_pose(unsigned char* src, const int width, const int height, float* d_points, unsigned int* d_skeleton, const int num_channels)
 {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -199,21 +199,23 @@ __global__ void gpu_draw_rat_pose(unsigned char* src, const int width, const int
             float proj_y = d_points[pt0_idx*2+1] + t * (d_points[pt1_idx*2+1]-d_points[pt0_idx*2+1]);
             float distance_squared = (x - proj_x) * (x - proj_x) + (y - proj_y) * (y - proj_y);
             if (distance_squared < 8.0f) {
-                *(src + ((y * width * 4) + (x * 4)))  = 51;
-                *(src + ((y * width * 4) + (x * 4)) + 1)  = 153;
-                *(src + ((y * width * 4) + (x * 4)) + 2)  = 255;
-                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;                   
+                *(src + ((y * width * num_channels) + (x * num_channels)))  = 51;
+                *(src + ((y * width * num_channels) + (x * num_channels)) + 1)  = 153;
+                *(src + ((y * width * num_channels) + (x * num_channels)) + 2)  = 255;
+                if (num_channels == 4) {
+                    *(src + ((y * width * num_channels) + (x * num_channels)) + 3)  = 255;
+                }
             }
         }
     }
 }
 
 
-void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_points, unsigned int* d_skeleton, cudaStream_t stream)
+void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_points, unsigned int* d_skeleton, cudaStream_t stream, int num_channels)
 {
     dim3 threads_per_block(32, 32);
     dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
-    gpu_draw_rat_pose <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, d_skeleton);
+    gpu_draw_rat_pose <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, d_skeleton, num_channels);
 }
 
 

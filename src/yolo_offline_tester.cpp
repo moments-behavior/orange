@@ -72,11 +72,11 @@ int main(int argc, char** argv)
         yolov8->copy_keypoints_gpu(d_points, objs);
 
         // TODO: need to convert from bgr to ragba for this drawing function on gpu 
-        //gpu_draw_rat_pose(d_frame, camera_width, camera_height, d_points, d_skeleton, yolov8->stream);
+        gpu_draw_rat_pose(d_frame, camera_width, camera_height, d_points, d_skeleton, yolov8->stream, 3);
         // copy frame back for opencv visualization
-        //cudaMemcpy2D(frame_draw, camera_width*3, d_frame, camera_width*3, camera_width*3, camera_height, cudaMemcpyDeviceToHost);
-        //view = cv::Mat(camera_width * camera_height * 3, 1, CV_8U, frame_draw).reshape(3, camera_height);
-        yolov8->draw_objects(image, view, objs, CLASS_NAMES, COLORS);
+        cudaMemcpy2D(frame_draw, camera_width*3, d_frame, camera_width*3, camera_width*3, camera_height, cudaMemcpyDeviceToHost);
+        view = cv::Mat(camera_width * camera_height * 3, 1, CV_8U, frame_draw).reshape(3, camera_height);
+        //yolov8->draw_objects(image, view, objs, CLASS_NAMES, COLORS);
         float r = 0.5;
         int   output_w = std::round(camera_width* r);
         int   output_h = std::round(camera_height * r);

@@ -9,7 +9,7 @@ const std::vector<std::vector<unsigned int>> COLORS = {{255,0,255}};
 int main(int argc, char** argv)
 {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s [engine_path] [image_path/image_dir/video_path]\n", argv[0]);
+        fprintf(stderr, "Usage: %s [engine_path] [video_path]\n", argv[0]);
         return -1;
     }
 

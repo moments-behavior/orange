@@ -157,7 +157,7 @@ void COpenGLDisplay::ThreadRunning()
 
                     }
                 }
-                // check if bounding boxes
+                // check for mouse getting closer to ball
                 if(id_mouse>-1 && id_ball > -1){
                     float dx = std::min( abs(x_mouse - x_ball), 
                                      abs(x_mouse + w_mouse - x_ball));
@@ -171,30 +171,11 @@ void COpenGLDisplay::ThreadRunning()
                     if(d_ball_center_to_mouse_corner - r_cutoff*r_cutoff <=0)
                         std::cout << "trigger reward" << std::endl;
                         if (indigo_signal_builder->indigo_connection != NULL) {
-                            send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
+                            send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_SUCCESS);
                         }
 
-                    
-                    
-
                 }
-                
-                
-
-                    
-
-                // if (indigo_signal_builder->indigo_connection != NULL) {
-                //         send_indigo_obj_pose2d(indigo_signal_builder->server,
-                //         )
-                // }
-                
-
-                // if (indigo_signal_builder->indigo_connection != NULL) {
-                //     send_indigo_obj_pose2d( indigo_signal_builder->server,
-                //                             )
-                //             send_indigo_obj(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
-                // }
-                
+                                                                    
                 // draw objects
                 std::cout << objs.size() << " objects detected; plotted " ;
                 if (objs.size()>0)
@@ -209,33 +190,12 @@ void COpenGLDisplay::ThreadRunning()
                         }
                         else {
                             gpu_draw_ring(debayer.d_debayer, camera_params->width, camera_params->height, d_points, 1.25, yolov8->stream);
-                            //  gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points, int num_points, cudaStream_t stream)
 
                         }
                         std::cout<< " obj " << ii;
                     }
                 }
-                std::cout << " " <<std::endl;
-
-                
-
-                // if (objs.size() > 0) {
-                //     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
-                //     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
-                //     // std::cout << bbox_center_x << std::endl;
-                //     // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
-                //     // if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
-                //     if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
-                //         // std::cout << "trigger ball drop" << std::endl;
-                //         if (indigo_signal_builder->indigo_connection != NULL) {
-                //             send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
-                //         }
-                //     }
-                //     objs_last_frame.push_back(objs[0]);
-                // } else {
-                //     objs_last_frame.clear();
-                // }
-                    
+                std::cout << " " <<std::endl;                        
                 
             }
 

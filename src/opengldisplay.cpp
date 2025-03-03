@@ -170,6 +170,9 @@ void COpenGLDisplay::ThreadRunning()
 
                     if(d_ball_center_to_mouse_corner - r_cutoff*r_cutoff <=0)
                         std::cout << "trigger reward" << std::endl;
+                        if (indigo_signal_builder->indigo_connection != NULL) {
+                            send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
+                        }
 
                     
                     

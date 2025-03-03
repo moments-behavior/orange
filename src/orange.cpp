@@ -144,6 +144,15 @@ int main(int argc, char **args) {
 
 
         // }
+        if (ImGui::Begin("Debug")) {
+            if (ImGui::Button("Send signal"))
+            {
+                if (indigo_signal_builder.indigo_connection != NULL) {
+                            send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_SUCCESS);
+                }
+            } 
+        }
+        ImGui::End();
 
 
         if (ImGui::Begin("Network")) {

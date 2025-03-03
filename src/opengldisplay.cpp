@@ -7,6 +7,11 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 
+
+int trigger_count = 0;
+int trigger_count_threshold = 10;
+
+
 COpenGLDisplay::COpenGLDisplay( const char *name, 
                                 CameraParams *camera_params, 
                                 CameraEachSelect *camera_select, 
@@ -157,6 +162,7 @@ void COpenGLDisplay::ThreadRunning()
 
                     }
                 }
+
                 // check for mouse getting closer to ball
                 if(id_mouse>-1 && id_ball > -1){
                     float dx = std::min( abs(x_mouse - x_ball), 
@@ -169,10 +175,22 @@ void COpenGLDisplay::ThreadRunning()
                     float r_cutoff =  1.414*1.25*100; // sqrt(2)*scale*ball_size_px
 
                     if(d_ball_center_to_mouse_corner - r_cutoff*r_cutoff <=0)
-                        std::cout << "trigger reward" << std::endl;
-                        if (indigo_signal_builder->indigo_connection != NULL) {
-                            send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_SUCCESS);
+                    {   
+
+                        trigger_count++;
+                        if(trigger_count==trigger_count_threshold)
+                        {
+                            std::cout << "trigger reward" << std::endl;                        
+                            if (indigo_signal_builder->indigo_connection != NULL) {
+                                send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_SUCCESS);
+                            }
+                            trigger_count = 0;
                         }
+                    }
+                    else
+                    {
+                        trigger_count = max(0,trigger_count--);
+                    }
 
                 }
                                                                     

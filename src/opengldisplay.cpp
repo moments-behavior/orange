@@ -116,7 +116,7 @@ void COpenGLDisplay::ThreadRunning()
                     label = obj.label;
                     
                     if(obj.label==0) {//mouse
-                        std::cout <<"ball at (x,y) = (" ;
+                        std::cout <<"mouse at (x,y) = (" ;
                     }
                     else { //ball
                         std::cout <<"ball at (x,y) = (" ;
@@ -174,7 +174,7 @@ void COpenGLDisplay::ThreadRunning()
                     float d_ball_center_to_mouse_corner  = pow(dx*dx + dy*dy,0.5);
                     float r_cutoff =  1.414*1.25*100; // sqrt(2)*scale*ball_size_px
 
-                    if(d_ball_center_to_mouse_corner - r_cutoff*r_cutoff <=0)
+                    if(d_ball_center_to_mouse_corner - r_cutoff <=0)
                     {   
 
                         trigger_count++;
@@ -183,6 +183,7 @@ void COpenGLDisplay::ThreadRunning()
                             std::cout << "trigger reward" << std::endl;                        
                             if (indigo_signal_builder->indigo_connection != NULL) {
                                 send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_SUCCESS);
+                                
                             }
                             trigger_count = 0;
                         }

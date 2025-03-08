@@ -272,6 +272,11 @@ int main(int argc, char **args) {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = false;
                             }
+                            if (cameras_params[i].camera_name == "710040")
+                            {
+                                cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo = false;                                
+                            }
                         }
 
                         ecams = new CameraEmergent[num_cameras];
@@ -566,7 +571,7 @@ int main(int argc, char **args) {
                     ImGui::Text("stream");
                     ImGui::TableNextColumn();
                     ImGui::Text("yolo");
-
+                    
                     for (int i = 0; i < num_cameras; i++) {
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
@@ -802,6 +807,10 @@ int main(int argc, char **args) {
                             }
 
                             if (cameras_params[i].camera_name == "shelter") {
+                                cameras_select[i].stream_on = true;
+                            }
+
+                            if (cameras_params[i].camera_name == "710040") {
                                 cameras_select[i].stream_on = true;
                             }
 

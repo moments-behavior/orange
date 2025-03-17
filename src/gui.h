@@ -88,7 +88,7 @@ inline void stop_camera_streaming(std::vector<std::thread>& camera_threads, Came
     }
 }
 
-static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, const int num_cameras)
+static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, const int num_cameras, std::vector<std::string>& color_temps)
 {
     if (ImGui::TreeNode("Camera Property"))
     {
@@ -111,6 +111,20 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
             OffsetY = cameras_params[selected_camera].offsety;
         }
     
+        ImGui::Checkbox("GPU Direct", &cameras_params[selected_camera].gpu_direct);
+        
+        ImGui::Checkbox("Color", &cameras_params[selected_camera].color);
+        // Find the index
+        auto it = std::find(color_temps.begin(), color_temps.end(), cameras_params->color_temp);
+        int item_current_idx = (it != color_temps.end()) ? std::distance(color_temps.begin(), it) : -1;
+        std::vector<const char*> item_cstrs;
+        for (const auto& item : color_temps) {
+            item_cstrs.push_back(item.c_str());
+        }
+        if (cameras_params[selected_camera].color) {
+            ImGui::Combo("Color Temp", &item_current_idx, item_cstrs.data(), color_temps.size());
+            update_color_temperature(&ecams[selected_camera].camera, color_temps[item_current_idx], &cameras_params[selected_camera]);
+        }
 
         if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[selected_camera].width_max, "%d"))
         {

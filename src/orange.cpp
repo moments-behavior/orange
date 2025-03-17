@@ -113,6 +113,7 @@ int main(int argc, char **args) {
 
     std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder,
                                           &quite_enet);
+    std::vector<std::string> color_temps = { "CT_Off", "CT_2800K", "CT_3000K", "CT_4000K", "CT_5000K", "CT_6500K", "CT_Custom"};
 
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
@@ -505,7 +506,7 @@ int main(int argc, char **args) {
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
 
-                set_camera_properties(ecams, cameras_params, num_cameras);
+                set_camera_properties(ecams, cameras_params, num_cameras, color_temps);
 
                 if (camera_control->record_video) {
                     ImGui::EndDisabled();
@@ -759,7 +760,7 @@ int main(int argc, char **args) {
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name == "ceiling_center") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
+                                cameras_select[i].yolo = false;
                             }
 
                             if (cameras_params[i].camera_name == "shelter") {

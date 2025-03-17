@@ -164,6 +164,13 @@ void update_gain_value(Emergent::CEmergentCamera *camera, int gain_val, CameraPa
     }
 }
 
+void update_color_temperature(Emergent::CEmergentCamera *camera, std::string color_string, CameraParams *camera_params)
+{
+    const char *color_temp = color_string.c_str();
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", color_temp), camera_params->camera_serial.c_str());
+    camera_params->color_temp = color_string;
+}
+
 void update_focus_value(Emergent::CEmergentCamera *camera, int focus_value, CameraParams *camera_params)
 {
     EVT_CameraGetUInt32ParamMax(camera, "Focus", &camera_params->focus_max);

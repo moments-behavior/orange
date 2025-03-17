@@ -121,6 +121,7 @@ void quick_print_camera(GigEVisionDeviceInfo* device_info, int camera_idx);
 unsigned long long get_current_PTP_time(Emergent::CEmergentCamera* camera);
 void test_gpo_manual_toggle(Emergent::CEmergentCamera* camera);
 void change_camera_ip_persistent(GigEVisionDeviceInfo* device_info, Emergent::CEmergentCamera* camera, const char* new_ip, CameraParams *camera_params);
+void update_color_temperature(Emergent::CEmergentCamera *camera, std::string color_string, CameraParams *camera_params);
 void update_gain_value(Emergent::CEmergentCamera* camera, int gain_val, CameraParams* camera_params);
 void update_exposure_value(Emergent::CEmergentCamera* camera, int exposure_val, CameraParams* camera_params);
 void update_exposure_framerate_value(Emergent::CEmergentCamera *camera, int exposure_val, int* frame_rate_val, CameraParams *camera_params);

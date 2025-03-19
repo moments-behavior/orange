@@ -422,16 +422,24 @@ void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInf
     unsigned long enum_buffer_size_return = 0;
     char enumBuffer[enum_buffer_size];
 
-    //Order is important as param max/mins get updated.
     EVT_CameraGetEnumParamRange(camera, "PixelFormat", enumBuffer, enum_buffer_size, &enum_buffer_size_return);
     std::cout << "PixelFormat: " << enumBuffer << std::endl;
     char* enum_member = strtok_s(enumBuffer, ",", &next_token);
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PixelFormat", enum_member), camera_params->camera_serial.c_str());
     camera_params->pixel_format = std::string(enum_member);
 
     if (camera_params->pixel_format == "Mono8") {
         camera_params->color = false;
     } else {
         camera_params->color = true;
+    }
+
+    if (camera_params->color) {
+        EVT_CameraGetEnumParamRange(camera, "ColorTemp", enumBuffer, enum_buffer_size, &enum_buffer_size_return);
+        std::cout << "ColorTemp: " << enumBuffer << std::endl;
+        char* enum_member = strtok_s(enumBuffer, ",", &next_token);
+        check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", enum_member), camera_params->camera_serial.c_str());
+        camera_params->color_temp = std::string(enum_member);
     }
 }
 

@@ -8,8 +8,7 @@
 #include <cuda_runtime_api.h>
 
 
-int trigger_count = 0;
-int trigger_count_threshold = 10;
+
 
 
 COpenGLDisplay::COpenGLDisplay( const char *name, 
@@ -58,6 +57,17 @@ void COpenGLDisplay::ThreadRunning()
     std::vector<Object> objs;
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
  
+
+    int trigger_count = 0;
+    int trigger_count_threshold = 5;
+    int is_detected = 0;
+
+    // ball geometry
+    float scale_ball_boundary = 2;
+    float ball_radius = 0.5*100; //0.5* width_in_pixels
+
+    float r_cutoff = scale_ball_boundary*ball_radius;  
+
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();
@@ -115,14 +125,14 @@ void COpenGLDisplay::ThreadRunning()
                     prob = obj.prob;
                     label = obj.label;
                     
-                    if(obj.label==0) {//mouse
-                        std::cout <<"mouse at (x,y) = (" ;
-                    }
-                    else { //ball
-                        std::cout <<"ball at (x,y) = (" ;
-                    }
+                    // if(obj.label==0) {//mouse
+                    //     std::cout <<"mouse at (x,y) = (" ;
+                    // }
+                    // else { //ball
+                    //     std::cout <<"ball at (x,y) = (" ;
+                    // }
 
-                    std::cout <<x_center << "," << y_center << ")" << std::endl; 
+                    // std::cout <<x_center << "," << y_center << ")" << std::endl; 
                 }
 
                 // extract object IDs
@@ -165,21 +175,31 @@ void COpenGLDisplay::ThreadRunning()
 
                 // check for mouse getting closer to ball
                 if(id_mouse>-1 && id_ball > -1){
-                    float dx = std::min( abs(x_mouse - x_ball), 
-                                     abs(x_mouse + w_mouse - x_ball));
 
-                    float dy = std::min( abs(y_mouse - y_ball), 
-                                        abs(y_mouse + h_mouse - y_ball));
-                                    
-                    float d_ball_center_to_mouse_corner  = pow(dx*dx + dy*dy,0.5);
-                    float r_cutoff =  1.414*1.25*100; // sqrt(2)*scale*ball_size_px
+
+
+                    float x_min = x_mouse - w_mouse/2;
+                    float x_max = x_mouse + w_mouse/2;
+                    float y_min = y_mouse - h_mouse/2;
+                    float y_max = y_mouse + h_mouse/2;
+                    
+                    // Find the closest point on the rectangle to the circle center
+                    float x_clamp = max(x_min, min(x_max, x_ball));
+                    float y_clamp = max(y_min, min(y_max, y_ball));
+
+                    // Compute squared distance from circle center to closest point
+                    float dx = x_clamp - x_ball;
+                    float dy = y_clamp - y_ball;
+                    float d_ball_center_to_mouse_corner = pow(dx*dx + dy*dy,0.5);
+
 
                     if(d_ball_center_to_mouse_corner - r_cutoff <=0)
                     {   
-
+                        is_detected = 1;
                         trigger_count++;
                         if(trigger_count==trigger_count_threshold)
                         {
+                            
                             std::cout << "trigger reward" << std::endl;                        
                             if (indigo_signal_builder->indigo_connection != NULL) {
                                 send_indigo_message(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection, FetchGame::SignalType_INDIGO_TRIAL_SUCCESS);
@@ -190,13 +210,14 @@ void COpenGLDisplay::ThreadRunning()
                     }
                     else
                     {
-                        trigger_count = max(0,trigger_count--);
+                        trigger_count = max(0,trigger_count-1);
+                        is_detected = 0;
                     }
 
                 }
                                                                     
                 // draw objects
-                std::cout << objs.size() << " objects detected; plotted " ;
+                // std::cout << objs.size() << " objects detected; plotted " ;
                 if (objs.size()>0)
                 {
 
@@ -208,13 +229,13 @@ void COpenGLDisplay::ThreadRunning()
 
                         }
                         else {
-                            gpu_draw_ring(debayer.d_debayer, camera_params->width, camera_params->height, d_points, 1.25, yolov8->stream);
+                            gpu_draw_ring(debayer.d_debayer, camera_params->width, camera_params->height, d_points, r_cutoff, is_detected, yolov8->stream);
 
                         }
-                        std::cout<< " obj " << ii;
+                        // std::cout<< " obj " << ii;
                     }
                 }
-                std::cout << " " <<std::endl;                        
+                // std::cout << " " <<std::endl;                        
                 
             }
 

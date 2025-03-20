@@ -103,7 +103,6 @@ int main(int argc, char **args) {
 
     int local_config_select = 0;
     bool select_all_cameras = false;
-    bool stream_all_cameras = false;
     char *temp_string = (char *) malloc(64);
     *temp_string = '\0';
     bool save_image_all_ready = true;
@@ -516,6 +515,22 @@ int main(int argc, char **args) {
                     ImGui::BeginDisabled();
                 }
 
+                bool stream_all_cameras = true;
+                for (int i = 0; i < num_cameras; i++) {
+                    if (!cameras_select[i].stream_on) {
+                        stream_all_cameras = false;
+                        break;
+                    }
+                }
+
+                bool record_all_cameras = true;
+                for (int i = 0; i < num_cameras; i++) {
+                    if (!cameras_select[i].record) {
+                        record_all_cameras = false;
+                        break;
+                    }
+                }
+
                 if (ImGui::BeginTable("Camera Control Setting", 5,
                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings |
                                       ImGuiTableFlags_Borders)) {
@@ -525,9 +540,34 @@ int main(int argc, char **args) {
                     ImGui::TableNextColumn();
                     ImGui::Text("serial");
                     ImGui::TableNextColumn();
-                    ImGui::Text("stream");
+                    ImGui::Text("stream "); ImGui::SameLine();
+                    if(ImGui::Checkbox("all##stream", &stream_all_cameras)) 
+                    {
+                        if (stream_all_cameras) {
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].stream_on = true;
+                            }
+                        } else {
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].stream_on = false;
+                            }
+                        }
+                    }
+                    
                     ImGui::TableNextColumn();
-                    ImGui::Text("record");
+                    ImGui::Text("record "); ImGui::SameLine();
+                    if(ImGui::Checkbox("all##record", &record_all_cameras)) 
+                    {
+                        if (record_all_cameras) {
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].record = true;
+                            }
+                        } else {
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].record = false;
+                            }
+                        }
+                    }
                     ImGui::TableNextColumn();
                     ImGui::Text("yolo");
 
@@ -548,19 +588,6 @@ int main(int argc, char **args) {
                         ImGui::Checkbox(temp_string, &cameras_select[i].yolo);
                     }
                     ImGui::EndTable();
-                }
-
-                if (ImGui::Button(stream_all_cameras ? "Clear all##streamselection" : "Select all##streamselection")) {
-                    stream_all_cameras = !stream_all_cameras;
-                    if (stream_all_cameras) {
-                        for (int i = 0; i < cam_count; i++) {
-                            cameras_select[i].stream_on = true;
-                        }
-                    } else {
-                        for (int i = 0; i < cam_count; i++) {
-                            cameras_select[i].stream_on = false;
-                        }
-                    }
                 }
 
                 if (camera_control->subscribe) {

@@ -23,6 +23,7 @@ struct CameraControl
 struct CameraEachSelect
 {
     bool stream_on = true;
+    bool record = true;
     bool yolo = false;
     PictureSaveState frame_save_state = State_Frame_Idle;
     std::string frame_save_name;

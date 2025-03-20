@@ -61,7 +61,7 @@ static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* ca
             camera_state->id_prev = ecam->frame_recv.frame_id;
 
         // push the image data to encode, or display
-        if (camera_control->record_video) {
+        if (camera_control->record_video && camera_select->record) {
             gpu_encoder->PushToDisplay(ecam->frame_recv.imagePtr, 
                 ecam->frame_recv.bufferSize, 
                 ecam->frame_recv.size_x, 
@@ -122,7 +122,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
 
     GPUVideoEncoder* gpu_encoder;
     bool encoder_ready_signal = false;
-    if (camera_control->record_video) {
+    if (camera_control->record_video && camera_select->record) {
         gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup, folder_name, &encoder_ready_signal);
         gpu_encoder->StartThread();
         
@@ -190,7 +190,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     if (camera_select->stream_on) {
         openGLDisplay->StopThread();
     }
-    if (camera_control->record_video) {
+    if (camera_control->record_video && camera_select->record) {
         gpu_encoder->StopThread();
     }
     report_statistics(camera_params, &camera_state, time_diff);

@@ -60,7 +60,15 @@ void prepare_application_folders(std::string orange_root_dir_str)
     std::filesystem::path picture_path(picture_str);
     if (!std::filesystem::exists(picture_path)) {
         if(std::filesystem::create_directory(picture_path)) {
-            std::cout << "Create config/network folder..." << std::endl;
+            std::cout << "Create picture folder..." << std::endl;
+        }
+    }
+
+    std::string calibration_str = orange_root_dir_str + "/calibration";
+    std::filesystem::path calibration_path(calibration_str);
+    if (!std::filesystem::exists(calibration_path)) {
+        if(std::filesystem::create_directory(calibration_path)) {
+            std::cout << "Create calibration folder..." << std::endl;
         }
     }
 }

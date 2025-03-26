@@ -610,6 +610,12 @@ int main(int argc, char **args) {
                     }
                     ImGui::SameLine();
                     ImGui::Text("%s", picture_save_folder.c_str());
+                    static int current_picture_format = 0;
+                    const char* picture_format_items[] = { "jpg", "tiff", "png"};
+                    ImGui::Combo("Picture format", &current_picture_format, picture_format_items, IM_ARRAYSIZE(picture_format_items));
+                    for (int i = 0; i < num_cameras; i++) {
+                        cameras_select[i].frame_save_format = std::string(picture_format_items[current_picture_format]);
+                    }
 
                     if (ImGui::TreeNode("Save pictures from streaming cameras")) {
                         save_image_all_ready = true;
@@ -675,10 +681,8 @@ int main(int argc, char **args) {
                                 calib_state = CalibSavePictures;
                             }
                         } else if (calib_state == CalibSavePictures) {
-                            if (ImGui::Button("Calib next pose")) {
-                                send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
-                                calib_state = CalibNextPose;
-                            }
+                            send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
+                            calib_state = CalibNextPose;
                         }
 
                         if (!save_image_all_ready) {

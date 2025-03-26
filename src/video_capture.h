@@ -26,6 +26,7 @@ struct CameraEachSelect
     bool record = true;
     bool yolo = false;
     PictureSaveState frame_save_state = State_Frame_Idle;
+    std::string frame_save_format;
     std::string frame_save_name;
     int pictures_counter = 0;
     bool selected_to_save = false;

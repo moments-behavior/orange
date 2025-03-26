@@ -112,18 +112,18 @@ static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_p
         }
     
         ImGui::Checkbox("GPU Direct", &cameras_params[selected_camera].gpu_direct);
-        
         ImGui::Checkbox("Color", &cameras_params[selected_camera].color);
-        // Find the index
-        auto it = std::find(color_temps.begin(), color_temps.end(), cameras_params->color_temp);
-        int item_current_idx = (it != color_temps.end()) ? std::distance(color_temps.begin(), it) : -1;
-        std::vector<const char*> item_cstrs;
-        for (const auto& item : color_temps) {
-            item_cstrs.push_back(item.c_str());
-        }
+
         if (cameras_params[selected_camera].color) {
-            ImGui::Combo("Color Temp", &item_current_idx, item_cstrs.data(), color_temps.size());
-            update_color_temperature(&ecams[selected_camera].camera, color_temps[item_current_idx], &cameras_params[selected_camera]);
+            auto it = std::find(color_temps.begin(), color_temps.end(), cameras_params->color_temp);
+            int item_current_idx = (it != color_temps.end()) ? std::distance(color_temps.begin(), it) : 0;
+            std::vector<const char*> item_cstrs;
+            for (const auto& item : color_temps) {
+                item_cstrs.push_back(item.c_str());
+            }
+            if(ImGui::Combo("Color Temp", &item_current_idx, item_cstrs.data(), color_temps.size())) {
+                update_color_temperature(&ecams[selected_camera].camera, color_temps[item_current_idx], &cameras_params[selected_camera]);
+            }
         }
 
         if(ImGui::SliderInt("Width", &slider_width, cameras_params[selected_camera].width_min, cameras_params[selected_camera].width_max, "%d"))

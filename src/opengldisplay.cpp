@@ -94,20 +94,19 @@ void COpenGLDisplay::ThreadRunning()
             // probably reduandant copy
             ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
 
-            if (camera_select->frame_save_state==State_Write_New_Frame) {
-                // yolo code goes here
-                rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
+            // if (camera_select->frame_save_state==State_Write_New_Frame) {
+            //     rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
                 
-                // copy frame back to cpu, and then save
-                cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
-                cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
+            //     // copy frame back to cpu, and then save
+            //     cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
+            //     cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
                 
-                std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
-                std::cout << image_name << std::endl;
-                cv::imwrite(image_name, view);
-                camera_select->pictures_counter++;
-                camera_select->frame_save_state = State_Frame_Idle;
-            }          
+            //     std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
+            //     std::cout << image_name << std::endl;
+            //     cv::imwrite(image_name, view);
+            //     camera_select->pictures_counter++;
+            //     camera_select->frame_save_state = State_Frame_Idle;
+            // }          
 
         }
         usleep(16000); // sleep for 16ms 

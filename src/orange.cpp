@@ -113,7 +113,7 @@ int main(int argc, char **args) {
     std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder,
                                           &quite_enet);
     std::vector<std::string> color_temps = { "CT_Off", "CT_2800K", "CT_3000K", "CT_4000K", "CT_5000K", "CT_6500K", "CT_Custom"};
-
+    
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
         if (ImGui::Begin("Network")) {
@@ -246,6 +246,19 @@ int main(int argc, char **args) {
                     camera_control->open = true;
                 }
                 ImGui::PopStyleColor(1);
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
+                if (ImGui::Button("Save to")) {
+                    IGFD::FileDialogConfig config;
+                    config.countSelectionMax = 1;
+                    config.path = input_folder;
+                    ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir", "Choose a Directory", nullptr, config);
+                }
+                ImGui::PopStyleColor(1);
+                ImGui::SameLine();
+                ImGui::SetWindowFontScale(1.5f); // 1.0 is default
+                ImGui::Text("%s", input_folder.c_str());
+                ImGui::SetWindowFontScale(1.0f); // Reset to normal
             }
 
             if (!camera_control->subscribe && my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD &&
@@ -475,19 +488,24 @@ int main(int argc, char **args) {
                 ImGui::BeginDisabled();
             }
 
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
             if (ImGui::Button("Save to")) {
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
                 config.path = input_folder;
                 ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir", "Choose a Directory", nullptr, config);
             }
+            ImGui::PopStyleColor(1); 
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4{1.0, 0.0f, 1.0f, 1.0f}, "%s", input_folder.c_str()); {
+            ImGui::Text("%s", input_folder.c_str()); 
+
+            {
                 const char *items[] = {"h264", "hevc"};
                 static int item_current = 0;
                 ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
                 encoder_config->encoder_codec = items[item_current];
-            } {
+            } 
+            {
                 const char *items[] = {"p1", "p3", "p5", "p7"};
                 static int item_current = 0;
                 ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
@@ -617,25 +635,22 @@ int main(int argc, char **args) {
                         cameras_select[i].frame_save_format = std::string(picture_format_items[current_picture_format]);
                     }
 
-                    if (ImGui::TreeNode("Save pictures from streaming cameras")) {
+                    if (ImGui::TreeNode("Save pictures from capturing")) {
                         save_image_all_ready = true;
                         for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].stream_on) {
-                                if (cameras_select[i].frame_save_state != State_Frame_Idle) {
-                                    save_image_all_ready = false;
-                                    break;
-                                }
-                            }
+                            if (cameras_select[i].frame_save_state != State_Frame_Idle) {
+                                save_image_all_ready = false;
+                                break;
+                            }  
                         }
 
                         for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].stream_on) {
-                                ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
-                                                &cameras_select[i].selected_to_save);
-                                ImGui::SameLine();
-                                ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "%d", cameras_select[i].pictures_counter);
-                                ImGui::SameLine();
-                            }
+                            ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
+                                            &cameras_select[i].selected_to_save);
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "%d", cameras_select[i].pictures_counter);
+                            ImGui::SameLine();
+
                         }
 
                         if (!save_image_all_ready) {
@@ -660,31 +675,28 @@ int main(int argc, char **args) {
                             for (int i = 0; i < num_cameras; i++) {
                                 cameras_select[i].frame_save_name = frame_save_name;
                                 cameras_select[i].picture_save_folder = picture_save_folder;
-                                if (cameras_select[i].stream_on) {
-                                    cameras_select[i].frame_save_state = State_Write_New_Frame;
-                                }
+                                cameras_select[i].frame_save_state = State_Write_New_Frame;
                             }
                         }
 
-
-                        if (calib_state == CalibPoseReached) {
-                            if (ImGui::Button("Calib save all")) {
-                                make_folder(picture_save_folder);
-                                std::string frame_save_name = get_current_time_milliseconds();
-                                for (int i = 0; i < num_cameras; i++) {
-                                    cameras_select[i].frame_save_name = frame_save_name;
-                                    cameras_select[i].picture_save_folder = picture_save_folder;
-                                    if (cameras_select[i].stream_on) {
-                                        cameras_select[i].frame_save_state = State_Write_New_Frame;
-                                    }
-                                }
-                                calib_state = CalibSavePictures;
-                            }
-                        } else if (calib_state == CalibSavePictures) {
+                        if (calib_state == CalibSavePictures) {
                             send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
                             calib_state = CalibNextPose;
                         }
 
+                        ImGui::BeginDisabled(calib_state!=CalibPoseReached);
+                        if (ImGui::Button("Calib save all")) {
+                            make_folder(picture_save_folder);
+                            std::string frame_save_name = get_current_time_milliseconds();
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].frame_save_name = frame_save_name;
+                                cameras_select[i].picture_save_folder = picture_save_folder;
+                                cameras_select[i].frame_save_state = State_Write_New_Frame;
+                            }
+                            calib_state = CalibSavePictures;
+                        }
+                        ImGui::EndDisabled();
+                        
                         if (!save_image_all_ready) {
                             ImGui::EndDisabled();
                         }

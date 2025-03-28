@@ -2,6 +2,7 @@
 #include "gpu_video_encoder.h"
 #include "acquire_frames_headless.h"
 
+
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
 {
 

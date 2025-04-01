@@ -243,5 +243,4 @@ void gx_cleanup(gx_context *window)
     glfwTerminate();
 }
 
-
 #endif

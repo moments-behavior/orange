@@ -23,6 +23,39 @@ struct GL_Texture {
 };
 
 
+void setup_texture(GL_Texture& tex, int width, int height) {
+    cudaStreamCreate(&tex.streams);
+    create_pbo(&tex.pbo, width, height);
+    register_pbo_to_cuda(&tex.pbo, &tex.cuda_resource);
+    map_cuda_resource(&tex.cuda_resource, tex.streams);
+    cuda_pointer_from_resource(&tex.cuda_buffer, &tex.cuda_pbo_storage_buffer_size, &tex.cuda_resource);
+    create_texture(&tex.texture, width, height);
+}
+
+void upload_texture_from_pbo(GL_Texture& tex, int width, int height) {
+    bind_pbo(&tex.pbo);
+    bind_texture(&tex.texture);
+    upload_image_pbo_to_texture(width, height);  // Uses currently bound PBO and texture
+    unbind_pbo();
+    unbind_texture();
+}
+
+void clear_upload_and_cleanup(GL_Texture& tex, int width, int height) {
+    // Clear the CUDA buffer
+    int size_pic = width * height * sizeof(unsigned char) * 4;
+    cudaMemset(tex.cuda_buffer, 0, size_pic);
+
+    // Upload from PBO to texture
+    upload_texture_from_pbo(tex, width, height);
+
+    // Cleanup resources
+    gx_delete_buffer(&tex.pbo);
+    unmap_cuda_resource(&tex.cuda_resource);
+    cuda_unregister_pbo(tex.cuda_resource);
+    cudaStreamDestroy(tex.streams);
+}
+
+
 inline void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams,
                                    CameraParams* cameras_params, CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras, int evt_buffer_size, bool ptp_stream_sync,
                                    const std::string& encoder_setup, const std::string& folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder,

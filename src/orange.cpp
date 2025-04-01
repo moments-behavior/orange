@@ -100,6 +100,7 @@ int main(int argc, char **args) {
         local_config_folders.push_back(entry.path().string());
     }
     std::string picture_save_folder = orange_root_dir_str + "/pictures/" + get_current_date();
+    std::string calib_save_folder = orange_root_dir_str + "/calibration/" + get_current_date();
 
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -133,7 +134,7 @@ int main(int argc, char **args) {
                 ImGui::Text("%s", temp_string);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::Text("Calibraton");
+                ImGui::Text("Calibration");
                 ImGui::TableNextColumn();
                 if (indigo_signal_builder.indigo_connection != nullptr) {
                     ImGui::Text("%s", enum_names_calib_state()[calib_state]);
@@ -644,19 +645,34 @@ int main(int argc, char **args) {
                             }  
                         }
 
-                        for (int i = 0; i < num_cameras; i++) {
-                            ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
-                                            &cameras_select[i].selected_to_save);
-                            ImGui::SameLine();
-                            ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "%d", cameras_select[i].pictures_counter);
-                            ImGui::SameLine();
+                        // for (int i = 0; i < num_cameras; i++) {
+                        //     ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
+                        //                     &cameras_select[i].selected_to_save);
+                        //     ImGui::SameLine();
+                        //     ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "%d", cameras_select[i].pictures_counter);
+                        //     ImGui::SameLine();
+                        // }
 
+                        const int cols = 5;
+                        for (int i = 0; i < num_cameras; ++i) {     
+                            std::string label = cameras_params[i].camera_name + ": " + std::to_string(cameras_select[i].pictures_counter) + "##calibration_save";
+                            if (ImGui::Selectable(label.c_str(), cameras_select[i].selected_to_save,
+                                                  ImGuiSelectableFlags_None,
+                                                  ImVec2(150, 50))) {
+                                cameras_select[i].selected_to_save = !cameras_select[i].selected_to_save;
+                            }
+
+                            // Keep items on the same line until end of row
+                            if ((i + 1) % cols != 0)
+                                ImGui::SameLine();
                         }
+
 
                         if (!save_image_all_ready) {
                             ImGui::BeginDisabled();
                         }
 
+                        ImGui::NewLine();
                         if (ImGui::Button("Save selected")) {
                             make_folder(picture_save_folder);
                             std::string frame_save_name = get_current_time_milliseconds();
@@ -668,6 +684,7 @@ int main(int argc, char **args) {
                                 }
                             }
                         }
+                        ImGui::SameLine();
 
                         if (ImGui::Button("Save pictures all")) {
                             make_folder(picture_save_folder);
@@ -686,16 +703,24 @@ int main(int argc, char **args) {
 
                         ImGui::BeginDisabled(calib_state!=CalibPoseReached);
                         if (ImGui::Button("Calib save all")) {
-                            make_folder(picture_save_folder);
-                            std::string frame_save_name = get_current_time_milliseconds();
+                            make_folder(calib_save_folder);
                             for (int i = 0; i < num_cameras; i++) {
-                                cameras_select[i].frame_save_name = frame_save_name;
-                                cameras_select[i].picture_save_folder = picture_save_folder;
+                                cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);
+                                cameras_select[i].picture_save_folder = calib_save_folder;
                                 cameras_select[i].frame_save_state = State_Write_New_Frame;
                             }
                             calib_state = CalibSavePictures;
                         }
                         ImGui::EndDisabled();
+
+                        if (ImGui::Button("Calib save global images")) {
+                            make_folder(calib_save_folder);
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);
+                                cameras_select[i].picture_save_folder = calib_save_folder;
+                                cameras_select[i].frame_save_state = State_Write_New_Frame;
+                            }
+                        }
                         
                         if (!save_image_all_ready) {
                             ImGui::EndDisabled();

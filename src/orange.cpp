@@ -54,6 +54,7 @@ int main(int argc, char **args) {
     std::vector<std::thread> camera_threads;
     GL_Texture *tex;
     int num_cameras = 0;
+    int stream_downsample = 1;
 
     CameraControl *camera_control = new CameraControl{false, false, false, false};
 
@@ -61,7 +62,6 @@ int main(int argc, char **args) {
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
 
     EncoderConfig *encoder_config = new EncoderConfig{
-        "-codec h264 -preset p1 -fps ",
         "h264",
         "p1"
     };
@@ -189,8 +189,21 @@ int main(int argc, char **args) {
 
             for (int i = 0; i < network_config_folders.size(); i++) {
                 std::vector<std::string> folder_token = string_split(network_config_folders[i], "/");
-                sprintf(temp_string, folder_token.back().c_str());
+                const std::string& label = folder_token.back();
+            
+                // Highlight "rig_new" in purple
+                if (label == "rig_new") {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.0f, 1.0f));  
+                }
+            
+                // Safely copy to temp_string
+                snprintf(temp_string, sizeof(temp_string), "%s", label.c_str());
                 ImGui::RadioButton(temp_string, &network_config_select, i);
+            
+                if (label == "rig_new") {
+                    ImGui::PopStyleColor();
+                }
+            
                 if (i != network_config_folders.size() - 1)
                     ImGui::SameLine();
             }
@@ -279,13 +292,7 @@ int main(int argc, char **args) {
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
                         if (cameras_select[i].stream_on) {
-                            cudaStreamCreate(&tex[i].streams);
-                            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                            register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
-                                                       &tex[i].cuda_resource);
-                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                            setup_texture(tex[i], cameras_params[i].width, cameras_params[i].height);
                         }
                     }
 
@@ -362,25 +369,8 @@ int main(int argc, char **args) {
             ptp_params->network_set_stop_ptp = false;
 
             for (int i = 0; i < num_cameras; i++) {
-                int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
-                cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-            }
-
-            for (int i = 0; i < num_cameras; i++) {
-                bind_pbo(&tex[i].pbo);
-                bind_texture(&tex[i].texture);
-                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                // Needs no arguments because texture and PBO are bound
-                unbind_pbo();
-                unbind_texture();
-            }
-
-            for (int i = 0; i < num_cameras; i++) {
                 if (cameras_select[i].stream_on) {
-                    gx_delete_buffer(&tex[i].pbo);
-                    unmap_cuda_resource(&tex[i].cuda_resource);
-                    cuda_unregister_pbo(tex[i].cuda_resource);
-                    cudaStreamDestroy(tex[i].streams);
+                    clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
                 }
             }
             delete[] tex;
@@ -502,16 +492,30 @@ int main(int argc, char **args) {
 
             {
                 const char *items[] = {"h264", "hevc"};
-                static int item_current = 0;
-                ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_config->encoder_codec = items[item_current];
+                static int codec_current = 0;
+                if (ImGui::Combo("codec", &codec_current, items, IM_ARRAYSIZE(items))) {
+                    encoder_config->encoder_codec = items[codec_current];
+                }
             } 
             {
                 const char *items[] = {"p1", "p3", "p5", "p7"};
-                static int item_current = 0;
-                ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_config->encoder_preset = items[item_current];
+                static int preset_current = 0;
+                if (ImGui::Combo("preset", &preset_current, items, IM_ARRAYSIZE(items))) {
+                    encoder_config->encoder_preset = items[preset_current];
+                }
             }
+
+            {
+                const char *items[] = {"1", "2", "4", "8"};
+                static const int item_numbers[] = {1, 2, 4, 8};
+                static int downsample_current = 0;
+                if(ImGui::Combo("stream downsample", &downsample_current, items, IM_ARRAYSIZE(items))) {
+                    for (int i = 0; i < num_cameras; i++) {
+                        cameras_select[i].downsample = item_numbers[downsample_current];
+                    }
+                }
+            }
+
 
             if (camera_control->record_video) {
                 ImGui::EndDisabled();
@@ -885,13 +889,7 @@ int main(int argc, char **args) {
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                cudaStreamCreate(&tex[i].streams);
-                                create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                                register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                                map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
-                                                           &tex[i].cuda_resource);
-                                create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                setup_texture(tex[i], cameras_params[i].width, cameras_params[i].height);
                             }
                         }
 
@@ -902,26 +900,8 @@ int main(int argc, char **args) {
                                                &indigo_signal_builder, yolo_model);
                     } else {
                         for (int i = 0; i < num_cameras; i++) {
-                            int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) *
-                                           4;
-                            cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
-                            bind_pbo(&tex[i].pbo);
-                            bind_texture(&tex[i].texture);
-                            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                            // Needs no arguments because texture and PBO are bound
-                            unbind_pbo();
-                            unbind_texture();
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                gx_delete_buffer(&tex[i].pbo);
-                                unmap_cuda_resource(&tex[i].cuda_resource);
-                                cuda_unregister_pbo(tex[i].cuda_resource);
-                                cudaStreamDestroy(tex[i].streams);
+                                clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
                             }
                         }
                         delete[] tex;
@@ -945,32 +925,12 @@ int main(int argc, char **args) {
                     if (camera_control->stop_record) {
                         if (camera_control->subscribe) {
                             camera_control->subscribe = false;
-                            // already streaming, turn the camera off
-                            for (int i = 0; i < num_cameras; i++) {
-                                int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned
-                                                   char) * 4;
-                                cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-                            }
-
-                            for (int i = 0; i < num_cameras; i++) {
-                                bind_pbo(&tex[i].pbo);
-                                bind_texture(&tex[i].texture);
-                                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                                // Needs no arguments because texture and PBO are bound
-                                unbind_pbo();
-                                unbind_texture();
-                            }
-
                             for (int i = 0; i < num_cameras; i++) {
                                 if (cameras_select[i].stream_on) {
-                                    gx_delete_buffer(&tex[i].pbo);
-                                    unmap_cuda_resource(&tex[i].cuda_resource);
-                                    cuda_unregister_pbo(tex[i].cuda_resource);
-                                    cudaStreamDestroy(tex[i].streams);
+                                    clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
                                 }
                             }
                             delete[] tex;
-
                             stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
                                                   num_cameras,
                                                   evt_buffer_size, ptp_params);
@@ -990,13 +950,7 @@ int main(int argc, char **args) {
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                cudaStreamCreate(&tex[i].streams);
-                                create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                                register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                                map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
-                                                           &tex[i].cuda_resource);
-                                create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                setup_texture(tex[i], cameras_params[i].width, cameras_params[i].height);
                             }
                         }
 
@@ -1011,26 +965,8 @@ int main(int argc, char **args) {
                         ptp_stream_sync = false;
 
                         for (int i = 0; i < num_cameras; i++) {
-                            int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) *
-                                           4;
-                            cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
-                            bind_pbo(&tex[i].pbo);
-                            bind_texture(&tex[i].texture);
-                            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                            // Needs no arguments because texture and PBO are bound
-                            unbind_pbo();
-                            unbind_texture();
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                gx_delete_buffer(&tex[i].pbo);
-                                unmap_cuda_resource(&tex[i].cuda_resource);
-                                cuda_unregister_pbo(tex[i].cuda_resource);
-                                cudaStreamDestroy(tex[i].streams);
+                                clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
                             }
                         }
                         delete[] tex;
@@ -1050,12 +986,7 @@ int main(int argc, char **args) {
         if (camera_control->subscribe) {
             for (int i = 0; i < num_cameras; i++) {
                 if (cameras_select[i].stream_on) {
-                    bind_pbo(&tex[i].pbo);
-                    bind_texture(&tex[i].texture);
-                    upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                    // Needs no arguments because texture and PBO are bound
-                    unbind_pbo();
-                    unbind_texture();
+                    upload_texture_from_pbo(tex[i], cameras_params[i].width, cameras_params[i].height);
                 }
             }
 

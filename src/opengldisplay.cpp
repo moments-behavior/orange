@@ -1,3 +1,4 @@
+
 #if defined(__GNUC__)
 #include <unistd.h>
 #endif
@@ -6,10 +7,30 @@
 #include "kernel.cuh"
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
+#include "global.h"
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
     : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)
 {
+    input_image_size.width = camera_params->width;
+    input_image_size.height = camera_params->height;
+    input_image_roi.x = 0;
+    input_image_roi.y = 0;
+    input_image_roi.width = camera_params->width;
+    input_image_roi.height = camera_params->height;
+
+    output_image_size.width = int(camera_params->width / camera_select->downsample);
+    output_image_size.height = int(camera_params->height / camera_select->downsample);
+
+    output_image_roi.x = 0;
+    output_image_roi.y = 0;
+    output_image_roi.width = output_image_size.width;
+    output_image_roi.height = output_image_size.height;
+
+    if (camera_select->downsample != 1) {
+        cudaMalloc((void **)&d_resize, output_image_size.width * output_image_size.height * 4);
+    }
+
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
     for (int i = 0; i < workerEntriesFreeQueueCount; i++)
@@ -47,9 +68,17 @@ void COpenGLDisplay::ThreadRunning()
 
     std::vector<Object> objs;
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
- 
+    
+    using clock = std::chrono::steady_clock;
+    const int targetFPS = 60;
+    const std::chrono::duration<double, std::milli> targetFrameDuration(1000.0 / targetFPS);
+
+    int frameCount = 0;
+    auto lastFPSUpdate = clock::now();
+
     while(IsMachineOn())
     {
+        auto frameStart = clock::now();
         void* f = GetObjectFromQueueIn();
         if(f) {
             WORKER_ENTRY entry = *(WORKER_ENTRY*)f;
@@ -91,26 +120,67 @@ void COpenGLDisplay::ThreadRunning()
                 gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream, 4);
             }
 
-            // probably reduandant copy
-            ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
 
-            if (camera_select->frame_save_state==State_Write_New_Frame) {
-                // yolo code goes here
-                rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
-                
-                // copy frame back to cpu, and then save
-                cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
-                cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
-                
-                std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
-                std::cout << image_name << std::endl;
-                cv::imwrite(image_name, view);
-                camera_select->pictures_counter++;
-                camera_select->frame_save_state = State_Frame_Idle;
-            }          
+            if (camera_select->downsample != 1) {
+                const NppStatus npp_result = nppiResize_8u_C4R(debayer.d_debayer, 
+                    camera_params->width * sizeof(uchar4), 
+                    input_image_size, 
+                    input_image_roi, 
+                    (Npp8u*)d_resize,
+                    output_image_size.width * sizeof(uchar4),
+                    output_image_size,
+                    output_image_roi,
+                    NPPI_INTER_SUPER);
+                if (npp_result != NPP_SUCCESS) {
+                    std::cerr << "Error executing resize in display -- code: " << npp_result << std::endl;
+                }
+                ck(cudaMemcpy2D(display_buffer,
+                    output_image_size.width * 4,
+                    d_resize,
+                    output_image_size.width * 4,
+                    output_image_size.width * 4,
+                    output_image_size.height,
+                    cudaMemcpyDeviceToDevice));
+ 
+            } else {
+               ck(cudaMemcpy2D(display_buffer,
+                output_image_size.width * 4,
+                debayer.d_debayer,
+                output_image_size.width * 4,
+                output_image_size.width * 4,
+                output_image_size.height,
+                cudaMemcpyDeviceToDevice));
+            }
+            cudaDeviceSynchronize();
 
+            // if (camera_select->frame_save_state==State_Write_New_Frame) {
+            //     rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
+                
+            //     // copy frame back to cpu, and then save
+            //     cudaMemcpy2D(frame_cpu.frame, camera_params->width*3, d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
+            //     cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
+                
+            //     std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
+            //     std::cout << image_name << std::endl;
+            //     cv::imwrite(image_name, view);
+            //     camera_select->pictures_counter++;
+            //     camera_select->frame_save_state = State_Frame_Idle;
+            // }          
         }
-        usleep(16000); // sleep for 16ms 
+        // Count frame for FPS
+        frameCount++;
+        auto now = clock::now();
+        std::chrono::duration<double> timeSinceLastFPSUpdate = now - lastFPSUpdate;
+        if (timeSinceLastFPSUpdate.count() >= 1.0) {
+            streaming_fps.store(frameCount / timeSinceLastFPSUpdate.count());
+            frameCount = 0;
+            lastFPSUpdate = now;
+        }
+        // Frame duration (GPU time included)
+        std::chrono::duration<double, std::milli> frameDuration = now - frameStart;
+        if (frameDuration < targetFrameDuration) {
+            std::this_thread::sleep_for(targetFrameDuration - frameDuration);
+        }
     }
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);

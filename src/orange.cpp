@@ -54,6 +54,7 @@ int main(int argc, char **args) {
     std::vector<std::thread> camera_threads;
     GL_Texture *tex;
     int num_cameras = 0;
+    int stream_downsample = 1;
 
     CameraControl *camera_control = new CameraControl{false, false, false, false};
 
@@ -61,7 +62,6 @@ int main(int argc, char **args) {
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
 
     EncoderConfig *encoder_config = new EncoderConfig{
-        "-codec h264 -preset p1 -fps ",
         "h264",
         "p1"
     };
@@ -100,6 +100,7 @@ int main(int argc, char **args) {
         local_config_folders.push_back(entry.path().string());
     }
     std::string picture_save_folder = orange_root_dir_str + "/pictures/" + get_current_date();
+    std::string calib_save_folder = orange_root_dir_str + "/exp/calibration/" + get_current_date();
 
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -113,7 +114,7 @@ int main(int argc, char **args) {
     std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder,
                                           &quite_enet);
     std::vector<std::string> color_temps = { "CT_Off", "CT_2800K", "CT_3000K", "CT_4000K", "CT_5000K", "CT_6500K", "CT_Custom"};
-
+    
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
         if (ImGui::Begin("Network")) {
@@ -133,7 +134,7 @@ int main(int argc, char **args) {
                 ImGui::Text("%s", temp_string);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::Text("Calibraton");
+                ImGui::Text("Calibration");
                 ImGui::TableNextColumn();
                 if (indigo_signal_builder.indigo_connection != nullptr) {
                     ImGui::Text("%s", enum_names_calib_state()[calib_state]);
@@ -188,8 +189,21 @@ int main(int argc, char **args) {
 
             for (int i = 0; i < network_config_folders.size(); i++) {
                 std::vector<std::string> folder_token = string_split(network_config_folders[i], "/");
-                sprintf(temp_string, folder_token.back().c_str());
+                const std::string& label = folder_token.back();
+            
+                // Highlight "rig_new" in purple
+                if (label == "rig_new") {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.0f, 1.0f));  
+                }
+            
+                // Safely copy to temp_string
+                snprintf(temp_string, sizeof(temp_string), "%s", label.c_str());
                 ImGui::RadioButton(temp_string, &network_config_select, i);
+            
+                if (label == "rig_new") {
+                    ImGui::PopStyleColor();
+                }
+            
                 if (i != network_config_folders.size() - 1)
                     ImGui::SameLine();
             }
@@ -246,6 +260,19 @@ int main(int argc, char **args) {
                     camera_control->open = true;
                 }
                 ImGui::PopStyleColor(1);
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
+                if (ImGui::Button("Save to")) {
+                    IGFD::FileDialogConfig config;
+                    config.countSelectionMax = 1;
+                    config.path = input_folder;
+                    ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir", "Choose a Directory", nullptr, config);
+                }
+                ImGui::PopStyleColor(1);
+                ImGui::SameLine();
+                ImGui::SetWindowFontScale(1.5f); // 1.0 is default
+                ImGui::Text("%s", input_folder.c_str());
+                ImGui::SetWindowFontScale(1.0f); // Reset to normal
             }
 
             if (!camera_control->subscribe && my_servers[0].server_state == FetchGame::ManagerState_WAITTHREAD &&
@@ -265,13 +292,9 @@ int main(int argc, char **args) {
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
                         if (cameras_select[i].stream_on) {
-                            cudaStreamCreate(&tex[i].streams);
-                            create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                            register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                            map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                            cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
-                                                       &tex[i].cuda_resource);
-                            create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                            int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                            int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                            setup_texture(tex[i], camera_width, camera_height);
                         }
                     }
 
@@ -348,25 +371,10 @@ int main(int argc, char **args) {
             ptp_params->network_set_stop_ptp = false;
 
             for (int i = 0; i < num_cameras; i++) {
-                int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) * 4;
-                cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-            }
-
-            for (int i = 0; i < num_cameras; i++) {
-                bind_pbo(&tex[i].pbo);
-                bind_texture(&tex[i].texture);
-                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                // Needs no arguments because texture and PBO are bound
-                unbind_pbo();
-                unbind_texture();
-            }
-
-            for (int i = 0; i < num_cameras; i++) {
                 if (cameras_select[i].stream_on) {
-                    gx_delete_buffer(&tex[i].pbo);
-                    unmap_cuda_resource(&tex[i].cuda_resource);
-                    cuda_unregister_pbo(tex[i].cuda_resource);
-                    cudaStreamDestroy(tex[i].streams);
+                    int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                    int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                    clear_upload_and_cleanup(tex[i], camera_width, camera_height);
                 }
             }
             delete[] tex;
@@ -475,24 +483,43 @@ int main(int argc, char **args) {
                 ImGui::BeginDisabled();
             }
 
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
             if (ImGui::Button("Save to")) {
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
                 config.path = input_folder;
                 ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir", "Choose a Directory", nullptr, config);
             }
+            ImGui::PopStyleColor(1); 
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4{1.0, 0.0f, 1.0f, 1.0f}, "%s", input_folder.c_str()); {
+            ImGui::Text("%s", input_folder.c_str()); 
+
+            {
                 const char *items[] = {"h264", "hevc"};
-                static int item_current = 0;
-                ImGui::Combo("codec", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_config->encoder_codec = items[item_current];
-            } {
+                static int codec_current = 0;
+                if (ImGui::Combo("codec", &codec_current, items, IM_ARRAYSIZE(items))) {
+                    encoder_config->encoder_codec = items[codec_current];
+                }
+            } 
+            {
                 const char *items[] = {"p1", "p3", "p5", "p7"};
-                static int item_current = 0;
-                ImGui::Combo("preset", &item_current, items, IM_ARRAYSIZE(items));
-                encoder_config->encoder_preset = items[item_current];
+                static int preset_current = 0;
+                if (ImGui::Combo("preset", &preset_current, items, IM_ARRAYSIZE(items))) {
+                    encoder_config->encoder_preset = items[preset_current];
+                }
             }
+
+            {
+                const char *items[] = {"1", "2", "4", "8"};
+                static const int item_numbers[] = {1, 2, 4, 8};
+                static int downsample_current = 0;
+                if(ImGui::Combo("stream downsample", &downsample_current, items, IM_ARRAYSIZE(items))) {
+                    for (int i = 0; i < num_cameras; i++) {
+                        cameras_select[i].downsample = item_numbers[downsample_current];
+                    }
+                }
+            }
+
 
             if (camera_control->record_video) {
                 ImGui::EndDisabled();
@@ -617,31 +644,43 @@ int main(int argc, char **args) {
                         cameras_select[i].frame_save_format = std::string(picture_format_items[current_picture_format]);
                     }
 
-                    if (ImGui::TreeNode("Save pictures from streaming cameras")) {
+                    if (ImGui::TreeNode("Save pictures from capturing")) {
                         save_image_all_ready = true;
                         for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].stream_on) {
-                                if (cameras_select[i].frame_save_state != State_Frame_Idle) {
-                                    save_image_all_ready = false;
-                                    break;
-                                }
-                            }
+                            if (cameras_select[i].frame_save_state != State_Frame_Idle) {
+                                save_image_all_ready = false;
+                                break;
+                            }  
                         }
 
-                        for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].stream_on) {
-                                ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
-                                                &cameras_select[i].selected_to_save);
-                                ImGui::SameLine();
-                                ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "%d", cameras_select[i].pictures_counter);
-                                ImGui::SameLine();
+                        // for (int i = 0; i < num_cameras; i++) {
+                        //     ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
+                        //                     &cameras_select[i].selected_to_save);
+                        //     ImGui::SameLine();
+                        //     ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "%d", cameras_select[i].pictures_counter);
+                        //     ImGui::SameLine();
+                        // }
+
+                        const int cols = 5;
+                        for (int i = 0; i < num_cameras; ++i) {     
+                            std::string label = cameras_params[i].camera_name + ": " + std::to_string(cameras_select[i].pictures_counter) + "##calibration_save";
+                            if (ImGui::Selectable(label.c_str(), cameras_select[i].selected_to_save,
+                                                  ImGuiSelectableFlags_None,
+                                                  ImVec2(150, 50))) {
+                                cameras_select[i].selected_to_save = !cameras_select[i].selected_to_save;
                             }
+
+                            // Keep items on the same line until end of row
+                            if ((i + 1) % cols != 0)
+                                ImGui::SameLine();
                         }
+
 
                         if (!save_image_all_ready) {
                             ImGui::BeginDisabled();
                         }
 
+                        ImGui::NewLine();
                         if (ImGui::Button("Save selected")) {
                             make_folder(picture_save_folder);
                             std::string frame_save_name = get_current_time_milliseconds();
@@ -653,6 +692,7 @@ int main(int argc, char **args) {
                                 }
                             }
                         }
+                        ImGui::SameLine();
 
                         if (ImGui::Button("Save pictures all")) {
                             make_folder(picture_save_folder);
@@ -660,31 +700,36 @@ int main(int argc, char **args) {
                             for (int i = 0; i < num_cameras; i++) {
                                 cameras_select[i].frame_save_name = frame_save_name;
                                 cameras_select[i].picture_save_folder = picture_save_folder;
-                                if (cameras_select[i].stream_on) {
-                                    cameras_select[i].frame_save_state = State_Write_New_Frame;
-                                }
+                                cameras_select[i].frame_save_state = State_Write_New_Frame;
                             }
                         }
 
-
-                        if (calib_state == CalibPoseReached) {
-                            if (ImGui::Button("Calib save all")) {
-                                make_folder(picture_save_folder);
-                                std::string frame_save_name = get_current_time_milliseconds();
-                                for (int i = 0; i < num_cameras; i++) {
-                                    cameras_select[i].frame_save_name = frame_save_name;
-                                    cameras_select[i].picture_save_folder = picture_save_folder;
-                                    if (cameras_select[i].stream_on) {
-                                        cameras_select[i].frame_save_state = State_Write_New_Frame;
-                                    }
-                                }
-                                calib_state = CalibSavePictures;
-                            }
-                        } else if (calib_state == CalibSavePictures) {
+                        if (calib_state == CalibSavePictures) {
                             send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
                             calib_state = CalibNextPose;
                         }
 
+                        ImGui::BeginDisabled(calib_state!=CalibPoseReached);
+                        if (ImGui::Button("Calib save all")) {
+                            make_folder(calib_save_folder);
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);
+                                cameras_select[i].picture_save_folder = calib_save_folder;
+                                cameras_select[i].frame_save_state = State_Write_New_Frame;
+                            }
+                            calib_state = CalibSavePictures;
+                        }
+                        ImGui::EndDisabled();
+
+                        if (ImGui::Button("Calib save global images")) {
+                            make_folder(calib_save_folder);
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);
+                                cameras_select[i].picture_save_folder = calib_save_folder;
+                                cameras_select[i].frame_save_state = State_Write_New_Frame;
+                            }
+                        }
+                        
                         if (!save_image_all_ready) {
                             ImGui::EndDisabled();
                         }
@@ -848,13 +893,9 @@ int main(int argc, char **args) {
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                cudaStreamCreate(&tex[i].streams);
-                                create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                                register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                                map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
-                                                           &tex[i].cuda_resource);
-                                create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                setup_texture(tex[i], camera_width, camera_height);                            
                             }
                         }
 
@@ -865,26 +906,10 @@ int main(int argc, char **args) {
                                                &indigo_signal_builder, yolo_model);
                     } else {
                         for (int i = 0; i < num_cameras; i++) {
-                            int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) *
-                                           4;
-                            cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
-                            bind_pbo(&tex[i].pbo);
-                            bind_texture(&tex[i].texture);
-                            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                            // Needs no arguments because texture and PBO are bound
-                            unbind_pbo();
-                            unbind_texture();
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                gx_delete_buffer(&tex[i].pbo);
-                                unmap_cuda_resource(&tex[i].cuda_resource);
-                                cuda_unregister_pbo(tex[i].cuda_resource);
-                                cudaStreamDestroy(tex[i].streams);
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                clear_upload_and_cleanup(tex[i], camera_width, camera_height);
                             }
                         }
                         delete[] tex;
@@ -908,32 +933,13 @@ int main(int argc, char **args) {
                     if (camera_control->stop_record) {
                         if (camera_control->subscribe) {
                             camera_control->subscribe = false;
-                            // already streaming, turn the camera off
-                            for (int i = 0; i < num_cameras; i++) {
-                                int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned
-                                                   char) * 4;
-                                cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-                            }
-
-                            for (int i = 0; i < num_cameras; i++) {
-                                bind_pbo(&tex[i].pbo);
-                                bind_texture(&tex[i].texture);
-                                upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                                // Needs no arguments because texture and PBO are bound
-                                unbind_pbo();
-                                unbind_texture();
-                            }
-
                             for (int i = 0; i < num_cameras; i++) {
                                 if (cameras_select[i].stream_on) {
-                                    gx_delete_buffer(&tex[i].pbo);
-                                    unmap_cuda_resource(&tex[i].cuda_resource);
-                                    cuda_unregister_pbo(tex[i].cuda_resource);
-                                    cudaStreamDestroy(tex[i].streams);
-                                }
+                                    int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                    int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                    clear_upload_and_cleanup(tex[i], camera_width, camera_height);                                }
                             }
                             delete[] tex;
-
                             stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
                                                   num_cameras,
                                                   evt_buffer_size, ptp_params);
@@ -953,13 +959,9 @@ int main(int argc, char **args) {
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                cudaStreamCreate(&tex[i].streams);
-                                create_pbo(&tex[i].pbo, cameras_params[i].width, cameras_params[i].height);
-                                register_pbo_to_cuda(&tex[i].pbo, &tex[i].cuda_resource);
-                                map_cuda_resource(&tex[i].cuda_resource, tex[i].streams);
-                                cuda_pointer_from_resource(&tex[i].cuda_buffer, &tex[i].cuda_pbo_storage_buffer_size,
-                                                           &tex[i].cuda_resource);
-                                create_texture(&tex[i].texture, cameras_params[i].width, cameras_params[i].height);
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                setup_texture(tex[i], camera_width, camera_height);                            
                             }
                         }
 
@@ -974,27 +976,10 @@ int main(int argc, char **args) {
                         ptp_stream_sync = false;
 
                         for (int i = 0; i < num_cameras; i++) {
-                            int size_pic = cameras_params[i].width * cameras_params[i].height * sizeof(unsigned char) *
-                                           4;
-                            cudaMemset(tex[i].cuda_buffer, 0, size_pic);
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
-                            bind_pbo(&tex[i].pbo);
-                            bind_texture(&tex[i].texture);
-                            upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                            // Needs no arguments because texture and PBO are bound
-                            unbind_pbo();
-                            unbind_texture();
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                gx_delete_buffer(&tex[i].pbo);
-                                unmap_cuda_resource(&tex[i].cuda_resource);
-                                cuda_unregister_pbo(tex[i].cuda_resource);
-                                cudaStreamDestroy(tex[i].streams);
-                            }
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                clear_upload_and_cleanup(tex[i], camera_width, camera_height);                            }
                         }
                         delete[] tex;
 
@@ -1013,12 +998,9 @@ int main(int argc, char **args) {
         if (camera_control->subscribe) {
             for (int i = 0; i < num_cameras; i++) {
                 if (cameras_select[i].stream_on) {
-                    bind_pbo(&tex[i].pbo);
-                    bind_texture(&tex[i].texture);
-                    upload_image_pbo_to_texture(cameras_params[i].width, cameras_params[i].height);
-                    // Needs no arguments because texture and PBO are bound
-                    unbind_pbo();
-                    unbind_texture();
+                    int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                    int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                    upload_texture_from_pbo(tex[i], camera_width, camera_height);
                 }
             }
 
@@ -1033,7 +1015,13 @@ int main(int argc, char **args) {
                     std::string window_name = cameras_params[i].camera_name;
                     ImGui::Begin(window_name.c_str());
                     if (camera_control->record_video) {
-                        ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, "Elapsed Time: %s", elapsed_time.c_str());
+                        ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, "Elapsed Time: %s, ", elapsed_time.c_str());
+                        ImGui::SameLine();
+                        ImGui::Text("FPS: %.1f", streaming_fps.load());                    
+                    } else {
+                        ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "NOT RECORDING, ");
+                        ImGui::SameLine();
+                        ImGui::Text("FPS: %.1f", streaming_fps.load());    
                     }
 
                     ImVec2 avail_size = ImGui::GetContentRegionAvail();

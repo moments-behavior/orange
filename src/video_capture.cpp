@@ -1,4 +1,6 @@
 #include "video_capture.h"
+#include <chrono>
+#include "global.h"
 
 void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff)
 {
@@ -86,5 +88,5 @@ void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam)
 
     } while (ptp_state->ptp_time <= ptp_state->ptp_time_plus_delta_to_start);
     // Countdown done.
-    printf("\n");
+    try_start_timer();
 }

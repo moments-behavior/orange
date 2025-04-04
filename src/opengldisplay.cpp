@@ -7,6 +7,7 @@
 #include "kernel.cuh"
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
+#include "global.h"
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
     : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)
@@ -67,9 +68,17 @@ void COpenGLDisplay::ThreadRunning()
 
     std::vector<Object> objs;
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
+    
+    using clock = std::chrono::steady_clock;
+    const int targetFPS = 60;
+    const std::chrono::duration<double, std::milli> targetFrameDuration(1000.0 / targetFPS);
+
+    int frameCount = 0;
+    auto lastFPSUpdate = clock::now();
 
     while(IsMachineOn())
     {
+        auto frameStart = clock::now();
         void* f = GetObjectFromQueueIn();
         if(f) {
             WORKER_ENTRY entry = *(WORKER_ENTRY*)f;
@@ -142,8 +151,7 @@ void COpenGLDisplay::ThreadRunning()
                 output_image_size.height,
                 cudaMemcpyDeviceToDevice));
             }
-
-
+            cudaDeviceSynchronize();
 
             // if (camera_select->frame_save_state==State_Write_New_Frame) {
             //     rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);
@@ -158,9 +166,21 @@ void COpenGLDisplay::ThreadRunning()
             //     camera_select->pictures_counter++;
             //     camera_select->frame_save_state = State_Frame_Idle;
             // }          
-
         }
-        usleep(16000); // sleep for 16ms 
+        // Count frame for FPS
+        frameCount++;
+        auto now = clock::now();
+        std::chrono::duration<double> timeSinceLastFPSUpdate = now - lastFPSUpdate;
+        if (timeSinceLastFPSUpdate.count() >= 1.0) {
+            streaming_fps.store(frameCount / timeSinceLastFPSUpdate.count());
+            frameCount = 0;
+            lastFPSUpdate = now;
+        }
+        // Frame duration (GPU time included)
+        std::chrono::duration<double, std::milli> frameDuration = now - frameStart;
+        if (frameDuration < targetFrameDuration) {
+            std::this_thread::sleep_for(targetFrameDuration - frameDuration);
+        }
     }
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);

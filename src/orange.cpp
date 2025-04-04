@@ -520,7 +520,16 @@ int main(int argc, char **args) {
                 }
             }
 
+            int fps_temp = streaming_target_fps.load(); // get the current atomic value
 
+            if (ImGui::InputInt("streaming fps", &fps_temp)) {
+                // Clamp if necessary
+                if (fps_temp < 1) fps_temp = 1;
+                if (fps_temp > 240) fps_temp = 240;
+                streaming_target_fps.store(fps_temp); // write it back safely
+            }
+            
+   
             if (camera_control->record_video) {
                 ImGui::EndDisabled();
             }

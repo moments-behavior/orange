@@ -5,6 +5,7 @@
 #include <mutex>
 
 extern std::atomic<double> streaming_fps;
+extern std::atomic<int> streaming_target_fps;
 // Calibration state enumeration
 enum CalibState {
     CalibIdle,

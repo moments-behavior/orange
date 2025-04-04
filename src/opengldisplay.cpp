@@ -70,8 +70,7 @@ void COpenGLDisplay::ThreadRunning()
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
     
     using clock = std::chrono::steady_clock;
-    const int targetFPS = 60;
-    const std::chrono::duration<double, std::milli> targetFrameDuration(1000.0 / targetFPS);
+   
 
     int frameCount = 0;
     auto lastFPSUpdate = clock::now();
@@ -79,6 +78,7 @@ void COpenGLDisplay::ThreadRunning()
     while(IsMachineOn())
     {
         auto frameStart = clock::now();
+        std::chrono::duration<double, std::milli> targetFrameDuration(1000.0 / streaming_target_fps.load());
         void* f = GetObjectFromQueueIn();
         if(f) {
             WORKER_ENTRY entry = *(WORKER_ENTRY*)f;

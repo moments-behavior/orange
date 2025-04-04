@@ -1,3 +1,4 @@
+
 #if defined(__GNUC__)
 #include <unistd.h>
 #endif
@@ -10,6 +11,25 @@
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
     : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)
 {
+    input_image_size.width = camera_params->width;
+    input_image_size.height = camera_params->height;
+    input_image_roi.x = 0;
+    input_image_roi.y = 0;
+    input_image_roi.width = camera_params->width;
+    input_image_roi.height = camera_params->height;
+
+    output_image_size.width = int(camera_params->width / camera_select->downsample);
+    output_image_size.height = int(camera_params->height / camera_select->downsample);
+
+    output_image_roi.x = 0;
+    output_image_roi.y = 0;
+    output_image_roi.width = output_image_size.width;
+    output_image_roi.height = output_image_size.height;
+
+    if (camera_select->downsample != 1) {
+        cudaMalloc((void **)&d_resize, output_image_size.width * output_image_size.height * 4);
+    }
+
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
     for (int i = 0; i < workerEntriesFreeQueueCount; i++)
@@ -47,7 +67,7 @@ void COpenGLDisplay::ThreadRunning()
 
     std::vector<Object> objs;
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
- 
+
     while(IsMachineOn())
     {
         void* f = GetObjectFromQueueIn();
@@ -91,8 +111,39 @@ void COpenGLDisplay::ThreadRunning()
                 gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream, 4);
             }
 
-            // probably reduandant copy
-            ck(cudaMemcpy2D(display_buffer, camera_params->width * 4, debayer.d_debayer, camera_params->width * 4, camera_params->width * 4, camera_params->height, cudaMemcpyDeviceToDevice));
+
+            if (camera_select->downsample != 1) {
+                const NppStatus npp_result = nppiResize_8u_C4R(debayer.d_debayer, 
+                    camera_params->width * sizeof(uchar4), 
+                    input_image_size, 
+                    input_image_roi, 
+                    (Npp8u*)d_resize,
+                    output_image_size.width * sizeof(uchar4),
+                    output_image_size,
+                    output_image_roi,
+                    NPPI_INTER_SUPER);
+                if (npp_result != NPP_SUCCESS) {
+                    std::cerr << "Error executing resize in display -- code: " << npp_result << std::endl;
+                }
+                ck(cudaMemcpy2D(display_buffer,
+                    output_image_size.width * 4,
+                    d_resize,
+                    output_image_size.width * 4,
+                    output_image_size.width * 4,
+                    output_image_size.height,
+                    cudaMemcpyDeviceToDevice));
+ 
+            } else {
+               ck(cudaMemcpy2D(display_buffer,
+                output_image_size.width * 4,
+                debayer.d_debayer,
+                output_image_size.width * 4,
+                output_image_size.width * 4,
+                output_image_size.height,
+                cudaMemcpyDeviceToDevice));
+            }
+
+
 
             // if (camera_select->frame_save_state==State_Write_New_Frame) {
             //     rgba2bgr_convert(d_convert, debayer.d_debayer, camera_params->width, camera_params->height, 0);

@@ -100,7 +100,7 @@ int main(int argc, char **args) {
         local_config_folders.push_back(entry.path().string());
     }
     std::string picture_save_folder = orange_root_dir_str + "/pictures/" + get_current_date();
-    std::string calib_save_folder = orange_root_dir_str + "/calibration/" + get_current_date();
+    std::string calib_save_folder = orange_root_dir_str + "/exp/calibration/" + get_current_date();
 
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -292,7 +292,9 @@ int main(int argc, char **args) {
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
                         if (cameras_select[i].stream_on) {
-                            setup_texture(tex[i], cameras_params[i].width, cameras_params[i].height);
+                            int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                            int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                            setup_texture(tex[i], camera_width, camera_height);
                         }
                     }
 
@@ -370,7 +372,9 @@ int main(int argc, char **args) {
 
             for (int i = 0; i < num_cameras; i++) {
                 if (cameras_select[i].stream_on) {
-                    clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
+                    int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                    int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                    clear_upload_and_cleanup(tex[i], camera_width, camera_height);
                 }
             }
             delete[] tex;
@@ -889,7 +893,9 @@ int main(int argc, char **args) {
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                setup_texture(tex[i], cameras_params[i].width, cameras_params[i].height);
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                setup_texture(tex[i], camera_width, camera_height);                            
                             }
                         }
 
@@ -901,7 +907,9 @@ int main(int argc, char **args) {
                     } else {
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                clear_upload_and_cleanup(tex[i], camera_width, camera_height);
                             }
                         }
                         delete[] tex;
@@ -927,8 +935,9 @@ int main(int argc, char **args) {
                             camera_control->subscribe = false;
                             for (int i = 0; i < num_cameras; i++) {
                                 if (cameras_select[i].stream_on) {
-                                    clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
-                                }
+                                    int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                    int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                    clear_upload_and_cleanup(tex[i], camera_width, camera_height);                                }
                             }
                             delete[] tex;
                             stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
@@ -950,7 +959,9 @@ int main(int argc, char **args) {
                         tex = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                setup_texture(tex[i], cameras_params[i].width, cameras_params[i].height);
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                setup_texture(tex[i], camera_width, camera_height);                            
                             }
                         }
 
@@ -966,8 +977,9 @@ int main(int argc, char **args) {
 
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
-                                clear_upload_and_cleanup(tex[i], cameras_params[i].width, cameras_params[i].height);
-                            }
+                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                                clear_upload_and_cleanup(tex[i], camera_width, camera_height);                            }
                         }
                         delete[] tex;
 
@@ -986,7 +998,9 @@ int main(int argc, char **args) {
         if (camera_control->subscribe) {
             for (int i = 0; i < num_cameras; i++) {
                 if (cameras_select[i].stream_on) {
-                    upload_texture_from_pbo(tex[i], cameras_params[i].width, cameras_params[i].height);
+                    int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
+                    int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
+                    upload_texture_from_pbo(tex[i], camera_width, camera_height);
                 }
             }
 

@@ -510,10 +510,10 @@ int main(int argc, char **args) {
             }
 
             {
-                const char *items[] = {"1", "2", "4", "8"};
-                static const int item_numbers[] = {1, 2, 4, 8};
+                const char *items[] = {"1", "2", "4", "8", "16"};
+                static const int item_numbers[] = {1, 2, 4, 8, 16};
                 static int downsample_current = 0;
-                if(ImGui::Combo("stream downsample", &downsample_current, items, IM_ARRAYSIZE(items))) {
+                if(ImGui::Combo("downsample streaming", &downsample_current, items, IM_ARRAYSIZE(items))) {
                     for (int i = 0; i < num_cameras; i++) {
                         cameras_select[i].downsample = item_numbers[downsample_current];
                     }

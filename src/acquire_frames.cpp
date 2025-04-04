@@ -225,6 +225,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"), camera_params->camera_serial.c_str());
+    try_stop_timer();
     double time_diff = w.Stop();
 
     if (camera_select->stream_on) {

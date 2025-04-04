@@ -41,6 +41,7 @@ set(ORANGE_CLIENT_SOURCES
     src/acquire_frames_headless.cpp
     src/threadworker.cpp
     src/gpu_video_encoder.cpp
+        src/global.cpp
     ${NVENCODER_SOURCES}
 )
 

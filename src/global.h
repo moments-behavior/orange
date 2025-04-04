@@ -6,6 +6,11 @@
 
 extern std::atomic<double> streaming_fps;
 extern std::atomic<int> streaming_target_fps;
+extern std::atomic<int64_t> record_start_time_ns;
+
+bool try_start_timer();
+bool try_stop_timer();
+
 // Calibration state enumeration
 enum CalibState {
     CalibIdle,

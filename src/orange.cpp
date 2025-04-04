@@ -1015,7 +1015,13 @@ int main(int argc, char **args) {
                     std::string window_name = cameras_params[i].camera_name;
                     ImGui::Begin(window_name.c_str());
                     if (camera_control->record_video) {
-                        ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, "Elapsed Time: %s", elapsed_time.c_str());
+                        ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, "Elapsed Time: %s, ", elapsed_time.c_str());
+                        ImGui::SameLine();
+                        ImGui::Text("FPS: %.1f", streaming_fps.load());                    
+                    } else {
+                        ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "NOT RECORDING, ");
+                        ImGui::SameLine();
+                        ImGui::Text("FPS: %.1f", streaming_fps.load());    
                     }
 
                     ImVec2 avail_size = ImGui::GetContentRegionAvail();

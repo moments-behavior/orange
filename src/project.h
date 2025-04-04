@@ -64,7 +64,7 @@ void prepare_application_folders(std::string orange_root_dir_str)
         }
     }
 
-    std::string calibration_str = orange_root_dir_str + "/calibration";
+    std::string calibration_str = orange_root_dir_str + "/exp/calibration";
     std::filesystem::path calibration_path(calibration_str);
     if (!std::filesystem::exists(calibration_path)) {
         if(std::filesystem::create_directory(calibration_path)) {

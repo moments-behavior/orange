@@ -164,7 +164,7 @@ void YOLOv8::preprocess_gpu(unsigned char* d_rgb)
     output_roi.width = padw;
     output_roi.height = padh;
 
-
+    //TODO: is input_w_int here correct
     const NppStatus npp_result = nppiResize_8u_C3R(d_rgb, 
                                             img_width * sizeof(uchar3), 
                                             img_size, 

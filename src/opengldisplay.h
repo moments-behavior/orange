@@ -2,6 +2,7 @@
 #include "threadworker.h"
 #include "image_processing.h"
 #include "yolov8_det.h"
+#include <nppi.h>
 
 #define WORK_ENTRIES_MAX 2
 
@@ -24,9 +25,13 @@ public:
 	unsigned char *d_convert;
     YOLOv8* yolov8;
 	FrameCPU frame_cpu;
-
+    NppiSize input_image_size;
+	NppiRect input_image_roi;
+    NppiSize output_image_size;
+	NppiRect output_image_roi;
 	float *d_points;
     unsigned int *d_skeleton;
+	unsigned int *d_resize;
 
 private: 
 	virtual void ThreadRunning(); // overides of COffThreadMachine for worker thread

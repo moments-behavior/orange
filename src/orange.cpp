@@ -708,13 +708,13 @@ int main(int argc, char **args) {
                             }
                         }
 
+                        //order important 
                         if (calib_state == CalibSavePictures) {
                             send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
                             calib_state = CalibNextPose;
                         }
 
-                        ImGui::BeginDisabled(calib_state!=CalibPoseReached);
-                        if (ImGui::Button("Calib save all")) {
+                        if (calib_state == CalibPoseReached) {
                             make_folder(calib_save_folder);
                             for (int i = 0; i < num_cameras; i++) {
                                 cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);
@@ -723,7 +723,6 @@ int main(int argc, char **args) {
                             }
                             calib_state = CalibSavePictures;
                         }
-                        ImGui::EndDisabled();
 
                         if (ImGui::Button("Calib save images use counter")) {
                             make_folder(calib_save_folder);

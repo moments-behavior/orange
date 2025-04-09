@@ -193,8 +193,7 @@ int main(int argc, char **args) {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.0f, 1.0f));  
                 }
             
-                // Safely copy to temp_string
-                snprintf(temp_string, sizeof(temp_string), "%s", label.c_str());
+                sprintf(temp_string, label.c_str());
                 ImGui::RadioButton(temp_string, &network_config_select, i);
             
                 if (label == "rig_new") {
@@ -724,7 +723,7 @@ int main(int argc, char **args) {
                             calib_state = CalibSavePictures;
                         }
 
-                        if (ImGui::Button("Calib save images use counter")) {
+                        if (ImGui::Button("Calib save images with counter")) {
                             make_folder(calib_save_folder);
                             for (int i = 0; i < num_cameras; i++) {
                                 cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);

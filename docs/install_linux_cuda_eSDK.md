@@ -162,7 +162,7 @@ here is the overview of the steps -- detailed instructions for each are in the s
   
       | property | value         |
       |----------|---------------|
-      |   MTU    |  3000         |
+      |   MTU    |  9000         |
       |   IPv4   |  Manual       |
       |  Address | 192.168.13.10 |
       |  Netmask | 255.255.255.0 |

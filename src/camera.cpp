@@ -133,6 +133,13 @@ void configure_factory_defaults(Emergent::CEmergentCamera *camera, CameraParams*
     // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Gain", 1000));
     // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Offset", 0));
 
+    
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Iris", 0), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Iris", 1), camera_params->camera_serial.c_str());
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Iris", 0), camera_params->camera_serial.c_str());
+
+    check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "Focus", 0), camera_params->camera_serial.c_str());
+
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "LUTEnable", false), camera_params->camera_serial.c_str());
     check_camera_errors(Emergent::EVT_CameraSetBoolParam(camera, "AutoGain", false), camera_params->camera_serial.c_str());
 }
@@ -166,6 +173,8 @@ void update_gain_value(Emergent::CEmergentCamera *camera, int gain_val, CameraPa
 
 void update_focus_value(Emergent::CEmergentCamera *camera, int focus_value, CameraParams *camera_params)
 {
+    EVT_CameraSetUInt32Param(camera, "Focus", focus_value+1);
+    usleep(50000);
     EVT_CameraGetUInt32ParamMax(camera, "Focus", &camera_params->focus_max);
     EVT_CameraGetUInt32ParamMin(camera, "Focus", &camera_params->focus_min);
     EVT_CameraGetUInt32ParamInc(camera, "Focus", &camera_params->focus_inc);
@@ -178,9 +187,12 @@ void update_focus_value(Emergent::CEmergentCamera *camera, int focus_value, Came
 
 void update_iris_value(Emergent::CEmergentCamera *camera, int iris_value, CameraParams *camera_params)
 {
+    EVT_CameraSetUInt32Param(camera, "Iris", iris_value+1);
+    usleep(50000);
     EVT_CameraGetUInt32ParamMax(camera, "Iris", &camera_params->iris_max);
     EVT_CameraGetUInt32ParamMin(camera, "Iris", &camera_params->iris_min);
     EVT_CameraGetUInt32ParamInc(camera, "Iris", &camera_params->iris_inc);
+    
     if (iris_value >= camera_params->iris_min && iris_value <= camera_params->iris_max)
     {
         EVT_CameraSetUInt32Param(camera, "Iris", iris_value);
@@ -316,6 +328,7 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
     check_camera_errors(EVT_CameraOpen(camera, device_info), camera_params->camera_serial.c_str());
 
     configure_factory_defaults(camera, camera_params);
+    
 
     unsigned int width_max, height_max;
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "Height", &height_max), camera_params->camera_serial.c_str());
@@ -352,7 +365,23 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera, GigEVisionDevice
     // printf("FrameRate Set to: \t%d\n", camera_params.frame_rate);
     update_frame_rate_value(camera, camera_params->frame_rate, camera_params);
     update_focus_value(camera, camera_params->focus, camera_params);
+
+    
+    // printf("Iris to be Set to: \t\t%d\n", camera_params->iris);
     update_iris_value(camera, camera_params->iris, camera_params);
+    // printf("Iris Set to: \t\t%d\n", camera_params->iris);
+
+    if (camera_params->camera_name == "710040")
+    {   
+        printf("710040 camera detected -- setting offsets\n");
+                                    
+        camera_params->offsetx = 512;
+        camera_params->offsety = 528;
+        update_offsetX_value(camera, camera_params->offsetx, camera_params);
+        update_offsetY_value(camera, camera_params->offsety, camera_params);
+        
+    }
+    
 }
 
 void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInfo *device_info, CameraParams *camera_params)

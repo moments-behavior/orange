@@ -276,6 +276,9 @@ int main(int argc, char **args) {
                             {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = false;                                
+                                cameras_params[i].offsetx = 512;
+                                cameras_params[i].offsety = 528;
+                                std::cout << "setting offset for 710040" << std::endl;
                             }
                         }
 
@@ -812,6 +815,10 @@ int main(int argc, char **args) {
 
                             if (cameras_params[i].camera_name == "710040") {
                                 cameras_select[i].stream_on = true;
+                                cameras_params[i].offsetx = 512;
+                                cameras_params[i].offsety = 528;
+                                std::cout << "setting offset for 710040" << std::endl;
+                                
                             }
 
                         }

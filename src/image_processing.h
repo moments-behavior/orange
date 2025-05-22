@@ -38,6 +38,14 @@ struct Debayer
     NppiBayerGridPosition grid;
 };
 
+struct FrameProcess
+{
+    FrameGPU frame_original;
+    Debayer debayer;
+    unsigned char *d_convert;
+    FrameCPU frame_cpu;
+};
+
 static inline void initialize_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
 {
     int size_pic = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);

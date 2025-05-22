@@ -5,14 +5,6 @@
 #include "kernel.cuh"
 #include <cuda_runtime_api.h>
 
-struct FrameProcess
-{
-    FrameGPU frame_original;
-    Debayer debayer;
-    unsigned char *d_convert;
-    FrameCPU frame_cpu;
-};
-
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state)
 {
 
@@ -37,7 +29,15 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
     ptp_state->frame_ts_prev = ptp_state->frame_ts;
 }
 
-static inline void get_one_frame(CameraState *camera_state, CameraEachSelect* camera_select, CameraControl *camera_control, CameraEmergent *ecam, CameraParams *camera_params, PTPState *ptp_state, COpenGLDisplay* openGLDisplay, GPUVideoEncoder* gpu_encoder, FrameProcess* frame_process)
+static inline void get_one_frame(CameraState *camera_state, 
+    CameraEachSelect* camera_select, 
+    CameraControl *camera_control, 
+    CameraEmergent *ecam, 
+    CameraParams *camera_params, 
+    PTPState *ptp_state, 
+    COpenGLDisplay* openGLDisplay, 
+    GPUVideoEncoder* gpu_encoder, 
+    FrameProcess* frame_process)
 {
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     
@@ -235,4 +235,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
         gpu_encoder->StopThread();
     }
     report_statistics(camera_params, &camera_state, time_diff);
+    cudaFree(frame_process.frame_original.d_orig);
+    cudaFree(frame_process.debayer.d_debayer);
+    free(frame_process.frame_cpu.frame);
 }

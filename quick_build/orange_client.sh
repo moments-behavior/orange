@@ -19,4 +19,6 @@ g++ -Ofast -ffast-math -std=c++17 $targets_folder/kernel.o \
     -lenet -I/usr/local/include/ \
     -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc \
     -I$HOME/nvidia/ffmpeg/build/include/ \
-    -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec
+    -L$HOME/nvidia/ffmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
+    -I/usr/local/include/opencv4 \
+    -lopencv_core -lopencv_imgcodecs -lopencv_imgproc

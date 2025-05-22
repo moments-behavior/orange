@@ -174,6 +174,10 @@ target_link_libraries(orange_client
     avutil
     avcodec
     m
+        opencv_sfm
+        opencv_core
+        opencv_imgcodecs
+        opencv_imgproc
 )
 
 

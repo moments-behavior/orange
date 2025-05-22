@@ -16,7 +16,7 @@ sudo make install
 
 3. Build OpenCV
 
-If you are also going to use `red`, the labeling tool, please intall with `cuDNN` first, and config OpenCV differently with `cuDNN`. 
+If you are also going to use [Red Labeling App](https://github.com/JohnsonLabJanelia/red), the labeling tool, please intall with `cuDNN` first, and config OpenCV differently with `cuDNN`. 
 
 #### Install cuDNN (depends on CUDA installation)
 - download the cudnn install files (we use `cudnn 8.9.3` with `driver 525.105.17` and `cuda 12.0` )

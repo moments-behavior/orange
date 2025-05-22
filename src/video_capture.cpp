@@ -87,6 +87,4 @@ void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam)
         }
 
     } while (ptp_state->ptp_time <= ptp_state->ptp_time_plus_delta_to_start);
-    // Countdown done.
-    try_start_timer();
 }

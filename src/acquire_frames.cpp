@@ -185,6 +185,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEac
     if (camera_control->sync_camera)
     {
         grab_frames_after_countdown(&ptp_state, ecam);
+        // Countdown done.
+        try_start_timer();
     }
     ptp_params->ptp_start_reached = true;
     w.Start();

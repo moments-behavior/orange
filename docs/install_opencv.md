@@ -18,7 +18,7 @@ sudo make install
 
 If you are also going to use `red`, the labeling tool, please intall with `cuDNN` first, and config OpenCV differently with `cuDNN`. 
 
-### Install cuDNN (depends on CUDA installation)
+#### Install cuDNN (depends on CUDA installation)
 - download the cudnn install files (we use `cudnn 8.9.3` with `driver 525.105.17` and `cuda 12.0` )
 - you may run the commands below for the exact version or download a TAR file for `cudnn-linux-x86_64-8.9.3.28_cuda12-archive.tar.xz` from the [cudnn version archives](https://developer.nvidia.com/rdp/cudnn-archive)
 - extract the file
@@ -42,7 +42,7 @@ If you are also going to use `red`, the labeling tool, please intall with `cuDNN
   #define CUDNN_VERSION (CUDNN_MAJOR * 1000 + CUDNN_MINOR * 100 + CUDNN_PATCHLEVEL)
   ```
 
-### Install OpenCV
+#### Install OpenCV
 - download and upzip `opencv-4.8.0.zip` and `opencv_contrib-4.8.0.zip`. Unzip the folders to `~/build/`, for instance. Note, if you are using cuda 12.2, please download opencv-4.10 instead.
 
 - to build OpenCV with opencv sfm, please follow instructions from: https://docs.opencv.org/4.x/db/db8/tutorial_sfm_installation.html first to install sfm dependency. Ceres solver is optional. If you wish to install ceres solver, a more detailed installation instruction can be found at: http://ceres-solver.org/installation.html#linux. At the time of test, one need to set CMake flag USE_CUDA=OFF for ceres.  
@@ -85,7 +85,7 @@ make -j $(nproc)
 sudo make install
 ```
 
-### Otherwise, you can simply do 
+#### Otherwise, you can simply do 
 
 ```
 cd opencv-4.8.0/ 
@@ -109,7 +109,7 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D INSTALL_PYTHON_EXAMPLES=OFF ..
 ```
 
-This instruction assumes the `opencv_contrib-4.8.0` is at `~/Build/opencv_contrib-4.8.0`. This will install OpenCV at `/usr/local`. 
+This instruction assumes the `opencv_contrib-4.8.0` is at `~/build/opencv_contrib-4.8.0`. This will install OpenCV at `/usr/local`. 
 
 ```
 make -j $(nproc)

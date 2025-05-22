@@ -93,6 +93,11 @@ YOLOv8::~YOLOv8()
     for (auto& ptr : this->host_ptrs) {
         CHECK(cudaFreeHost(ptr));
     }
+
+    CHECK(cudaFree(d_temp));
+    CHECK(cudaFree(d_boarder));
+    CHECK(cudaFree(d_float));
+    CHECK(cudaFree(d_planar));
 }
 
 void YOLOv8::make_pipe(bool warmup)

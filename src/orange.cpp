@@ -1058,9 +1058,9 @@ int main(int argc, char **args) {
                         ImGui::Begin(window_name.c_str());
                         ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "NOT RECORDING, ");
                         ImGui::SameLine();
-                        ImGui::Text("FPS: %.1f", streaming_fps.load());    
+                        ImGui::Text("FPS: %.1f", streaming_fps.load());
                         ImVec2 avail_size = ImGui::GetContentRegionAvail();
-    
+
                         static ImVec2 bmin(0, 0);
                         static ImVec2 uv0(0, 0);
                         static ImVec2 uv1(1, 1);
@@ -1082,8 +1082,6 @@ int main(int argc, char **args) {
                     }
                 }
             }
-
-
         }
 
         if (camera_control->open && show_realtime_plot) {

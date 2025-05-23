@@ -55,7 +55,7 @@ int main(int argc, char **args) {
     GL_Texture *tex;
     int num_cameras = 0;
     int stream_downsample = 1;
-    CameraControl *camera_control = new CameraControl{false, false, false, false};
+    CameraControl *camera_control = new CameraControl{false, false, false, false, false};
 
     int evt_buffer_size{100};
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
@@ -523,6 +523,7 @@ int main(int argc, char **args) {
                 streaming_target_fps.store(fps_temp); // write it back safely
             }
             
+            ImGui::Checkbox("calibration", &camera_control->trigger_mode);
    
             if (camera_control->record_video) {
                 ImGui::EndDisabled();
@@ -837,7 +838,6 @@ int main(int argc, char **args) {
 
                             }
                         }
-
                         
                         for (int i = 0; i < num_cameras; i++) {
                             cameras_select[i].stream_on = false;
@@ -856,12 +856,14 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             if (!skip_setting_params[i]) {
                                 open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
-                                                    &cameras_params[i]);                                
+                                                    &cameras_params[i]);
                             } else {
                                 update_camera_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
                                                     &cameras_params[i]);
                             }
-
+                            if (camera_control->trigger_mode) {
+                                camera_trigger_mode(&ecams[i].camera, &cameras_params[i]);
+                            }
                         }
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                         

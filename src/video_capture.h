@@ -18,6 +18,7 @@ struct CameraControl
     bool stop_record = false;
     bool record_video = false;
     bool sync_camera = false;
+    bool trigger_mode = false;
 };
 
 struct CameraEachSelect
@@ -74,4 +75,13 @@ void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, CameraParams *ca
 void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam);
 bool try_start_timer();
 bool try_stop_timer();
+void acquire_frames(CameraEmergent *ecam, 
+    CameraParams *camera_params, 
+    CameraEachSelect* camera_select, 
+    CameraControl* camera_control, 
+    unsigned char *display_buffer, 
+    std::string encoder_setup, 
+    std::string folder_name, 
+    PTPParams* ptp_params, 
+    INDIGOSignalBuilder* indigo_signal_builder);
 #endif

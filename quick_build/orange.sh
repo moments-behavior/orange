@@ -30,7 +30,7 @@ g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot_
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
 
 g++ -Ofast -ffast-math -std=c++17 $targets_folder/*.o \
-    -o $targets_folder/orange -I ./src/ src/orange.cpp src/network_base.cpp src/global.cpp src/FFmpegWriter.cpp src/camera.cpp src/video_capture.cpp src/acquire_frames.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
+    -o $targets_folder/orange -I ./src/ src/orange.cpp src/network_base.cpp src/global.cpp src/FFmpegWriter.cpp src/camera.cpp src/video_capture.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
     -I$DIR_IMGUI \
     -I$DIR_IMGUI_BACKEND \
     -I$DIR_IMPLOT \

@@ -38,10 +38,9 @@ set(ORANGE_CLIENT_SOURCES
     src/camera.cpp
     src/video_capture.cpp
     src/offthreadmachine.cpp
-    src/acquire_frames_headless.cpp
     src/threadworker.cpp
     src/gpu_video_encoder.cpp
-        src/global.cpp
+    src/global.cpp
     ${NVENCODER_SOURCES}
 )
 
@@ -174,12 +173,12 @@ target_link_libraries(orange_client
     avutil
     avcodec
     m
-        opencv_sfm
-        opencv_core
-        opencv_imgcodecs
-        opencv_imgproc
+    opencv_sfm
+    opencv_core
+    opencv_imgcodecs
+    opencv_imgproc
 )
-
+target_compile_definitions(orange_client PRIVATE HEADLESS)
 
 target_link_libraries(yolo_offline
     opencv_sfm

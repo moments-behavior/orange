@@ -1,6 +1,6 @@
-## Configure PTP 
+# Configure PTP 
 
-### Local PTP 
+## Local PTP 
 
 0. install Linux PTP package
 
@@ -39,7 +39,7 @@ sudo phc2sys -a -rr -m
 this will sync the computer time and consider it as a time source
 
 
-### Network PTP using switch 
+## Network PTP using switch 
 If you are using network switch, please enable PTP on all the ports connected to either the camera or host NICs. Here is an example of setting it with Arista and Mellanox (Onyx) switch.
 
 Once logged in: 

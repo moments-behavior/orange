@@ -4,7 +4,6 @@
 #include "camera.h"
 #include <math.h>
 #include <thread>
-#include "acquire_frames.h"
 
 struct EncoderConfig {
     std::string encoder_codec;

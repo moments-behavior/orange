@@ -522,9 +522,7 @@ int main(int argc, char **args) {
                 if (fps_temp > 240) fps_temp = 240;
                 streaming_target_fps.store(fps_temp); // write it back safely
             }
-            
-            ImGui::Checkbox("calibration", &camera_control->trigger_mode);
-   
+               
             if (camera_control->record_video) {
                 ImGui::EndDisabled();
             }
@@ -861,9 +859,6 @@ int main(int argc, char **args) {
                                 update_camera_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
                                                     &cameras_params[i]);
                             }
-                            if (camera_control->trigger_mode) {
-                                camera_trigger_mode(&ecams[i].camera, &cameras_params[i]);
-                            }
                         }
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                         
@@ -886,7 +881,7 @@ int main(int argc, char **args) {
                     ImGui::BeginDisabled();
                 }
                 ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync);
-                ImGui::SameLine();
+                ImGui::Checkbox("Trigger Mode", &camera_control->trigger_mode);
                 if (camera_control->subscribe) {
                     ImGui::EndDisabled();
                 }

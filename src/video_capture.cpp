@@ -132,6 +132,11 @@ inline void get_one_frame(CameraState *camera_state,
     GPUVideoEncoder* gpu_encoder, 
     FrameProcess* frame_process)
 {
+    if (camera_control->trigger_mode) {
+        std::cout << "trigger" << std::endl;
+        check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "TriggerSoftware"), camera_params->camera_serial.c_str());
+    }
+
     camera_state->camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
     
     // get the system clock
@@ -194,7 +199,8 @@ inline void get_one_frame(CameraState *camera_state,
         // temp changes to take images for calibration
         if (camera_select->frame_save_state==State_Write_New_Frame) {
 
-            ck(cudaMemcpy2D(frame_process->frame_original.d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyHostToDevice));
+            ck(cudaMemcpy2D(frame_process->frame_original.d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyDeviceToDevice));
+            
             if (camera_params->color){
                 debayer_frame_gpu(camera_params, &frame_process->frame_original, &frame_process->debayer);
             } else {
@@ -202,8 +208,9 @@ inline void get_one_frame(CameraState *camera_state,
             }      
             rgba2bgr_convert(frame_process->d_convert, frame_process->debayer.d_debayer, camera_params->width, camera_params->height, 0);                
             cudaMemcpy2D(frame_process->frame_cpu.frame, camera_params->width*3, frame_process->d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
+
             cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_process->frame_cpu.frame).reshape(3, camera_params->height);
-                
+
             std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
             std::cout << image_name << std::endl;
             cv::imwrite(image_name, view);
@@ -239,7 +246,15 @@ inline void get_one_frame(CameraState *camera_state,
 }
 
 
-void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params, CameraEachSelect* camera_select, CameraControl *camera_control, unsigned char *display_buffer, std::string encoder_setup, std::string folder_name, PTPParams *ptp_params, INDIGOSignalBuilder* indigo_signal_builder)
+void acquire_frames(CameraEmergent *ecam, 
+    CameraParams *camera_params, 
+    CameraEachSelect* camera_select, 
+    CameraControl *camera_control, 
+    unsigned char *display_buffer, 
+    std::string encoder_setup, 
+    std::string folder_name, 
+    PTPParams *ptp_params, 
+    INDIGOSignalBuilder* indigo_signal_builder)
 {
     CameraState camera_state;
     PTPState ptp_state;

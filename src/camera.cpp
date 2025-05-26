@@ -446,6 +446,8 @@ void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInf
 
 void camera_trigger_mode(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
 {
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"), camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 76), camera_params->camera_serial.c_str());
     check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSelector", "FrameStart"),  camera_params->camera_serial.c_str());
     check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"),  camera_params->camera_serial.c_str());
 }

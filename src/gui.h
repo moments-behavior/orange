@@ -80,6 +80,12 @@ inline void start_camera_streaming(std::vector<std::thread>& camera_threads, Cam
         camera_control->sync_camera = true;
     }
     
+    if (camera_control->trigger_mode) {
+        for (int i = 0; i < num_cameras; i++) {
+            camera_trigger_mode(&ecams[i].camera, &cameras_params[i]);
+        }
+    }
+
     for (int i = 0; i < num_cameras; i++)
     {
         cameras_select[i].yolo_model = yolo_model.c_str();

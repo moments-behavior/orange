@@ -24,6 +24,7 @@ public:
 private:
     void thread_loop();
 
+    cudaStream_t stream;
     CameraParams* camera_params;
     CameraEachSelect* camera_select;
     FrameProcess frame_process;

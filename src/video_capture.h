@@ -7,8 +7,9 @@
 #include "network_base.h"
 
 enum PictureSaveState {
-    State_Frame_Idle = 0, 
-    State_Write_New_Frame = 1
+    State_Frame_Idle = 0,
+    State_Write_New_Frame = 1,
+    State_Frame_Copy_Done = 2
 };
 
 struct CameraControl
@@ -27,13 +28,14 @@ struct CameraEachSelect
     bool record = true;
     bool yolo = false;
     int downsample = 1;
-    PictureSaveState frame_save_state = State_Frame_Idle;
+    std::atomic<PictureSaveState> frame_save_state;
     std::string frame_save_format;
     std::string frame_save_name;
     int pictures_counter = 0;
     bool selected_to_save = false;
     std::string picture_save_folder;
     const char* yolo_model;
+    CameraEachSelect() : frame_save_state(State_Frame_Idle) {}
 };
 
 struct CameraState

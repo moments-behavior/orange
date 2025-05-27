@@ -3,9 +3,8 @@
 #include <chrono>
 #include "NvEncoder/NvCodecUtils.h"
 #include "gpu_video_encoder.h"
-#include "kernel.cuh"
-#include "image_processing.h"
 #include "opencv2/opencv.hpp"
+#include "FrameSaver.h"
 
 #ifndef HEADLESS
 #include "opengldisplay.h"
@@ -130,7 +129,7 @@ inline void get_one_frame(CameraState *camera_state,
     PTPState *ptp_state, 
     void* openGLDisplay, 
     GPUVideoEncoder* gpu_encoder, 
-    FrameProcess* frame_process)
+    FrameSaver* frame_saver)
 {
     if (camera_control->trigger_mode) {
         std::cout << "trigger" << std::endl;
@@ -180,7 +179,6 @@ inline void get_one_frame(CameraState *camera_state,
                 );
         }
 
-
 #ifndef HEADLESS
         COpenGLDisplay* display = static_cast<COpenGLDisplay*>(openGLDisplay);
         if (display) {
@@ -196,32 +194,14 @@ inline void get_one_frame(CameraState *camera_state,
         }
 #endif        
 
-        // temp changes to take images for calibration
-        if (camera_select->frame_save_state==State_Write_New_Frame) {
-
-            ck(cudaMemcpy2D(frame_process->frame_original.d_orig, camera_params->width, ecam->frame_recv.imagePtr, camera_params->width, camera_params->width, camera_params->height, cudaMemcpyDeviceToDevice));
-            
-            if (camera_params->color){
-                debayer_frame_gpu(camera_params, &frame_process->frame_original, &frame_process->debayer);
-            } else {
-                duplicate_channel_gpu(camera_params, &frame_process->frame_original, &frame_process->debayer);
-            }      
-            rgba2bgr_convert(frame_process->d_convert, frame_process->debayer.d_debayer, camera_params->width, camera_params->height, 0);                
-            cudaMemcpy2D(frame_process->frame_cpu.frame, camera_params->width*3, frame_process->d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost);
-
-            cv::Mat view = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, frame_process->frame_cpu.frame).reshape(3, camera_params->height);
-
-            std::string image_name = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
-            std::cout << image_name << std::endl;
-            cv::imwrite(image_name, view);
-            camera_select->pictures_counter++;
-            camera_select->frame_save_state = State_Frame_Idle;
-        }          
-
+        if (camera_select->frame_save_state.load() == State_Write_New_Frame) {
+            frame_saver->notify_frame_ready(ecam->frame_recv.imagePtr);
+        }
 
         camera_state->camera_return = EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.
-        if (camera_state->camera_return)
+        if (camera_state->camera_return) {
             std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
+        }
 
         if (camera_state->frame_count % 500 == 99)
         {
@@ -255,18 +235,14 @@ void acquire_frames(CameraEmergent *ecam,
     std::string folder_name, 
     PTPParams *ptp_params, 
     INDIGOSignalBuilder* indigo_signal_builder)
-{
+{   
+    ck(cudaSetDevice(camera_params->gpu_id));
     CameraState camera_state;
     PTPState ptp_state;
     StopWatch w;
 
-    FrameProcess frame_process;
-    ck(cudaSetDevice(camera_params->gpu_id));
-    // innitialization
-    initalize_gpu_frame(&frame_process.frame_original, camera_params);
-    initialize_gpu_debayer(&frame_process.debayer, camera_params);
-    initialize_cpu_frame(&frame_process.frame_cpu, camera_params);
-    ck(cudaMalloc((void **)&frame_process.d_convert, camera_params->width * camera_params->height * 3));
+    FrameSaver frame_saver(camera_params, camera_select);
+    frame_saver.start();
 
 #ifndef HEADLESS    
     COpenGLDisplay* openGLDisplay;
@@ -315,9 +291,9 @@ void acquire_frames(CameraEmergent *ecam,
         // int OFFSET_Y_VAL = 1300 + offset * 4;
         // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
 #ifndef HEADLESS
-        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder, &frame_process);
+        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, openGLDisplay, gpu_encoder, &frame_saver);
 #else 
-        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, nullptr, gpu_encoder, &frame_process);
+        get_one_frame(&camera_state, camera_select, camera_control, ecam, camera_params, &ptp_state, nullptr, gpu_encoder, &frame_saver);
 #endif
         if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
             if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {                
@@ -359,7 +335,4 @@ void acquire_frames(CameraEmergent *ecam,
         gpu_encoder->StopThread();
     }
     report_statistics(camera_params, &camera_state, time_diff);
-    cudaFree(frame_process.frame_original.d_orig);
-    cudaFree(frame_process.debayer.d_debayer);
-    free(frame_process.frame_cpu.frame);
 }

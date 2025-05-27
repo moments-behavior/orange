@@ -707,8 +707,11 @@ int main(int argc, char **args) {
                         }
 
                         //order important 
-                        if (calib_state == CalibSavePictures) {
-                            send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
+                        if (save_image_all_ready && calib_state == CalibSavePictures) {
+                            send_indigo_message(indigo_signal_builder.server, 
+                                indigo_signal_builder.builder, 
+                                indigo_signal_builder.indigo_connection, 
+                                FetchGame::SignalType_CalibrationNextPose);
                             calib_state = CalibNextPose;
                         }
 

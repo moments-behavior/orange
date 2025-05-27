@@ -55,7 +55,7 @@ static inline void initialize_cpu_frame(FrameCPU *cpu_buffer, CameraParams *came
 static inline void initialize_pinned_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
 {
     int size_pic = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
-    cudaMallocHost((void**)&cpu_buffer->frame, size_pic); // Pinned allocation
+    ck(cudaMallocHost((void**)&cpu_buffer->frame, size_pic));  // pinned memory
 }
 
 static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *camera_params)

@@ -649,7 +649,7 @@ int main(int argc, char **args) {
                     if (ImGui::TreeNode("Save pictures from capturing")) {
                         save_image_all_ready = true;
                         for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].frame_save_state != State_Frame_Idle) {
+                            if (cameras_select[i].frame_save_state.load() != State_Frame_Idle) {
                                 save_image_all_ready = false;
                                 break;
                             }  

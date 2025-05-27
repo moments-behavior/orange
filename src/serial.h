@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-
 class SerialPort {
     public:
         SerialPort();
@@ -18,6 +17,8 @@ class SerialPort {
         bool write(const std::string& data);
         std::string read();
     
+        void send_pump_command(char pump, bool push, int cycles, int delay_us);
+    
     private:
-        int fd_; // File descriptor for Linux
+        int fd_;
 };

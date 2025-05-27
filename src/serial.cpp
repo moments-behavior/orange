@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <iostream>
+#include <sstream>
 
 SerialPort::SerialPort() : fd_(-1) {}
 SerialPort::~SerialPort() { close(); }
@@ -69,4 +70,12 @@ std::vector<std::string> SerialPort::list_available_ports() {
     }
     closedir(dev_dir);
     return ports;
+}
+
+void SerialPort::send_pump_command(char pump, bool push, int cycles, int delay_us) {
+    if (!is_open()) return;
+
+    std::ostringstream oss;
+    oss << (push ? 'h' : 'l') << pump << " " << cycles << " " << delay_us << "\n";
+    write(oss.str());
 }

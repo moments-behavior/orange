@@ -38,6 +38,12 @@ int main(int argc, char **args) {
     GigEVisionDeviceInfo device_info[max_cameras];
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
+    static SerialPort serial;
+    static std::vector<std::string> port_list;
+    static int selected_port = -1;
+    static char send_buffer[128] = "";
+    static std::string recv_data;
+
     std::filesystem::path cwd = std::filesystem::current_path();
     std::string delimiter = "/";
     std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
@@ -999,11 +1005,10 @@ int main(int argc, char **args) {
 
         if (ImGui::Begin("serial")) {
             // window for serial communication functions
-            static SerialPort serial;
-            static std::vector<std::string> port_list;
-            static int selected_port = -1;
-            static char send_buffer[128] = "";
-            static std::string recv_data;
+            const char pump_ids[] = { 'x', 'y', 'z' };
+            static int cycles[3] = { 1000, 1000, 1000 };
+            static int delays[3] = { 500, 500, 500 };
+            static int push_directions[3] = { 1, 1, 1 };
 
             if (ImGui::Button("scan ports")) {
                 port_list = SerialPort::list_available_ports();
@@ -1026,18 +1031,30 @@ int main(int argc, char **args) {
                     serial.close();
                 }
             }
+
+            for (int i = 0; i < 3; ++i) {
+                ImGui::PushID(i);  // Make widgets unique
         
-            ImGui::Separator();
-            ImGui::InputText("Send", send_buffer, IM_ARRAYSIZE(send_buffer));
-            if (ImGui::Button("Send") && serial.is_open()) {
-                serial.write(std::string(send_buffer) + "\n");
-            }
+                std::string label = std::string("Pump ") + (char)toupper(pump_ids[i]);
+                ImGui::Text("%s", label.c_str());
         
-            if (serial.is_open()) {
-                recv_data += serial.read();
-                if (!recv_data.empty()) {
-                    ImGui::TextWrapped("Received: %s", recv_data.c_str());
+                ImGui::RadioButton("Push", &push_directions[i], 1); ImGui::SameLine();
+                ImGui::RadioButton("Pull", &push_directions[i], 0);
+        
+                ImGui::SliderInt("Cycles", &cycles[i], 100, 10000);
+                ImGui::SliderInt("Delay (us)", &delays[i], 100, 10000);
+        
+                if (serial.is_open()) {
+                    if (ImGui::Button("Send Command")) {
+                        bool is_push = (push_directions[i] == 1);
+                        serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
+                    }
+                } else {
+                    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Serial port not open");
                 }
+        
+                ImGui::Separator();
+                ImGui::PopID();
             }
 
         }

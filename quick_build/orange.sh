@@ -24,6 +24,8 @@ g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wf
 g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o $targets_folder/imgui_widgets.o ./third_party/imgui/imgui_widgets.cpp
 g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o $targets_folder/imgui_impl_glfw.o ./third_party/imgui/backends/imgui_impl_glfw.cpp
 g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o $targets_folder/imgui_impl_opengl3.o ./third_party/imgui/backends/imgui_impl_opengl3.cpp
+g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -g -Wall -Wformat `pkg-config --cflags glfw3` -c -o $targets_folder/serial.o ./src/serial.cpp
+
 
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot.o $DIR_IMPLOT/implot.cpp
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot_items.o $DIR_IMPLOT/implot_items.cpp

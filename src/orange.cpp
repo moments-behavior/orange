@@ -11,6 +11,7 @@
 #include "network_base.h"
 #include "enet_thread.h"
 #include "global.h"
+#include "serial.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -993,6 +994,52 @@ int main(int argc, char **args) {
             }
 
             ImGui::PopStyleColor(1);
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("serial")) {
+            // window for serial communication functions
+            static SerialPort serial;
+            static std::vector<std::string> port_list;
+            static int selected_port = -1;
+            static char send_buffer[128] = "";
+            static std::string recv_data;
+
+            if (ImGui::Button("scan ports")) {
+                port_list = SerialPort::list_available_ports();
+                selected_port = -1;
+            }
+
+            for (int i = 0; i < port_list.size(); i++) {
+                if (ImGui::RadioButton(port_list[i].c_str(), selected_port == i)) {
+                    selected_port = i;
+                }
+            }
+
+            if (!serial.is_open() && selected_port >= 0) {
+                if (ImGui::Button("Open Port")) {
+                    serial.open(port_list[selected_port]);
+                }
+            } else if (serial.is_open()) {
+                ImGui::Text("Port Open");
+                if (ImGui::Button("Close Port")) {
+                    serial.close();
+                }
+            }
+        
+            ImGui::Separator();
+            ImGui::InputText("Send", send_buffer, IM_ARRAYSIZE(send_buffer));
+            if (ImGui::Button("Send") && serial.is_open()) {
+                serial.write(std::string(send_buffer) + "\n");
+            }
+        
+            if (serial.is_open()) {
+                recv_data += serial.read();
+                if (!recv_data.empty()) {
+                    ImGui::TextWrapped("Received: %s", recv_data.c_str());
+                }
+            }
+
         }
         ImGui::End();
 

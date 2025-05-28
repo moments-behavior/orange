@@ -1009,6 +1009,8 @@ int main(int argc, char **args) {
             static int cycles[3] = { 1000, 1000, 1000 };
             static int delays[3] = { 500, 500, 500 };
             static int push_directions[3] = { 1, 1, 1 };
+            static int control_mode[3] = {0, 0, 0};
+            static float microliters[3] = { 10.0f, 10.0f, 10.0f };
 
             if (ImGui::Button("scan ports")) {
                 port_list = SerialPort::list_available_ports();
@@ -1041,13 +1043,26 @@ int main(int argc, char **args) {
                 ImGui::RadioButton("Push", &push_directions[i], 1); ImGui::SameLine();
                 ImGui::RadioButton("Pull", &push_directions[i], 0);
         
-                ImGui::SliderInt("Cycles", &cycles[i], 100, 10000);
-                ImGui::SliderInt("Delay (us)", &delays[i], 100, 10000);
+                ImGui::RadioButton("µL", &control_mode[i], 0); ImGui::SameLine();
+                ImGui::RadioButton("Cycles/Delay", &control_mode[i], 1);
+
+                // µL or Cycles/Delay inputs
+                if (control_mode[i] == 0) {
+                    ImGui::SliderFloat("Target µL", &microliters[i], 1.0f, 20.0f, "%.1f");
+                } else {
+                    ImGui::SliderInt("Cycles", &cycles[i], 100, 10000);
+                    ImGui::SliderInt("Delay", &delays[i], 100, 10000);
+                }
         
                 if (serial.is_open()) {
                     if (ImGui::Button("Send Command")) {
                         bool is_push = (push_directions[i] == 1);
-                        serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
+                        if (control_mode[i] == 0) {
+                            serial.send_pump_command(pump_ids[i], is_push, microliters[i]);
+                        }
+                        else {
+                            serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
+                        }
                     }
                 } else {
                     ImGui::TextColored(ImVec4(1, 0, 0, 1), "Serial port not open");
@@ -1055,6 +1070,22 @@ int main(int argc, char **args) {
         
                 ImGui::Separator();
                 ImGui::PopID();
+            }
+
+            if (serial.is_open()) {
+                if (ImGui::Button("Send All Commands")) {
+                    for (int i = 0; i < 3; ++i) {
+                        bool is_push = (push_directions[i] == 1);
+                        if (control_mode[i] == 0) {
+                            serial.send_pump_command(pump_ids[i], is_push, microliters[i]);
+                        }
+                        else {
+                            serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
+                        }
+                    }
+                }
+            } else {
+                ImGui::TextColored(ImVec4(1, 0, 0, 1), "Serial port not open");
             }
 
         }

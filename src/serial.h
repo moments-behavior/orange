@@ -18,7 +18,9 @@ class SerialPort {
         std::string read();
     
         void send_pump_command(char pump, bool push, int cycles, int delay_us);
-    
+
+        void send_pump_command(char pump, bool push, float ul);
+
     private:
         int fd_;
 };

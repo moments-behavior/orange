@@ -6,6 +6,7 @@
 #include <string.h>
 #include <iostream>
 #include <sstream>
+#define PI 3.14159265358979323846
 
 SerialPort::SerialPort() : fd_(-1) {}
 SerialPort::~SerialPort() { close(); }
@@ -78,4 +79,29 @@ void SerialPort::send_pump_command(char pump, bool push, int cycles, int delay_u
     std::ostringstream oss;
     oss << (push ? 'h' : 'l') << pump << " " << cycles << " " << delay_us << "\n";
     write(oss.str());
+}
+
+void SerialPort::send_pump_command(char pump, bool push, float ul) {
+    if (!is_open()) return;
+
+    std::ostringstream oss;
+    double lead_mm = 0.8;
+    int steps_per_rev = 200;
+    int microsteps = 16;
+    double syringe_ID_mm = 9.144;
+    int dispense_time_ms = 100;
+
+    int usteps_per_rev = steps_per_rev * microsteps;
+    double usteps_per_mm = usteps_per_rev / lead_mm;
+
+    double r = syringe_ID_mm / 2.0;
+    double stroke = ul / (PI * r * r);
+
+    int pulse_count = (int) (stroke * usteps_per_mm);
+
+    int delay = dispense_time_ms * 1000 / pulse_count;
+    
+    oss << (push ? 'h' : 'l') << pump << " " << pulse_count << " " << delay << "\n";
+    write(oss.str());
+
 }

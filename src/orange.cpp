@@ -489,19 +489,41 @@ int main(int argc, char **args) {
             ImGui::Text("%s", input_folder.c_str()); 
 
             {
-                const char *items[] = {"h264", "hevc"};
-                static int codec_current = 0;
-                if (ImGui::Combo("codec", &codec_current, items, IM_ARRAYSIZE(items))) {
-                    encoder_config->encoder_codec = items[codec_current];
+                const char* codecs[] = { "h264", "hevc" };
+                static int codec_current = -1;
+            
+                if (codec_current == -1) {
+                    for (int i = 0; i < IM_ARRAYSIZE(codecs); ++i) {
+                        if (encoder_config->encoder_codec == codecs[i]) {
+                            codec_current = i;
+                            break;
+                        }
+                    }
                 }
-            } 
-            {
-                const char *items[] = {"p1", "p3", "p5", "p7"};
-                static int preset_current = 0;
-                if (ImGui::Combo("preset", &preset_current, items, IM_ARRAYSIZE(items))) {
-                    encoder_config->encoder_preset = items[preset_current];
+            
+                if (ImGui::Combo("Codec", &codec_current, codecs, IM_ARRAYSIZE(codecs))) {
+                    encoder_config->encoder_codec = codecs[codec_current];
                 }
             }
+
+            {
+                const char* presets[] = { "p1", "p3", "p5", "p7" };
+                static int preset_current = -1;
+            
+                if (preset_current == -1) {
+                    for (int i = 0; i < IM_ARRAYSIZE(presets); ++i) {
+                        if (encoder_config->encoder_preset == presets[i]) {
+                            preset_current = i;
+                            break;
+                        }
+                    }
+                }
+            
+                if (ImGui::Combo("Preset", &preset_current, presets, IM_ARRAYSIZE(presets))) {
+                    encoder_config->encoder_preset = presets[preset_current];
+                }
+            }
+            
 
             {
                 const char *items[] = {"1", "2", "4", "8", "16"};

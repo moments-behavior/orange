@@ -1003,16 +1003,28 @@ int main(int argc, char **args) {
         }
         ImGui::End();
 
-        if (ImGui::Begin("serial")) {
+        if (ImGui::Begin("Syringe Control")) {
             // window for serial communication functions
             const char pump_ids[] = { 'x', 'y', 'z' };
-            static int cycles[3] = { 1000, 1000, 1000 };
-            static int delays[3] = { 500, 500, 500 };
-            static int push_directions[3] = { 1, 1, 1 };
+            static int cycles[3] = {1000, 1000, 1000};
+            static int delays[3] = {50, 50, 50};
+            static int push_directions[3] = {1, 1, 1};
             static int control_mode[3] = {0, 0, 0};
-            static float microliters[3] = { 10.0f, 10.0f, 10.0f };
+            static float microliters[3] = {2.0f, 2.0f, 2.0f};
+            static int delivery_ms[3] = {100, 100, 100};
+            static bool repeat[3] = {false, false, false};
+            static int repeat_delay[3] = {10, 10, 10};
+            static double last_sent_time[3] = {0.0, 0.0, 0.0};
+            static bool curr_running[3] = {false, false, false};
+            static std::vector<std::string> config_files = list_json_files_in_folder();
+            static int selected_config_index = 0;
+            static std::string current_config_file = config_files.empty() ? "" : config_files[0];
 
-            if (ImGui::Button("scan ports")) {
+            std::size_t pos = current_config_file.find_last_of("/\\");
+            std::string current_filename = (pos == std::string::npos) ? current_config_file 
+                                                : current_config_file.substr(pos + 1);
+            
+            if (ImGui::Button("Scan Ports")) {
                 port_list = SerialPort::list_available_ports();
                 selected_port = -1;
             }
@@ -1026,6 +1038,8 @@ int main(int argc, char **args) {
             if (!serial.is_open() && selected_port >= 0) {
                 if (ImGui::Button("Open Port")) {
                     serial.open(port_list[selected_port]);
+                    const auto& configs = get_loaded_pump_configs(config_files[0]);
+                    initialize_pump_state_from_config(configs, pump_ids, microliters, delivery_ms, cycles, delays, push_directions, control_mode, repeat, repeat_delay);  
                 }
             } else if (serial.is_open()) {
                 ImGui::Text("Port Open");
@@ -1049,23 +1063,51 @@ int main(int argc, char **args) {
                 // µL or Cycles/Delay inputs
                 if (control_mode[i] == 0) {
                     ImGui::SliderFloat("Target µL", &microliters[i], 1.0f, 20.0f, "%.1f");
+                    ImGui::SliderInt("Delivery Time", &delivery_ms[i], 10, 1000);
                 } else {
-                    ImGui::SliderInt("Cycles", &cycles[i], 100, 10000);
-                    ImGui::SliderInt("Delay", &delays[i], 100, 10000);
+                    ImGui::SliderInt("Cycles", &cycles[i], 100, 30000);
+                    ImGui::SliderInt("Delay", &delays[i], 10, 100);
                 }
         
                 if (serial.is_open()) {
-                    if (ImGui::Button("Send Command")) {
+                    if (curr_running[i]) {
+                        if (ImGui::Button("Stop Command")) {
+                            curr_running[i] = false;
+                        } ImGui::SameLine();
+                        
+                    } else {
+                        if (ImGui::Button("Send Command")) {
+                            if (repeat[i]) {
+                                curr_running[i] = true;
+                            } else {
+                                bool is_push = (push_directions[i] == 1);
+                                if (control_mode[i] == 0) {
+                                    serial.send_pump_command(pump_ids[i], is_push, microliters[i], delivery_ms[i]);
+                                }
+                                else {
+                                    serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
+                                }
+                            }
+                        } ImGui::SameLine();
+                    }
+                    
+
+                    ImGui::Checkbox("Repeat", &repeat[i]); 
+                    if (repeat[i]) {
+                        ImGui::SliderInt("Interval", &repeat_delay[i], 5, 5000); // TODO: change
+                    }
+
+                    double now = ImGui::GetTime();
+                    if (repeat[i] && (now - last_sent_time[i] >= repeat_delay[i]) && curr_running[i]) {
                         bool is_push = (push_directions[i] == 1);
                         if (control_mode[i] == 0) {
-                            serial.send_pump_command(pump_ids[i], is_push, microliters[i]);
+                            serial.send_pump_command(pump_ids[i], is_push, microliters[i], delivery_ms[i]);
                         }
                         else {
                             serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
                         }
+                        last_sent_time[i] = now;
                     }
-                } else {
-                    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Serial port not open");
                 }
         
                 ImGui::Separator();
@@ -1075,19 +1117,62 @@ int main(int argc, char **args) {
             if (serial.is_open()) {
                 if (ImGui::Button("Send All Commands")) {
                     for (int i = 0; i < 3; ++i) {
-                        bool is_push = (push_directions[i] == 1);
-                        if (control_mode[i] == 0) {
-                            serial.send_pump_command(pump_ids[i], is_push, microliters[i]);
+                        if (repeat[i]) {
+                            curr_running[i] = true;
+                        } else {
+                            bool is_push = (push_directions[i] == 1);
+                            if (control_mode[i] == 0) {
+                                serial.send_pump_command(pump_ids[i], is_push, microliters[i], delivery_ms[i]);
+                            }
+                            else {
+                                serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
+                            }
                         }
-                        else {
-                            serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
-                        }
+                    }
+                } ImGui::SameLine();
+                if (ImGui::Button("Stop All Commands")) {
+                    for (int i = 0; i < 3; ++i) {
+                        curr_running[i] = false;
                     }
                 }
             } else {
                 ImGui::TextColored(ImVec4(1, 0, 0, 1), "Serial port not open");
             }
 
+            
+
+            if (ImGui::BeginCombo("Select Config", current_filename.c_str())) {
+                for (int i = 0; i < config_files.size(); ++i) {
+                    std::string full_path = config_files[i];
+                    std::size_t pos = full_path.find_last_of("/\\");
+                    std::string filename = (pos == std::string::npos) ? full_path : full_path.substr(pos + 1);
+                    bool is_selected = (selected_config_index == i);
+                    if (ImGui::Selectable(filename.c_str(), is_selected)) {
+                        selected_config_index = i;
+                        current_config_file = config_files[i];
+            
+                        if (load_pump_config(current_config_file, cfg)) {
+                            const auto& configs = get_loaded_pump_configs(current_config_file);
+                        
+                            initialize_pump_state_from_config(configs, pump_ids, microliters, delivery_ms, cycles, delays, push_directions, control_mode, repeat, repeat_delay);      
+                        }
+                    }
+                    if (is_selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            if (ImGui::Button("Reload Config")) {
+                config_files = list_json_files_in_folder();  // refresh file list
+                if (!config_files.empty() && selected_config_index < config_files.size()) {
+                    current_config_file = config_files[selected_config_index];
+                    if (load_pump_config(current_config_file, cfg)) {
+                        const auto& configs = get_loaded_pump_configs(current_config_file);
+            
+                        initialize_pump_state_from_config(configs, pump_ids, microliters, delivery_ms, cycles, delays, push_directions, control_mode, repeat, repeat_delay);    
+                    }
+                }
+            }
         }
         ImGui::End();
 

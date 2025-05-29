@@ -6,10 +6,115 @@
 #include <string.h>
 #include <iostream>
 #include <sstream>
+#include <fstream>
+#include <cstdlib>
+#include <filesystem>
+#include <map>
+#include <vector>
+#include <dirent.h>
+#include <cstring>
+#include "json.hpp"
 #define PI 3.14159265358979323846
+using json = nlohmann::json;
+
 
 SerialPort::SerialPort() : fd_(-1) {}
 SerialPort::~SerialPort() { close(); }
+
+std::vector<std::string> list_json_files_in_folder() {
+    const std::string folder_path = "/home/user/orange_data/config/pump";
+    std::vector<std::string> result;
+
+    DIR* dir = opendir(folder_path.c_str());
+    if (!dir) return result;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string filename(entry->d_name);
+        if (filename.size() >= 5 && filename.substr(filename.size() - 5) == ".json") {
+            result.push_back(folder_path + "/" + filename); 
+        }
+    }
+
+    closedir(dir);
+    return result;
+}
+
+
+bool load_pump_config(const std::string& filename, std::map<char, PumpConfig>& config) {
+    std::ifstream in(filename);
+    if (!in.is_open()) {
+        std::cerr << "failed to open config\n";
+        return false;
+    }
+
+    try {
+
+        json j;
+        in >> j;
+
+        cfg.clear(); // make room for new config
+
+        for (const auto& [key, val] : j.items()) {
+            char pump_id = key[0];
+            PumpConfig cfg;
+            cfg.target_uL = val.at("target_uL").get<float>();
+            cfg.dispense_time_ms = val.at("dispense_time_ms").get<int>();
+            cfg.cycles = val.at("cycles").get<int>();
+            cfg.delay = val.at("delay").get<int>();
+            cfg.syringe_ID_mm = val.at("syringe_ID_mm").get<float>();
+            cfg.steps_per_rev = val.at("steps_per_rev").get<int>();
+            cfg.microsteps = val.at("microsteps").get<int>();
+            cfg.lead_mm = val.at("lead_mm").get<float>();
+            cfg.push_direction = val.at("push_direction").get<int>();
+            cfg.control_mode = val.at("control_mode").get<int>();
+            cfg.repeat = val.at("repeat").get<bool>();
+            cfg.repeat_delay = val.at("repeat_delay").get<int>();
+            config[pump_id] = cfg;
+        }
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing config: " << e.what() << "\n";
+        return false;
+    }
+
+    return true;
+}
+
+
+const std::map<char, PumpConfig>& get_loaded_pump_configs(std::string filename) {
+    std::string user = std::getenv("USER");
+    if (!load_pump_config(filename, cfg)) {
+        std::cerr << "failed to load config\n";
+    }
+    return cfg;
+}
+
+void initialize_pump_state_from_config(const std::map<char, PumpConfig>& configs,
+    const char pump_ids[],
+    float microliters[3],
+    int delivery_ms[3],
+    int cycles[3],
+    int delays[3],
+    int push_directions[3],
+    int control_mode[3],
+    bool repeat[3],
+    int repeat_delay[3]) {
+    for (int i = 0; i < 3; ++i) {
+        char id = pump_ids[i];
+        if (configs.count(id)) {
+            const auto& cfg = configs.at(id);
+            microliters[i] = cfg.target_uL;
+            delivery_ms[i] = cfg.dispense_time_ms;
+            cycles[i] = cfg.cycles;
+            delays[i] = cfg.delay;
+            push_directions[i] = cfg.push_direction;
+            control_mode[i] = cfg.control_mode;
+            repeat[i] = cfg.repeat;
+            repeat_delay[i] = cfg.repeat_delay;
+        }
+    }
+}
 
 bool SerialPort::open(const std::string& port_name, int baud_rate) {
     fd_ = ::open(port_name.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -81,15 +186,19 @@ void SerialPort::send_pump_command(char pump, bool push, int cycles, int delay_u
     write(oss.str());
 }
 
-void SerialPort::send_pump_command(char pump, bool push, float ul) {
+
+
+void SerialPort::send_pump_command(char pump, bool push, float ul, int dispense_time_ms) {
     if (!is_open()) return;
 
     std::ostringstream oss;
-    double lead_mm = 0.8;
-    int steps_per_rev = 200;
-    int microsteps = 16;
-    double syringe_ID_mm = 9.144;
-    int dispense_time_ms = 100;
+
+    PumpConfig config = cfg[pump];
+
+    double lead_mm = config.lead_mm;
+    int steps_per_rev = config.steps_per_rev;
+    int microsteps = config.microsteps;
+    double syringe_ID_mm = config.syringe_ID_mm;
 
     int usteps_per_rev = steps_per_rev * microsteps;
     double usteps_per_mm = usteps_per_rev / lead_mm;

@@ -1073,6 +1073,7 @@ int main(int argc, char **args) {
                     if (curr_running[i]) {
                         if (ImGui::Button("Stop Command")) {
                             curr_running[i] = false;
+                            last_sent_time[i] = 0.0;
                         } ImGui::SameLine();
                         
                     } else {
@@ -1133,6 +1134,7 @@ int main(int argc, char **args) {
                 if (ImGui::Button("Stop All Commands")) {
                     for (int i = 0; i < 3; ++i) {
                         curr_running[i] = false;
+                        last_sent_time[i] = 0.0;
                     }
                 }
             } else {

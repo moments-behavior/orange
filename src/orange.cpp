@@ -1108,6 +1108,7 @@ int main(int argc, char **args) {
                             serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
                         }
                         last_sent_time[i] = now;
+                        cout << "Now Dispensing at time: " << now << "\n";
                     }
                 }
         

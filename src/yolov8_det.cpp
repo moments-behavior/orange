@@ -377,6 +377,27 @@ void YOLOv8::copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs
     CHECK(cudaMemcpy(d_points, points, sizeof(float) * 8, cudaMemcpyHostToDevice));
 }
 
+void YOLOv8::copy_keypoints_gpu(float* d_points, const Object& obj)
+{
+    const int num_point = 4;
+    float points[8] = {0};
+    
+    points[0] = obj.rect.x;
+    points[1] = obj.rect.y;
+
+    points[2] = obj.rect.x;
+    points[3] = obj.rect.y + obj.rect.height;
+    
+    points[4] = obj.rect.x + obj.rect.width;
+    points[5] = obj.rect.y + obj.rect.height;
+
+    points[6] = obj.rect.x + obj.rect.width;
+    points[7] = obj.rect.y;
+    
+    CHECK(cudaMemcpy(d_points, points, sizeof(float) * 8, cudaMemcpyHostToDevice));
+}
+
+
 void YOLOv8::draw_objects(const cv::Mat&                                image,
                           cv::Mat&                                      res,
                           const std::vector<Object>&                    objs,

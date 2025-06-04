@@ -101,11 +101,20 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->copy_keypoints_gpu(d_points, objs);
 
                 if (objs.size() > 0) {
+                    // std::cout << "Objects detected: " << objs.size() << " ";
+                    // std::cout << objs[0].rect.x << " " << objs[0].rect.y << "\n";
+                    for (int obj=0; obj < objs.size(); obj++) {
+
+                        yolov8->copy_keypoints_gpu(d_points, objs[obj]);
+                        gpu_draw_box(debayer.d_debayer, camera_params->width, camera_params->height, d_points, yolov8->stream, objs[obj].label);
+                        
+                    }
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
                     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
                     // std::cout << bbox_center_x << std::endl;
                     // if (objs[0].rect.x < 2260.41 && objs[0].rect.x < objs_last_frame[0].rect.x) {
                     // if (objs[0].rect.x < 2500.0 && objs[0].rect.x > 2100.0) {
+                    
                     if (objs[0].rect.x < 2600.0 && objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
                         if (indigo_signal_builder->indigo_connection != NULL) {
@@ -117,7 +126,7 @@ void COpenGLDisplay::ThreadRunning()
                     objs_last_frame.clear();
                 }
                     
-                gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream, 4);
+                // gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream, 4);
             }
 
 

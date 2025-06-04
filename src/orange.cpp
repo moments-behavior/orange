@@ -1089,6 +1089,10 @@ int main(int argc, char **args) {
                                     serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
                                 }
                             }
+                            std::time_t dispense_time = std::time(nullptr);
+                            char ts[64];
+                            std::strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S] ", std::localtime(&dispense_time));
+                            std::cout << ts << "Dispensing pump " << pump_ids[i] << std::endl;
                         } ImGui::SameLine();
                     }
                     
@@ -1099,6 +1103,7 @@ int main(int argc, char **args) {
                     }
 
                     double now = ImGui::GetTime();
+                    
                     if (repeat[i] && (now - last_sent_time[i] >= repeat_delay[i]) && curr_running[i]) {
                         bool is_push = (push_directions[i] == 1);
                         if (control_mode[i] == 0) {
@@ -1108,7 +1113,10 @@ int main(int argc, char **args) {
                             serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
                         }
                         last_sent_time[i] = now;
-                        cout << "Now Dispensing at time: " << now << "\n";
+                        std::time_t dispense_time = std::time(nullptr);
+                        char ts[64];
+                        std::strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S] ", std::localtime(&dispense_time));
+                        std::cout << ts << "Dispensing pump " << pump_ids[i] << std::endl;
                     }
                 }
         
@@ -1130,6 +1138,10 @@ int main(int argc, char **args) {
                                 serial.send_pump_command(pump_ids[i], is_push, cycles[i], delays[i]);
                             }
                         }
+                        std::time_t dispense_time = std::time(nullptr);
+                        char ts[64];
+                        std::strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S] ", std::localtime(&dispense_time));
+                        std::cout << ts << "Dispensing pump " << pump_ids[i] << std::endl;
                     }
                 } ImGui::SameLine();
                 if (ImGui::Button("Stop All Commands")) {

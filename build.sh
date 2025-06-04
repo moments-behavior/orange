@@ -213,6 +213,8 @@ if [ $need_link -eq 1 ]; then
       src/gpu_video_encoder.cpp \
       src/yolov8_det.cpp \
       src/yolo_worker.cpp \
+      src/enet_thread.cpp \
+      src/project.cpp \
       src/global.cpp \
       $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
       -I$DIR_IMGUI \

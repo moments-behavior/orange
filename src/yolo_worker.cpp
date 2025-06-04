@@ -6,6 +6,7 @@
 #include <string>
 #include <chrono>
 #include "yolo_payload_generated.h"
+#include "message_wrapper_generated.h"
 
 YOLOv8Worker::YOLOv8Worker(const char* name,
                            CameraParams* cam_params,
@@ -121,158 +122,198 @@ YOLOv8Worker::~YOLOv8Worker() {
 }
 
 void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer) {
-    // ... (implementation as before)
-    enet_host_context_ = host_ctx; //
-    enet_target_peer_ = target_peer; //
-    if (target_peer) { //
-        std::cout << "YOLOv8Worker " << threadName << " ENet target set." << std::endl; //
+    // Use the 'threadName' member from CThreadWorker for more specific logging
+    std::cout << "YOLOv8Worker (" << this->threadName // Assuming threadName is set by CThreadWorker constructor
+              << "): SetENetTarget called. Host_ctx address: " << static_cast<void*>(host_ctx)
+              << ". Target_peer address: " << static_cast<void*>(target_peer);
+    if (target_peer) {
+        std::cout << " (Peer ID: " << target_peer->incomingPeerID << ")";
+    }
+    std::cout << std::endl;
+
+    enet_host_context_ = host_ctx;
+    enet_target_peer_ = target_peer;
+
+    if (enet_host_context_) {
+        std::cout << "YOLOv8Worker (" << this->threadName
+                  << "): enet_host_context_ successfully set. Address: " << static_cast<void*>(enet_host_context_) << std::endl;
     } else {
-        std::cout << "YOLOv8Worker " << threadName << " ENet target cleared." << std::endl; //
+        std::cout << "YOLOv8Worker (" << this->threadName
+                  << "): enet_host_context_ is NULL after assignment in SetENetTarget." << std::endl;
+    }
+    if (enet_target_peer_) {
+         std::cout << "YOLOv8Worker (" << this->threadName
+                  << "): enet_target_peer_ successfully set. Address: " << static_cast<void*>(enet_target_peer_) << std::endl;
+    } else {
+         std::cout << "YOLOv8Worker (" << this->threadName
+                  << "): enet_target_peer_ is NULL after assignment in SetENetTarget." << std::endl;
     }
 }
 
 bool YOLOv8Worker::WorkerFunction(void* f) {
-    if (!yolov8_instance_ || !fb_builder_) { //
-        PutObjectToQueueOut(f); //
+    if (!yolov8_instance_ || !fb_builder_) {
+        if (f) PutObjectToQueueOut(f); // Ensure entry is returned if worker is not fully initialized
         return false;
     }
 
-    WORKER_ENTRY* original_entry = static_cast<WORKER_ENTRY*>(f); //
-    ck(cudaSetDevice(associated_camera_params_->gpu_id)); //
+    WORKER_ENTRY* original_entry = static_cast<WORKER_ENTRY*>(f);
+    ck(cudaSetDevice(associated_camera_params_->gpu_id));
 
-    ck(cudaMemcpy2DAsync(frame_original_gpu_.d_orig, //
-                    associated_camera_params_->width, //
-                    original_entry->imagePtr,        //
-                    associated_camera_params_->width, //
-                    associated_camera_params_->width, //
-                    associated_camera_params_->height, //
-                    cudaMemcpyHostToDevice,          //
-                    yolov8_instance_->stream));      //
+    ck(cudaMemcpy2DAsync(frame_original_gpu_.d_orig,
+                    associated_camera_params_->width,
+                    original_entry->imagePtr,
+                    associated_camera_params_->width,
+                    associated_camera_params_->width,
+                    associated_camera_params_->height,
+                    cudaMemcpyHostToDevice,
+                    yolov8_instance_->stream));
 
-    if (associated_camera_params_->color) { //
-        debayer_frame_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_); //
+    if (associated_camera_params_->color) {
+        debayer_frame_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
     } else {
-        duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_); //
-    }
-    
-    rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer, //
-                     associated_camera_params_->width, associated_camera_params_->height, yolov8_instance_->stream); //
-
-    yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_); //
-    yolov8_instance_->infer(); //
-    
-    frame_counter_++; //
-    auto current_time = std::chrono::steady_clock::now(); //
-    std::chrono::duration<double> elapsed_seconds = current_time - last_fps_update_time_; //
-
-    if (elapsed_seconds.count() >= 1.0) { //
-        current_fps_ = static_cast<double>(frame_counter_) / elapsed_seconds.count(); //
-        std::cout << "YOLOv8 Worker (" << threadName << ") Inference FPS: " << current_fps_ << std::endl; //
-        frame_counter_ = 0; //
-        last_fps_update_time_ = current_time; //
+        duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
     }
 
-    std::vector<pose::Object> detections; 
-    yolov8_instance_->postprocess(detections); //
+    rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer,
+                     associated_camera_params_->width, associated_camera_params_->height, yolov8_instance_->stream);
+
+    yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_);
+    yolov8_instance_->infer();
+
+    frame_counter_++;
+    auto current_time = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = current_time - last_fps_update_time_;
+
+    if (elapsed_seconds.count() >= 1.0) {
+        current_fps_ = static_cast<double>(frame_counter_) / elapsed_seconds.count();
+        std::cout << "YOLOv8 Worker (" << threadName << ") Inference FPS: " << current_fps_ << std::endl; // Optional: reduce verbosity
+        frame_counter_ = 0;
+        last_fps_update_time_ = current_time;
+    }
+
+    std::vector<pose::Object> detections;
+    yolov8_instance_->postprocess(detections);
 
     // --- Draw detections and copy to display buffer ---
     if (display_texture_buffer_ && associated_camera_select_->stream_on) {
         if (!detections.empty()) {
-            // For simplicity, draw the bounding box of the first detection
-            // This logic can be expanded to draw all detections or more complex visuals
             const auto& obj = detections[0];
             float points[8] = {
-                obj.rect.x, obj.rect.y,                                 // Top-left
-                obj.rect.x + obj.rect.width, obj.rect.y,                // Top-right
-                obj.rect.x + obj.rect.width, obj.rect.y + obj.rect.height, // Bottom-right
-                obj.rect.x, obj.rect.y + obj.rect.height                // Bottom-left
+                obj.rect.x, obj.rect.y,
+                obj.rect.x + obj.rect.width, obj.rect.y,
+                obj.rect.x + obj.rect.width, obj.rect.y + obj.rect.height,
+                obj.rect.x, obj.rect.y + obj.rect.height
             };
-            // The skeleton for a box: 0-1, 1-2, 2-3, 3-0. d_skeleton_for_drawing_ should be set up for this.
-            CHECK(cudaMemcpyAsync(d_points_for_drawing_, points, sizeof(float) * 8, cudaMemcpyHostToDevice, yolov8_instance_->stream)); //
-            // Assuming debayer_gpu_.d_debayer is RGBA and gpu_draw_rat_pose can draw on RGBA (num_channels=4)
-            gpu_draw_rat_pose(debayer_gpu_.d_debayer, associated_camera_params_->width, associated_camera_params_->height, d_points_for_drawing_, d_skeleton_for_drawing_, yolov8_instance_->stream, 4); //
+            CHECK(cudaMemcpyAsync(d_points_for_drawing_, points, sizeof(float) * 8, cudaMemcpyHostToDevice, yolov8_instance_->stream));
+            gpu_draw_rat_pose(debayer_gpu_.d_debayer, associated_camera_params_->width, associated_camera_params_->height, d_points_for_drawing_, d_skeleton_for_drawing_, yolov8_instance_->stream, 4);
         }
 
         unsigned char* source_for_display = debayer_gpu_.d_debayer;
         int source_width = associated_camera_params_->width;
         int source_height = associated_camera_params_->height;
 
-        if (associated_camera_select_->downsample != 1) { //
+        if (associated_camera_select_->downsample != 1) {
             NppiSize srcSize = {associated_camera_params_->width, associated_camera_params_->height};
-            const NppStatus npp_result = nppiResize_8u_C4R( //
-                debayer_gpu_.d_debayer, //
-                associated_camera_params_->width * 4, // Source step (pitch)
-                srcSize,                               
-                input_roi_for_display_resize_,       
+            const NppStatus npp_result = nppiResize_8u_C4R(
+                debayer_gpu_.d_debayer,
+                associated_camera_params_->width * 4,
+                srcSize,
+                input_roi_for_display_resize_,
                 d_display_resize_buffer_,
-                output_display_size_.width * 4,      
-                output_display_size_,                
-                output_roi_for_display_resize_,      
-                NPPI_INTER_SUPER); //
-            if (npp_result != NPP_SUCCESS) { //
-                std::cerr << "YOLO Worker: Error executing resize -- code: " << npp_result << std::endl; //
+                output_display_size_.width * 4,
+                output_display_size_,
+                output_roi_for_display_resize_,
+                NPPI_INTER_SUPER);
+            if (npp_result != NPP_SUCCESS) {
+                std::cerr << "YOLO Worker: Error executing resize -- code: " << npp_result << std::endl;
             }
             source_for_display = d_display_resize_buffer_;
             source_width = output_display_size_.width;
             source_height = output_display_size_.height;
         }
-        
-        ck(cudaMemcpy2DAsync(display_texture_buffer_, //
-                         source_width * 4, //
-                         source_for_display, //
-                         source_width * 4, //
-                         source_width * 4, //
-                         source_height, //
-                         cudaMemcpyDeviceToDevice, //
+
+        ck(cudaMemcpy2DAsync(display_texture_buffer_,
+                         source_width * 4,
+                         source_for_display,
+                         source_width * 4,
+                         source_width * 4,
+                         source_height,
+                         cudaMemcpyDeviceToDevice,
                          yolov8_instance_->stream));
     }
     // --- End drawing and copying ---
 
-
+    // ##### START OF MODIFICATION: ADD LOGGING FOR SEND ATTEMPT #####
     if (enet_host_context_ && enet_target_peer_ &&
-        enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) { //
-        
-        fb_builder_->Clear(); //
-        // ... (rest of FlatBuffer building and sending logic as before) ...
-        std::vector<flatbuffers::Offset<Orange::VisionData::Detection>> fb_detections_offsets; //
+        enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) {
 
-        for (const auto& det : detections) { //
-            Orange::VisionData::BoundingBox box_struct( //
-                det.rect.x, //
-                det.rect.y, //
-                det.rect.width, //
-                det.rect.height, //
-                det.label, //
-                det.prob //
+        // Log that we are attempting to send
+        std::cout << "YOLOv8Worker (" << threadName
+                  << "): Attempting to send " << detections.size()
+                  << " detections to peer ID " << enet_target_peer_->incomingPeerID
+                  << " for frame ID " << original_entry->frame_id
+                  << std::endl;
+
+        fb_builder_->Clear();
+        std::vector<flatbuffers::Offset<Orange::VisionData::Detection>> fb_detections_offsets;
+
+        for (const auto& det : detections) {
+            Orange::VisionData::BoundingBox box_struct(
+                det.rect.x,
+                det.rect.y,
+                det.rect.width,
+                det.rect.height,
+                det.label,
+                det.prob
             );
-            
-            fb_detections_offsets.push_back(Orange::VisionData::CreateDetection(*fb_builder_, &box_struct)); //
+            fb_detections_offsets.push_back(Orange::VisionData::CreateDetection(*fb_builder_, &box_struct));
         }
 
-        auto detections_vector = fb_builder_->CreateVector(fb_detections_offsets); //
-        auto camera_serial_str = fb_builder_->CreateString(associated_camera_params_->camera_serial); //
+        auto detections_vector = fb_builder_->CreateVector(fb_detections_offsets);
+        auto camera_serial_str = fb_builder_->CreateString(associated_camera_params_->camera_serial);
 
-        Orange::VisionData::YoloFrameDetectionsBuilder yolo_frame_builder(*fb_builder_); //
-        yolo_frame_builder.add_camera_serial(camera_serial_str); //
-        yolo_frame_builder.add_timestamp(original_entry->timestamp); //
-        yolo_frame_builder.add_frame_id(original_entry->frame_id); //
-        yolo_frame_builder.add_detections(detections_vector); //
-        
-        auto final_payload_offset = yolo_frame_builder.Finish(); //
-        fb_builder_->Finish(final_payload_offset); //
+        Orange::VisionData::YoloFrameDetectionsBuilder yolo_frame_builder(*fb_builder_);
+        yolo_frame_builder.add_camera_serial(camera_serial_str);
+        yolo_frame_builder.add_timestamp(original_entry->timestamp);
+        yolo_frame_builder.add_frame_id(original_entry->frame_id);
+        yolo_frame_builder.add_detections(detections_vector);
+        auto yolo_payload_offset = yolo_frame_builder.Finish();
 
-        uint8_t* buf = fb_builder_->GetBufferPointer(); //
-        size_t size = fb_builder_->GetSize(); //
-        
-        ENetPacket* packet = enet_packet_create(buf, size, ENET_PACKET_FLAG_RELIABLE); //
-        enet_peer_send(enet_target_peer_, 0, packet); //
+        auto root_message_offset = Orange::Network::CreateRootMessage(
+            *fb_builder_,
+            Orange::Network::Payload_Orange_VisionData_YoloFrameDetections,
+            yolo_payload_offset.Union()
+        );
+        fb_builder_->Finish(root_message_offset, Orange::Network::RootMessageIdentifier());
+
+        uint8_t* buf = fb_builder_->GetBufferPointer();
+        size_t size = fb_builder_->GetSize();
+
+        ENetPacket* packet = enet_packet_create(buf, size, ENET_PACKET_FLAG_RELIABLE);
+        enet_peer_send(enet_target_peer_, 0, packet);
+
+        // Optionally, log after successful send attempt
+        std::cout << "YOLOv8Worker (" << threadName << "): Packet sent." << std::endl;
+
+    } else {
+        if (!enet_host_context_) {
+            std::cout << "YOLOv8Worker (" << this->threadName // Use this->threadName
+                      << "): Not sending data, enet_host_context_ is null. Address: " << static_cast<void*>(enet_host_context_) << std::endl;
+       } else if (!enet_target_peer_) {
+            std::cout << "YOLOv8Worker (" << this->threadName
+                      << "): Not sending data, enet_target_peer_ is null. Host context address: " << static_cast<void*>(enet_host_context_) << std::endl;
+       } else if (enet_target_peer_->state != ENET_PEER_STATE_CONNECTED) {
+            std::cout << "YOLOv8Worker (" << this->threadName
+                      << "): Not sending data, enet_target_peer_ not connected (state: " << enet_target_peer_->state
+                      << "). Host context address: " << static_cast<void*>(enet_host_context_) << std::endl;
+       }
+   }
+
+    PutObjectToQueueOut(f);
+    if (display_texture_buffer_ && associated_camera_select_->stream_on) {
+        cudaStreamSynchronize(yolov8_instance_->stream);
     }
-    
-    PutObjectToQueueOut(f); //
-    if (display_texture_buffer_ && associated_camera_select_->stream_on) { //
-        cudaStreamSynchronize(yolov8_instance_->stream); //
-    }
-    return true; 
+    return true;
 }
 
 void YOLOv8Worker::WorkerReset() {

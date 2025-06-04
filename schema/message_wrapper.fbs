@@ -1,0 +1,23 @@
+// message_wrapper.fbs
+include "fetch.fbs";
+include "yolo_payload.fbs";
+
+namespace Orange.Network;
+
+enum MessagePayload : byte {
+  NONE = 0,
+  FetchGame_Server = 1,
+  Orange_VisionData_YoloFrameDetections = 2,
+}
+
+union Payload {
+  FetchGame.Server,
+  Orange.VisionData.YoloFrameDetections
+}
+
+table RootMessage {
+  payload: Payload;
+}
+
+file_identifier "ORNG";
+root_type RootMessage;

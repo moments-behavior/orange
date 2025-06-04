@@ -6,6 +6,8 @@
 #include <thread>
 #include "acquire_frames.h"
 #include "yolo_worker.h" // Include the YOLOv8Worker header
+#include "network_base.h"
+#include "enet_thread.h"
 
 struct EncoderConfig {
     std::string encoder_codec;
@@ -79,7 +81,8 @@ inline void start_camera_streaming(
     const std::string& folder_name,
     PTPParams* ptp_params,
     INDIGOSignalBuilder* indigo_signal_builder,
-    const std::string& yolo_model_path_from_gui // Renamed for clarity
+    const std::string& yolo_model_path_from_gui,
+    EnetContext* main_enet_server_context
 )
 {
     // Clear any existing yolo_workers from a previous session
@@ -131,16 +134,14 @@ inline void start_camera_streaming(
                       << " for GPU: " << cameras_params[i].gpu_id
                       << " with model: " << (cameras_select[i].yolo_model ? cameras_select[i].yolo_model : "NONE")
                       << std::endl;
-            
-            // Determine the display buffer for this YOLO worker
+
             unsigned char* display_buffer_for_yolo = nullptr;
-            if (cameras_select[i].stream_on) { // If YOLO is on AND streaming is on for this camera
+            if (cameras_select[i].stream_on) {
                 display_buffer_for_yolo = tex[i].cuda_buffer;
             }
 
-            // Add an additional check here before creating the worker, just in case
             if (cameras_select[i].yolo_model == nullptr || strlen(cameras_select[i].yolo_model) == 0) {
-                 std::cerr << "YOLOv8Worker Error: yolo_model for " << worker_name << " is still null or empty after attempting to set from GUI path. Skipping worker creation." << std::endl;
+                 std::cerr << "YOLOv8Worker Error: yolo_model for " << worker_name << " is still null or empty. Skipping worker creation." << std::endl;
             } else {
                 current_yolo_worker = new YOLOv8Worker(
                     worker_name.c_str(),
@@ -148,6 +149,20 @@ inline void start_camera_streaming(
                     &cameras_select[i],
                     display_buffer_for_yolo
                 );
+
+                if (external_data_consumer_peer && main_enet_server_context) {
+                    std::cout << "start_camera_streaming: Proactively calling SetENetTarget for worker " << worker_name
+                              << " with peer ID: " << external_data_consumer_peer->incomingPeerID
+                              << " and host_ctx: " << static_cast<void*>(main_enet_server_context) << std::endl;
+                    current_yolo_worker->SetENetTarget(main_enet_server_context, external_data_consumer_peer);
+                } else {
+                     std::cout << "start_camera_streaming: No external_data_consumer_peer or main_enet_server_context yet for worker " << worker_name << std::endl;
+                     if (!external_data_consumer_peer) std::cout << "  external_data_consumer_peer is NULL" << std::endl;
+                     if (!main_enet_server_context) std::cout << "  main_enet_server_context is NULL" << std::endl;
+                }
+                std::cout << "start_camera_streaming: Created YOLOv8Worker for " << worker_name
+                          << " at address " << static_cast<void*>(current_yolo_worker) << std::endl;
+
                 current_yolo_worker->StartThread();
                 yolo_workers[i] = current_yolo_worker;
             }

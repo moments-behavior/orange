@@ -5,12 +5,13 @@
 #include <math.h>
 #include <thread>
 #include "acquire_frames.h"
+#include "yolo_worker.h" // Include the YOLOv8Worker header
 
 struct EncoderConfig {
     std::string encoder_codec;
     std::string encoder_preset;
     std::string folder_name;
-}; 
+};
 
 struct GL_Texture {
     GLuint texture;
@@ -43,26 +44,57 @@ void upload_texture_from_pbo(GL_Texture& tex, int width, int height) {
 void clear_upload_and_cleanup(GL_Texture& tex, int width, int height) {
     // Clear the CUDA buffer
     int size_pic = width * height * sizeof(unsigned char) * 4;
-    cudaMemset(tex.cuda_buffer, 0, size_pic);
+    if (tex.cuda_buffer) { // Check if buffer was actually allocated (e.g. stream_on was true)
+      cudaMemset(tex.cuda_buffer, 0, size_pic);
+    }
 
     // Upload from PBO to texture
     upload_texture_from_pbo(tex, width, height);
 
     // Cleanup resources
     gx_delete_buffer(&tex.pbo);
-    unmap_cuda_resource(&tex.cuda_resource);
-    cuda_unregister_pbo(tex.cuda_resource);
-    cudaStreamDestroy(tex.streams);
+    if (tex.cuda_resource) { // Check if resource was registered
+      unmap_cuda_resource(&tex.cuda_resource);
+      cuda_unregister_pbo(tex.cuda_resource);
+    }
+    if (tex.streams) {
+      cudaStreamDestroy(tex.streams);
+      tex.streams = nullptr;
+    }
 }
 
 
-inline void start_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams,
-                                   CameraParams* cameras_params, CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras, int evt_buffer_size, bool ptp_stream_sync,
-                                   const std::string& encoder_setup, const std::string& folder_name, PTPParams* ptp_params, INDIGOSignalBuilder* indigo_signal_builder,
-                                   const std::string& yolo_model)
+inline void start_camera_streaming(
+    std::vector<std::thread>& camera_threads,
+    std::vector<YOLOv8Worker*>& yolo_workers, // Added yolo_workers
+    CameraControl *camera_control,
+    CameraEmergent* ecams,
+    CameraParams* cameras_params,
+    CameraEachSelect *cameras_select,
+    GL_Texture *tex, // This is an array of GL_Texture
+    int num_cameras,
+    int evt_buffer_size,
+    bool ptp_stream_sync,
+    const std::string& encoder_setup,
+    const std::string& folder_name,
+    PTPParams* ptp_params,
+    INDIGOSignalBuilder* indigo_signal_builder,
+    const std::string& yolo_model_path_from_gui // Renamed for clarity
+)
 {
+    // Clear any existing yolo_workers from a previous session
+    for (YOLOv8Worker* worker : yolo_workers) {
+        if (worker) {
+            worker->StopThread(); // Ensure it's stopped before deleting
+            // worker->join_thread(); // Join should happen in stop_camera_streaming
+            delete worker;
+        }
+    }
+    yolo_workers.clear();
+    yolo_workers.resize(num_cameras, nullptr); // Pre-allocate with nullptrs for easier indexing
+
     for (int i = 0; i < num_cameras; i++)
-    {               
+    {
         camera_open_stream(&ecams[i].camera, &cameras_params[i]);
         ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
         allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
@@ -80,45 +112,116 @@ inline void start_camera_streaming(std::vector<std::thread>& camera_threads, Cam
         }
         camera_control->sync_camera = true;
     }
-    
-    for (int i = 0; i < num_cameras; i++)
-    {
-        cameras_select[i].yolo_model = yolo_model.c_str();
-    }
 
     for (int i = 0; i < num_cameras; i++)
     {
-        camera_threads.emplace_back(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, tex[i].cuda_buffer, encoder_setup, folder_name, ptp_params, indigo_signal_builder);
+        // cameras_select[i].yolo_model is set in orange.cpp when "Open Camera" is clicked
+        // or if yolo checkbox is toggled. Ensure yolo_model_path_from_gui is used if it's the most current.
+        // For now, we assume cameras_select[i].yolo_model is correctly populated before this function.
+        // If yolo_model_path_from_gui is meant to override, logic would be:
+        // if (!yolo_model_path_from_gui.empty()) { cameras_select[i].yolo_model = yolo_model_path_from_gui.c_str(); }
+
+        YOLOv8Worker* current_yolo_worker = nullptr;
+        if (cameras_select[i].yolo) {
+            if (!yolo_model_path_from_gui.empty()) {
+                cameras_select[i].yolo_model = yolo_model_path_from_gui.c_str();
+            }
+            std::string worker_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
+            std::cout << "Creating YOLOv8Worker: " << worker_name
+                      << " for GPU: " << cameras_params[i].gpu_id
+                      << " with model: " << (cameras_select[i].yolo_model ? cameras_select[i].yolo_model : "NONE")
+                      << std::endl;
+
+            current_yolo_worker = new YOLOv8Worker(
+                worker_name.c_str(),
+                &cameras_params[i],
+                &cameras_select[i] // Pass the specific select struct for this camera
+            );
+            current_yolo_worker->StartThread();
+            yolo_workers[i] = current_yolo_worker; // Store based on camera index
+        }
+
+        unsigned char* display_buffer_for_cam = nullptr;
+        if (cameras_select[i].stream_on) {
+             // tex is an array, access tex[i]
+            display_buffer_for_cam = tex[i].cuda_buffer;
+        }
+
+        camera_threads.emplace_back(
+            &acquire_frames,
+            &ecams[i],
+            &cameras_params[i],
+            &cameras_select[i],
+            camera_control,
+            display_buffer_for_cam, // Pass the specific cuda_buffer for this camera's texture
+            encoder_setup,
+            folder_name,
+            ptp_params,
+            indigo_signal_builder,
+            current_yolo_worker // Pass the (potentially null) YOLO worker for this camera
+        );
     }
 }
 
-inline void stop_camera_streaming(std::vector<std::thread>& camera_threads, CameraControl *camera_control, CameraEmergent* ecams, CameraParams* cameras_params,
-                                  CameraEachSelect *cameras_select, const int num_cameras, const int evt_buffer_size, PTPParams* ptp_params)
+inline void stop_camera_streaming(
+    std::vector<std::thread>& camera_threads,
+    std::vector<YOLOv8Worker*>& yolo_workers, // Added yolo_workers
+    CameraControl *camera_control,
+    CameraEmergent* ecams,
+    CameraParams* cameras_params,
+    CameraEachSelect *cameras_select, // Added cameras_select for texture cleanup logic
+    GL_Texture *tex,                  // Added tex for texture cleanup logic
+    const int num_cameras,
+    const int evt_buffer_size,
+    PTPParams* ptp_params
+)
 {
-    for (auto &t : camera_threads)
-        t.join();
-    
-    for (int i = 0; i < num_cameras; i++)
-    {
-        camera_threads.pop_back();
+    for (auto &t : camera_threads) {
+        if (t.joinable()) { // Check if joinable before joining
+            t.join();
+        }
     }
+    camera_threads.clear(); // Clear after joining all
+
+
+    for (YOLOv8Worker* worker : yolo_workers) {
+        if (worker) {
+            worker->StopThread();
+            // Assuming CThreadWorker's StopThread is synchronous or join is handled internally/next
+            // If not, and if CThreadWorker has a join_thread() or similar:
+            // worker->join_thread(); // Or ensure StopThread itself blocks until thread exits
+            delete worker;
+        }
+    }
+    yolo_workers.clear();
 
     for (int i = 0; i < num_cameras; i++)
     {
-        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, cameras_params);
+        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);
         delete[] ecams[i].evt_frame;
+        ecams[i].evt_frame = nullptr; // Avoid dangling pointer
         check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
     }
-    
-    if (num_cameras > 1) {
+
+    if (num_cameras > 0 && ptp_params->network_sync) { // Check num_cameras to avoid issues if it was 0
         for (int i = 0; i < num_cameras; i++)
         {
-            ptp_sync_off(&ecams[i].camera, cameras_params);
+            ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
         }
+    }
+    // Reset PTP parameters only if they were used
+    if (ptp_params->network_sync || camera_control->sync_camera) {
         ptp_params->ptp_counter = 0;
         ptp_params->ptp_global_time = 0;
-        camera_control->sync_camera = false;
+        ptp_params->ptp_stop_time = 0; // Ensure stop time is also reset
+        ptp_params->ptp_stop_counter = 0;
+        // ptp_params->network_sync remains as it was set (true if network PTP, false otherwise)
+        ptp_params->network_set_start_ptp = false;
+        ptp_params->ptp_start_reached = false;
+        ptp_params->ptp_stop_reached = false;
+        ptp_params->network_set_stop_ptp = false;
     }
+    camera_control->sync_camera = false; // Always reset this internal control flag
 }
 
 static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, const int num_cameras, std::vector<std::string>& color_temps)

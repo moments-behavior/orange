@@ -1,0 +1,33 @@
+// yolo_payload.fbs
+namespace Orange.VisionData; // Using a new namespace for clarity
+
+// A struct to represent a single bounding box and its properties.
+// Structs are good for fixed-size data that's frequently accessed.
+struct BoundingBox {
+  x:float;          // Top-left x coordinate
+  y:float;          // Top-left y coordinate
+  width:float;      // Width of the box
+  height:float;     // Height of the box
+  label:int;        // Class label ID
+  probability:float; // Detection confidence
+}
+
+// A table for a single detection. This allows for future expansion,
+// for example, if you want to add keypoints or other per-detection metadata.
+// If BoundingBox is the only thing per detection, you could embed it directly
+// in YoloFrameDetections as a vector of structs.
+table Detection {
+  box:BoundingBox;
+  // keypoints:[KeyPoint]; // Example for future extension
+}
+
+// The main table that will be sent over ENet for each frame's YOLO results.
+table YoloFrameDetections {
+  camera_serial:string (required); // Identifier for the camera source
+  timestamp:ulong;                 // Frame timestamp (e.g., from SDK)
+  frame_id:ulong;                  // Frame counter or ID
+  detections:[Detection];          // A list of all detections in the frame
+}
+
+// Define the root type of the buffer.
+root_type YoloFrameDetections;

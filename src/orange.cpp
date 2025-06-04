@@ -10,7 +10,11 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "enet_thread.h"
+#include "yolo_worker.h"
 #include "global.h"
+
+std::vector<YOLOv8Worker*> yolo_workers; // For managing YOLO workers
+ENetPeer* external_data_consumer_peer = nullptr; // Store the peer for YOLO data
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -294,7 +298,7 @@ int main(int argc, char **args) {
                         }
                     }
 
-                    start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select, tex,
+                    start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select, tex,
                                            num_cameras, evt_buffer_size, true, encoder_setup,
                                            encoder_config->folder_name, ptp_params,
                                            &indigo_signal_builder, yolo_model);
@@ -901,7 +905,7 @@ int main(int argc, char **args) {
                             }
                         }
 
-                        start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
+                        start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
                                                tex, num_cameras,
                                                evt_buffer_size, ptp_stream_sync, "",
                                                encoder_config->folder_name, ptp_params,
@@ -916,9 +920,8 @@ int main(int argc, char **args) {
                         }
                         delete[] tex;
 
-                        stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
-                                              num_cameras,
-                                              evt_buffer_size, ptp_params);
+                        stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
+                            tex, num_cameras, evt_buffer_size, ptp_params);
                     }
                 }
             }
@@ -942,9 +945,8 @@ int main(int argc, char **args) {
                                     clear_upload_and_cleanup(tex[i], camera_width, camera_height);                                }
                             }
                             delete[] tex;
-                            stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
-                                                  num_cameras,
-                                                  evt_buffer_size, ptp_params);
+                            stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
+                                tex, num_cameras, evt_buffer_size, ptp_params);
                         }
 
                         std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset+ " -fps ";
@@ -967,7 +969,7 @@ int main(int argc, char **args) {
                             }
                         }
 
-                        start_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
+                        start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
                                                tex, num_cameras, evt_buffer_size, ptp_stream_sync, encoder_setup,
                                                encoder_config->folder_name, ptp_params,
                                                &indigo_signal_builder, yolo_model);
@@ -984,9 +986,8 @@ int main(int argc, char **args) {
                         }
                         delete[] tex;
 
-                        stop_camera_streaming(camera_threads, camera_control, ecams, cameras_params, cameras_select,
-                                              num_cameras,
-                                              evt_buffer_size, ptp_params);
+                        stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
+                            tex, num_cameras, evt_buffer_size, ptp_params);
                         camera_control->record_video = false;
                     }
                 }

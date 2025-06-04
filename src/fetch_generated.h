@@ -17,9 +17,11 @@ namespace FetchGame {
 
 struct bring_up_message;
 struct bring_up_messageBuilder;
+struct bring_up_messageT;
 
 struct Server;
 struct ServerBuilder;
+struct ServerT;
 
 enum ServerControl : int8_t {
   ServerControl_IDLE = 0,
@@ -168,7 +170,14 @@ inline const char *EnumNameManagerState(ManagerState e) {
   return EnumNamesManagerState()[index];
 }
 
+struct bring_up_messageT : public ::flatbuffers::NativeTable {
+  typedef bring_up_message TableType;
+  std::string server_name{};
+  int16_t num_cameras = 0;
+};
+
 struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef bring_up_messageT NativeTableType;
   typedef bring_up_messageBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_SERVER_NAME = 4,
@@ -187,6 +196,9 @@ struct bring_up_message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<int16_t>(verifier, VT_NUM_CAMERAS, 2) &&
            verifier.EndTable();
   }
+  bring_up_messageT *UnPack(const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  void UnPackTo(bring_up_messageT *_o, const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  static ::flatbuffers::Offset<bring_up_message> Pack(::flatbuffers::FlatBufferBuilder &_fbb, const bring_up_messageT* _o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
 };
 
 struct bring_up_messageBuilder {
@@ -231,7 +243,26 @@ inline ::flatbuffers::Offset<bring_up_message> Createbring_up_messageDirect(
       num_cameras);
 }
 
+::flatbuffers::Offset<bring_up_message> Createbring_up_message(::flatbuffers::FlatBufferBuilder &_fbb, const bring_up_messageT *_o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
+
+struct ServerT : public ::flatbuffers::NativeTable {
+  typedef Server TableType;
+  FetchGame::SignalType signal_type = FetchGame::SignalType_ClientBringup;
+  FetchGame::ServerControl control = FetchGame::ServerControl_IDLE;
+  std::unique_ptr<FetchGame::bring_up_messageT> server_mesg{};
+  std::string config_folder{};
+  std::string record_folder{};
+  std::string encoder_setup{};
+  uint64_t ptp_global_time = 0;
+  FetchGame::ManagerState server_state = FetchGame::ManagerState_IDLE;
+  ServerT() = default;
+  ServerT(const ServerT &o);
+  ServerT(ServerT&&) FLATBUFFERS_NOEXCEPT = default;
+  ServerT &operator=(ServerT o) FLATBUFFERS_NOEXCEPT;
+};
+
 struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef ServerT NativeTableType;
   typedef ServerBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_SIGNAL_TYPE = 4,
@@ -283,6 +314,9 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<int8_t>(verifier, VT_SERVER_STATE, 1) &&
            verifier.EndTable();
   }
+  ServerT *UnPack(const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  void UnPackTo(ServerT *_o, const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  static ::flatbuffers::Offset<Server> Pack(::flatbuffers::FlatBufferBuilder &_fbb, const ServerT* _o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
 };
 
 struct ServerBuilder {
@@ -371,6 +405,107 @@ inline ::flatbuffers::Offset<Server> CreateServerDirect(
       server_state);
 }
 
+::flatbuffers::Offset<Server> CreateServer(::flatbuffers::FlatBufferBuilder &_fbb, const ServerT *_o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
+
+inline bring_up_messageT *bring_up_message::UnPack(const ::flatbuffers::resolver_function_t *_resolver) const {
+  auto _o = std::unique_ptr<bring_up_messageT>(new bring_up_messageT());
+  UnPackTo(_o.get(), _resolver);
+  return _o.release();
+}
+
+inline void bring_up_message::UnPackTo(bring_up_messageT *_o, const ::flatbuffers::resolver_function_t *_resolver) const {
+  (void)_o;
+  (void)_resolver;
+  { auto _e = server_name(); if (_e) _o->server_name = _e->str(); }
+  { auto _e = num_cameras(); _o->num_cameras = _e; }
+}
+
+inline ::flatbuffers::Offset<bring_up_message> bring_up_message::Pack(::flatbuffers::FlatBufferBuilder &_fbb, const bring_up_messageT* _o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  return Createbring_up_message(_fbb, _o, _rehasher);
+}
+
+inline ::flatbuffers::Offset<bring_up_message> Createbring_up_message(::flatbuffers::FlatBufferBuilder &_fbb, const bring_up_messageT *_o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  (void)_rehasher;
+  (void)_o;
+  struct _VectorArgs { ::flatbuffers::FlatBufferBuilder *__fbb; const bring_up_messageT* __o; const ::flatbuffers::rehasher_function_t *__rehasher; } _va = { &_fbb, _o, _rehasher}; (void)_va;
+  auto _server_name = _o->server_name.empty() ? 0 : _fbb.CreateString(_o->server_name);
+  auto _num_cameras = _o->num_cameras;
+  return FetchGame::Createbring_up_message(
+      _fbb,
+      _server_name,
+      _num_cameras);
+}
+
+inline ServerT::ServerT(const ServerT &o)
+      : signal_type(o.signal_type),
+        control(o.control),
+        server_mesg((o.server_mesg) ? new FetchGame::bring_up_messageT(*o.server_mesg) : nullptr),
+        config_folder(o.config_folder),
+        record_folder(o.record_folder),
+        encoder_setup(o.encoder_setup),
+        ptp_global_time(o.ptp_global_time),
+        server_state(o.server_state) {
+}
+
+inline ServerT &ServerT::operator=(ServerT o) FLATBUFFERS_NOEXCEPT {
+  std::swap(signal_type, o.signal_type);
+  std::swap(control, o.control);
+  std::swap(server_mesg, o.server_mesg);
+  std::swap(config_folder, o.config_folder);
+  std::swap(record_folder, o.record_folder);
+  std::swap(encoder_setup, o.encoder_setup);
+  std::swap(ptp_global_time, o.ptp_global_time);
+  std::swap(server_state, o.server_state);
+  return *this;
+}
+
+inline ServerT *Server::UnPack(const ::flatbuffers::resolver_function_t *_resolver) const {
+  auto _o = std::unique_ptr<ServerT>(new ServerT());
+  UnPackTo(_o.get(), _resolver);
+  return _o.release();
+}
+
+inline void Server::UnPackTo(ServerT *_o, const ::flatbuffers::resolver_function_t *_resolver) const {
+  (void)_o;
+  (void)_resolver;
+  { auto _e = signal_type(); _o->signal_type = _e; }
+  { auto _e = control(); _o->control = _e; }
+  { auto _e = server_mesg(); if (_e) { if(_o->server_mesg) { _e->UnPackTo(_o->server_mesg.get(), _resolver); } else { _o->server_mesg = std::unique_ptr<FetchGame::bring_up_messageT>(_e->UnPack(_resolver)); } } else if (_o->server_mesg) { _o->server_mesg.reset(); } }
+  { auto _e = config_folder(); if (_e) _o->config_folder = _e->str(); }
+  { auto _e = record_folder(); if (_e) _o->record_folder = _e->str(); }
+  { auto _e = encoder_setup(); if (_e) _o->encoder_setup = _e->str(); }
+  { auto _e = ptp_global_time(); _o->ptp_global_time = _e; }
+  { auto _e = server_state(); _o->server_state = _e; }
+}
+
+inline ::flatbuffers::Offset<Server> Server::Pack(::flatbuffers::FlatBufferBuilder &_fbb, const ServerT* _o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  return CreateServer(_fbb, _o, _rehasher);
+}
+
+inline ::flatbuffers::Offset<Server> CreateServer(::flatbuffers::FlatBufferBuilder &_fbb, const ServerT *_o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  (void)_rehasher;
+  (void)_o;
+  struct _VectorArgs { ::flatbuffers::FlatBufferBuilder *__fbb; const ServerT* __o; const ::flatbuffers::rehasher_function_t *__rehasher; } _va = { &_fbb, _o, _rehasher}; (void)_va;
+  auto _signal_type = _o->signal_type;
+  auto _control = _o->control;
+  auto _server_mesg = _o->server_mesg ? Createbring_up_message(_fbb, _o->server_mesg.get(), _rehasher) : 0;
+  auto _config_folder = _o->config_folder.empty() ? 0 : _fbb.CreateString(_o->config_folder);
+  auto _record_folder = _o->record_folder.empty() ? 0 : _fbb.CreateString(_o->record_folder);
+  auto _encoder_setup = _o->encoder_setup.empty() ? 0 : _fbb.CreateString(_o->encoder_setup);
+  auto _ptp_global_time = _o->ptp_global_time;
+  auto _server_state = _o->server_state;
+  return FetchGame::CreateServer(
+      _fbb,
+      _signal_type,
+      _control,
+      _server_mesg,
+      _config_folder,
+      _record_folder,
+      _encoder_setup,
+      _ptp_global_time,
+      _server_state);
+}
+
 inline const FetchGame::Server *GetServer(const void *buf) {
   return ::flatbuffers::GetRoot<FetchGame::Server>(buf);
 }
@@ -399,6 +534,18 @@ inline void FinishSizePrefixedServerBuffer(
     ::flatbuffers::FlatBufferBuilder &fbb,
     ::flatbuffers::Offset<FetchGame::Server> root) {
   fbb.FinishSizePrefixed(root);
+}
+
+inline std::unique_ptr<FetchGame::ServerT> UnPackServer(
+    const void *buf,
+    const ::flatbuffers::resolver_function_t *res = nullptr) {
+  return std::unique_ptr<FetchGame::ServerT>(GetServer(buf)->UnPack(res));
+}
+
+inline std::unique_ptr<FetchGame::ServerT> UnPackSizePrefixedServer(
+    const void *buf,
+    const ::flatbuffers::resolver_function_t *res = nullptr) {
+  return std::unique_ptr<FetchGame::ServerT>(GetSizePrefixedServer(buf)->UnPack(res));
 }
 
 }  // namespace FetchGame

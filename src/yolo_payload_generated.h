@@ -20,9 +20,11 @@ struct BoundingBox;
 
 struct Detection;
 struct DetectionBuilder;
+struct DetectionT;
 
 struct YoloFrameDetections;
 struct YoloFrameDetectionsBuilder;
+struct YoloFrameDetectionsT;
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) BoundingBox FLATBUFFERS_FINAL_CLASS {
  private:
@@ -71,7 +73,17 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) BoundingBox FLATBUFFERS_FINAL_CLASS {
 };
 FLATBUFFERS_STRUCT_END(BoundingBox, 24);
 
+struct DetectionT : public ::flatbuffers::NativeTable {
+  typedef Detection TableType;
+  std::unique_ptr<Orange::VisionData::BoundingBox> box{};
+  DetectionT() = default;
+  DetectionT(const DetectionT &o);
+  DetectionT(DetectionT&&) FLATBUFFERS_NOEXCEPT = default;
+  DetectionT &operator=(DetectionT o) FLATBUFFERS_NOEXCEPT;
+};
+
 struct Detection FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef DetectionT NativeTableType;
   typedef DetectionBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_BOX = 4
@@ -84,6 +96,9 @@ struct Detection FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<Orange::VisionData::BoundingBox>(verifier, VT_BOX, 4) &&
            verifier.EndTable();
   }
+  DetectionT *UnPack(const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  void UnPackTo(DetectionT *_o, const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  static ::flatbuffers::Offset<Detection> Pack(::flatbuffers::FlatBufferBuilder &_fbb, const DetectionT* _o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
 };
 
 struct DetectionBuilder {
@@ -112,7 +127,22 @@ inline ::flatbuffers::Offset<Detection> CreateDetection(
   return builder_.Finish();
 }
 
+::flatbuffers::Offset<Detection> CreateDetection(::flatbuffers::FlatBufferBuilder &_fbb, const DetectionT *_o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
+
+struct YoloFrameDetectionsT : public ::flatbuffers::NativeTable {
+  typedef YoloFrameDetections TableType;
+  std::string camera_serial{};
+  uint64_t timestamp = 0;
+  uint64_t frame_id = 0;
+  std::vector<std::unique_ptr<Orange::VisionData::DetectionT>> detections{};
+  YoloFrameDetectionsT() = default;
+  YoloFrameDetectionsT(const YoloFrameDetectionsT &o);
+  YoloFrameDetectionsT(YoloFrameDetectionsT&&) FLATBUFFERS_NOEXCEPT = default;
+  YoloFrameDetectionsT &operator=(YoloFrameDetectionsT o) FLATBUFFERS_NOEXCEPT;
+};
+
 struct YoloFrameDetections FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef YoloFrameDetectionsT NativeTableType;
   typedef YoloFrameDetectionsBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_CAMERA_SERIAL = 4,
@@ -143,6 +173,9 @@ struct YoloFrameDetections FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
            verifier.VerifyVectorOfTables(detections()) &&
            verifier.EndTable();
   }
+  YoloFrameDetectionsT *UnPack(const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  void UnPackTo(YoloFrameDetectionsT *_o, const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  static ::flatbuffers::Offset<YoloFrameDetections> Pack(::flatbuffers::FlatBufferBuilder &_fbb, const YoloFrameDetectionsT* _o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
 };
 
 struct YoloFrameDetectionsBuilder {
@@ -203,6 +236,94 @@ inline ::flatbuffers::Offset<YoloFrameDetections> CreateYoloFrameDetectionsDirec
       detections__);
 }
 
+::flatbuffers::Offset<YoloFrameDetections> CreateYoloFrameDetections(::flatbuffers::FlatBufferBuilder &_fbb, const YoloFrameDetectionsT *_o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
+
+inline DetectionT::DetectionT(const DetectionT &o)
+      : box((o.box) ? new Orange::VisionData::BoundingBox(*o.box) : nullptr) {
+}
+
+inline DetectionT &DetectionT::operator=(DetectionT o) FLATBUFFERS_NOEXCEPT {
+  std::swap(box, o.box);
+  return *this;
+}
+
+inline DetectionT *Detection::UnPack(const ::flatbuffers::resolver_function_t *_resolver) const {
+  auto _o = std::unique_ptr<DetectionT>(new DetectionT());
+  UnPackTo(_o.get(), _resolver);
+  return _o.release();
+}
+
+inline void Detection::UnPackTo(DetectionT *_o, const ::flatbuffers::resolver_function_t *_resolver) const {
+  (void)_o;
+  (void)_resolver;
+  { auto _e = box(); if (_e) _o->box = std::unique_ptr<Orange::VisionData::BoundingBox>(new Orange::VisionData::BoundingBox(*_e)); }
+}
+
+inline ::flatbuffers::Offset<Detection> Detection::Pack(::flatbuffers::FlatBufferBuilder &_fbb, const DetectionT* _o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  return CreateDetection(_fbb, _o, _rehasher);
+}
+
+inline ::flatbuffers::Offset<Detection> CreateDetection(::flatbuffers::FlatBufferBuilder &_fbb, const DetectionT *_o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  (void)_rehasher;
+  (void)_o;
+  struct _VectorArgs { ::flatbuffers::FlatBufferBuilder *__fbb; const DetectionT* __o; const ::flatbuffers::rehasher_function_t *__rehasher; } _va = { &_fbb, _o, _rehasher}; (void)_va;
+  auto _box = _o->box ? _o->box.get() : nullptr;
+  return Orange::VisionData::CreateDetection(
+      _fbb,
+      _box);
+}
+
+inline YoloFrameDetectionsT::YoloFrameDetectionsT(const YoloFrameDetectionsT &o)
+      : camera_serial(o.camera_serial),
+        timestamp(o.timestamp),
+        frame_id(o.frame_id) {
+  detections.reserve(o.detections.size());
+  for (const auto &detections_ : o.detections) { detections.emplace_back((detections_) ? new Orange::VisionData::DetectionT(*detections_) : nullptr); }
+}
+
+inline YoloFrameDetectionsT &YoloFrameDetectionsT::operator=(YoloFrameDetectionsT o) FLATBUFFERS_NOEXCEPT {
+  std::swap(camera_serial, o.camera_serial);
+  std::swap(timestamp, o.timestamp);
+  std::swap(frame_id, o.frame_id);
+  std::swap(detections, o.detections);
+  return *this;
+}
+
+inline YoloFrameDetectionsT *YoloFrameDetections::UnPack(const ::flatbuffers::resolver_function_t *_resolver) const {
+  auto _o = std::unique_ptr<YoloFrameDetectionsT>(new YoloFrameDetectionsT());
+  UnPackTo(_o.get(), _resolver);
+  return _o.release();
+}
+
+inline void YoloFrameDetections::UnPackTo(YoloFrameDetectionsT *_o, const ::flatbuffers::resolver_function_t *_resolver) const {
+  (void)_o;
+  (void)_resolver;
+  { auto _e = camera_serial(); if (_e) _o->camera_serial = _e->str(); }
+  { auto _e = timestamp(); _o->timestamp = _e; }
+  { auto _e = frame_id(); _o->frame_id = _e; }
+  { auto _e = detections(); if (_e) { _o->detections.resize(_e->size()); for (::flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { if(_o->detections[_i]) { _e->Get(_i)->UnPackTo(_o->detections[_i].get(), _resolver); } else { _o->detections[_i] = std::unique_ptr<Orange::VisionData::DetectionT>(_e->Get(_i)->UnPack(_resolver)); }; } } else { _o->detections.resize(0); } }
+}
+
+inline ::flatbuffers::Offset<YoloFrameDetections> YoloFrameDetections::Pack(::flatbuffers::FlatBufferBuilder &_fbb, const YoloFrameDetectionsT* _o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  return CreateYoloFrameDetections(_fbb, _o, _rehasher);
+}
+
+inline ::flatbuffers::Offset<YoloFrameDetections> CreateYoloFrameDetections(::flatbuffers::FlatBufferBuilder &_fbb, const YoloFrameDetectionsT *_o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+  (void)_rehasher;
+  (void)_o;
+  struct _VectorArgs { ::flatbuffers::FlatBufferBuilder *__fbb; const YoloFrameDetectionsT* __o; const ::flatbuffers::rehasher_function_t *__rehasher; } _va = { &_fbb, _o, _rehasher}; (void)_va;
+  auto _camera_serial = _fbb.CreateString(_o->camera_serial);
+  auto _timestamp = _o->timestamp;
+  auto _frame_id = _o->frame_id;
+  auto _detections = _o->detections.size() ? _fbb.CreateVector<::flatbuffers::Offset<Orange::VisionData::Detection>> (_o->detections.size(), [](size_t i, _VectorArgs *__va) { return CreateDetection(*__va->__fbb, __va->__o->detections[i].get(), __va->__rehasher); }, &_va ) : 0;
+  return Orange::VisionData::CreateYoloFrameDetections(
+      _fbb,
+      _camera_serial,
+      _timestamp,
+      _frame_id,
+      _detections);
+}
+
 inline const Orange::VisionData::YoloFrameDetections *GetYoloFrameDetections(const void *buf) {
   return ::flatbuffers::GetRoot<Orange::VisionData::YoloFrameDetections>(buf);
 }
@@ -231,6 +352,18 @@ inline void FinishSizePrefixedYoloFrameDetectionsBuffer(
     ::flatbuffers::FlatBufferBuilder &fbb,
     ::flatbuffers::Offset<Orange::VisionData::YoloFrameDetections> root) {
   fbb.FinishSizePrefixed(root);
+}
+
+inline std::unique_ptr<Orange::VisionData::YoloFrameDetectionsT> UnPackYoloFrameDetections(
+    const void *buf,
+    const ::flatbuffers::resolver_function_t *res = nullptr) {
+  return std::unique_ptr<Orange::VisionData::YoloFrameDetectionsT>(GetYoloFrameDetections(buf)->UnPack(res));
+}
+
+inline std::unique_ptr<Orange::VisionData::YoloFrameDetectionsT> UnPackSizePrefixedYoloFrameDetections(
+    const void *buf,
+    const ::flatbuffers::resolver_function_t *res = nullptr) {
+  return std::unique_ptr<Orange::VisionData::YoloFrameDetectionsT>(GetSizePrefixedYoloFrameDetections(buf)->UnPack(res));
 }
 
 }  // namespace VisionData

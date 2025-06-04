@@ -301,7 +301,7 @@ int main(int argc, char **args) {
                     start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select, tex,
                                            num_cameras, evt_buffer_size, true, encoder_setup,
                                            encoder_config->folder_name, ptp_params,
-                                           &indigo_signal_builder, yolo_model);
+                                           &indigo_signal_builder, yolo_model, &server);
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -909,7 +909,7 @@ int main(int argc, char **args) {
                                                tex, num_cameras,
                                                evt_buffer_size, ptp_stream_sync, "",
                                                encoder_config->folder_name, ptp_params,
-                                               &indigo_signal_builder, yolo_model);
+                                               &indigo_signal_builder, yolo_model, &server);
                     } else {
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
@@ -972,7 +972,7 @@ int main(int argc, char **args) {
                         start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
                                                tex, num_cameras, evt_buffer_size, ptp_stream_sync, encoder_setup,
                                                encoder_config->folder_name, ptp_params,
-                                               &indigo_signal_builder, yolo_model);
+                                               &indigo_signal_builder, yolo_model, &server);
                         camera_control->subscribe = true;
                     } else {
                         camera_control->subscribe = false;

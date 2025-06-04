@@ -131,20 +131,32 @@ inline void start_camera_streaming(
                       << " for GPU: " << cameras_params[i].gpu_id
                       << " with model: " << (cameras_select[i].yolo_model ? cameras_select[i].yolo_model : "NONE")
                       << std::endl;
+            
+            // Determine the display buffer for this YOLO worker
+            unsigned char* display_buffer_for_yolo = nullptr;
+            if (cameras_select[i].stream_on) { // If YOLO is on AND streaming is on for this camera
+                display_buffer_for_yolo = tex[i].cuda_buffer;
+            }
 
-            current_yolo_worker = new YOLOv8Worker(
-                worker_name.c_str(),
-                &cameras_params[i],
-                &cameras_select[i] // Pass the specific select struct for this camera
-            );
-            current_yolo_worker->StartThread();
-            yolo_workers[i] = current_yolo_worker; // Store based on camera index
+            // Add an additional check here before creating the worker, just in case
+            if (cameras_select[i].yolo_model == nullptr || strlen(cameras_select[i].yolo_model) == 0) {
+                 std::cerr << "YOLOv8Worker Error: yolo_model for " << worker_name << " is still null or empty after attempting to set from GUI path. Skipping worker creation." << std::endl;
+            } else {
+                current_yolo_worker = new YOLOv8Worker(
+                    worker_name.c_str(),
+                    &cameras_params[i],
+                    &cameras_select[i],
+                    display_buffer_for_yolo
+                );
+                current_yolo_worker->StartThread();
+                yolo_workers[i] = current_yolo_worker;
+            }
         }
 
-        unsigned char* display_buffer_for_cam = nullptr;
+        unsigned char* display_buffer_for_acquire_frames_thread = nullptr;
         if (cameras_select[i].stream_on) {
              // tex is an array, access tex[i]
-            display_buffer_for_cam = tex[i].cuda_buffer;
+            display_buffer_for_acquire_frames_thread = tex[i].cuda_buffer;
         }
 
         camera_threads.emplace_back(
@@ -153,7 +165,7 @@ inline void start_camera_streaming(
             &cameras_params[i],
             &cameras_select[i],
             camera_control,
-            display_buffer_for_cam, // Pass the specific cuda_buffer for this camera's texture
+            display_buffer_for_acquire_frames_thread, // Pass the specific cuda_buffer for this camera's texture
             encoder_setup,
             folder_name,
             ptp_params,

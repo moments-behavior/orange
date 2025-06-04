@@ -1,48 +1,52 @@
-// src/yolo_worker.h
 #ifndef YOLO_WORKER_H
 #define YOLO_WORKER_H
 
 #include "threadworker.h"
-#include "yolov8_det.h"       // For YOLOv8 class
-#include "image_processing.h" // For WORKER_ENTRY, FrameGPU, Debayer
-#include "camera.h"           // For CameraParams
-#include "video_capture.h"    // For CameraEachSelect
-#include "network_base.h"     // For EnetContext and ENetPeer
-#include "yolo_payload_generated.h" // For FlatBufferBuilder and YOLO payload messages
-#include <chrono> // Required for timing
-
-// Forward declare ENet types if not fully included by network_base.h for this header's needs
-// struct ENetHost; // Typically ENetHost is typedef'd from _ENetHost
-// struct ENetPeer;
+#include "yolov8_det.h"
+#include "image_processing.h"
+#include "camera.h"
+#include "video_capture.h"
+#include "network_base.h"
+#include "yolo_payload_generated.h"
+#include <chrono>
+#include <nppi_geometry_transforms.h> // For NppiSize, NppiRect, nppiResize_8u_C4R
 
 class YOLOv8Worker : public CThreadWorker {
 public:
     YOLOv8Worker(const char* name,
                    CameraParams* cam_params,
-                   CameraEachSelect* cam_select);
+                   CameraEachSelect* cam_select,
+                   unsigned char* display_texture_buffer); // Added display_texture_buffer
     ~YOLOv8Worker() override;
 
-    // Method to set the ENet target for sending data
     void SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer);
 
 private:
-    bool WorkerFunction(void* f) override; // Process one WORKER_ENTRY
-    void WorkerReset() override;          // Optional: for resetting worker state
+    bool WorkerFunction(void* f) override;
+    void WorkerReset() override;
 
-    YOLOv8* yolov8_instance_; // Underscore to denote member
+    YOLOv8* yolov8_instance_;
     CameraParams* associated_camera_params_;
     CameraEachSelect* associated_camera_select_;
 
-    // ENet communication members
     EnetContext* enet_host_context_ = nullptr;
     ENetPeer* enet_target_peer_ = nullptr;
-    flatbuffers::FlatBufferBuilder* fb_builder_; // For serializing data to send via ENet
+    flatbuffers::FlatBufferBuilder* fb_builder_;
 
+    FrameGPU frame_original_gpu_;
+    Debayer debayer_gpu_;
+    unsigned char* d_rgb_yolo_input_gpu_ = nullptr;
 
-    // Internal GPU buffers for YOLO processing
-    FrameGPU frame_original_gpu_; // To hold raw frame on GPU
-    Debayer debayer_gpu_;         // For debayered/duplicated RGBA output on GPU
-    unsigned char* d_rgb_yolo_input_gpu_ = nullptr; // Buffer for RGB data if YOLOv8 needs RGB
+    // For display output
+    unsigned char* display_texture_buffer_ = nullptr;
+    unsigned char* d_display_resize_buffer_ = nullptr;
+    NppiSize output_display_size_;
+    NppiRect input_roi_for_display_resize_;
+    NppiRect output_roi_for_display_resize_;
+
+    // For drawing detections
+    float *d_points_for_drawing_ = nullptr;
+    unsigned int *d_skeleton_for_drawing_ = nullptr;
 
     // FPS Counter members
     std::chrono::steady_clock::time_point last_fps_update_time_;

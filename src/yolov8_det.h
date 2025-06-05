@@ -24,6 +24,7 @@ public:
                            const std::vector<std::vector<unsigned int>>& COLORS);
 
     void copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs);
+    void copy_keypoints_gpu(float* d_points, const Object& obj);
     
     int num_bindings;
     int num_inputs = 0;

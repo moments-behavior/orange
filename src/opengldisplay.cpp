@@ -101,6 +101,16 @@ void COpenGLDisplay::ThreadRunning()
                 yolov8->copy_keypoints_gpu(d_points, objs);
 
                 if (objs.size() > 0) {
+
+                    for (int obj = 0; obj < objs.size(); obj++) {
+                        // draw all bounding boxes when objects are detected
+                        // default to highlighting by class color
+                        yolov8->copy_keypoints_gpu(d_points, objs[obj]);
+                        gpu_draw_box(debayer.d_debayer, camera_params->width, camera_params->height, d_points, objs[obj].label, yolov8->stream);
+
+
+                    }
+
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
                     // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
                     // std::cout << bbox_center_x << std::endl;
@@ -117,7 +127,6 @@ void COpenGLDisplay::ThreadRunning()
                     objs_last_frame.clear();
                 }
                     
-                gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream, 4);
             }
 
 

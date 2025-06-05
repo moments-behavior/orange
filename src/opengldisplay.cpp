@@ -8,6 +8,8 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 #include "global.h"
+#include "shaman.h"
+#include "pose_shaman.h"
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
     : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)
@@ -70,6 +72,9 @@ void COpenGLDisplay::ThreadRunning()
     std::vector<Object> objs_last_frame; // think about better way that scales with frame
     
     using clock = std::chrono::steady_clock;
+
+    // create shaman writer
+    shaman::SharedBoxQueue writer(true);
    
 
     int frameCount = 0;
@@ -107,6 +112,10 @@ void COpenGLDisplay::ThreadRunning()
 
                         yolov8->copy_keypoints_gpu(d_points, objs[obj]);
                         gpu_draw_box(debayer.d_debayer, camera_params->width, camera_params->height, d_points, yolov8->stream, objs[obj].label);
+
+                        // write to shared memory with shaman 
+                        std::vector<shaman::Object> conv_objs = conv_shaman(objs);
+                        writer.push(conv_objs);
                         
                     }
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;

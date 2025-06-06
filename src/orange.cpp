@@ -52,7 +52,7 @@ int main(int argc, char **args) {
     std::string input_folder = orange_root_dir_str + "/exp/unsorted";
 
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
-    std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
+    std::string yolo_model = yolo_model_folder + "/bee7.engine"; // default yolo engine here!
     
     bool check[cam_count]{0};
     CameraParams *cameras_params;
@@ -108,8 +108,8 @@ int main(int argc, char **args) {
     std::string picture_save_folder = orange_root_dir_str + "/pictures/" + get_current_date();
     std::string calib_save_folder = orange_root_dir_str + "/exp/calibration/" + get_current_date();
 
-    int local_config_select = 0;
-    bool select_all_cameras = false;
+    int local_config_select = 1;
+    bool select_all_cameras = true;
     char *temp_string = (char *) malloc(64);
     *temp_string = '\0';
     bool save_image_all_ready = true;
@@ -847,7 +847,8 @@ int main(int argc, char **args) {
 
                         
                         for (int i = 0; i < num_cameras; i++) {
-                            cameras_select[i].stream_on = false;
+                            cameras_select[i].stream_on = true;
+                            cameras_select[i].yolo = true;
                             if (cameras_params[i].camera_name == "ceiling_center") {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = false;

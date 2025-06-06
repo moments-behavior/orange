@@ -9,7 +9,7 @@
 #include <cuda_runtime_api.h>
 #include "global.h"
 #include "shaman/shaman.h"
-#include "pose_shaman.h"
+#include "shaman/pose_shaman.h"
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)
     : CThreadWorker(name), camera_params(camera_params), camera_select(camera_select), display_buffer(display_buffer), indigo_signal_builder(indigo_signal_builder)

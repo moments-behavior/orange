@@ -8,7 +8,7 @@
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
 #include "global.h"
-#include "shaman.h"
+#include "shaman/shaman.h"
 #include "pose_shaman.h"
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder)

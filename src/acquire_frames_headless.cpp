@@ -78,15 +78,15 @@ static inline void get_one_frame_headless(CameraState *camera_state, CameraEachS
 
         if (camera_state->frame_count % 500 == 99)
         {
-            printf("\n");
-            fflush(stdout);
+            // printf("\n");
+            // fflush(stdout);
         }
 
         if (camera_state->frame_count % 1000 == 99)
         {
             // printf(".");
             // fflush(stdout);
-            std::cout << camera_params->camera_name << std::endl;
+            // std::cout << camera_params->camera_name << std::endl;
         }
         // if (camera_state->frame_count % 20000 == 9999)
             // printf("\n");

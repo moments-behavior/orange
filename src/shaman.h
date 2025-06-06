@@ -41,37 +41,39 @@ struct SharedQueue {
 
 class SharedBoxQueue {
     public:
-        SharedBoxQueue(bool is_writer) : writer(is_writer) {
-            if (writer) {
-                // Wait for reader
-                while ((shm_fd = shm_open(SHM_NAME, O_RDWR, 0666)) == -1) {
-                    usleep(100000);
-                }
-                map_shared_memory();
-                while (!shared->initialized.load(std::memory_order_acquire)) {
-                    usleep(10000);
-                }
-            } else {
-                shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
-                if (shm_fd == -1) throw std::runtime_error("shm_open failed");
+    SharedBoxQueue(bool is_writer) : writer(is_writer) {
+        bool creator = false;
+        shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
+        if (shm_fd == -1) throw std::runtime_error("shm_open failed");
     
-                ftruncate(shm_fd, sizeof(SharedQueue));
-                map_shared_memory();
-    
-                std::memset(shared, 0, sizeof(SharedQueue));
-                shared->head.store(0, std::memory_order_relaxed);
-                shared->tail.store(0, std::memory_order_relaxed);
-                shared->initialized.store(true, std::memory_order_release);
-            }
+        // Determine if we created it (first one in)
+        struct stat shm_stat;
+        fstat(shm_fd, &shm_stat);
+        if (shm_stat.st_size == 0) {
+            ftruncate(shm_fd, sizeof(SharedQueue));
+            creator = true;
         }
     
-        ~SharedBoxQueue() {
-            if (shared) munmap(shared, sizeof(SharedQueue));
-            if (shm_fd >= 0) {
-                close(shm_fd);
-                if (!writer) shm_unlink(SHM_NAME);
+        map_shared_memory();
+    
+        if (creator) {
+            std::memset(shared, 0, sizeof(SharedQueue));
+            shared->head.store(0, std::memory_order_relaxed);
+            shared->tail.store(0, std::memory_order_relaxed);
+            shared->initialized.store(true, std::memory_order_release);
+        } else {
+            // Wait for whoever created it to finish initializing
+            while (!shared->initialized.load(std::memory_order_acquire)) {
+                usleep(10000); // wait until fully initialized
             }
         }
+    }
+    
+    ~SharedBoxQueue() {
+        if (shared) munmap(shared, sizeof(SharedQueue));
+        if (shm_fd >= 0) close(shm_fd);
+        // if (!writer) shm_unlink(SHM_NAME);
+    }
     
         // Writer pushes a vector
         bool push(const std::vector<Object>& vec) {

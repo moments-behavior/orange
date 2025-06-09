@@ -284,15 +284,39 @@ int main(int argc, char **args) {
                 my_servers[1].server_state == FetchGame::ManagerState_WAITTHREAD) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Clients start camera threads")) {
-                    std::string encoder_setup =
+                    // --- This button now does two things ---
+                    // 1. It sends the command to the clients to start their threads.
+                    // 2. It starts its own local threads using the same robust, centralized logic.
+            
+                    // --- Logic for telling clients to start ---
+                    std::string encoder_setup_for_clients =
                             "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset +
                             " -fps ";
                     encoder_config->folder_name = input_folder + "/" + get_current_date_time();
                     make_folder(encoder_config->folder_name);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_setup);
-                    camera_control->record_video = true;
-
+                    host_broadcast_start_threads(fb_builder, &server, encoder_config->folder_name, encoder_setup_for_clients);
+                    
+                    // --- Centralized Startup Logic (for local cameras) ---
+                    (camera_control->subscribe) = true; // Set the master flag to true
+                    camera_control->record_video = true; // This button implies recording
+            
+                    // 1. ALLOCATE SHARED RESOURCES
+                    worker_entry_pool = new WORKER_ENTRY[ACQUIRE_WORK_ENTRIES_MAX];
+                    free_entries_queue = new SafeQueue<WORKER_ENTRY*>();
+                    recycle_queue = new SafeQueue<WORKER_ENTRY*>();
+                    openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
+                    for(int i = 0; i < num_cameras; ++i) {
+                        openGLDisplayWorkers[i] = nullptr;
+                    }
+            
+                    const size_t frame_size_bytes = cameras_params[0].width * cameras_params[0].height;
+                    for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
+                        worker_entry_pool[i].imageData.resize(frame_size_bytes);
+                        free_entries_queue->push(&worker_entry_pool[i]);
+                    }
+            
+                    // 2. SETUP GPU TEXTURES FOR DISPLAY
                     cudaSetDevice(display_gpu_id);
                     tex = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
@@ -302,16 +326,60 @@ int main(int argc, char **args) {
                             setup_texture(tex[i], camera_width, camera_height);
                         }
                     }
-                    {
-                        std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
-
-                        start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select, tex,
-                                               num_cameras, evt_buffer_size, true, encoder_setup,
-                                               encoder_config->folder_name, ptp_params,
-                                               &indigo_signal_builder, yolo_model, &server);
+            
+                    // 3. CREATE AND LINK WORKER THREADS
+                    yolo_workers.assign(num_cameras, nullptr);
+                    for (int i = 0; i < num_cameras; i++) {
+                        if (cameras_select[i].stream_on) {
+                            std::string display_name = "OpenGLDisplay_Cam_" + cameras_params[i].camera_serial;
+                            openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
+                        }
+                        if (cameras_select[i].yolo) {
+                            std::string yolo_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
+                            yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), &cameras_params[i], &cameras_select[i], *recycle_queue);
+                            if (openGLDisplayWorkers[i]) {
+                                yolo_workers[i]->SetDisplayWorker(openGLDisplayWorkers[i]);
+                            }
+                        }
                     }
-                ImGui::PopStyleColor(1);
+            
+                    // 4. START ALL WORKER THREADS
+                    for (int i = 0; i < num_cameras; i++) {
+                        if (openGLDisplayWorkers[i]) openGLDisplayWorkers[i]->StartThread();
+                        if (yolo_workers[i]) yolo_workers[i]->StartThread();
+                    }
+            
+                    // 5. START ACQUISITION THREADS
+                    for (int i = 0; i < num_cameras; i++) {
+                        camera_open_stream(&ecams[i].camera, &cameras_params[i]);
+                        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+                        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
+                    }
+            
+                    if (ptp_stream_sync) {
+                        for (int i = 0; i < num_cameras; i++) {
+                            ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+                        }
+                        camera_control->sync_camera = true;
+                    }
+            
+                    std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
+            
+                    for (int i = 0; i < num_cameras; i++) {
+                         camera_threads.emplace_back(
+                            &acquire_frames,
+                            &ecams[i], &cameras_params[i], &cameras_select[i],
+                            camera_control,
+                            (cameras_select[i].stream_on ? tex[i].cuda_buffer : nullptr),
+                            encoder_setup, encoder_config->folder_name,
+                            ptp_params, &indigo_signal_builder,
+                            yolo_workers[i],
+                            free_entries_queue,
+                            recycle_queue
+                        );
+                    }
                 }
+                ImGui::PopStyleColor(1);
             }
 
             if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTART && my_servers[1].server_state ==
@@ -961,6 +1029,11 @@ int main(int argc, char **args) {
                             // Create YOLO Worker if needed
                             if (cameras_select[i].yolo) {
                                 std::string yolo_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
+                                cameras_select[i].yolo_model = yolo_model.c_str();
+                                if (yolo_model.empty()) {
+                                    std::cerr << "YOLO model not selected. Please select a YOLO model." << std::endl;
+                                    continue; // Skip creating YOLO worker if no model is selected
+                                }
                                 yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), &cameras_params[i], &cameras_select[i], *recycle_queue);
                                 
                                 // Link YOLO worker to its corresponding display worker
@@ -994,7 +1067,6 @@ int main(int argc, char **args) {
                             camera_control->sync_camera = true;
                         }
                         
-                        // Define encoder_setup string here, where it's needed
                         std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                 
                         for (int i = 0; i < num_cameras; i++) {
@@ -1024,10 +1096,12 @@ int main(int argc, char **args) {
                             if (yolo_workers[i]) {
                                 yolo_workers[i]->StopThread();
                                 delete yolo_workers[i];
+                                yolo_workers[i] = nullptr;
                             }
                             if (openGLDisplayWorkers[i]) {
                                 openGLDisplayWorkers[i]->StopThread();
                                 delete openGLDisplayWorkers[i];
+                                openGLDisplayWorkers[i] = nullptr;
                             }
                         }
                         yolo_workers.clear();
@@ -1044,6 +1118,7 @@ int main(int argc, char **args) {
                             }
                         }
                         delete[] tex;
+                        tex = nullptr;
                 
                         // 4. CLEANUP SHARED RESOURCES
                         delete[] openGLDisplayWorkers;
@@ -1058,6 +1133,7 @@ int main(int argc, char **args) {
                         recycle_queue = nullptr;
                     }
                 }
+            }
 
             if (camera_control->stop_record) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.5f, 0, 0, 1.0f});
@@ -1066,75 +1142,30 @@ int main(int argc, char **args) {
             }
 
             if (camera_control->open) {
-                if (ImGui::Button(camera_control->stop_record ? ICON_FK_PAUSE : ICON_FK_PLAY)) {
-                    (camera_control->stop_record) = !(camera_control->stop_record);
-                    if (camera_control->stop_record) {
-                        if (camera_control->subscribe) {
-                            camera_control->subscribe = false;
-                            for (int i = 0; i < num_cameras; i++) {
-                                if (cameras_select[i].stream_on) {
-                                    int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
-                                    int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
-                                    clear_upload_and_cleanup(tex[i], camera_width, camera_height);                                }
-                            }
-                            delete[] tex;
-                            // Acquire the lock before modifying the shared yolo_workers vector
-                            {
-                                std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
-                                stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
-                                    tex, num_cameras, evt_buffer_size, ptp_params);
-                            }
-                        }
 
-                        std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset+ " -fps ";
-                        camera_control->record_video = true;
+                if (!camera_control->subscribe) {
+                    ImGui::BeginDisabled();
+                }
+
+                if (ImGui::Button(camera_control->record_video ? ICON_FK_PAUSE : ICON_FK_PLAY)) {
+                    // This button now ONLY toggles the boolean flag for recording.
+                    camera_control->record_video = !camera_control->record_video;
+                
+                    if (camera_control->record_video) {
+                        // When recording starts, prepare the folder and start the timer.
                         encoder_config->folder_name = input_folder + "/" + get_current_date_time();
                         make_folder(encoder_config->folder_name);
-                        if (num_cameras > 1) {
-                            ptp_stream_sync = true;
-                        } else {
-                            ptp_stream_sync = false;
-                        }
-
-                        cudaSetDevice(display_gpu_id);
-                        tex = new GL_Texture[num_cameras];
-                        for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].stream_on) {
-                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
-                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
-                                setup_texture(tex[i], camera_width, camera_height);                            
-                            }
-                        }
-
-                        {
-                            std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
-    
-                            start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select, tex,
-                                                   num_cameras, evt_buffer_size, true, encoder_setup,
-                                                   encoder_config->folder_name, ptp_params,
-                                                   &indigo_signal_builder, yolo_model, &server);
-                        }
-                        camera_control->subscribe = true;
+                        try_start_timer();
+                        std::cout << "Recording started. Saving to: " << encoder_config->folder_name << std::endl;
                     } else {
-                        camera_control->subscribe = false;
-                        ptp_stream_sync = false;
-
-                        for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].stream_on) {
-                                int camera_width = int(cameras_params[i].width / cameras_select[i].downsample);
-                                int camera_height = int(cameras_params[i].height / cameras_select[i].downsample);
-                                clear_upload_and_cleanup(tex[i], camera_width, camera_height);                            }
-                        }
-                        delete[] tex;
-
-                        // Acquire the lock before modifying the shared yolo_workers vector
-                        {
-                            std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
-                            stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
-                                tex, num_cameras, evt_buffer_size, ptp_params);
-                        }
-                        camera_control->record_video = false;
+                        // When recording stops, just stop the timer.
+                        try_stop_timer();
+                        std::cout << "Recording stopped." << std::endl;
                     }
+                }
+                
+                if (!camera_control->subscribe) {
+                    ImGui::EndDisabled();
                 }
             }
 

@@ -12,6 +12,9 @@
 #include <chrono>
 #include <vector>             // For std::vector (if passing detections)
 #include "common.hpp"         // For pose::Object (if passing detections)
+#include "opengldisplay.h"
+#include <chrono>
+#include "opengldisplay.h"
 
 
 class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
@@ -20,10 +23,12 @@ public:
     // Constructor no longer takes display_texture_buffer
     YOLOv8Worker(const char* name,
                    CameraParams* cam_params,
-                   CameraEachSelect* cam_select);
+                   CameraEachSelect* cam_select,
+                   SafeQueue<WORKER_ENTRY*>& recycle_queue);
     ~YOLOv8Worker() override;
 
     void SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer);
+    void SetDisplayWorker(COpenGLDisplay* display_worker) { m_display_worker = display_worker; }
 
     // New: Define a structure for passing detection results (or use pose::Object directly)
     // This could also be part of WORKER_ENTRY if you modify it globally
@@ -32,13 +37,7 @@ public:
         unsigned long long timestamp;
         uint64_t timestamp_sys;
         std::vector<pose::Object> detections;
-        // You might also want to include the original WORKER_ENTRY's imagePtr
-        // if the next stage needs the raw image data associated with these detections.
-        // void* original_image_ptr; // Example
     };
-
-    // New: Output queue for detection results (if not using the existing out-queue for this)
-    // lock_free_queue<YoloDetectionOutput> detection_output_queue; // Example, choose appropriate queue
 
 private:
     bool WorkerFunction(WORKER_ENTRY* f) override;
@@ -64,6 +63,8 @@ private:
 
     // Shared memory IPC
     shaman::SharedBoxQueue* shaman_ipc_queue_;
+    COpenGLDisplay* m_display_worker = nullptr; // Pointer to OpenGL display worker
+    SafeQueue<WORKER_ENTRY*>& m_recycle_queue; // Reference to the central recycle queue
 };
 
 #endif // YOLO_WORKER_H

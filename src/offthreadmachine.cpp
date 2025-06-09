@@ -6,7 +6,10 @@
 COffThreadMachine::COffThreadMachine(const char* tName)
 :threadOn(0), threadHandle(0), cpuToUse(-1)
 {
-	if(tName) strncpy(threadName, tName, 16);
+	if(tName) { 
+		strncpy(threadName, tName, 63);
+		threadName[63] = 0; // Ensure null termination
+	}
 	else threadName[0] = 0;
 }
 

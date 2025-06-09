@@ -23,7 +23,7 @@ public:
 	bool IsMachineOn() const { return threadOn; }
 
 protected:
-	char threadName[16];
+	char threadName[64];
 
 private:
 	static THREAD_FUNCTION MachineThread(void*);	

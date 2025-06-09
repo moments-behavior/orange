@@ -4,6 +4,7 @@ std::atomic<double> streaming_fps = 0.0;
 std::atomic<int> streaming_target_fps = 60;
 std::atomic<int64_t> record_start_time_ns{0};
 std::atomic<CalibState> calib_state{CalibIdle};
+std::mutex g_yolo_net_mutex;
 
 bool try_start_timer() {
     int64_t expected = record_start_time_ns.load();

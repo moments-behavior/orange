@@ -297,14 +297,16 @@ int main(int argc, char **args) {
                             setup_texture(tex[i], camera_width, camera_height);
                         }
                     }
+                    {
+                        std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
 
-                    start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select, tex,
-                                           num_cameras, evt_buffer_size, true, encoder_setup,
-                                           encoder_config->folder_name, ptp_params,
-                                           &indigo_signal_builder, yolo_model, &server);
-                    camera_control->subscribe = true;
-                }
+                        start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select, tex,
+                                               num_cameras, evt_buffer_size, true, encoder_setup,
+                                               encoder_config->folder_name, ptp_params,
+                                               &indigo_signal_builder, yolo_model, &server);
+                    }
                 ImGui::PopStyleColor(1);
+                }
             }
 
             if (my_servers[0].server_state == FetchGame::ManagerState_WAITSTART && my_servers[1].server_state ==
@@ -565,17 +567,17 @@ int main(int argc, char **args) {
                     }
                 }
 
-                if (ImGui::BeginTable("Camera Control Setting", 5,
+                if (ImGui::BeginTable("Camera Control Setting", 7,
                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings |
                                       ImGuiTableFlags_Borders)) {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::Text("name");
+                    ImGui::Text("Name");
                     ImGui::TableNextColumn();
-                    ImGui::Text("serial");
+                    ImGui::Text("Serial");
                     ImGui::TableNextColumn();
-                    ImGui::Text("stream "); ImGui::SameLine();
-                    if(ImGui::Checkbox("all##stream", &stream_all_cameras)) 
+                    ImGui::Text("Stream "); ImGui::SameLine();
+                    if(ImGui::Checkbox("All##stream", &stream_all_cameras))
                     {
                         if (stream_all_cameras) {
                             for (int i = 0; i < num_cameras; i++) {
@@ -587,10 +589,10 @@ int main(int argc, char **args) {
                             }
                         }
                     }
-                    
+
                     ImGui::TableNextColumn();
-                    ImGui::Text("record "); ImGui::SameLine();
-                    if(ImGui::Checkbox("all##record", &record_all_cameras)) 
+                    ImGui::Text("Record "); ImGui::SameLine();
+                    if(ImGui::Checkbox("All##record", &record_all_cameras))
                     {
                         if (record_all_cameras) {
                             for (int i = 0; i < num_cameras; i++) {
@@ -602,8 +604,23 @@ int main(int argc, char **args) {
                             }
                         }
                     }
+
                     ImGui::TableNextColumn();
-                    ImGui::Text("yolo");
+                    ImGui::Text("YOLO "); ImGui::SameLine(); // Add "YOLO " for consistency
+                    // Add "All" checkbox for YOLO if you want similar functionality
+                    // static bool yolo_all_cameras = false; // Requires similar logic as stream_all_cameras
+                    // if(ImGui::Checkbox("All##yolo", &yolo_all_cameras)) { ... }
+
+
+                    // New Columns for IPC and ENet selection for YOLO
+                    ImGui::TableNextColumn();
+                    ImGui::Text("YOLO IPC"); // New header
+                    // Add "All" checkbox for YOLO IPC if desired
+
+                    ImGui::TableNextColumn();
+                    ImGui::Text("YOLO ENet"); // New header
+                    // Add "All" checkbox for YOLO ENet if desired
+
 
                     for (int i = 0; i < num_cameras; i++) {
                         ImGui::TableNextRow();
@@ -617,9 +634,18 @@ int main(int argc, char **args) {
                         ImGui::TableNextColumn();
                         sprintf(temp_string, "##checkbox_record%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].record);
-                        ImGui::TableNextColumn();                        
+                        ImGui::TableNextColumn();
                         sprintf(temp_string, "##checkbox_yolo%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].yolo);
+
+                        // New Checkboxes for IPC and ENet
+                        ImGui::TableNextColumn();
+                        sprintf(temp_string, "##yolo_ipc%d", i);
+                        ImGui::Checkbox(temp_string, &cameras_select[i].send_yolo_via_ipc); // Assumes flag name from video_capture.h
+
+                        ImGui::TableNextColumn();
+                        sprintf(temp_string, "##yolo_enet%d", i);
+                        ImGui::Checkbox(temp_string, &cameras_select[i].send_yolo_via_enet); // Assumes flag name from video_capture.h
                     }
                     ImGui::EndTable();
                 }
@@ -920,8 +946,12 @@ int main(int argc, char **args) {
                         }
                         delete[] tex;
 
-                        stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
-                            tex, num_cameras, evt_buffer_size, ptp_params);
+                        // Acquire the lock before modifying the shared yolo_workers vector
+                        {
+                            std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
+                            stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
+                                tex, num_cameras, evt_buffer_size, ptp_params);
+                        }
                     }
                 }
             }
@@ -945,8 +975,12 @@ int main(int argc, char **args) {
                                     clear_upload_and_cleanup(tex[i], camera_width, camera_height);                                }
                             }
                             delete[] tex;
-                            stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
-                                tex, num_cameras, evt_buffer_size, ptp_params);
+                            // Acquire the lock before modifying the shared yolo_workers vector
+                            {
+                                std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
+                                stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
+                                    tex, num_cameras, evt_buffer_size, ptp_params);
+                            }
                         }
 
                         std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset+ " -fps ";
@@ -969,10 +1003,14 @@ int main(int argc, char **args) {
                             }
                         }
 
-                        start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
-                                               tex, num_cameras, evt_buffer_size, ptp_stream_sync, encoder_setup,
-                                               encoder_config->folder_name, ptp_params,
-                                               &indigo_signal_builder, yolo_model, &server);
+                        {
+                            std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
+    
+                            start_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select, tex,
+                                                   num_cameras, evt_buffer_size, true, encoder_setup,
+                                                   encoder_config->folder_name, ptp_params,
+                                                   &indigo_signal_builder, yolo_model, &server);
+                        }
                         camera_control->subscribe = true;
                     } else {
                         camera_control->subscribe = false;
@@ -986,8 +1024,12 @@ int main(int argc, char **args) {
                         }
                         delete[] tex;
 
-                        stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
-                            tex, num_cameras, evt_buffer_size, ptp_params);
+                        // Acquire the lock before modifying the shared yolo_workers vector
+                        {
+                            std::lock_guard<std::mutex> lock(g_yolo_net_mutex);
+                            stop_camera_streaming(camera_threads, yolo_workers, camera_control, ecams, cameras_params, cameras_select,
+                                tex, num_cameras, evt_buffer_size, ptp_params);
+                        }
                         camera_control->record_video = false;
                     }
                 }

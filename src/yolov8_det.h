@@ -36,12 +36,11 @@ public:
     PreParam pparam;
     cudaStream_t stream = nullptr;
 
-private:
-    // device pointer for gpu preprocessing
-    unsigned char *d_temp;
-    unsigned char *d_boarder;
-    float *d_float;
-    float *d_planar;
+    private:
+    unsigned char *d_temp = nullptr;
+    unsigned char *d_boarder = nullptr;
+    float *d_float = nullptr;
+    float *d_planar = nullptr;
     int img_width;
     int img_height;
     int padw;

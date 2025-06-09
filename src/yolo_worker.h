@@ -1,57 +1,69 @@
+// src/yolo_worker.h
 #ifndef YOLO_WORKER_H
 #define YOLO_WORKER_H
 
 #include "threadworker.h"
 #include "yolov8_det.h"
-#include "image_processing.h"
-#include "camera.h"
-#include "video_capture.h"
-#include "network_base.h"
-#include "yolo_payload_generated.h"
+#include "image_processing.h" // For FrameGPU, Debayer
+#include "camera.h"           // For CameraParams
+#include "video_capture.h"    // For CameraEachSelect, WORKER_ENTRY (if detections are added here)
+#include "network_base.h"     // For EnetContext, ENetPeer
+#include "shaman.h"           // For shaman::SharedBoxQueue
 #include <chrono>
-#include <nppi_geometry_transforms.h> // For NppiSize, NppiRect, nppiResize_8u_C4R
+#include <vector>             // For std::vector (if passing detections)
+#include "common.hpp"         // For pose::Object (if passing detections)
 
-class YOLOv8Worker : public CThreadWorker {
+
+class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
+{
 public:
+    // Constructor no longer takes display_texture_buffer
     YOLOv8Worker(const char* name,
                    CameraParams* cam_params,
-                   CameraEachSelect* cam_select,
-                   unsigned char* display_texture_buffer); // Added display_texture_buffer
+                   CameraEachSelect* cam_select);
     ~YOLOv8Worker() override;
 
     void SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer);
 
+    // New: Define a structure for passing detection results (or use pose::Object directly)
+    // This could also be part of WORKER_ENTRY if you modify it globally
+    struct YoloDetectionOutput {
+        unsigned long long frame_id;
+        unsigned long long timestamp;
+        uint64_t timestamp_sys;
+        std::vector<pose::Object> detections;
+        // You might also want to include the original WORKER_ENTRY's imagePtr
+        // if the next stage needs the raw image data associated with these detections.
+        // void* original_image_ptr; // Example
+    };
+
+    // New: Output queue for detection results (if not using the existing out-queue for this)
+    // lock_free_queue<YoloDetectionOutput> detection_output_queue; // Example, choose appropriate queue
+
 private:
-    bool WorkerFunction(void* f) override;
+    bool WorkerFunction(WORKER_ENTRY* f) override;
     void WorkerReset() override;
 
     YOLOv8* yolov8_instance_;
     CameraParams* associated_camera_params_;
     CameraEachSelect* associated_camera_select_;
 
-    EnetContext* enet_host_context_ = nullptr;
-    ENetPeer* enet_target_peer_ = nullptr;
+    EnetContext* enet_host_context_;
+    ENetPeer* enet_target_peer_;
     flatbuffers::FlatBufferBuilder* fb_builder_;
 
+    // Buffers needed for YOLO preprocessing
     FrameGPU frame_original_gpu_;
     Debayer debayer_gpu_;
-    unsigned char* d_rgb_yolo_input_gpu_ = nullptr;
-
-    // For display output
-    unsigned char* display_texture_buffer_ = nullptr;
-    unsigned char* d_display_resize_buffer_ = nullptr;
-    NppiSize output_display_size_;
-    NppiRect input_roi_for_display_resize_;
-    NppiRect output_roi_for_display_resize_;
-
-    // For drawing detections
-    float *d_points_for_drawing_ = nullptr;
-    unsigned int *d_skeleton_for_drawing_ = nullptr;
+    unsigned char* d_rgb_yolo_input_gpu_;
 
     // FPS Counter members
     std::chrono::steady_clock::time_point last_fps_update_time_;
     int frame_counter_;
     double current_fps_;
+
+    // Shared memory IPC
+    shaman::SharedBoxQueue* shaman_ipc_queue_;
 };
 
 #endif // YOLO_WORKER_H

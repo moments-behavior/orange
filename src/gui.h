@@ -118,12 +118,6 @@ inline void start_camera_streaming(
 
     for (int i = 0; i < num_cameras; i++)
     {
-        // cameras_select[i].yolo_model is set in orange.cpp when "Open Camera" is clicked
-        // or if yolo checkbox is toggled. Ensure yolo_model_path_from_gui is used if it's the most current.
-        // For now, we assume cameras_select[i].yolo_model is correctly populated before this function.
-        // If yolo_model_path_from_gui is meant to override, logic would be:
-        // if (!yolo_model_path_from_gui.empty()) { cameras_select[i].yolo_model = yolo_model_path_from_gui.c_str(); }
-
         YOLOv8Worker* current_yolo_worker = nullptr;
         if (cameras_select[i].yolo) {
             if (!yolo_model_path_from_gui.empty()) {
@@ -134,20 +128,16 @@ inline void start_camera_streaming(
                       << " for GPU: " << cameras_params[i].gpu_id
                       << " with model: " << (cameras_select[i].yolo_model ? cameras_select[i].yolo_model : "NONE")
                       << std::endl;
-
-            unsigned char* display_buffer_for_yolo = nullptr;
-            if (cameras_select[i].stream_on) {
-                display_buffer_for_yolo = tex[i].cuda_buffer;
-            }
-
+            
             if (cameras_select[i].yolo_model == nullptr || strlen(cameras_select[i].yolo_model) == 0) {
                  std::cerr << "YOLOv8Worker Error: yolo_model for " << worker_name << " is still null or empty. Skipping worker creation." << std::endl;
             } else {
+                // *** THIS IS THE KEY CHANGE ***
+                // The display buffer is no longer passed to the worker's constructor.
                 current_yolo_worker = new YOLOv8Worker(
                     worker_name.c_str(),
                     &cameras_params[i],
-                    &cameras_select[i],
-                    display_buffer_for_yolo
+                    &cameras_select[i]
                 );
 
                 if (external_data_consumer_peer && main_enet_server_context) {
@@ -190,6 +180,8 @@ inline void start_camera_streaming(
     }
 }
 
+
+// No changes needed for stop_camera_streaming, but included for completeness.
 inline void stop_camera_streaming(
     std::vector<std::thread>& camera_threads,
     std::vector<YOLOv8Worker*>& yolo_workers, // Added yolo_workers
@@ -214,9 +206,6 @@ inline void stop_camera_streaming(
     for (YOLOv8Worker* worker : yolo_workers) {
         if (worker) {
             worker->StopThread();
-            // Assuming CThreadWorker's StopThread is synchronous or join is handled internally/next
-            // If not, and if CThreadWorker has a join_thread() or similar:
-            // worker->join_thread(); // Or ensure StopThread itself blocks until thread exits
             delete worker;
         }
     }

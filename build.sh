@@ -209,7 +209,6 @@ if [ $need_link -eq 1 ]; then
       src/acquire_frames.cpp \
       src/offthreadmachine.cpp \
       src/opengldisplay.cpp \
-      src/threadworker.cpp \
       src/gpu_video_encoder.cpp \
       src/yolov8_det.cpp \
       src/yolo_worker.cpp \

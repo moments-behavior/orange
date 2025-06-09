@@ -8,9 +8,7 @@
 #include <vector>         // For std::vector
 
 typedef struct {
-    // void* imagePtr; // OLD - Remove this line
-    std::vector<unsigned char> imageData;
-    size_t bufferSize; // size of imagePtr in bytes
+    unsigned char* d_image;
     int width;
     int height;
     int pixelFormat;

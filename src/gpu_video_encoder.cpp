@@ -103,7 +103,6 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
     }
 }
 
-// --- FIXED CONSTRUCTOR IMPLEMENTATION ---
 GPUVideoEncoder::GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name, bool* encoder_ready_signal, SafeQueue<WORKER_ENTRY*>& recycle_queue)
     : CThreadWorker<WORKER_ENTRY>(name),
       camera_params(camera_params),

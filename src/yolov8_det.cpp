@@ -33,7 +33,7 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
     this->context = this->engine->createExecutionContext();
 
     assert(this->context != nullptr);
-    // cudaStreamCreate(&this->stream); // Moved to make_pipe for conditional creation
+
     this->num_bindings = this->engine->getNbIOTensors();
 
     for (int i = 0; i < this->num_bindings; ++i) {
@@ -324,7 +324,6 @@ void YOLOv8::infer()
             cudaMemcpyDeviceToHost,
             this->stream));
     }
-    cudaStreamSynchronize(this->stream);
 }
 
 void YOLOv8::postprocess(std::vector<Object>& objs)

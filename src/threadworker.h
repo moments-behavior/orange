@@ -29,6 +29,7 @@ public:
     T* GetObjectFromQueueOut();
     void PutObjectToQueueOut(T* f);
     T* GetObjectFromQueueIn();
+    void SetMaxQueueSize(int size) { maxQueueSize = size; }
 
     int GetCountQueueInSize();
     int GetCountQueueOutSize();
@@ -73,6 +74,7 @@ private:
     int countInTotal = 0;
     int countOutTotal = 0;
     int countQueueInMax = 0;
+    int maxQueueSize = 40; // Default max queue size
 
     int myWork = 0;
     unsigned int interval;
@@ -138,14 +140,22 @@ void CThreadWorker<T>::ResetInner()
 template<typename T>
 void CThreadWorker<T>::PutObjectToQueueIn(T* f)
 {
-    mutexQueueIn.Lock();
-    queueIn.push(f);
-    countQueueIn++;
-    countInTotal++;
-    if (countQueueInMax < countQueueIn) {
-        countQueueInMax = countQueueIn;
+    // This loop will now block until there is space in the queue
+    while (IsMachineOn()) {
+        mutexQueueIn.Lock();
+        if (queueIn.size() < maxQueueSize) {
+            queueIn.push(f);
+            countQueueIn++;
+            countInTotal++;
+            if (countQueueInMax < countQueueIn) {
+                countQueueInMax = countQueueIn;
+            }
+            mutexQueueIn.Unlock();
+            return; // Exit the loop and function once the item is pushed
+        }
+        mutexQueueIn.Unlock();
+        usleep(1000); // Wait for 1ms if the queue is full before trying again
     }
-    mutexQueueIn.Unlock();
 }
 
 template<typename T>

@@ -1,3 +1,4 @@
+// src/video_capture.h
 #ifndef ORANGE_VIDEO_CAPTURE
 #define ORANGE_VIDEO_CAPTURE
 #include "thread.h"
@@ -7,7 +8,7 @@
 #include "network_base.h"
 
 enum PictureSaveState {
-    State_Frame_Idle = 0, 
+    State_Frame_Idle = 0,
     State_Write_New_Frame = 1
 };
 
@@ -33,6 +34,9 @@ struct CameraEachSelect
     bool selected_to_save = false;
     std::string picture_save_folder;
     const char* yolo_model;
+    // New flags for configurable YOLO output:
+    bool send_yolo_via_ipc = false; // Default to false
+    bool send_yolo_via_enet = true;  // Default to true (current behavior)
 };
 
 struct CameraState
@@ -44,7 +48,7 @@ struct CameraState
     unsigned long long frame_count = 0;
 };
 
-struct PTPState 
+struct PTPState
 {
     int ptp_offset;
     int ptp_offset_sum=0;
@@ -58,7 +62,7 @@ struct PTPState
     unsigned long long ptp_time;
     unsigned long long ptp_time_prev;
     unsigned long long ptp_time_countdown;
-    unsigned long long frame_ts; 
+    unsigned long long frame_ts;
     unsigned long long frame_ts_prev;
     unsigned long long frame_ts_delta;
     unsigned long long frame_ts_delta_sum = 0;

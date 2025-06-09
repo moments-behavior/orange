@@ -1,42 +1,35 @@
+// src/opengldisplay.h
 #pragma once
 #include "threadworker.h"
 #include "image_processing.h"
-#include "yolov8_det.h"
+#include "thread.h" // For SafeQueue
 #include <nppi.h>
+#include "common.hpp"
 
-#define WORK_ENTRIES_MAX 2
-
-class COpenGLDisplay : public CThreadWorker
+class COpenGLDisplay : public CThreadWorker<WORKER_ENTRY>
 {
 public:
-    COpenGLDisplay(const char* name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer, INDIGOSignalBuilder* indigo_signal_builder); // name is the thread name
-    ~COpenGLDisplay ();
+    COpenGLDisplay(const char* name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer_cuda_pbo, INDIGOSignalBuilder* indigo_signal_builder, SafeQueue<WORKER_ENTRY*>& recycle_queue);
+    ~COpenGLDisplay() override;
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id);
+    CameraParams* camera_params;
+    CameraEachSelect* camera_select;
+    unsigned char* display_buffer_pbo_cuda_ptr_;
+    FrameGPU frame_original_gpu_;
+    Debayer debayer_gpu_;
+    INDIGOSignalBuilder* indigo_signal_builder_;
 
-	//open gl dimensions:
-	CameraParams* camera_params;
-	CameraEachSelect* camera_select;
-	unsigned char* display_buffer;
-	FrameGPU frame_original; // frame on gpu device 
-	Debayer debayer;
-	INDIGOSignalBuilder* indigo_signal_builder;
-	//for real time: refactor this
-	unsigned char *d_convert;
-    YOLOv8* yolov8;
-	FrameCPU frame_cpu;
-    NppiSize input_image_size;
-	NppiRect input_image_roi;
-    NppiSize output_image_size;
-	NppiRect output_image_roi;
-	float *d_points;
-    unsigned int *d_skeleton;
-	unsigned int *d_resize;
+protected:
+    bool WorkerFunction(WORKER_ENTRY* f) override;
 
-private: 
-	virtual void ThreadRunning(); // overides of COffThreadMachine for worker thread
-private:	
-	WORKER_ENTRY workerEntries[WORK_ENTRIES_MAX];
-	WORKER_ENTRY* workerEntriesFreeQueue[WORK_ENTRIES_MAX];
-	int workerEntriesFreeQueueCount;
+private:
+    float *d_points_for_drawing_;
+    unsigned int *d_skeleton_for_drawing_;
+    unsigned char *d_display_resize_buffer_;
+    NppiSize output_display_size_;
+    NppiRect input_roi_for_display_resize_;
+    NppiRect output_roi_for_display_resize_;
+
+    // --- FIX: Add a reference to the central recycle queue ---
+    SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };

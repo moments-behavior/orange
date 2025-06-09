@@ -1,3 +1,5 @@
+// src/gpu_video_encoder.h
+
 #ifndef ORANGE_GPU_VIDEO_ENCODER
 #define ORANGE_GPU_VIDEO_ENCODER
 
@@ -7,14 +9,13 @@
 #include "NvEncoder/NvEncoderCuda.h"
 #include "NvEncoder/NvEncoderCLIOptions.h"
 #include "image_processing.h"
-
-#define ENCODER_ENTRIES_MAX 20
+#include "thread.h" // For SafeQueue
 
 struct Writer
 {
     std::string video_file;
     std::string keyframe_file;
-	std::string metadata_file;
+    std::string metadata_file;
     FFmpegWriter *video;
     std::ofstream* metadata;
 };
@@ -29,34 +30,29 @@ struct EncoderContext
     NvEncoderCuda *pEnc;
 };
 
-class GPUVideoEncoder : public CThreadWorker
+class GPUVideoEncoder : public CThreadWorker<WORKER_ENTRY>
 {
 public:
-    GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name, bool* encoder_ready_signal); // name is the thread name
-    ~GPUVideoEncoder ();
+    // --- Constructor now requires the recycle_queue ---
+    GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name, bool* encoder_ready_signal, SafeQueue<WORKER_ENTRY*>& recycle_queue);
+    ~GPUVideoEncoder() override;
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id, uint64_t timestamp_sys);
-	void ProcessOneFrame(void *f);
-
-	//open gl dimensions:
+    // Public members
 	bool* encoder_ready_signal;
-	CameraParams* camera_params;	
-	unsigned char* display_buffer;
-	FrameGPU frame_original; // frame on gpu device 
+	CameraParams* camera_params;
+	FrameGPU frame_original;
 	Debayer debayer;
-
-	// encoding
 	EncoderContext encoder;
     Writer writer;
 	std::string encoder_setup;
 	std::string folder_name;
 
-private: 
-	virtual void ThreadRunning(); // overides of COffThreadMachine for worker thread
-private:	
-	WORKER_ENTRY workerEntries[ENCODER_ENTRIES_MAX];
-	WORKER_ENTRY* workerEntriesFreeQueue[ENCODER_ENTRIES_MAX];
-	int workerEntriesFreeQueueCount;
+protected:
+    bool WorkerFunction(WORKER_ENTRY* f) override;
+
+private:
+    SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };
+
 
 #endif

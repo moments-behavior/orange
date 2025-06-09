@@ -4,16 +4,22 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include <nppi.h>
 #include "video_capture.h"
+#include "common.hpp"      // For pose::Object
+#include <vector>         // For std::vector
 
 typedef struct {
-	void* imagePtr; // source image buffer
-	size_t bufferSize; // size of imagePtr in bytes
-	int width;
-	int height;
-	int pixelFormat;
+    // void* imagePtr; // OLD - Remove this line
+    std::vector<unsigned char> imageData;
+    size_t bufferSize; // size of imagePtr in bytes
+    int width;
+    int height;
+    int pixelFormat;
     unsigned long long timestamp;
     unsigned long long frame_id;
     uint64_t timestamp_sys;
+    // --- Fields for YOLO results ---
+    std::vector<pose::Object> detections; // Store YOLO detection results
+    bool has_detections;                  // Flag to indicate if detections are present
 } WORKER_ENTRY;
 
 
@@ -37,6 +43,16 @@ struct Debayer
     NppiRect roi;
     NppiBayerGridPosition grid;
 };
+
+// --- Add the FrameProcess struct definition here ---
+struct FrameProcess
+{
+    FrameGPU frame_original;
+    Debayer debayer;
+    unsigned char *d_convert;
+    FrameCPU frame_cpu;
+};
+
 
 static inline void initialize_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
 {

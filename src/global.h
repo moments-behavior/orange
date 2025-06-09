@@ -4,6 +4,8 @@
 #include <atomic>
 #include <mutex>
 
+extern std::mutex g_yolo_net_mutex;
+
 extern std::atomic<double> streaming_fps;
 extern std::atomic<int> streaming_target_fps;
 extern std::atomic<int64_t> record_start_time_ns;

@@ -82,7 +82,7 @@ void acquire_frames(
         }
     }
 
-    WORKER_ENTRY worker_entry_pool[ACQUIRE_WORK_ENTRIES_MAX];
+    static WORKER_ENTRY worker_entry_pool[ACQUIRE_WORK_ENTRIES_MAX];
     SafeQueue<WORKER_ENTRY*> free_entries_queue;
     
     for(int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {

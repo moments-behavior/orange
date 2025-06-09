@@ -606,20 +606,14 @@ int main(int argc, char **args) {
                     }
 
                     ImGui::TableNextColumn();
-                    ImGui::Text("YOLO "); ImGui::SameLine(); // Add "YOLO " for consistency
-                    // Add "All" checkbox for YOLO if you want similar functionality
-                    // static bool yolo_all_cameras = false; // Requires similar logic as stream_all_cameras
-                    // if(ImGui::Checkbox("All##yolo", &yolo_all_cameras)) { ... }
-
+                    ImGui::Text("YOLO "); ImGui::SameLine();
 
                     // New Columns for IPC and ENet selection for YOLO
                     ImGui::TableNextColumn();
                     ImGui::Text("YOLO IPC"); // New header
-                    // Add "All" checkbox for YOLO IPC if desired
 
                     ImGui::TableNextColumn();
                     ImGui::Text("YOLO ENet"); // New header
-                    // Add "All" checkbox for YOLO ENet if desired
 
 
                     for (int i = 0; i < num_cameras; i++) {

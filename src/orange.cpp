@@ -51,7 +51,7 @@ int main(int argc, char **args) {
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
     std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
     
-    bool check[cam_count]{0};
+    bool camera_is_selected[cam_count]{0};
     CameraParams *cameras_params;
     CameraEachSelect *cameras_select;
     CameraEmergent *ecams;
@@ -218,12 +218,12 @@ int main(int argc, char **args) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Open Cameras")) {
                     update_camera_configs(camera_config_files, network_config_folders[network_config_select]);
-                    select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
+                    select_cameras_have_configs(camera_config_files, device_info, camera_is_selected, cam_count);
                     host_broadcast_open_cameras(fb_builder, &server, network_config_folders[network_config_select]);
                     // open cameras
                     num_cameras = 0;
                     for (int i = 0; i < cam_count; i++) {
-                        if (check[i]) {
+                        if (camera_is_selected[i]) {
                             num_cameras++;
                         }
                     }
@@ -233,7 +233,7 @@ int main(int argc, char **args) {
 
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++) {
-                            if (check[i]) {
+                            if (camera_is_selected[i]) {
                                 selected_cameras.push_back(i);
                             }
                         }
@@ -312,7 +312,7 @@ int main(int argc, char **args) {
             
                     const size_t frame_size_bytes = cameras_params[0].width * cameras_params[0].height;
                     for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
-                        worker_entry_pool[i].imageData.resize(frame_size_bytes);
+                        ck(cudaMalloc(&worker_entry_pool[i].d_image, frame_size_bytes));
                         free_entries_queue->push(&worker_entry_pool[i]);
                     }
             
@@ -486,7 +486,7 @@ int main(int argc, char **args) {
             camera_control->open = false;
 
             for (int i = 0; i < cam_count; i++) {
-                check[i] = 0;
+                camera_is_selected[i] = 0;
             }
         }
 
@@ -505,7 +505,7 @@ int main(int argc, char **args) {
                     sprintf(temp_string, "%d", i);
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::Selectable(temp_string, &check[i], ImGuiSelectableFlags_SpanAllColumns);
+                    ImGui::Selectable(temp_string, &camera_is_selected[i], ImGuiSelectableFlags_SpanAllColumns);
                     ImGui::TableNextColumn();
                     ImGui::Text("%s", device_info[i].serialNumber);
                     ImGui::TableNextColumn();
@@ -518,11 +518,11 @@ int main(int argc, char **args) {
                 select_all_cameras = !select_all_cameras;
                 if (select_all_cameras) {
                     for (int i = 0; i < cam_count; i++) {
-                        check[i] = true;
+                        camera_is_selected[i] = true;
                     }
                 } else {
                     for (int i = 0; i < cam_count; i++) {
-                        check[i] = false;
+                        camera_is_selected[i] = false;
                     }
                 }
             }
@@ -900,12 +900,12 @@ int main(int argc, char **args) {
                 if (!camera_control->open) {
                     if (local_config_select < local_config_folders.size()) {
                         update_camera_configs(camera_config_files, local_config_folders[local_config_select]);
-                        select_cameras_have_configs(camera_config_files, device_info, check, cam_count);
+                        select_cameras_have_configs(camera_config_files, device_info, camera_is_selected, cam_count);
                     }
 
                     num_cameras = 0;
                     for (int i = 0; i < cam_count; i++) {
-                        if (check[i]) {
+                        if (camera_is_selected[i]) {
                             num_cameras++;
                         }
                     }
@@ -916,7 +916,7 @@ int main(int argc, char **args) {
 
                         std::vector<int> selected_cameras;
                         for (int i = 0; i < cam_count; i++) {
-                            if (check[i]) {
+                            if (camera_is_selected[i]) {
                                 selected_cameras.push_back(i);
                             }
                         }
@@ -992,7 +992,7 @@ int main(int argc, char **args) {
                         // --- START STREAMING LOGIC ---
                 
                         // 1. ALLOCATE SHARED RESOURCES
-                        worker_entry_pool = new WORKER_ENTRY[ACQUIRE_WORK_ENTRIES_MAX];
+                        worker_entry_pool = new WORKER_ENTRY[ACQUIRE_WORK_ENTRIES_MAX] ;
                         free_entries_queue = new SafeQueue<WORKER_ENTRY*>();
                         recycle_queue = new SafeQueue<WORKER_ENTRY*>();
                         openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
@@ -1002,7 +1002,7 @@ int main(int argc, char **args) {
                 
                         const size_t frame_size_bytes = cameras_params[0].width * cameras_params[0].height;
                         for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
-                            worker_entry_pool[i].imageData.resize(frame_size_bytes);
+                            ck(cudaMalloc(&worker_entry_pool[i].d_image, frame_size_bytes));
                             free_entries_queue->push(&worker_entry_pool[i]);
                         }
                 

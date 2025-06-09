@@ -120,25 +120,21 @@ void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer) {
     enet_target_peer_ = target_peer;
 }
 
-bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* f) {
-    if (!yolov8_instance_) {
-        // If this worker is inactive or receives a null frame, do nothing.
-        // Returning false prevents the base class from queueing a null pointer.
+bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
+    if (!yolov8_instance_ || !entry) {
         return false;
     }
 
-    WORKER_ENTRY* entry = static_cast<WORKER_ENTRY*>(f);
     ck(cudaSetDevice(associated_camera_params_->gpu_id));
 
     // --- Frame acquisition and YOLO processing ---
-    ck(cudaMemcpy2DAsync(frame_original_gpu_.d_orig,
-        associated_camera_params_->width,
-        entry->imageData.data(), // Use the vector's data
-        associated_camera_params_->width,
-        associated_camera_params_->width,
-        associated_camera_params_->height,
-        cudaMemcpyHostToDevice,
-        yolov8_instance_->stream));
+    // UPDATED: Perform a fast Device-to-Device copy from the entry's GPU buffer.
+    size_t buffer_size = static_cast<size_t>(entry->width) * static_cast<size_t>(entry->height);
+    ck(cudaMemcpyAsync(frame_original_gpu_.d_orig,
+                       entry->d_image,
+                       buffer_size,
+                       cudaMemcpyDeviceToDevice,
+                       yolov8_instance_->stream));
 
     if (associated_camera_params_->color) {
         debayer_frame_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
@@ -152,18 +148,10 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* f) {
     yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_);
     yolov8_instance_->infer();
 
-    frame_counter_++;
-    auto current_time_fps = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = current_time_fps - last_fps_update_time_;
-    if (elapsed_seconds.count() >= 1.0) {
-        current_fps_ = static_cast<double>(frame_counter_) / elapsed_seconds.count();
-        frame_counter_ = 0;
-        last_fps_update_time_ = current_time_fps;
-    }
-
-    // This is the key change: populate the detections in the WORKER_ENTRY itself.
+    // Populate the detections in the WORKER_ENTRY itself.
     yolov8_instance_->postprocess(entry->detections);
     entry->has_detections = !entry->detections.empty();
+    
     frame_counter_++;
     auto now = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = now - last_fps_update_time_;
@@ -179,14 +167,13 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* f) {
         if (associated_camera_select_->send_yolo_via_ipc && shaman_ipc_queue_) {
             std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
             if (!shaman_ipc_queue_->push(shaman_objects)) {
-                // Optional: log if queue is full
                 std::cerr << "YOLOv8Worker (" << threadName << "): IPC queue is full, dropping YOLO results." << std::endl;
             }
         }
 
         if (associated_camera_select_->send_yolo_via_enet && enet_host_context_ && enet_target_peer_ &&
             enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) {
-            // ENet transmission logic remains here, as it's part of producing the YOLO result.
+            // ENet transmission logic would go here
         }
     }
     

@@ -133,15 +133,16 @@ GPUVideoEncoder::~GPUVideoEncoder()
     cuCtxDestroy(encoder.cuContext);
 }
 
-// --- NEWLY IMPLEMENTED WORKERFUNCTION ---
 bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 {
     if (!entry) return false;
 
     ck(cudaSetDevice(camera_params->gpu_id));
 
-    // Copy frame from the entry's host buffer to this worker's GPU buffer
-    ck(cudaMemcpy(frame_original.d_orig, entry->imageData.data(), entry->bufferSize, cudaMemcpyHostToDevice));
+    // CHANGE: Copy from the entry's GPU buffer to this worker's internal GPU buffer
+    // This is a fast Device-to-Device copy.
+    size_t buffer_size = camera_params->width * camera_params->height;
+    ck(cudaMemcpy(frame_original.d_orig, entry->d_image, buffer_size, cudaMemcpyDeviceToDevice));
 
     // Debayer/process the frame
     if (camera_params->color){

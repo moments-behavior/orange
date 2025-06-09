@@ -132,14 +132,14 @@ void acquire_frames(
             size_t frame_bufferSize = ecam->frame_recv.bufferSize;
 
             if (imageDataSource != nullptr && frame_bufferSize > 0) {
+                // The 'd_temp_unscrambled_buffer' is no longer needed here,
+                // we will write directly into the WORKER_ENTRY's GPU buffer.
                 if (camera_params->need_reorder) {
-                    GSPRINT4521_Convert(d_temp_unscrambled_buffer, static_cast<const unsigned char*>(imageDataSource), camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0);
+                    GSPRINT4521_Convert(current_entry->d_image, static_cast<const unsigned char*>(imageDataSource), camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0);
                 } else {
-                    ck(cudaMemcpy(d_temp_unscrambled_buffer, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
+                    // Copy directly from host memory to the WORKER_ENTRY's pre-allocated GPU buffer
+                    ck(cudaMemcpy(current_entry->d_image, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
                 }
-                
-                ck(cudaMemcpy(current_entry->imageData.data(), d_temp_unscrambled_buffer, frame_size_bytes, cudaMemcpyDeviceToHost));
-                current_entry->bufferSize = frame_size_bytes;
                 
                 current_entry->width = ecam->frame_recv.size_x;
                 current_entry->height = ecam->frame_recv.size_y;

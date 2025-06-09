@@ -42,18 +42,20 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     
     ck(cudaSetDevice(camera_params->gpu_id));
 
-    // Copy and process the frame data...
-    ck(cudaMemcpy(frame_original_gpu_.d_orig, f->imageData.data(), f->bufferSize, cudaMemcpyHostToDevice));
+    // CHANGE: Copy from the entry's GPU buffer instead of a host vector.
+    size_t buffer_size = static_cast<size_t>(f->width) * static_cast<size_t>(f->height);
+    ck(cudaMemcpy(frame_original_gpu_.d_orig, f->d_image, buffer_size, cudaMemcpyDeviceToDevice));
+    
+    // Process the frame data...
     if (camera_params->color){
         debayer_frame_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
     } else {
         duplicate_channel_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
     }
+    // Copy the final processed RGBA data to the PBO for display.
     ck(cudaMemcpy(display_buffer_pbo_cuda_ptr_, debayer_gpu_.d_debayer, camera_params->width * camera_params->height * 4, cudaMemcpyDeviceToDevice));
     
-    // --- FIX: Return the used entry to the central recycling queue ---
     m_recycle_queue.push(f);
     
-    // Return false, as this is the end of the line for this entry
     return false; 
 }

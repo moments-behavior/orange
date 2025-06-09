@@ -9,10 +9,12 @@
 #include "yolo_payload_generated.h"
 #include "message_wrapper_generated.h"
 #include "pose_shaman.h"
+#include "thread.h"
 
 YOLOv8Worker::YOLOv8Worker(const char* name,
                            CameraParams* cam_params,
-                           CameraEachSelect* cam_select)
+                           CameraEachSelect* cam_select,
+                           SafeQueue<WORKER_ENTRY*>& recycle_queue)
     : CThreadWorker(name),
       yolov8_instance_(nullptr),
       associated_camera_params_(cam_params),
@@ -24,7 +26,8 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
       last_fps_update_time_(std::chrono::steady_clock::now()),
       frame_counter_(0),
       current_fps_(0.0),
-      shaman_ipc_queue_(nullptr)
+      shaman_ipc_queue_(nullptr),
+      m_recycle_queue(recycle_queue)
 {
     std::cout << "YOLOv8Worker instance created for: " << name << std::endl;
 
@@ -119,7 +122,8 @@ void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer) {
 
 bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* f) {
     if (!yolov8_instance_) {
-        if (f) PutObjectToQueueOut(f);
+        // If this worker is inactive or receives a null frame, do nothing.
+        // Returning false prevents the base class from queueing a null pointer.
         return false;
     }
 
@@ -160,6 +164,15 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* f) {
     // This is the key change: populate the detections in the WORKER_ENTRY itself.
     yolov8_instance_->postprocess(entry->detections);
     entry->has_detections = !entry->detections.empty();
+    frame_counter_++;
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed = now - last_fps_update_time_;
+    if (elapsed.count() >= 1.0) {
+        current_fps_ = frame_counter_ / elapsed.count();
+        std::cout << threadName << " Inference FPS: " << current_fps_ << std::endl;
+        frame_counter_ = 0;
+        last_fps_update_time_ = now;
+    }
 
     // --- Configurable Data Transmission ---
     if (entry->has_detections) {
@@ -167,6 +180,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* f) {
             std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
             if (!shaman_ipc_queue_->push(shaman_objects)) {
                 // Optional: log if queue is full
+                std::cerr << "YOLOv8Worker (" << threadName << "): IPC queue is full, dropping YOLO results." << std::endl;
             }
         }
 
@@ -176,11 +190,16 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* f) {
         }
     }
     
-    // Pass the modified entry (now with detections) to the output queue for the next stage.
-    PutObjectToQueueOut(f);
+    // Instead of putting the result on our own output queue, push it to the display worker.
+    if (m_display_worker) {
+        m_display_worker->PutObjectToQueueIn(entry);
+    } else {
+        m_recycle_queue.push(entry); // Recycle the entry if no display worker is set
+    }
 
-    cudaStreamSynchronize(yolov8_instance_->stream);
-    return true;
+    // Return 'false' to tell the CThreadWorker base class that we have manually
+    // handled the buffer and it should NOT place it on our own output queue.
+    return false;
 }
 
 void YOLOv8Worker::WorkerReset() {

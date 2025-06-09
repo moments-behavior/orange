@@ -66,179 +66,185 @@ void clear_upload_and_cleanup(GL_Texture& tex, int width, int height) {
 }
 
 
-inline void start_camera_streaming(
-    std::vector<std::thread>& camera_threads,
-    std::vector<YOLOv8Worker*>& yolo_workers, // Added yolo_workers
-    CameraControl *camera_control,
-    CameraEmergent* ecams,
-    CameraParams* cameras_params,
-    CameraEachSelect *cameras_select,
-    GL_Texture *tex, // This is an array of GL_Texture
-    int num_cameras,
-    int evt_buffer_size,
-    bool ptp_stream_sync,
-    const std::string& encoder_setup,
-    const std::string& folder_name,
-    PTPParams* ptp_params,
-    INDIGOSignalBuilder* indigo_signal_builder,
-    const std::string& yolo_model_path_from_gui,
-    EnetContext* main_enet_server_context
-)
-{
-    // Clear any existing yolo_workers from a previous session
-    for (YOLOv8Worker* worker : yolo_workers) {
-        if (worker) {
-            worker->StopThread(); // Ensure it's stopped before deleting
-            // worker->join_thread(); // Join should happen in stop_camera_streaming
-            delete worker;
-        }
-    }
-    yolo_workers.clear();
-    yolo_workers.resize(num_cameras, nullptr); // Pre-allocate with nullptrs for easier indexing
+// inline void start_camera_streaming(
+//     std::vector<std::thread>& camera_threads,
+//     std::vector<YOLOv8Worker*>& yolo_workers, // Added yolo_workers
+//     CameraControl *camera_control,
+//     CameraEmergent* ecams,
+//     CameraParams* cameras_params,
+//     CameraEachSelect *cameras_select,
+//     GL_Texture *tex, // This is an array of GL_Texture
+//     int num_cameras,
+//     int evt_buffer_size,
+//     bool ptp_stream_sync,
+//     const std::string& encoder_setup,
+//     const std::string& folder_name,
+//     PTPParams* ptp_params,
+//     INDIGOSignalBuilder* indigo_signal_builder,
+//     const std::string& yolo_model_path_from_gui,
+//     EnetContext* main_enet_server_context,
+//     COpenGLDisplay** openGLDisplayWorkers
+// )
+// {
+//     // Clear any existing yolo_workers from a previous session
+//     for (YOLOv8Worker* worker : yolo_workers) {
+//         if (worker) {
+//             worker->StopThread(); // Ensure it's stopped before deleting
+//             // worker->join_thread(); // Join should happen in stop_camera_streaming
+//             delete worker;
+//         }
+//     }
+//     yolo_workers.clear();
+//     yolo_workers.resize(num_cameras, nullptr); // Pre-allocate with nullptrs for easier indexing
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        camera_open_stream(&ecams[i].camera, &cameras_params[i]);
-        ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
-        allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
+//     for (int i = 0; i < num_cameras; i++)
+//     {
+//         camera_open_stream(&ecams[i].camera, &cameras_params[i]);
+//         ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+//         allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
 
-        if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
-        {
-            allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
-        }
-    }
+//         if (cameras_params[i].need_reorder && cameras_params[i].gpu_direct)
+//         {
+//             allocate_frame_reorder_buffer(&ecams[i].camera, &ecams[i].frame_reorder, &cameras_params[i]);
+//         }
+//     }
 
-    if (ptp_stream_sync){
-        for (int i = 0; i < num_cameras; i++)
-        {
-            ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
-        }
-        camera_control->sync_camera = true;
-    }
+//     if (ptp_stream_sync){
+//         for (int i = 0; i < num_cameras; i++)
+//         {
+//             ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+//         }
+//         camera_control->sync_camera = true;
+//     }
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        YOLOv8Worker* current_yolo_worker = nullptr;
-        if (cameras_select[i].yolo) {
-            if (!yolo_model_path_from_gui.empty()) {
-                cameras_select[i].yolo_model = yolo_model_path_from_gui.c_str();
-            }
-            std::string worker_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
-            std::cout << "Creating YOLOv8Worker: " << worker_name
-                      << " for GPU: " << cameras_params[i].gpu_id
-                      << " with model: " << (cameras_select[i].yolo_model ? cameras_select[i].yolo_model : "NONE")
-                      << std::endl;
+//     for (int i = 0; i < num_cameras; i++)
+//     {
+//         YOLOv8Worker* current_yolo_worker = nullptr;
+//         if (cameras_select[i].yolo) {
+//             if (!yolo_model_path_from_gui.empty()) {
+//                 cameras_select[i].yolo_model = yolo_model_path_from_gui.c_str();
+//             }
+//             std::string worker_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
+//             std::cout << "Creating YOLOv8Worker: " << worker_name
+//                       << " for GPU: " << cameras_params[i].gpu_id
+//                       << " with model: " << (cameras_select[i].yolo_model ? cameras_select[i].yolo_model : "NONE")
+//                       << std::endl;
             
-            if (cameras_select[i].yolo_model == nullptr || strlen(cameras_select[i].yolo_model) == 0) {
-                 std::cerr << "YOLOv8Worker Error: yolo_model for " << worker_name << " is still null or empty. Skipping worker creation." << std::endl;
-            } else {
-                // *** THIS IS THE KEY CHANGE ***
-                // The display buffer is no longer passed to the worker's constructor.
-                current_yolo_worker = new YOLOv8Worker(
-                    worker_name.c_str(),
-                    &cameras_params[i],
-                    &cameras_select[i]
-                );
+//             if (cameras_select[i].yolo_model == nullptr || strlen(cameras_select[i].yolo_model) == 0) {
+//                  std::cerr << "YOLOv8Worker Error: yolo_model for " << worker_name << " is still null or empty. Skipping worker creation." << std::endl;
+//             } else {
+//                 // *** THIS IS THE KEY CHANGE ***
+//                 // The display buffer is no longer passed to the worker's constructor.
+//                 current_yolo_worker = new YOLOv8Worker(
+//                     worker_name.c_str(),
+//                     &cameras_params[i],
+//                     &cameras_select[i]
+//                 );
 
-                if (external_data_consumer_peer && main_enet_server_context) {
-                    std::cout << "start_camera_streaming: Proactively calling SetENetTarget for worker " << worker_name
-                              << " with peer ID: " << external_data_consumer_peer->incomingPeerID
-                              << " and host_ctx: " << static_cast<void*>(main_enet_server_context) << std::endl;
-                    current_yolo_worker->SetENetTarget(main_enet_server_context, external_data_consumer_peer);
-                } else {
-                     std::cout << "start_camera_streaming: No external_data_consumer_peer or main_enet_server_context yet for worker " << worker_name << std::endl;
-                     if (!external_data_consumer_peer) std::cout << "  external_data_consumer_peer is NULL" << std::endl;
-                     if (!main_enet_server_context) std::cout << "  main_enet_server_context is NULL" << std::endl;
-                }
-                std::cout << "start_camera_streaming: Created YOLOv8Worker for " << worker_name
-                          << " at address " << static_cast<void*>(current_yolo_worker) << std::endl;
+//                 if (external_data_consumer_peer && main_enet_server_context) {
+//                     std::cout << "start_camera_streaming: Proactively calling SetENetTarget for worker " << worker_name
+//                               << " with peer ID: " << external_data_consumer_peer->incomingPeerID
+//                               << " and host_ctx: " << static_cast<void*>(main_enet_server_context) << std::endl;
+//                     current_yolo_worker->SetENetTarget(main_enet_server_context, external_data_consumer_peer);
+//                 } else {
+//                      std::cout << "start_camera_streaming: No external_data_consumer_peer or main_enet_server_context yet for worker " << worker_name << std::endl;
+//                      if (!external_data_consumer_peer) std::cout << "  external_data_consumer_peer is NULL" << std::endl;
+//                      if (!main_enet_server_context) std::cout << "  main_enet_server_context is NULL" << std::endl;
+//                 }
+//                 std::cout << "start_camera_streaming: Created YOLOv8Worker for " << worker_name
+//                           << " at address " << static_cast<void*>(current_yolo_worker) << std::endl;
+                        
+//                 // If the display for this camera is also active, link them.
+//                 if (cameras_select[i].stream_on && openGLDisplayWorkers[i]) {
+//                     current_yolo_worker->SetDisplayWorker(openGLDisplayWorkers[i]);
+//                 }
 
-                current_yolo_worker->StartThread();
-                yolo_workers[i] = current_yolo_worker;
-            }
-        }
+//                 current_yolo_worker->StartThread();
+//                 yolo_workers[i] = current_yolo_worker;
+//             }
+//         }
 
-        unsigned char* display_buffer_for_acquire_frames_thread = nullptr;
-        if (cameras_select[i].stream_on) {
-             // tex is an array, access tex[i]
-            display_buffer_for_acquire_frames_thread = tex[i].cuda_buffer;
-        }
+//         unsigned char* display_buffer_for_acquire_frames_thread = nullptr;
+//         if (cameras_select[i].stream_on) {
+//              // tex is an array, access tex[i]
+//             display_buffer_for_acquire_frames_thread = tex[i].cuda_buffer;
+//         }
 
-        camera_threads.emplace_back(
-            &acquire_frames,
-            &ecams[i],
-            &cameras_params[i],
-            &cameras_select[i],
-            camera_control,
-            display_buffer_for_acquire_frames_thread, // Pass the specific cuda_buffer for this camera's texture
-            encoder_setup,
-            folder_name,
-            ptp_params,
-            indigo_signal_builder,
-            current_yolo_worker // Pass the (potentially null) YOLO worker for this camera
-        );
-    }
-}
-
-
-// No changes needed for stop_camera_streaming, but included for completeness.
-inline void stop_camera_streaming(
-    std::vector<std::thread>& camera_threads,
-    std::vector<YOLOv8Worker*>& yolo_workers, // Added yolo_workers
-    CameraControl *camera_control,
-    CameraEmergent* ecams,
-    CameraParams* cameras_params,
-    CameraEachSelect *cameras_select, // Added cameras_select for texture cleanup logic
-    GL_Texture *tex,                  // Added tex for texture cleanup logic
-    const int num_cameras,
-    const int evt_buffer_size,
-    PTPParams* ptp_params
-)
-{
-    for (auto &t : camera_threads) {
-        if (t.joinable()) { // Check if joinable before joining
-            t.join();
-        }
-    }
-    camera_threads.clear(); // Clear after joining all
+//         camera_threads.emplace_back(
+//             &acquire_frames,
+//             &ecams[i],
+//             &cameras_params[i],
+//             &cameras_select[i],
+//             camera_control,
+//             display_buffer_for_acquire_frames_thread, // Pass the specific cuda_buffer for this camera's texture
+//             encoder_setup,
+//             folder_name,
+//             ptp_params,
+//             indigo_signal_builder,
+//             current_yolo_worker // Pass the (potentially null) YOLO worker for this camera
+//         );
+//     }
+// }
 
 
-    for (YOLOv8Worker* worker : yolo_workers) {
-        if (worker) {
-            worker->StopThread();
-            delete worker;
-        }
-    }
-    yolo_workers.clear();
+// // No changes needed for stop_camera_streaming, but included for completeness.
+// inline void stop_camera_streaming(
+//     std::vector<std::thread>& camera_threads,
+//     std::vector<YOLOv8Worker*>& yolo_workers, // Added yolo_workers
+//     CameraControl *camera_control,
+//     CameraEmergent* ecams,
+//     CameraParams* cameras_params,
+//     CameraEachSelect *cameras_select, // Added cameras_select for texture cleanup logic
+//     GL_Texture *tex,                  // Added tex for texture cleanup logic
+//     const int num_cameras,
+//     const int evt_buffer_size,
+//     PTPParams* ptp_params
+// )
+// {
+//     for (auto &t : camera_threads) {
+//         if (t.joinable()) { // Check if joinable before joining
+//             t.join();
+//         }
+//     }
+//     camera_threads.clear(); // Clear after joining all
 
-    for (int i = 0; i < num_cameras; i++)
-    {
-        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);
-        delete[] ecams[i].evt_frame;
-        ecams[i].evt_frame = nullptr; // Avoid dangling pointer
-        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
-    }
 
-    if (num_cameras > 0 && ptp_params->network_sync) { // Check num_cameras to avoid issues if it was 0
-        for (int i = 0; i < num_cameras; i++)
-        {
-            ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
-        }
-    }
-    // Reset PTP parameters only if they were used
-    if (ptp_params->network_sync || camera_control->sync_camera) {
-        ptp_params->ptp_counter = 0;
-        ptp_params->ptp_global_time = 0;
-        ptp_params->ptp_stop_time = 0; // Ensure stop time is also reset
-        ptp_params->ptp_stop_counter = 0;
-        // ptp_params->network_sync remains as it was set (true if network PTP, false otherwise)
-        ptp_params->network_set_start_ptp = false;
-        ptp_params->ptp_start_reached = false;
-        ptp_params->ptp_stop_reached = false;
-        ptp_params->network_set_stop_ptp = false;
-    }
-    camera_control->sync_camera = false; // Always reset this internal control flag
-}
+//     for (YOLOv8Worker* worker : yolo_workers) {
+//         if (worker) {
+//             worker->StopThread();
+//             delete worker;
+//         }
+//     }
+//     yolo_workers.clear();
+
+//     for (int i = 0; i < num_cameras; i++)
+//     {
+//         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);
+//         delete[] ecams[i].evt_frame;
+//         ecams[i].evt_frame = nullptr; // Avoid dangling pointer
+//         check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
+//     }
+
+//     if (num_cameras > 0 && ptp_params->network_sync) { // Check num_cameras to avoid issues if it was 0
+//         for (int i = 0; i < num_cameras; i++)
+//         {
+//             ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
+//         }
+//     }
+//     // Reset PTP parameters only if they were used
+//     if (ptp_params->network_sync || camera_control->sync_camera) {
+//         ptp_params->ptp_counter = 0;
+//         ptp_params->ptp_global_time = 0;
+//         ptp_params->ptp_stop_time = 0; // Ensure stop time is also reset
+//         ptp_params->ptp_stop_counter = 0;
+//         // ptp_params->network_sync remains as it was set (true if network PTP, false otherwise)
+//         ptp_params->network_set_start_ptp = false;
+//         ptp_params->ptp_start_reached = false;
+//         ptp_params->ptp_stop_reached = false;
+//         ptp_params->network_set_stop_ptp = false;
+//     }
+//     camera_control->sync_camera = false; // Always reset this internal control flag
+// }
 
 static void set_camera_properties(CameraEmergent* ecams, CameraParams* cameras_params, const int num_cameras, std::vector<std::string>& color_temps)
 {

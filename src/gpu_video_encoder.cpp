@@ -8,6 +8,7 @@
 #include "kernel.cuh"
 #include "gpu_video_encoder.h"
 #include <cuda_runtime_api.h>
+#include <iostream> // Added for logging
 
 // Helper to initialize the NvEncoder (no changes needed)
 template <class EncoderClass>
@@ -48,7 +49,7 @@ static inline void initialize_writer(Writer *writer, CameraParams *camera_params
 }
 
 
-static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, Debayer *debayer)
+static inline void encode_frame(EncoderContext *encoder, Writer *writer, Debayer *debayer)
 {
     const NvEncInputFrame *encoderInputFrame = encoder->pEnc->GetNextInputFrame();
     NvEncoderCuda::CopyToDeviceFrame(encoder->cuContext,
@@ -63,10 +64,17 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer, D
                                      encoderInputFrame->chromaOffsets,
                                      encoderInputFrame->numChromaPlanes);
 
+    // LOGGING: Confirm we are about to encode a frame
+    std::cout << "[GPUVideoEncoder] Encoding frame: " << encoder->num_frame_encode << std::endl;
     encoder->pEnc->EncodeFrame(encoder->vPacket);
+    // LOGGING: Confirm encoding finished and check for packets
+    std::cout << "[GPUVideoEncoder] EncodeFrame finished. Packet count: " << encoder->vPacket.size() << std::endl;
+
     for (std::vector<uint8_t> &packet : encoder->vPacket)
     {
-        writer->push_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
+        // LOGGING: Confirm we are pushing a packet to the writer
+        std::cout << "[GPUVideoEncoder] Pushing packet to FFmpegWriter. Size: " << packet.size() << " bytes, PTS: " << encoder->num_frame_encode << std::endl;
+        writer->video->push_packet(packet.data(), (int)packet.size(), encoder->num_frame_encode++);
     }
 }
 
@@ -111,10 +119,14 @@ GPUVideoEncoder::GPUVideoEncoder(const char* name, CameraParams *camera_params, 
       encoder_ready_signal(encoder_ready_signal),
       m_recycle_queue(recycle_queue)
 {
+    // LOGGING: Confirm constructor is called
+    std::cout << "[GPUVideoEncoder] Constructor for " << name << " on GPU " << camera_params->gpu_id << std::endl;
+
     ck(cudaSetDevice(camera_params->gpu_id));
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
     ck(cuCtxCreate(&encoder.cuContext, 0, camera_params->gpu_id));
+    encoder.eFormat = NV_ENC_BUFFER_FORMAT_NV12;
     encoder.pEnc = new NvEncoderCuda(encoder.cuContext, camera_params->width, camera_params->height, encoder.eFormat);
     encoder.encodeCLIOptions = NvEncoderInitParam(encoder_setup.c_str());
     InitializeEncoder(encoder.pEnc, encoder.encodeCLIOptions, encoder.eFormat);
@@ -125,6 +137,8 @@ GPUVideoEncoder::GPUVideoEncoder(const char* name, CameraParams *camera_params, 
 
 GPUVideoEncoder::~GPUVideoEncoder()
 {
+    // LOGGING: Confirm destructor is called
+    std::cout << "[GPUVideoEncoder] Destructor for " << this->threadName << std::endl;
     close_writer(&encoder, &writer);
     ck(cudaSetDevice(camera_params->gpu_id));
     cudaFree(frame_original.d_orig);
@@ -135,6 +149,9 @@ GPUVideoEncoder::~GPUVideoEncoder()
 bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 {
     if (!entry) return false;
+
+    // LOGGING: Confirm frame reception in the worker thread
+    std::cout << "[GPUVideoEncoder] WorkerFunction received frame_id: " << entry->frame_id << std::endl;
 
     ck(cudaSetDevice(camera_params->gpu_id));
 
@@ -151,7 +168,7 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
     }
 
     // Encode the frame and write metadata
-    encode_frame(&encoder, writer.video, &debayer);
+    encode_frame(&encoder, &writer, &debayer);
     write_meatadata(writer.metadata, entry->frame_id, entry->timestamp, entry->timestamp_sys);
 
     // This worker is a final consumer for this data path.

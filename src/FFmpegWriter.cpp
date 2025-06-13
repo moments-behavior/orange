@@ -1,5 +1,6 @@
-#include "FFmpegWriter.h"
+// src/FFmpegWriter.cpp
 
+#include "FFmpegWriter.h"
 
 FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps, const char *szOutFilePath, const char *metadata_file) : nFps(nFps), m_quitting(false)
 {
@@ -10,7 +11,7 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps
     }
 
     // Set format on oc
-    AVOutputFormat *fmt = av_guess_format("mpegts", NULL, NULL);
+    AVOutputFormat *fmt = (AVOutputFormat *)av_guess_format("mpegts", NULL, NULL);
     if (!fmt) {
         printf("Invalid format");
         return;
@@ -73,7 +74,7 @@ void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
         return;
     }
     memcpy(pkt->data, pData, nBytes);   
-    pkt->pts = av_rescale_q(nPts++, AVRational {1, nFps}, vs->time_base);
+    pkt->pts = av_rescale_q(nPts, AVRational {1, nFps}, vs->time_base);
     // No B-frames
     pkt->dts = pkt->pts;
     pkt->stream_index = vs->index;    
@@ -81,6 +82,8 @@ void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
         pkt->flags |= AV_PKT_FLAG_KEY;
     }
     m_queue.push(pkt);
+    // LOGGING: Confirm packet was pushed to the queue
+    std::cout << "[FFmpegWriter] Pushed packet to queue. Size: " << nBytes << ", PTS: " << pkt->pts << std::endl;
 }
 
 void FFmpegWriter::create_thread()
@@ -112,25 +115,33 @@ void FFmpegWriter::write_one_pkt(AVPacket* pkt)
 // off-thread saving
 void FFmpegWriter::write_thread()
 {
+    // LOGGING: Confirm writer thread has started
+    std::cout << "[FFmpegWriter] Writer thread started." << std::endl;
     while(!m_quitting) {
-        std::shared_ptr<AVPacket*> pkt(m_queue.pop());
-        if(pkt) {
-            write_one_pkt(*pkt.get());
+        AVPacket* pkt = nullptr; // Note: Not a shared_ptr anymore
+        if(m_queue.pop(pkt)) { // Use the SafeQueue pop method
+            if(pkt) { // Check if the popped pointer is valid
+                write_one_pkt(pkt);
+                av_packet_free(&pkt); // Free the packet after use
+            }
         }
     }   
 
     // check if there is more in the queue 
     while(true) {
-        std::shared_ptr<AVPacket*> pkt(m_queue.pop());
-        if (!pkt) {
-            // empty queue
+        AVPacket* pkt = nullptr;
+        if (!m_queue.pop(pkt)) { // If pop returns false, the queue is empty
             break;
         } 
         else {
-            write_one_pkt(*pkt.get());
+            if (pkt) {
+                write_one_pkt(pkt);
+                av_packet_free(&pkt);
+            }
         }
     }
 }
+
 
 // this function only used for on thread saving
 bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts)

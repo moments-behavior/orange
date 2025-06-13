@@ -166,19 +166,23 @@ void acquire_frames(
                 bool entry_dispatched = false;
                 
                 if (camera_control->record_video && camera_select->record && gpu_encoder) {
+                    std::cout << "[acquire_frames] Dispatching frame " << current_entry->frame_id << " to gpu_encoder." << std::endl;
                     gpu_encoder->PutObjectToQueueIn(current_entry);
                     entry_dispatched = true;
                 }
 
                 if (camera_select->yolo && yolo_worker_for_this_camera != nullptr) {
+                    std::cout << "[acquire_frames] Dispatching frame " << current_entry->frame_id << " to yolo_worker." << std::endl;
                     yolo_worker_for_this_camera->PutObjectToQueueIn(current_entry);
                     entry_dispatched = true;
                 } else if (camera_select->stream_on && openGLDisplay != nullptr) {
+                    std::cout << "[acquire_frames] Dispatching frame " << current_entry->frame_id << " to openGLDisplay." << std::endl;
                     openGLDisplay->PutObjectToQueueIn(current_entry);
                     entry_dispatched = true;
                 }
                 
                 if (!entry_dispatched) {
+                    std::cout << "[acquire_frames] Frame " << current_entry->frame_id << " not dispatched, recycling." << std::endl;
                     free_entries_queue->push(current_entry);
                 }
 

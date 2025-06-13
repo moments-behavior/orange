@@ -68,7 +68,7 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
         try {
             std::cout << "YOLOv8Worker (" << name << "): Initializing SharedBoxQueue as writer for IPC." << std::endl;
             shaman_ipc_queue_ = new shaman::SharedBoxQueue(true /* is_writer */);
-            std::cout << "YOLOv8Worker (" << name << "): SharedBoxQueue for IPC initialized." << std::endl;
+            std::cout << "YOLOv8Worker (" << name << "): SharedBoxQueue constructor returned." << std::endl;
         } catch (const std::runtime_error& e) {
             std::cerr << "YOLOv8Worker (" << name << ") Error initializing SharedBoxQueue for IPC: " << e.what() << std::endl;
             shaman_ipc_queue_ = nullptr;
@@ -128,7 +128,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
     ck(cudaSetDevice(associated_camera_params_->gpu_id));
 
     // --- Frame acquisition and YOLO processing ---
-    // UPDATED: Perform a fast Device-to-Device copy from the entry's GPU buffer.
     size_t buffer_size = static_cast<size_t>(entry->width) * static_cast<size_t>(entry->height);
     ck(cudaMemcpyAsync(frame_original_gpu_.d_orig,
                        entry->d_image,
@@ -148,7 +147,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
     yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_);
     yolov8_instance_->infer();
 
-    // Populate the detections in the WORKER_ENTRY itself.
     yolov8_instance_->postprocess(entry->detections);
     entry->has_detections = !entry->detections.empty();
     
@@ -161,20 +159,20 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         frame_counter_ = 0;
         last_fps_update_time_ = now;
     }
-
-    // --- Configurable Data Transmission ---
-    if (entry->has_detections) {
-        if (associated_camera_select_->send_yolo_via_ipc && shaman_ipc_queue_) {
-            std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
-            if (!shaman_ipc_queue_->push(shaman_objects)) {
-                std::cerr << "YOLOv8Worker (" << threadName << "): IPC queue is full, dropping YOLO results." << std::endl;
-            }
+    
+    // Always try to send, even if detections are empty.
+    if (associated_camera_select_->send_yolo_via_ipc && shaman_ipc_queue_) {
+        //std::cout << "[YOLO Worker] Attempting to push " << entry->detections.size() << " detections to IPC queue..." << std::endl;
+        std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
+        if (!shaman_ipc_queue_->push(shaman_objects)) {
+            // This provides a more specific error message.
+            std::cerr << "YOLOv8Worker (" << threadName << "): Failed to push to IPC queue (is reader running and queue not full?)." << std::endl;
         }
+    }
 
-        if (associated_camera_select_->send_yolo_via_enet && enet_host_context_ && enet_target_peer_ &&
-            enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) {
-            // ENet transmission logic would go here
-        }
+    if (associated_camera_select_->send_yolo_via_enet && enet_host_context_ && enet_target_peer_ &&
+        enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) {
+        // ENet transmission logic would go here
     }
     
     // Instead of putting the result on our own output queue, push it to the display worker.

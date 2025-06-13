@@ -28,7 +28,7 @@ int main(int argc, char **args) {
         .swap_interval = 1, // use vsync
         .width = 1920,
         .height = 1080,
-        .render_target_title = (char *) malloc(100), // window title
+        .render_target_title = (char *) "Orange", // window title
         .glsl_version = (char *) malloc(100)
     };
 
@@ -67,7 +67,8 @@ int main(int argc, char **args) {
     WORKER_ENTRY* worker_entry_pool = nullptr;
     SafeQueue<WORKER_ENTRY*>* free_entries_queue = nullptr;
     SafeQueue<WORKER_ENTRY*>* recycle_queue = nullptr;
-    COpenGLDisplay** openGLDisplayWorkers = nullptr; // Array of pointers for display workers
+    COpenGLDisplay** openGLDisplayWorkers = nullptr;
+    GPUVideoEncoder** gpuVideoEncoders = nullptr; // Define pointer, but allocate later
 
     EncoderConfig *encoder_config = new EncoderConfig{
         "h264",
@@ -374,6 +375,7 @@ int main(int argc, char **args) {
                             encoder_setup, encoder_config->folder_name,
                             ptp_params, &indigo_signal_builder,
                             yolo_workers[i],
+                            nullptr, // Pass nullptr for GPUVideoEncoder since it's not used here yet
                             free_entries_queue,
                             recycle_queue
                         );
@@ -996,9 +998,14 @@ int main(int argc, char **args) {
                         free_entries_queue = new SafeQueue<WORKER_ENTRY*>();
                         recycle_queue = new SafeQueue<WORKER_ENTRY*>();
                         openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
+                        
+                        // --- CORRECTED BLOCK ---
+                        gpuVideoEncoders = new GPUVideoEncoder*[num_cameras]();
                         for(int i = 0; i < num_cameras; ++i) {
-                            openGLDisplayWorkers[i] = nullptr; // Initialize all to null
+                            openGLDisplayWorkers[i] = nullptr; 
+                            gpuVideoEncoders[i] = nullptr;
                         }
+                        // --- END CORRECTION ---
                 
                         const size_t frame_size_bytes = cameras_params[0].width * cameras_params[0].height;
                         for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
@@ -1021,36 +1028,48 @@ int main(int argc, char **args) {
                         yolo_workers.assign(num_cameras, nullptr);
                 
                         for (int i = 0; i < num_cameras; i++) {
-                            // Create Display Worker if needed
                             if (cameras_select[i].stream_on) {
                                 std::string display_name = "OpenGLDisplay_Cam_" + cameras_params[i].camera_serial;
                                 openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
                             }
-                            // Create YOLO Worker if needed
                             if (cameras_select[i].yolo) {
                                 std::string yolo_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
                                 cameras_select[i].yolo_model = yolo_model.c_str();
                                 if (yolo_model.empty()) {
                                     std::cerr << "YOLO model not selected. Please select a YOLO model." << std::endl;
-                                    continue; // Skip creating YOLO worker if no model is selected
+                                    continue; 
                                 }
                                 yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), &cameras_params[i], &cameras_select[i], *recycle_queue);
                                 
-                                // Link YOLO worker to its corresponding display worker
                                 if (openGLDisplayWorkers[i]) {
                                     yolo_workers[i]->SetDisplayWorker(openGLDisplayWorkers[i]);
                                 }
                             }
+                            
+                            // --- ADDED THIS BLOCK TO CREATE ENCODERS ---
+                            if (cameras_select[i].record) {
+                                std::string encoder_thread_name = "GPUEncoder_Cam_" + cameras_params[i].camera_serial;
+                                std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps " + std::to_string(cameras_params[i].frame_rate);
+                                bool encoder_ready_signal = false;
+                                
+                                gpuVideoEncoders[i] = new GPUVideoEncoder(
+                                    encoder_thread_name.c_str(),
+                                    &cameras_params[i],
+                                    encoder_setup,
+                                    encoder_config->folder_name,
+                                    &encoder_ready_signal,
+                                    *recycle_queue
+                                );
+                            }
+                            // --- END ADD ---
                         }
                 
                         // 4. START ALL WORKER THREADS
                         for (int i = 0; i < num_cameras; i++) {
-                            if (openGLDisplayWorkers[i]) {
-                                openGLDisplayWorkers[i]->StartThread();
-                            }
-                            if (yolo_workers[i]) {
-                                yolo_workers[i]->StartThread();
-                            }
+                            if (openGLDisplayWorkers[i]) openGLDisplayWorkers[i]->StartThread();
+                            if (yolo_workers[i]) yolo_workers[i]->StartThread();
+                            // --- ADD THIS LINE ---
+                            if (gpuVideoEncoders[i]) gpuVideoEncoders[i]->StartThread();
                         }
                 
                         // 5. PREPARE CAMERAS AND START ACQUISITION THREADS
@@ -1069,6 +1088,7 @@ int main(int argc, char **args) {
                         
                         std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                 
+                        // --- CORRECTED THIS LOOP ---
                         for (int i = 0; i < num_cameras; i++) {
                              camera_threads.emplace_back(
                                 &acquire_frames,
@@ -1078,6 +1098,7 @@ int main(int argc, char **args) {
                                 encoder_setup, encoder_config->folder_name,
                                 ptp_params, &indigo_signal_builder,
                                 yolo_workers[i],
+                                gpuVideoEncoders[i], // <-- Pass the correct encoder instance
                                 free_entries_queue,
                                 recycle_queue
                             );
@@ -1085,13 +1106,11 @@ int main(int argc, char **args) {
                 
                     } else { // --- STOP STREAMING LOGIC ---
                 
-                        // 1. JOIN ACQUISITION THREADS
                         for (auto &t : camera_threads) {
                             if (t.joinable()) t.join();
                         }
                         camera_threads.clear();
                 
-                        // 2. STOP AND DELETE ALL WORKER THREADS
                         for (int i = 0; i < num_cameras; i++) {
                             if (yolo_workers[i]) {
                                 yolo_workers[i]->StopThread();
@@ -1103,10 +1122,21 @@ int main(int argc, char **args) {
                                 delete openGLDisplayWorkers[i];
                                 openGLDisplayWorkers[i] = nullptr;
                             }
+                            // --- ADD THIS BLOCK ---
+                            if (gpuVideoEncoders[i]) {
+                                gpuVideoEncoders[i]->StopThread();
+                                delete gpuVideoEncoders[i];
+                                gpuVideoEncoders[i] = nullptr;
+                            }
+                            // --- END ADD ---
                         }
                         yolo_workers.clear();
+                        
+                        // --- ADD THIS BLOCK ---
+                        delete[] gpuVideoEncoders;
+                        gpuVideoEncoders = nullptr;
+                        // --- END ADD ---
                 
-                        // 3. CLEANUP CAMERA AND TEXTURE RESOURCES
                         for (int i = 0; i < num_cameras; i++) {
                             destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);
                             delete[] ecams[i].evt_frame;
@@ -1120,13 +1150,11 @@ int main(int argc, char **args) {
                         delete[] tex;
                         tex = nullptr;
                 
-                        // 4. CLEANUP SHARED RESOURCES
                         delete[] openGLDisplayWorkers;
                         delete[] worker_entry_pool;
                         delete free_entries_queue;
                         delete recycle_queue;
                         
-                        // Reset pointers to null to avoid dangling pointers
                         openGLDisplayWorkers = nullptr;
                         worker_entry_pool = nullptr;
                         free_entries_queue = nullptr;

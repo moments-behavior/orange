@@ -42,6 +42,7 @@ void acquire_frames(
     PTPParams* ptp_params,
     INDIGOSignalBuilder* indigo_signal_builder,
     YOLOv8Worker* yolo_worker_for_this_camera,
+    GPUVideoEncoder* gpu_encoder,
     SafeQueue<WORKER_ENTRY*>* free_entries_queue,
     SafeQueue<WORKER_ENTRY*>* recycle_queue
 ){
@@ -66,22 +67,7 @@ void acquire_frames(
         openGLDisplay->StartThread();
     }
 
-    GPUVideoEncoder* gpu_encoder = nullptr;
-    bool encoder_ready_signal = false;
-    if (camera_control->record_video && camera_select->record) {
-        std::string encoder_thread_name = "GPUEncoder_Cam_" + camera_params->camera_serial;
-        gpu_encoder = new GPUVideoEncoder(
-            encoder_thread_name.c_str(),
-            camera_params,
-            encoder_setup,
-            folder_name,
-            &encoder_ready_signal,
-            *recycle_queue);
-        gpu_encoder->StartThread();
-        while(!encoder_ready_signal && camera_control->subscribe) {
-            usleep(10);
-        }
-    }
+    // *** The local GPUVideoEncoder creation block has been REMOVED from here. ***
 
     if (camera_control->sync_camera) {
         show_ptp_offset(&ptp_state, ecam);
@@ -132,12 +118,9 @@ void acquire_frames(
             size_t frame_bufferSize = ecam->frame_recv.bufferSize;
 
             if (imageDataSource != nullptr && frame_bufferSize > 0) {
-                // The 'd_temp_unscrambled_buffer' is no longer needed here,
-                // we will write directly into the WORKER_ENTRY's GPU buffer.
                 if (camera_params->need_reorder) {
                     GSPRINT4521_Convert(current_entry->d_image, static_cast<const unsigned char*>(imageDataSource), camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0);
                 } else {
-                    // Copy directly from host memory to the WORKER_ENTRY's pre-allocated GPU buffer
                     ck(cudaMemcpy(current_entry->d_image, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
                 }
                 
@@ -163,27 +146,67 @@ void acquire_frames(
                 current_entry->has_detections = false;
                 current_entry->detections.clear();
 
-                bool entry_dispatched = false;
-                
-                if (camera_control->record_video && camera_select->record && gpu_encoder) {
-                    std::cout << "[acquire_frames] Dispatching frame " << current_entry->frame_id << " to gpu_encoder." << std::endl;
-                    gpu_encoder->PutObjectToQueueIn(current_entry);
-                    entry_dispatched = true;
+                // Identify which workers need this frame
+                bool needs_display = camera_select->stream_on && openGLDisplay != nullptr;
+                bool needs_yolo = camera_select->yolo && yolo_worker_for_this_camera != nullptr;
+                bool needs_record = camera_control->record_video && camera_select->record && gpu_encoder;
+
+                // Keep track of which entries we dispatch
+                WORKER_ENTRY* display_entry = nullptr;
+                WORKER_ENTRY* yolo_entry = nullptr;
+                WORKER_ENTRY* record_entry = nullptr;
+
+                // The first worker can reuse the initial entry we already have.
+                if (needs_yolo) {
+                    yolo_entry = current_entry;
+                } else if (needs_display) {
+                    display_entry = current_entry;
+                } else if (needs_record) {
+                    record_entry = current_entry;
+                } else {
+                    // No worker needs this frame, so recycle it immediately.
+                    free_entries_queue->push(current_entry);
+                    current_entry = nullptr;
                 }
 
-                if (camera_select->yolo && yolo_worker_for_this_camera != nullptr) {
-                    std::cout << "[acquire_frames] Dispatching frame " << current_entry->frame_id << " to yolo_worker." << std::endl;
-                    yolo_worker_for_this_camera->PutObjectToQueueIn(current_entry);
-                    entry_dispatched = true;
-                } else if (camera_select->stream_on && openGLDisplay != nullptr) {
-                    std::cout << "[acquire_frames] Dispatching frame " << current_entry->frame_id << " to openGLDisplay." << std::endl;
-                    openGLDisplay->PutObjectToQueueIn(current_entry);
-                    entry_dispatched = true;
+                // For any other workers that need the frame, get a new entry and copy the GPU data.
+                if (yolo_entry) {
+                    if (needs_display) {
+                        if (free_entries_queue->pop(display_entry)) {
+                            ck(cudaMemcpy(display_entry->d_image, yolo_entry->d_image, frame_size_bytes, cudaMemcpyDeviceToDevice));
+                            display_entry->frame_id = yolo_entry->frame_id;
+                            display_entry->timestamp = yolo_entry->timestamp;
+                            display_entry->timestamp_sys = yolo_entry->timestamp_sys;
+                        }
+                    }
+                    if (needs_record) {
+                        if (free_entries_queue->pop(record_entry)) {
+                            ck(cudaMemcpy(record_entry->d_image, yolo_entry->d_image, frame_size_bytes, cudaMemcpyDeviceToDevice));
+                            record_entry->frame_id = yolo_entry->frame_id;
+                            record_entry->timestamp = yolo_entry->timestamp;
+                            record_entry->timestamp_sys = yolo_entry->timestamp_sys;
+                        }
+                    }
+                } else if (display_entry) {
+                    if (needs_record) {
+                        if (free_entries_queue->pop(record_entry)) {
+                            ck(cudaMemcpy(record_entry->d_image, display_entry->d_image, frame_size_bytes, cudaMemcpyDeviceToDevice));
+                            record_entry->frame_id = display_entry->frame_id;
+                            record_entry->timestamp = display_entry->timestamp;
+                            record_entry->timestamp_sys = display_entry->timestamp_sys;
+                        }
+                    }
                 }
-                
-                if (!entry_dispatched) {
-                    std::cout << "[acquire_frames] Frame " << current_entry->frame_id << " not dispatched, recycling." << std::endl;
-                    free_entries_queue->push(current_entry);
+
+                // Now, dispatch the unique entries to their respective workers.
+                if (yolo_entry) {
+                    yolo_worker_for_this_camera->PutObjectToQueueIn(yolo_entry);
+                }
+                if (display_entry) {
+                    openGLDisplay->PutObjectToQueueIn(display_entry);
+                }
+                if (record_entry) {
+                    gpu_encoder->PutObjectToQueueIn(record_entry);
                 }
 
             } else {
@@ -228,10 +251,6 @@ void acquire_frames(
     if (openGLDisplay) {
         openGLDisplay->StopThread();
         delete openGLDisplay;
-    }
-    if (gpu_encoder) {
-        gpu_encoder->StopThread();
-        delete gpu_encoder;
     }
 
     report_statistics(camera_params, &camera_state, time_diff);

@@ -30,7 +30,7 @@ private:
     int nFps = 0;
     int nPts = 0;
     std::ofstream *metadata;
-    lock_free_queue<AVPacket*> m_queue;
+    SafeQueue<AVPacket*> m_queue; // Queue for packets to be written
     std::thread m_thread;
     bool m_quitting;
     void write_thread();

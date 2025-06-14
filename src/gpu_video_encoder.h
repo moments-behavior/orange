@@ -54,7 +54,7 @@ private:
     Debayer debayer;
     EncoderContext encoder;
     Writer writer;
-
+	CUcontext m_cuContext; // Store the CUDA context
     int scaled_width_;
     int scaled_height_;
     unsigned char* d_scaled_mono_buffer_;

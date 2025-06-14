@@ -1022,32 +1022,37 @@ int main(int argc, char **args) {
                 
                     if (camera_control->subscribe) {
                         // --- START STREAMING LOGIC ---
-                
                         // ADD THIS BLOCK AT THE TOP OF THE STREAMING LOGIC
                         if (std::any_of(cameras_select, cameras_select + num_cameras, [](const CameraEachSelect& cs){ return cs.record; })) {
                             encoder_config->folder_name = input_folder + "/" + get_current_date_time();
                             make_folder(encoder_config->folder_name);
                             std::cout << "Recording session folder created: " << encoder_config->folder_name << std::endl;
                         }
-                        // --- START STREAMING LOGIC ---
                 
                         // 1. ALLOCATE SHARED RESOURCES
                         worker_entry_pool = new WORKER_ENTRY[ACQUIRE_WORK_ENTRIES_MAX] ;
                         free_entries_queue = new SafeQueue<WORKER_ENTRY*>();
                         recycle_queue = new SafeQueue<WORKER_ENTRY*>();
                         openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
-                        
-                        // --- CORRECTED BLOCK ---
                         gpuVideoEncoders = new GPUVideoEncoder*[num_cameras]();
                         for(int i = 0; i < num_cameras; ++i) {
                             openGLDisplayWorkers[i] = nullptr; 
                             gpuVideoEncoders[i] = nullptr;
                         }
-                        // --- END CORRECTION ---
-                
-                        const size_t frame_size_bytes = cameras_params[0].width * cameras_params[0].height;
+
+                        // --- FIX: Calculate the MAX frame size from ALL selected cameras ---
+                        size_t max_frame_size_bytes = 0;
+                        for (int i = 0; i < num_cameras; ++i) {
+                            size_t current_size = static_cast<size_t>(cameras_params[i].width) * static_cast<size_t>(cameras_params[i].height);
+                            if (current_size > max_frame_size_bytes) {
+                                max_frame_size_bytes = current_size;
+                            }
+                        }
+                        std::cout << "Allocating worker pool with max frame size: " << max_frame_size_bytes << " bytes" << std::endl;
+
+                        // --- FIX: Allocate all buffers using the calculated max size ---
                         for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
-                            ck(cudaMalloc(&worker_entry_pool[i].d_image, frame_size_bytes));
+                            ck(cudaMalloc(&worker_entry_pool[i].d_image, max_frame_size_bytes));
                             free_entries_queue->push(&worker_entry_pool[i]);
                         }
                 
@@ -1064,11 +1069,11 @@ int main(int argc, char **args) {
                 
                         // 3. CREATE AND LINK WORKER THREADS
                         yolo_workers.assign(num_cameras, nullptr);
-                
+
                         for (int i = 0; i < num_cameras; i++) {
+                            // Note: openGLDisplayWorkers is already created correctly in your existing code
                             if (cameras_select[i].stream_on) {
                                 std::string display_name = "OpenGLDisplay_Cam_" + cameras_params[i].camera_serial;
-                                // --- FIX: Pass shared context ---
                                 openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
                             }
                             if (cameras_select[i].yolo) {
@@ -1078,7 +1083,7 @@ int main(int argc, char **args) {
                                     std::cerr << "YOLO model not selected. Please select a YOLO model." << std::endl;
                                     continue; 
                                 }
-                                // --- FIX: Pass shared context ---
+                                // --- FIX: Pass the shared cuContext to the YOLO worker constructor ---
                                 yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], *recycle_queue);
                                 
                                 if (openGLDisplayWorkers[i]) {
@@ -1090,7 +1095,7 @@ int main(int argc, char **args) {
                                 std::string encoder_thread_name = "GPUEncoder_Cam_" + cameras_params[i].camera_serial;
                                 bool encoder_ready_signal = false;
                                 
-                                // --- FIX: Pass shared context ---
+                                // --- FIX: Pass the shared cuContext to the GPUVideoEncoder constructor ---
                                 gpuVideoEncoders[i] = new GPUVideoEncoder(
                                     encoder_thread_name.c_str(),
                                     cuContext, // Pass the shared context

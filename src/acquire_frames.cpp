@@ -12,6 +12,34 @@
 #include <cuda_runtime_api.h>
 #include "global.h"
 #include "thread.h" // Ensures SafeQueue is included
+#include <cuda.h>
+
+#include <iostream>
+#include <cuda_runtime.h>
+
+// Macro for CUDA RUNTIME API calls (functions with 'cuda' prefix)
+#define CUDA_CHECK(call)                                                      \
+do {                                                                          \
+    cudaError_t err = call;                                                   \
+    if (err != cudaSuccess) {                                                 \
+        fprintf(stderr, "[CUDA FATAL] Runtime API error in %s at line %d: %s (%s)\n", \
+                __FILE__, __LINE__, cudaGetErrorString(err), #call);           \
+        abort();                                                              \
+    }                                                                         \
+} while (0)
+
+// Macro for CUDA DRIVER API calls (functions with 'cu' prefix)
+#define CU_CHECK(call)                                                        \
+do {                                                                          \
+    CUresult err = call;                                                      \
+    if (err != CUDA_SUCCESS) {                                                \
+        const char* err_str;                                                  \
+        cuGetErrorString(err, &err_str);                                      \
+        fprintf(stderr, "[CUDA FATAL] Driver API error in %s at line %d: %s (%s)\n", \
+                __FILE__, __LINE__, err_str, #call);                          \
+        abort();                                                              \
+    }                                                                         \
+} while (0)
 
 // Static helper function (PTP_timestamp_checking) remains unchanged...
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state){
@@ -48,7 +76,7 @@ void acquire_frames(
     SafeQueue<WORKER_ENTRY*>* recycle_queue
 ){
     // Ensure the CUDA context is set for the thread
-    ck(cuCtxPushCurrent(cuda_context));
+    CU_CHECK(cuCtxPushCurrent(cuda_context));
 
     CameraState camera_state;
     PTPState ptp_state;
@@ -61,13 +89,13 @@ void acquire_frames(
     unsigned char* d_temp_unscrambled_buffer = nullptr;
     const size_t frame_size_bytes = camera_params->width * camera_params->height;
 
-    ck(cudaSetDevice(camera_params->gpu_id));
-    ck(cudaMalloc(&d_temp_unscrambled_buffer, frame_size_bytes));
+    CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
+    // --- MODIFICATION --- Replaced ck() with our ew robust macro
+    CUDA_CHECK(cudaMalloc(&d_temp_unscrambled_buffer, frame_size_bytes));
 
     COpenGLDisplay* openGLDisplay = nullptr;
     if (camera_select->stream_on && display_buffer != nullptr) {
         std::string display_thread_name = "OpenGLDisplay_Cam_" + camera_params->camera_serial;
-        // FIX: Pass the cuda_context to the constructor
         openGLDisplay = new COpenGLDisplay(display_thread_name.c_str(), cuda_context, camera_params, camera_select, display_buffer, indigo_signal_builder, *recycle_queue);
         openGLDisplay->StartThread();
     }
@@ -103,18 +131,12 @@ void acquire_frames(
             continue;
         }
 
-        // --- START: MODIFIED ERROR HANDLING ---
         camera_state.camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, 1000);
 
-        // A timeout is not a fatal error, just continue the loop.
-        // Any other error, however, should be treated as fatal to stop the error spam.
         if (camera_state.camera_return != EVT_SUCCESS && camera_state.camera_return != EVT_ERROR_TIMEDOUT)
         {
-            // The existing macro throws an exception, which will stop the program
-            // and allow you to see the first error message clearly in your debugger.
             check_camera_errors((EVT_ERROR)camera_state.camera_return, camera_params->camera_serial.c_str());
         }
-        // --- END: MODIFIED ERROR HANDLING ---
 
         if (camera_state.camera_return == EVT_SUCCESS) {
             acq_frame_count++;
@@ -122,7 +144,6 @@ void acquire_frames(
             std::chrono::duration<double> elapsed = now - last_acq_time;
             if (elapsed.count() >= 1.0) {
                 acq_fps = acq_frame_count / elapsed.count();
-                std::cout << camera_params->camera_serial << " Acquisition FPS: " << acq_fps << std::endl;
                 acq_frame_count = 0;
                 last_acq_time = now;
             }
@@ -133,7 +154,27 @@ void acquire_frames(
                 if (camera_params->need_reorder) {
                     GSPRINT4521_Convert(current_entry->d_image, static_cast<const unsigned char*>(imageDataSource), camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0);
                 } else {
-                    ck(cudaMemcpy(current_entry->d_image, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
+                    if (ecam->frame_recv.bufferSize < frame_size_bytes) {
+                        fprintf(stderr, "[WARNING] Buffer size mismatch! Camera sent %zu bytes, but we expected %zu bytes.\n",
+                                ecam->frame_recv.bufferSize, frame_size_bytes);
+                    }
+                    // --- START: MODIFICATION ---
+                    // 1. Get current CUDA device for context verification
+                    int current_device_id;
+                    cudaGetDevice(&current_device_id);
+
+                    // 2. Add detailed logging BEFORE the call
+                    fprintf(stdout, "\n--- [DEBUG | acquire_frames] ---\n");
+                    fprintf(stdout, "Attempting cudaMemcpy for camera %s\n", camera_params->camera_serial.c_str());
+                    fprintf(stdout, "  > Current CUDA Device ID:      %d\n", current_device_id);
+                    fprintf(stdout, "  > Destination (GPU) Pointer:   %p\n", current_entry->d_image);
+                    fprintf(stdout, "  > Source (CPU) Pointer:        %p\n", imageDataSource);
+                    fprintf(stdout, "  > Transfer Size (bytes):       %zu\n", frame_size_bytes);
+                    fprintf(stdout, "---------------------------------\n\n");
+
+                    // 3. Replace the original ck() with our robust CUDA_CHECK() macro
+                    CUDA_CHECK(cudaMemcpy(current_entry->d_image, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
+                    // --- END: MODIFICATION ---
                 }
                 
                 // Populate metadata
@@ -151,15 +192,9 @@ void acquire_frames(
                 bool needs_record = camera_control->record_video && camera_select->record && gpu_encoder != nullptr;
                 
                 int dispatch_count = 0;
-                if (needs_yolo) {
-                    dispatch_count++;
-                } else if (needs_display) {
-                    dispatch_count++;
-                }
-
-                if (needs_record) {
-                    dispatch_count++;
-                }
+                if (needs_yolo) dispatch_count++;
+                if (needs_display) dispatch_count++;
+                if (needs_record) dispatch_count++;
 
                 if (dispatch_count > 0)
                 {
@@ -167,10 +202,10 @@ void acquire_frames(
 
                     if (needs_yolo) {
                         yolo_worker_for_this_camera->PutObjectToQueueIn(current_entry);
-                    } else if (needs_display) {
+                    }
+                    if (needs_display) {
                         openGLDisplay->PutObjectToQueueIn(current_entry);
                     }
-
                     if (needs_record) {
                         gpu_encoder->PutObjectToQueueIn(current_entry);
                     }
@@ -187,7 +222,6 @@ void acquire_frames(
             }
             EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
         } else {
-            // This now only handles EVT_ERROR_TIMEDOUT
             free_entries_queue->push(current_entry);
         }
         
@@ -206,7 +240,8 @@ void acquire_frames(
     } // End of while(camera_control->subscribe)
 
     if (d_temp_unscrambled_buffer) {
-        ck(cudaFree(d_temp_unscrambled_buffer));
+        // --- MODIFICATION --- Replaced ck() with our new robust macro
+        CUDA_CHECK(cudaFree(d_temp_unscrambled_buffer));
     }
 
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"), camera_params->camera_serial.c_str());
@@ -222,7 +257,8 @@ void acquire_frames(
 
     report_statistics(camera_params, &camera_state, time_diff);
     std::cout << "Acquire frames thread finished for camera: " << camera_params->camera_serial << std::endl;
-    // Pop the context before the thread exits
+
     CUcontext popped_context;
-    ck(cuCtxPopCurrent(&popped_context));
+    // --- MODIFICATION --- Replaced ck() with our new robust macro
+    CU_CHECK(cuCtxPopCurrent(&popped_context));
 }

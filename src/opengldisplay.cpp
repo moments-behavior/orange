@@ -75,7 +75,6 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         h_points.reserve(f->detections.size() * 4 * 2);
 
         for(const auto& obj : f->detections) {
-            // ... (point generation logic remains the same)
             h_points.push_back(obj.rect.x);
             h_points.push_back(obj.rect.y);
             h_points.push_back(obj.rect.x + obj.rect.width);
@@ -110,7 +109,12 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     // Synchronize the stream to ensure all operations are complete before recycling the buffer
     ck(cudaStreamSynchronize(m_stream));
     
-    m_recycle_queue.push(f);
+    // FIX: Instead of unconditionally recycling, correctly decrement the
+    // reference count and recycle only if this is the last owner.
+    if (f->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        m_recycle_queue.push(f);
+    }
+
     CUcontext popped_context;
     ck(cuCtxPopCurrent(&popped_context));
     return false; 

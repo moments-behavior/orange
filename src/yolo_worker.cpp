@@ -108,6 +108,8 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
 
 YOLOv8Worker::~YOLOv8Worker() {
     std::cout << "YOLOv8Worker instance for " << threadName << " being destroyed." << std::endl;
+    // Ensure the CUDA context is set before freeing resources
+    ck(cuCtxPushCurrent(m_cuContext)); // Ensure the CUDA context is active for this thread
 
     if (associated_camera_params_) {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
@@ -122,6 +124,8 @@ YOLOv8Worker::~YOLOv8Worker() {
     if (shaman_ipc_queue_) delete shaman_ipc_queue_;
     if (fb_builder_) delete fb_builder_;
 
+    CUcontext popped_context;
+    ck(cuCtxPopCurrent(&popped_context));
     std::cout << "YOLOv8Worker for " << threadName << " resources cleaned up." << std::endl;
 }
 
@@ -136,10 +140,15 @@ void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer) {
 
 bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
     if (!yolov8_instance_ || !entry) {
+        if (entry) {
+             if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+                m_recycle_queue.push(entry);
+            }
+        }
         return false;
     }
 
-    // --- FIX: Push the shared context to make it active for this thread's work ---
+    // --- FIX: Push/Pop context around the worker function body ---
     ck(cuCtxPushCurrent(m_cuContext));
 
     // --- START: DYNAMIC PIPELINE LOGIC ---
@@ -147,25 +156,30 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
     const int model_width = yolov8_instance_->inp_w_int;
     const int camera_width = associated_camera_params_->width;
     
+    // --- START: MODIFIED DOWNSAMPLING LOGIC ---
     if (model_width < camera_width) 
     {
-        // DOWNSAMPLING PATH
+        // DOWNSAMPLING PATH (For high-res cameras)
         size_t buffer_size = static_cast<size_t>(entry->width) * static_cast<size_t>(entry->height);
         ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, entry->d_image, buffer_size, cudaMemcpyDeviceToDevice, yolov8_instance_->stream));
+        
         NppiSize oSrcSize = { camera_width, (int)associated_camera_params_->height };
         NppiRect oSrcRect = { 0, 0, camera_width, (int)associated_camera_params_->height };
-        NppiSize oDstSize = { scaled_width_, scaled_height_ };
-        nppiResize_8u_C1R(frame_original_gpu_.d_orig, camera_width, oSrcSize, oSrcRect, d_scaled_mono_buffer_, scaled_width_, oDstSize, oSrcRect, NPPI_INTER_LANCZOS);
+        NppiSize oDstSize = { yolov8_instance_->inp_w_int, yolov8_instance_->inp_h_int };
+        
+        nppiResize_8u_C1R(frame_original_gpu_.d_orig, camera_width, oSrcSize, oSrcRect, d_scaled_mono_buffer_, yolov8_instance_->inp_w_int, oDstSize, oSrcRect, NPPI_INTER_LANCZOS);
+        
         FrameGPU frame_scaled_gpu;
         frame_scaled_gpu.d_orig = d_scaled_mono_buffer_;
-        debayer_gpu_.size.width = scaled_width_;
-        debayer_gpu_.size.height = scaled_height_;
+        debayer_gpu_.size = oDstSize; // Use scaled size for debayering
+        
         if (associated_camera_params_->color) {
             debayer_frame_gpu(associated_camera_params_, &frame_scaled_gpu, &debayer_gpu_);
         } else {
             duplicate_channel_gpu(associated_camera_params_, &frame_scaled_gpu, &debayer_gpu_);
         }
-        rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer, scaled_width_, scaled_height_, yolov8_instance_->stream);
+        
+        rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer, oDstSize.width, oDstSize.height, yolov8_instance_->stream);
         yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_);
     } 
     else 
@@ -173,13 +187,16 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         // FULL-RESOLUTION PATH
         size_t buffer_size = static_cast<size_t>(entry->width) * static_cast<size_t>(entry->height);
         ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, entry->d_image, buffer_size, cudaMemcpyDeviceToDevice, yolov8_instance_->stream));
+        
         debayer_gpu_.size.width = camera_width;
         debayer_gpu_.size.height = associated_camera_params_->height;
+
         if (associated_camera_params_->color) {
             debayer_frame_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         } else {
             duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         }
+        
         rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer, camera_width, associated_camera_params_->height, yolov8_instance_->stream);
         yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_);
     }
@@ -203,7 +220,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         std::cout << threadName << " found " << entry->detections.size() << " objects." << std::endl;
     }
 
-    // IPC and ENet logic
+    // --- IPC and ENet logic remains the same ---
     if (associated_camera_select_->send_yolo_via_ipc && shaman_ipc_queue_) {
         std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
         if (!shaman_ipc_queue_->push(shaman_objects)) {
@@ -216,19 +233,31 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         // ENet transmission logic would go here
     }
 
-    // Pass the entry to the display worker or recycle it
-    if (m_display_worker) {
-        m_display_worker->PutObjectToQueueIn(entry);
-    } else {
-        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-             m_recycle_queue.push(entry);
-        }
+    // ====================================================================
+    // --- START: CORRECTED MEMORY MANAGEMENT LOGIC ---
+    //
+    // The YOLO worker's job is now done. It should NOT pass the entry to the
+    // display worker. Instead, it must handle the reference count.
+    //
+    // 1. Atomically decrement the reference count.
+    // 2. The 'fetch_sub' operation returns the value BEFORE it was decremented.
+    // 3. If the value was 1, it means we were the last owner, and the new value is 0.
+    //    Therefore, this thread is now responsible for recycling the entry.
+    //
+    if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+         m_recycle_queue.push(entry);
     }
-        // --- FIX: Pop the context before the thread returns to its loop ---
-        CUcontext popped_context;
-        ck(cuCtxPopCurrent(&popped_context));
+    //
+    // --- END: CORRECTED MEMORY MANAGEMENT LOGIC ---
+    // ====================================================================
 
-    return false; // We handled the buffer, so the base class doesn't need to.
+    // Pop the context before the thread sleeps or loops
+    CUcontext popped_context;
+    ck(cuCtxPopCurrent(&popped_context));
+
+    // Return false because we have handled the entry's lifecycle.
+    // The base class CThreadWorker should not do anything further with it.
+    return false;
 }
 
 void YOLOv8Worker::WorkerReset() {

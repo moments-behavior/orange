@@ -12,6 +12,7 @@
 struct EncoderConfig {
     std::string encoder_codec;
     std::string encoder_preset;
+    std::string tuning_info;
     std::string folder_name;
 };
 

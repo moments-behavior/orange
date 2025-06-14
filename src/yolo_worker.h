@@ -15,6 +15,7 @@
 #include "opengldisplay.h"
 #include <chrono>
 #include "opengldisplay.h"
+#include <cuda.h>
 
 
 class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
@@ -22,9 +23,10 @@ class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
 public:
     // Constructor no longer takes display_texture_buffer
     YOLOv8Worker(const char* name,
-                   CameraParams* cam_params,
-                   CameraEachSelect* cam_select,
-                   SafeQueue<WORKER_ENTRY*>& recycle_queue);
+                    CUcontext cuda_context,
+                    CameraParams* cam_params,
+                    CameraEachSelect* cam_select,
+                    SafeQueue<WORKER_ENTRY*>& recycle_queue);
     ~YOLOv8Worker() override;
 
     void SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer);
@@ -56,6 +58,12 @@ private:
     Debayer debayer_gpu_;
     unsigned char* d_rgb_yolo_input_gpu_;
 
+    // --- ADDED FOR DYNAMIC DOWNSAMPLING ---
+    int scaled_width_;
+    int scaled_height_;
+    unsigned char* d_scaled_mono_buffer_; 
+    // --- END ADD ---
+
     // FPS Counter members
     std::chrono::steady_clock::time_point last_fps_update_time_;
     int frame_counter_;
@@ -64,6 +72,7 @@ private:
     // Shared memory IPC
     shaman::SharedBoxQueue* shaman_ipc_queue_;
     COpenGLDisplay* m_display_worker = nullptr; // Pointer to OpenGL display worker
+    CUcontext m_cuContext;
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue; // Reference to the central recycle queue
 };
 

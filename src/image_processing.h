@@ -6,6 +6,7 @@
 #include "video_capture.h"
 #include "common.hpp"      // For pose::Object
 #include <vector>         // For std::vector
+#include <atomic>         // For std::atomic
 
 typedef struct {
     unsigned char* d_image;
@@ -18,6 +19,7 @@ typedef struct {
     // --- Fields for YOLO results ---
     std::vector<pose::Object> detections; // Store YOLO detection results
     bool has_detections;                  // Flag to indicate if detections are present
+    std::atomic<int> ref_count; // Reference count for memory management
 } WORKER_ENTRY;
 
 

@@ -32,6 +32,7 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
 
 
 void acquire_frames(
+    CUcontext cuda_context,
     CameraEmergent *ecam,
     CameraParams *camera_params,
     CameraEachSelect* camera_select,
@@ -46,6 +47,9 @@ void acquire_frames(
     SafeQueue<WORKER_ENTRY*>* free_entries_queue,
     SafeQueue<WORKER_ENTRY*>* recycle_queue
 ){
+    // Ensure the CUDA context is set for the thread
+    ck(cuCtxPushCurrent(cuda_context));
+
     CameraState camera_state;
     PTPState ptp_state;
     StopWatch w;
@@ -63,11 +67,10 @@ void acquire_frames(
     COpenGLDisplay* openGLDisplay = nullptr;
     if (camera_select->stream_on && display_buffer != nullptr) {
         std::string display_thread_name = "OpenGLDisplay_Cam_" + camera_params->camera_serial;
-        openGLDisplay = new COpenGLDisplay(display_thread_name.c_str(), camera_params, camera_select, display_buffer, indigo_signal_builder, *recycle_queue);
+        // FIX: Pass the cuda_context to the constructor
+        openGLDisplay = new COpenGLDisplay(display_thread_name.c_str(), cuda_context, camera_params, camera_select, display_buffer, indigo_signal_builder, *recycle_queue);
         openGLDisplay->StartThread();
     }
-
-    // *** The local GPUVideoEncoder creation block has been REMOVED from here. ***
 
     if (camera_control->sync_camera) {
         show_ptp_offset(&ptp_state, ecam);
@@ -85,7 +88,7 @@ void acquire_frames(
               << " (need_reorder=" << camera_params->need_reorder << ")" << std::endl;
 
     while (camera_control->subscribe) {
-        // Reclaim recycled entries from the recycle queue
+        // Reclaim recycled entries first
         WORKER_ENTRY* recycled_entry = nullptr;
         while(recycle_queue->pop(recycled_entry)) {
             if (recycled_entry) {
@@ -93,15 +96,25 @@ void acquire_frames(
             }
         }
 
-        // Step 1: Get a free entry from your safe pool
+        // Get a free entry from the pool
         WORKER_ENTRY* current_entry = nullptr;
         if (!free_entries_queue->pop(current_entry)) {
             usleep(100);
             continue;
         }
 
-        // Step 2: Get the frame from the camera SDK
+        // --- START: MODIFIED ERROR HANDLING ---
         camera_state.camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, 1000);
+
+        // A timeout is not a fatal error, just continue the loop.
+        // Any other error, however, should be treated as fatal to stop the error spam.
+        if (camera_state.camera_return != EVT_SUCCESS && camera_state.camera_return != EVT_ERROR_TIMEDOUT)
+        {
+            // The existing macro throws an exception, which will stop the program
+            // and allow you to see the first error message clearly in your debugger.
+            check_camera_errors((EVT_ERROR)camera_state.camera_return, camera_params->camera_serial.c_str());
+        }
+        // --- END: MODIFIED ERROR HANDLING ---
 
         if (camera_state.camera_return == EVT_SUCCESS) {
             acq_frame_count++;
@@ -115,115 +128,69 @@ void acquire_frames(
             }
             
             void* imageDataSource = ecam->frame_recv.imagePtr;
-            size_t frame_bufferSize = ecam->frame_recv.bufferSize;
-
-            if (imageDataSource != nullptr && frame_bufferSize > 0) {
+            if (imageDataSource != nullptr && ecam->frame_recv.bufferSize > 0) {
+                // Copy data to GPU buffer
                 if (camera_params->need_reorder) {
                     GSPRINT4521_Convert(current_entry->d_image, static_cast<const unsigned char*>(imageDataSource), camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0);
                 } else {
                     ck(cudaMemcpy(current_entry->d_image, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
                 }
                 
+                // Populate metadata
                 current_entry->width = ecam->frame_recv.size_x;
                 current_entry->height = ecam->frame_recv.size_y;
                 current_entry->pixelFormat = ecam->frame_recv.pixel_type;
                 current_entry->timestamp = ecam->frame_recv.timestamp;
-                
-                camera_state.frame_count++;
-                if (((ecam->frame_recv.frame_id) != camera_state.id_prev + 1) &&
-                    (camera_state.id_prev != 65535 && camera_state.frame_count > 1)) {
-                    camera_state.dropped_frames++;
-                } else {
-                    camera_state.frames_recd++;
-                }
-                camera_state.id_prev = ecam->frame_recv.frame_id;
-                current_entry->frame_id = camera_state.frame_count;
-
-                struct timespec ts_rt1;
-                clock_gettime(CLOCK_REALTIME, &ts_rt1);
-                current_entry->timestamp_sys = (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
-
                 current_entry->has_detections = false;
                 current_entry->detections.clear();
+                camera_state.frame_count++;
+                current_entry->frame_id = camera_state.frame_count;
 
-                // Identify which workers need this frame
                 bool needs_display = camera_select->stream_on && openGLDisplay != nullptr;
                 bool needs_yolo = camera_select->yolo && yolo_worker_for_this_camera != nullptr;
-                bool needs_record = camera_control->record_video && camera_select->record && gpu_encoder;
-
-                // Keep track of which entries we dispatch
-                WORKER_ENTRY* display_entry = nullptr;
-                WORKER_ENTRY* yolo_entry = nullptr;
-                WORKER_ENTRY* record_entry = nullptr;
-
-                // The first worker can reuse the initial entry we already have.
+                bool needs_record = camera_control->record_video && camera_select->record && gpu_encoder != nullptr;
+                
+                int dispatch_count = 0;
                 if (needs_yolo) {
-                    yolo_entry = current_entry;
+                    dispatch_count++;
                 } else if (needs_display) {
-                    display_entry = current_entry;
-                } else if (needs_record) {
-                    record_entry = current_entry;
-                } else {
-                    // No worker needs this frame, so recycle it immediately.
+                    dispatch_count++;
+                }
+
+                if (needs_record) {
+                    dispatch_count++;
+                }
+
+                if (dispatch_count > 0)
+                {
+                    current_entry->ref_count.store(dispatch_count);
+
+                    if (needs_yolo) {
+                        yolo_worker_for_this_camera->PutObjectToQueueIn(current_entry);
+                    } else if (needs_display) {
+                        openGLDisplay->PutObjectToQueueIn(current_entry);
+                    }
+
+                    if (needs_record) {
+                        gpu_encoder->PutObjectToQueueIn(current_entry);
+                    }
+                }
+                else
+                {
                     free_entries_queue->push(current_entry);
-                    current_entry = nullptr;
                 }
-
-                // For any other workers that need the frame, get a new entry and copy the GPU data.
-                if (yolo_entry) {
-                    if (needs_display) {
-                        if (free_entries_queue->pop(display_entry)) {
-                            ck(cudaMemcpy(display_entry->d_image, yolo_entry->d_image, frame_size_bytes, cudaMemcpyDeviceToDevice));
-                            display_entry->frame_id = yolo_entry->frame_id;
-                            display_entry->timestamp = yolo_entry->timestamp;
-                            display_entry->timestamp_sys = yolo_entry->timestamp_sys;
-                        }
-                    }
-                    if (needs_record) {
-                        if (free_entries_queue->pop(record_entry)) {
-                            ck(cudaMemcpy(record_entry->d_image, yolo_entry->d_image, frame_size_bytes, cudaMemcpyDeviceToDevice));
-                            record_entry->frame_id = yolo_entry->frame_id;
-                            record_entry->timestamp = yolo_entry->timestamp;
-                            record_entry->timestamp_sys = yolo_entry->timestamp_sys;
-                        }
-                    }
-                } else if (display_entry) {
-                    if (needs_record) {
-                        if (free_entries_queue->pop(record_entry)) {
-                            ck(cudaMemcpy(record_entry->d_image, display_entry->d_image, frame_size_bytes, cudaMemcpyDeviceToDevice));
-                            record_entry->frame_id = display_entry->frame_id;
-                            record_entry->timestamp = display_entry->timestamp;
-                            record_entry->timestamp_sys = display_entry->timestamp_sys;
-                        }
-                    }
-                }
-
-                // Now, dispatch the unique entries to their respective workers.
-                if (yolo_entry) {
-                    yolo_worker_for_this_camera->PutObjectToQueueIn(yolo_entry);
-                }
-                if (display_entry) {
-                    openGLDisplay->PutObjectToQueueIn(display_entry);
-                }
-                if (record_entry) {
-                    gpu_encoder->PutObjectToQueueIn(record_entry);
-                }
-
+        
             } else {
                 std::cerr << "Invalid frame data: imageDataSource=" << imageDataSource
-                          << ", frame_bufferSize=" << frame_bufferSize << std::endl;
+                          << ", frame_bufferSize=" << ecam->frame_recv.bufferSize << std::endl;
                 free_entries_queue->push(current_entry);
             }
             EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
         } else {
-            if (camera_state.camera_return != EVT_ERROR_TIMEDOUT) {
-                camera_state.dropped_frames++;
-                std::cerr << "EVT_CameraGetFrame Error: " << camera_state.camera_return
-                          << ", camera serial: " << camera_params->camera_serial << std::endl;
-            }
+            // This now only handles EVT_ERROR_TIMEDOUT
             free_entries_queue->push(current_entry);
         }
-
+        
         if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
             if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {
                 sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
@@ -255,4 +222,7 @@ void acquire_frames(
 
     report_statistics(camera_params, &camera_state, time_diff);
     std::cout << "Acquire frames thread finished for camera: " << camera_params->camera_serial << std::endl;
+    // Pop the context before the thread exits
+    CUcontext popped_context;
+    ck(cuCtxPopCurrent(&popped_context));
 }

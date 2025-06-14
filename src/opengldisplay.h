@@ -5,11 +5,19 @@
 #include "thread.h" // For SafeQueue
 #include <nppi.h>
 #include "common.hpp"
+#include <cuda.h>
 
 class COpenGLDisplay : public CThreadWorker<WORKER_ENTRY>
 {
 public:
-    COpenGLDisplay(const char* name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer_cuda_pbo, INDIGOSignalBuilder* indigo_signal_builder, SafeQueue<WORKER_ENTRY*>& recycle_queue);
+COpenGLDisplay(
+	const char* name,
+	CUcontext cuda_context,
+	CameraParams *camera_params,
+	CameraEachSelect *camera_select,
+	unsigned char *display_buffer_cuda_pbo,
+	INDIGOSignalBuilder* indigo_signal_builder,
+	SafeQueue<WORKER_ENTRY*>& recycle_queue);
     ~COpenGLDisplay() override;
 
     CameraParams* camera_params;
@@ -23,12 +31,15 @@ protected:
     bool WorkerFunction(WORKER_ENTRY* f) override;
 
 private:
+	CUcontext m_cuContext; // Store the CUDA context
     float *d_points_for_drawing_;
     unsigned int *d_skeleton_for_drawing_;
     unsigned char *d_display_resize_buffer_;
     NppiSize output_display_size_;
     NppiRect input_roi_for_display_resize_;
     NppiRect output_roi_for_display_resize_;
+
+	cudaStream_t m_stream;
 
     // --- FIX: Add a reference to the central recycle queue ---
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;

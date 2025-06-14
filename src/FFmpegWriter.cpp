@@ -11,7 +11,7 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps
     }
 
     // Set format on oc
-    AVOutputFormat *fmt = (AVOutputFormat *)av_guess_format("mpegts", NULL, NULL);
+    AVOutputFormat *fmt = (AVOutputFormat *)av_guess_format("mp4", NULL, NULL);
     if (!fmt) {
         printf("Invalid format");
         return;
@@ -45,25 +45,19 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight, int nFps
         printf("FFMPEG: avformat_write_header error!");
         return;
     }
-    
-    // metadata = new std::ofstream();
-    // metadata->open(metadata_file);
-    // if (!(*metadata))
-    // {
-    //     std::cout << "File did not open!";
-    //     return;
-    // }
-    // *metadata << "frame_id, keyframe\n";
 }
 
 FFmpegWriter::~FFmpegWriter()
 {
+    // The quit_thread() and join_thread() calls should be done by the owner
+    // (GPUVideoEncoder::close_writer) *before* this destructor is called.
+    // This ensures all packets are processed before we write the trailer.
     if (oc) {
+        av_write_frame(oc, NULL);
         av_write_trailer(oc);
         avio_close(oc->pb);
         avformat_free_context(oc);
     }
-    // metadata->close();
 }
 
 void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
@@ -82,8 +76,6 @@ void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
         pkt->flags |= AV_PKT_FLAG_KEY;
     }
     m_queue.push(pkt);
-    // LOGGING: Confirm packet was pushed to the queue
-    std::cout << "[FFmpegWriter] Pushed packet to queue. Size: " << nBytes << ", PTS: " << pkt->pts << std::endl;
 }
 
 void FFmpegWriter::create_thread()
@@ -104,7 +96,8 @@ void FFmpegWriter::join_thread()
 void FFmpegWriter::write_one_pkt(AVPacket* pkt) 
 {
     int ret = av_write_frame(oc, pkt);
-    av_write_frame(oc, NULL);
+    // FIX: Removed the flush call from here.
+    // av_write_frame(oc, NULL); 
     if (ret < 0) {
         std::cout << "FFMPEG: Error while writing video frame" << std::endl;
     } else {
@@ -115,14 +108,12 @@ void FFmpegWriter::write_one_pkt(AVPacket* pkt)
 // off-thread saving
 void FFmpegWriter::write_thread()
 {
-    // LOGGING: Confirm writer thread has started
-    std::cout << "[FFmpegWriter] Writer thread started." << std::endl;
     while(!m_quitting) {
-        AVPacket* pkt = nullptr; // Note: Not a shared_ptr anymore
-        if(m_queue.pop(pkt)) { // Use the SafeQueue pop method
-            if(pkt) { // Check if the popped pointer is valid
+        AVPacket* pkt = nullptr;
+        if(m_queue.pop(pkt)) {
+            if(pkt) {
                 write_one_pkt(pkt);
-                av_packet_free(&pkt); // Free the packet after use
+                av_packet_free(&pkt);
             }
         }
     }   
@@ -130,7 +121,7 @@ void FFmpegWriter::write_thread()
     // check if there is more in the queue 
     while(true) {
         AVPacket* pkt = nullptr;
-        if (!m_queue.pop(pkt)) { // If pop returns false, the queue is empty
+        if (!m_queue.pop(pkt)) {
             break;
         } 
         else {
@@ -146,9 +137,6 @@ void FFmpegWriter::write_thread()
 // this function only used for on thread saving
 bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts)
 {
-
-    //AVPacket pkt = {0};
-    //av_init_packet(&pkt);
     AVPacket *pkt;
     pkt = av_packet_alloc();
 
@@ -161,14 +149,10 @@ bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts)
 
     if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
         pkt->flags |= AV_PKT_FLAG_KEY;
-        // *metadata << nPts << "," << 1 << std::endl;
-    } else {
-        // *metadata << nPts << "," << 0 << std::endl;
     }
 
     // Write the compressed frame into the output
     int ret = av_write_frame(oc, pkt);
-    av_write_frame(oc, NULL);
     if (ret < 0) {
         std::cout << "FFMPEG: Error while writing video frame" << std::endl;
 

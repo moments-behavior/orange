@@ -140,8 +140,9 @@ void CThreadWorker<T>::ResetInner()
 template<typename T>
 void CThreadWorker<T>::PutObjectToQueueIn(T* f)
 {
-    // This loop will now block until there is space in the queue
-    while (IsMachineOn()) {
+    // This loop will now block until there is space in the queue.
+    // The IsMachineOn() check is removed to prevent the race condition on startup.
+    while (true) {
         mutexQueueIn.Lock();
         if (queueIn.size() < maxQueueSize) {
             queueIn.push(f);
@@ -154,7 +155,8 @@ void CThreadWorker<T>::PutObjectToQueueIn(T* f)
             return; // Exit the loop and function once the item is pushed
         }
         mutexQueueIn.Unlock();
-        usleep(1000); // Wait for 1ms if the queue is full before trying again
+        // Wait a moment if the queue is full before trying again.
+        usleep(1000);
     }
 }
 

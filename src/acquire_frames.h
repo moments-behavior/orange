@@ -6,7 +6,9 @@
 #include "image_processing.h"
 #include "gpu_video_encoder.h"
 
-void acquire_frames(CameraEmergent *ecam,
+void acquire_frames(
+    CUcontext cuda_context,
+    CameraEmergent *ecam,
     CameraParams *camera_params,
     CameraEachSelect* camera_select,
     CameraControl* camera_control,

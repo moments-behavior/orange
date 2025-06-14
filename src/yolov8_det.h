@@ -1,3 +1,4 @@
+// src/yolov8_det.h
 #ifndef DETECT_END2END_YOLOV8_HPP
 #define DETECT_END2END_YOLOV8_HPP
 #include "NvInferPlugin.h"
@@ -33,10 +34,15 @@ public:
     std::vector<void *> host_ptrs;
     std::vector<void *> device_ptrs;
 
+    // --- MOVED from private to public ---
+    int inp_h_int;
+    int inp_w_int;
+    // --- END MOVE ---
+
     PreParam pparam;
     cudaStream_t stream = nullptr;
 
-    private:
+private:
     unsigned char *d_temp = nullptr;
     unsigned char *d_boarder = nullptr;
     float *d_float = nullptr;
@@ -45,8 +51,8 @@ public:
     int img_height;
     int padw;
     int padh;
-    int inp_h_int;
-    int inp_w_int;
+    // int inp_h_int; // Now public
+    // int inp_w_int; // Now public
 
     nvinfer1::ICudaEngine *engine = nullptr;
     nvinfer1::IRuntime *runtime = nullptr;

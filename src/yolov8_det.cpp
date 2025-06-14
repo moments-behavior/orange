@@ -248,7 +248,9 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera) // Renamed for cla
                                             border_val);
 
     if (npp_result_border != NPP_SUCCESS) {
-        std::cerr << "Error executing nppiCopyConstBorder_8u_C3R -- code: " << npp_result_border << std::endl;
+        // Or throw an exception
+        fprintf(stderr, "[NPP FATAL] NPP error in %s at line %d: %d\n", __FILE__, __LINE__, npp_result_border);
+        abort();
     }
 
     // Convert to float, normalize, and transpose

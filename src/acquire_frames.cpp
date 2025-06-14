@@ -174,6 +174,7 @@ void acquire_frames(
 
                     // 3. Replace the original ck() with our robust CUDA_CHECK() macro
                     CUDA_CHECK(cudaMemcpy(current_entry->d_image, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
+                    CUDA_CHECK(cudaStreamSynchronize(0)); // Ensure the copy is complete before proceeding
                     // --- END: MODIFICATION ---
                 }
                 

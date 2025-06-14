@@ -108,12 +108,9 @@ GPUVideoEncoder::GPUVideoEncoder(const char* name, CUcontext cuda_context, Camer
         initialize_gpu_debayer(&debayer, camera_params);
 
         ck(cudaMalloc(&d_scaled_mono_buffer_, scaled_width_ * scaled_height_));
-        // --- START FIX ---
-        // Allocate d_rgb_temp_ to hold the SCALED RGB data, not the full size.
-        // The full-size debayered data will go into `debayer.d_debayer` first.
+        // Allocate the RGB and IYUV buffers for the encoder
         ck(cudaMalloc(&d_rgb_temp_, scaled_width_ * scaled_height_ * 3));
-        // --- END FIX ---
-        ck(cudaMalloc(&d_iyuv_temp_, scaled_width_ * scaled_height_ * 3 / 2));
+        ck(cudaMalloc(&d_iyuv_temp_, (size_t)scaled_width_ * scaled_height_ * 3 / 2));
 
         encoder.cuContext = m_cuContext;
         encoder.eFormat = NV_ENC_BUFFER_FORMAT_IYUV;
@@ -195,7 +192,7 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
     ck(cuCtxPushCurrent(m_cuContext));
     ck(cudaSetDevice(camera_params->gpu_id));
 
-    // --- Common setup for both color and mono ---
+    // Common setup for both color and mono
     const int width = camera_params->width;
     const int height = camera_params->height;
 
@@ -209,12 +206,10 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         frame_counter_ = 0;
         last_fps_update_time_ = now;
     }
-
-    // --- START FIX ---
-    // The processing pipeline is now re-ordered to be safe for both color and mono.
     
-    // 1. Copy the full-resolution frame from the entry buffer to our local buffer
-    ck(cudaMemcpy(frame_original.d_orig, entry->d_image, width * height, cudaMemcpyDeviceToDevice));
+    // 1. Copy the full-resolution frame from the entry's d_image to a local buffer
+    // This is safe because acquire_frames now synchronizes the stream after its copy.
+    ck(cudaMemcpy(frame_original.d_orig, entry->d_image, (size_t)width * height, cudaMemcpyDeviceToDevice));
     
     // 2. Prepare for downscaling
     NppiSize oSrcSize = { width, height };
@@ -223,18 +218,16 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
     NppiRect oDstRect = { 0, 0, scaled_width_, scaled_height_ };
 
     if (camera_params->color){
-        // --- COLOR PATH ---
-        // 2a. Debayer the full-size mono image to a full-size RGBA buffer
-        debayer_frame_gpu(camera_params, &frame_original, &debayer);
+        // --- FINAL, SIMPLIFIED COLOR PATH ---
 
-        // 2b. Resize the full-size RGBA image down to the scaled RGBA buffer
-        NppStatus nppStatResize = nppiResize_8u_AC4R(
-            debayer.d_debayer,        // Source: full-res RGBA image from debayer
-            width * 4,                // Source pitch
+        // 1. Resize the raw MONO Bayer data first. This is more efficient.
+        NppStatus nppStatResize = nppiResize_8u_C1R(
+            frame_original.d_orig,
+            width,
             oSrcSize,
             oSrcRect,
-            d_rgb_temp_,              // Destination: correctly-sized SCALED buffer
-            scaled_width_ * 4,        // Destination pitch
+            d_scaled_mono_buffer_, // Use the dedicated mono buffer for the resized bayer data
+            scaled_width_,
             oDstSize,
             oDstRect,
             NPPI_INTER_LANCZOS
@@ -242,57 +235,62 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         if (nppStatResize != NPP_SUCCESS) {
             std::cerr << "Error: NPP Resize (Color) failed with status " << nppStatResize << std::endl;
             if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
+            CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
             return false;
         }
 
-        // 2c. Convert the SCALED RGBA image to IYUV (YUV420p)
-        const Npp8u* pRgbSrc = d_rgb_temp_;
-        int nRgbSrcStep = scaled_width_ * 4;
+        // 2. Debayer the SCALED Bayer data directly to a 3-channel RGB image.
+        NppStatus nppStatDebayer = nppiCFAToRGB_8u_C1C3R(
+            d_scaled_mono_buffer_,      // Source is the scaled bayer data
+            scaled_width_,              // Pitch of the source
+            oDstSize,                   // Size of the source
+            oDstRect,
+            d_rgb_temp_,                // Destination is our 3-channel RGB buffer
+            scaled_width_ * 3,          // Pitch of the destination
+            debayer.grid,               // Your original grid setting is correct
+            NPPI_INTER_UNDEFINED
+        );
+
+        // 3. Convert the SCALED RGB image to planar YUV.
+        const Npp8u* pRgbSrc[] = {d_rgb_temp_, d_rgb_temp_ + 1, d_rgb_temp_ + 2}; // This is now incorrect, see below
+        int nRgbSrcStep[] = {scaled_width_ * 3, scaled_width_ * 3, scaled_width_ * 3};
         Npp8u* pYuvDst[] = {
             d_iyuv_temp_,
-            d_iyuv_temp_ + (scaled_width_ * scaled_height_),
-            d_iyuv_temp_ + (scaled_width_ * scaled_height_) + (scaled_width_ * scaled_height_ / 4)
+            d_iyuv_temp_ + (size_t)scaled_width_ * scaled_height_,
+            d_iyuv_temp_ + ((size_t)scaled_width_ * scaled_height_ * 5 / 4)
         };
         int rYuvDstStep[] = { scaled_width_, scaled_width_ / 2, scaled_width_ / 2 };
-        NppiSize oScaledSizeROI = { scaled_width_, scaled_height_ };
 
-        NppStatus nppStat = nppiRGBToYUV420_8u_AC4P3R(pRgbSrc, nRgbSrcStep, pYuvDst, rYuvDstStep, oScaledSizeROI);
-        if (nppStat != NPP_SUCCESS) {
-            std::cerr << "Error: NPP RGBToYUV420 (3-plane) conversion failed with status " << nppStat << std::endl;
+        // Use the standard function for converting interleaved RGB to planar YUV
+        NppStatus nppStatYUV = nppiRGBToYUV420_8u_C3P3R(d_rgb_temp_, scaled_width_ * 3, pYuvDst, rYuvDstStep, oDstSize);
+        if (nppStatYUV != NPP_SUCCESS) {
+            std::cerr << "Error: NPP RGBToYUV420 (3-plane) conversion failed with status " << nppStatYUV << std::endl;
             if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
             CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
             return false;
         }
     } else {
-        // --- MONOCHROME PATH ---
-        // 2a. Downscale the full-res mono frame to our target encode size
+        // --- MONOCHROME PATH (This logic is correct) ---
         NppStatus nppStatResize = nppiResize_8u_C1R(
-            frame_original.d_orig,
-            width,
-            oSrcSize,
-            oSrcRect,
-            d_scaled_mono_buffer_,
-            scaled_width_,
-            oDstSize,
-            oDstRect,
+            frame_original.d_orig, width, oSrcSize, oSrcRect,
+            d_scaled_mono_buffer_, scaled_width_, oDstSize, oDstRect,
             NPPI_INTER_LANCZOS
         );
         if (nppStatResize != NPP_SUCCESS) {
             std::cerr << "Error: NPP Resize (Mono) failed with status " << nppStatResize << std::endl;
             if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
+            CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
             return false;
         }    
 
-        // 2b. Copy the scaled mono data to the Y-plane and set U/V planes to neutral gray (128)
         unsigned char* d_y_plane_dst = d_iyuv_temp_;
-        ck(cudaMemcpy(d_y_plane_dst, d_scaled_mono_buffer_, scaled_width_ * scaled_height_, cudaMemcpyDeviceToDevice));
+        ck(cudaMemcpy(d_y_plane_dst, d_scaled_mono_buffer_, (size_t)scaled_width_ * scaled_height_, cudaMemcpyDeviceToDevice));
         
-        unsigned char* d_u_plane_dst = d_iyuv_temp_ + (scaled_width_ * scaled_height_);
-        unsigned char* d_v_plane_dst = d_u_plane_dst + (scaled_width_ * scaled_height_ / 4);
-        ck(cudaMemset(d_u_plane_dst, 128, scaled_width_ * scaled_height_ / 4));
-        ck(cudaMemset(d_v_plane_dst, 128, scaled_width_ * scaled_height_ / 4));
+        unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)scaled_width_ * scaled_height_);
+        unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)scaled_width_ * scaled_height_ / 4);
+        ck(cudaMemset(d_u_plane_dst, 128, (size_t)scaled_width_ * scaled_height_ / 4));
+        ck(cudaMemset(d_v_plane_dst, 128, (size_t)scaled_width_ * scaled_height_ / 4));
     }
-    // --- END FIX ---
 
     // 3. Copy the final IYUV frame to the encoder's input surface
     const NvEncInputFrame *encoderInputFrame = encoder.pEnc->GetNextInputFrame();

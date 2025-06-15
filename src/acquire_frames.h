@@ -1,12 +1,13 @@
 #ifndef ORANGE_ACQUIRE_FRAMES
 #define ORANGE_ACQUIRE_FRAMES
+
 #include "thread.h"
 #include "camera.h"
 #include <iostream>
 #include <fstream>
 #include "network_base.h"
-#include "image_processing.h" // FIX: Include for WORKER_ENTRY definition
-#include <cuda.h>             // FIX: Include for CUcontext definition
+#include "image_processing.h"
+#include <cuda.h>
 
 // Forward declare worker classes to break include cycles
 class COpenGLDisplay;

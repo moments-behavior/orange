@@ -55,6 +55,7 @@ private:
     EncoderContext encoder;
     Writer writer;
 	CUcontext m_cuContext; // Store the CUDA context
+    cudaStream_t m_stream; // Dedicated stream for this worker
     int scaled_width_;
     int scaled_height_;
     unsigned char* d_scaled_mono_buffer_;

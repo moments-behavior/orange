@@ -44,7 +44,6 @@ struct Debayer
     NppiBayerGridPosition grid;
 };
 
-// --- Add the FrameProcess struct definition here ---
 struct FrameProcess
 {
     FrameGPU frame_original;
@@ -52,7 +51,6 @@ struct FrameProcess
     unsigned char *d_convert;
     FrameCPU frame_cpu;
 };
-
 
 static inline void initialize_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
 {

@@ -1,10 +1,9 @@
 // src/yolov8_det.cpp - Fixed
 #include "yolov8_det.h"
 
+// ... (Constructor and Destructor remain the same) ...
 YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 {
-    std::cout << "YOLOv8 constructor START - Engine: " << engine_file_path << std::endl;
-    
     img_width = width;
     img_height = height;
 
@@ -100,7 +99,6 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 
 YOLOv8::~YOLOv8()
 {
-    std::cout << "YOLOv8 destructor START" << std::endl;
     if (this->stream) {
         cudaStreamSynchronize(this->stream);
     }
@@ -115,7 +113,6 @@ YOLOv8::~YOLOv8()
     if (this->d_temp) { cudaFree(this->d_temp); }
     if (this->d_bgr_temp) { cudaFree(this->d_bgr_temp); }
     if (this->stream) { cudaStreamDestroy(this->stream); }
-    std::cout << "YOLOv8 destructor COMPLETE" << std::endl;
 }
 
 void YOLOv8::make_pipe(bool warmup)
@@ -164,9 +161,10 @@ void YOLOv8::make_pipe(bool warmup)
 void YOLOv8::preprocess_gpu(unsigned char *d_rgba, int source_width, int source_height)
 {
     NppiSize src_size_4c = {source_width, source_height};
-    const int dst_order[4] = {2, 1, 0, 3}; // Swaps R and B channels: RGBA -> BGRA
-    nppiSwapChannels_8u_C4R(d_rgba, source_width * 4, d_bgr_temp, source_width * 3, src_size_4c, dst_order, 0);
-
+    const int dst_order[4] = {2, 1, 0, 3}; 
+    // --- FIX: Removed the extra '0' argument ---
+    nppiSwapChannels_8u_C4R(d_rgba, source_width * 4, d_bgr_temp, source_width * 3, src_size_4c, dst_order);
+    
     const float inp_h  = (float)inp_h_int;
     const float inp_w  = (float)inp_w_int;
     float       current_img_width  = (float)source_width;
@@ -178,7 +176,7 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgba, int source_width, int source_
     NppiSize src_img_size = {source_width, source_height};
     NppiRect src_roi = {0, 0, source_width, source_height};
     NppiSize resized_output_size = {current_padw, current_padh};
-    NppiRect resized_output_roi = {0, 0, current_padw, current_padh}; // FIX: Added this missing argument
+    NppiRect resized_output_roi = {0, 0, current_padw, current_padh};
 
     nppiResize_8u_C3R(d_bgr_temp, source_width * 3, src_img_size, src_roi, this->d_temp, current_padw * 3, resized_output_size, resized_output_roi, NPPI_INTER_SUPER);
 
@@ -240,7 +238,8 @@ void YOLOv8::infer()
     }
 }
 
-// ... (Rest of the file remains the same) ...
+// ... (Rest of the file is unchanged) ...
+
 void YOLOv8::postprocess(std::vector<Object>& objs)
 {
     objs.clear();

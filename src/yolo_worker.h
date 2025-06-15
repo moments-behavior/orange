@@ -58,12 +58,6 @@ private:
     Debayer debayer_gpu_;
     unsigned char* d_rgb_yolo_input_gpu_;
 
-    // --- ADDED FOR DYNAMIC DOWNSAMPLING ---
-    int scaled_width_;
-    int scaled_height_;
-    unsigned char* d_scaled_mono_buffer_; 
-    // --- END ADD ---
-
     // FPS Counter members
     std::chrono::steady_clock::time_point last_fps_update_time_;
     int frame_counter_;

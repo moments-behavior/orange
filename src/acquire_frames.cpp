@@ -101,6 +101,8 @@ void acquire_frames(
 
             // 1. Copy the raw frame to our persistent worker buffer ONCE.
             ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
+
+            ck(cudaStreamSynchronize(stream));
             
             // 2. We can now immediately requeue the camera buffer.
             EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
@@ -155,12 +157,40 @@ void acquire_frames(
             if (camera_control->record_video && gpu_encoder) dispatch_count++;
             if (camera_select->yolo && yolo_worker) dispatch_count++;
 
+            std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " << current_entry->frame_id 
+                    << " dispatch analysis:" << std::endl;
+            std::cout << "  - stream_on: " << (camera_select->stream_on ? "true" : "false") 
+                    << ", openGLDisplay: " << (openGLDisplay ? "valid" : "null") << std::endl;
+            std::cout << "  - record_video: " << (camera_control->record_video ? "true" : "false") 
+                    << ", gpu_encoder: " << (gpu_encoder ? "valid" : "null") << std::endl;
+            std::cout << "  - yolo: " << (camera_select->yolo ? "true" : "false") 
+                    << ", yolo_worker: " << (yolo_worker ? "valid" : "null") << std::endl;
+            std::cout << "  - Total dispatch_count: " << dispatch_count << std::endl;
+
             if (dispatch_count > 0) {
                 current_entry->ref_count.store(dispatch_count);
-                if (camera_select->stream_on && openGLDisplay) openGLDisplay->PutObjectToQueueIn(current_entry);
-                if (camera_control->record_video && gpu_encoder) gpu_encoder->PutObjectToQueueIn(current_entry);
-                if (camera_select->yolo && yolo_worker) yolo_worker->PutObjectToQueueIn(current_entry);
+                
+                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Dispatching frame " 
+                        << current_entry->frame_id << " to " << dispatch_count << " consumers:" << std::endl;
+                
+                if (camera_select->stream_on && openGLDisplay) {
+                    std::cout << "  -> Sending to OpenGL Display" << std::endl;
+                    openGLDisplay->PutObjectToQueueIn(current_entry);
+                }
+                if (camera_control->record_video && gpu_encoder) {
+                    std::cout << "  -> Sending to GPU Encoder" << std::endl;
+                    gpu_encoder->PutObjectToQueueIn(current_entry);
+                }
+                if (camera_select->yolo && yolo_worker) {
+                    std::cout << "  -> Sending to YOLO Worker" << std::endl;
+                    yolo_worker->PutObjectToQueueIn(current_entry);
+                }
+                
+                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
+                        << current_entry->frame_id << " dispatched successfully" << std::endl;
             } else {
+                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
+                        << current_entry->frame_id << " has no consumers - recycling immediately" << std::endl;
                 free_entries_queue->push(current_entry);
             }
         } else {

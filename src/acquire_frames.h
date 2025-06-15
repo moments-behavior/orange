@@ -1,3 +1,5 @@
+// File: src/acquire_frames.h
+
 #ifndef ORANGE_ACQUIRE_FRAMES
 #define ORANGE_ACQUIRE_FRAMES
 
@@ -15,6 +17,7 @@ class GPUVideoEncoder;
 class YOLOv8Worker;
 class ImageWriterWorker;
 
+// --- FIX: Update the function signature to match the call in orange.cpp ---
 void acquire_frames(
     CUcontext cuda_context,
     CameraEmergent *ecam,

@@ -1153,9 +1153,82 @@ int main(int argc, char **args) {
                         std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
                     
                         for (int i = 0; i < num_cameras; i++) {
-                            camera_threads.emplace_back(&acquire_frames, cuContext, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, (cameras_select[i].stream_on ? tex[i].cuda_buffer : nullptr), encoder_setup, encoder_config->folder_name, ptp_params, &indigo_signal_builder, yolo_workers[i], gpuVideoEncoders[i], free_entries_queue, recycle_queue);
+                            camera_threads.emplace_back(
+                                &acquire_frames,
+                                cuContext,                          // CUcontext cuda_context
+                                &ecams[i],                         // CameraEmergent *ecam
+                                &cameras_params[i],                // CameraParams *camera_params
+                                &cameras_select[i],                // CameraEachSelect* camera_select
+                                camera_control,                    // CameraControl* camera_control
+                                ptp_params,                        // PTPParams* ptp_params
+                                &indigo_signal_builder,            // INDIGOSignalBuilder* indigo_signal_builder
+                                openGLDisplayWorkers[i],           // COpenGLDisplay* openGLDisplay
+                                gpuVideoEncoders[i],               // GPUVideoEncoder* gpu_encoder
+                                yolo_workers[i],                   // YOLOv8Worker* yolo_worker
+                                image_writer,                      // ImageWriterWorker* image_writer
+                                free_entries_queue,                // SafeQueue<WORKER_ENTRY*>* free_entries_queue
+                                recycle_queue                      // SafeQueue<WORKER_ENTRY*>* recycle_queue
+                            );
                         }
+                    } else {
+                        // --- STOP STREAMING ---
+                        std::cout << "STOPPING STREAMING SESSION..." << std::endl;
+    
+                        // --- REFACTOR 4: ORDERLY SHUTDOWN AND CLEANUP ---
+                        // 1. Stop the acquisition threads from producing more work
+                        for (auto &t : camera_threads) {
+                            if (t.joinable()) t.join();
+                        }
+                        camera_threads.clear();
+    
+                        // 2. Stop all worker threads
+                        for (int i = 0; i < num_cameras; i++) {
+                            if (yolo_workers[i]) { yolo_workers[i]->StopThread(); }
+                            if (openGLDisplayWorkers[i]) { openGLDisplayWorkers[i]->StopThread(); }
+                            if (gpuVideoEncoders[i]) { gpuVideoEncoders[i]->StopThread(); }
+                        }
+                         for (int i = 0; i < num_cameras; i++) {
+                            if (yolo_workers[i]) { delete yolo_workers[i]; }
+                            if (openGLDisplayWorkers[i]) { delete openGLDisplayWorkers[i]; }
+                            if (gpuVideoEncoders[i]) { delete gpuVideoEncoders[i]; }
+                        }
+                        yolo_workers.clear();
+                        if(openGLDisplayWorkers) delete[] openGLDisplayWorkers;
+                        openGLDisplayWorkers = nullptr;
+                        if(gpuVideoEncoders) delete[] gpuVideoEncoders;
+                        gpuVideoEncoders = nullptr;
+    
+                        // 3. Clean up camera SDK resources
+                        for (int i = 0; i < num_cameras; i++) {
+                            destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, evt_buffer_size, &cameras_params[i]);
+                            delete[] ecams[i].evt_frame;
+                            ecams[i].evt_frame = nullptr;
+                            check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera), cameras_params[i].camera_serial.c_str());
+                        }
+    
+                        // 4. Clean up OpenGL textures
+                        for (int i = 0; i < num_cameras; i++) {
+                             if (cameras_select[i].stream_on) {
+                                 int w = int(cameras_params[i].width / cameras_select[i].downsample);
+                                 int h = int(cameras_params[i].height / cameras_select[i].downsample);
+                                 clear_upload_and_cleanup(tex[i], w, h);
+                             }
+                        }
+                        if(tex) delete[] tex;
+                        tex = nullptr;
+    
+                        // 5. Clean up the shared resource pool
+                        if (worker_entry_pool) {
+                            for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
+                                if (worker_entry_pool[i].d_image) cudaFree(worker_entry_pool[i].d_image);
+                            }
+                            delete[] worker_entry_pool;
+                            worker_entry_pool = nullptr;
+                        }
+                        if (free_entries_queue) { delete free_entries_queue; free_entries_queue = nullptr; }
+                        if (recycle_queue) { delete recycle_queue; recycle_queue = nullptr; }
                     }
+                }
             }
 
             if (camera_control->stop_record) {

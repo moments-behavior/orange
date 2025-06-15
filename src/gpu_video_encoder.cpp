@@ -79,6 +79,7 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
     }
 }
 
+// SIMPLIFIED CONSTRUCTOR - No resizing, use native camera resolution
 GPUVideoEncoder::GPUVideoEncoder(const char* name, CUcontext cuda_context, CameraParams *camera_params,
     const std::string& codec, const std::string& preset, const std::string& tuning,
     std::string folder_name, bool* encoder_ready_signal,
@@ -95,12 +96,14 @@ d_iyuv_temp_(nullptr),
 last_fps_update_time_(std::chrono::steady_clock::now()),
 frame_counter_(0),
 current_fps_(0.0),
-scaled_width_(3840),
-scaled_height_(3840),
+scaled_width_(camera_params->width),   // USE NATIVE CAMERA WIDTH
+scaled_height_(camera_params->height), // USE NATIVE CAMERA HEIGHT
 d_scaled_mono_buffer_(nullptr),
 encoder_pitch_(0)
 {
 std::cout << "[GPUVideoEncoder] Constructor for " << name << " on GPU " << camera_params->gpu_id << std::endl;
+std::cout << "[GPUVideoEncoder] NATIVE RESOLUTION MODE: " << scaled_width_ << "x" << scaled_height_ << std::endl;
+
 ck(cuCtxPushCurrent(cuda_context));
 
 try
@@ -111,7 +114,8 @@ ck(cudaStreamCreate(&m_stream));
 initalize_gpu_frame(&frame_original, camera_params);
 initialize_gpu_debayer(&debayer, camera_params);
 
-ck(cudaMalloc(&d_scaled_mono_buffer_, scaled_width_ * scaled_height_));
+// No need for d_scaled_mono_buffer since we're not resizing
+// ck(cudaMalloc(&d_scaled_mono_buffer_, scaled_width_ * scaled_height_));
 ck(cudaMalloc(&d_rgb_temp_, scaled_width_ * scaled_height_ * 3));
 // DON'T allocate d_iyuv_temp_ yet - we need encoder pitch first
 
@@ -158,15 +162,13 @@ encoder_pitch_ = tempFrame->pitch;
 size_t encoder_buffer_size = (size_t)encoder_pitch_ * scaled_height_ * 3 / 2;
 ck(cudaMalloc(&d_iyuv_temp_, encoder_buffer_size));
 
-std::cout << "[GPUVideoEncoder] Allocated IYUV buffer with encoder pitch: " << encoder_pitch_
-          << " (vs our width: " << scaled_width_ << ")" << std::endl;
+std::cout << "[GPUVideoEncoder] Native resolution " << scaled_width_ << "x" << scaled_height_ 
+          << " with encoder pitch: " << encoder_pitch_ << std::endl;
 
 initialize_writer(&writer, camera_params, folder_name, codec);
 writer.video->create_thread();
-std::cout << "[GPUVideoEncoder] Successfully initialized encoder for " << name
+std::cout << "[GPUVideoEncoder] Successfully initialized NATIVE RESOLUTION encoder for " << name 
           << " - Codec: " << codec << ", Preset: " << preset << ", Tuning: " << tuning << std::endl;
-std::cout << "[GPUVideoEncoder] Encoder dimensions: " << scaled_width_ << "x" << scaled_height_
-          << ", Camera dimensions: " << camera_params->width << "x" << camera_params->height << std::endl;
 *encoder_ready_signal = true;
 }
 catch (const std::exception& e)
@@ -206,7 +208,6 @@ CUcontext popped_context;
 ck(cuCtxPopCurrent(&popped_context));
 }
 
-// CORRECTED WORKERFUNCTION WITH ADDITIONAL LOGGING
 bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 {
     if (!entry) return false;
@@ -229,102 +230,69 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         last_fps_update_time_ = now;
     }
 
-    std::cout << "[GPUEncoder] Processing frame " << entry->frame_id 
-              << " - Source: " << width << "x" << height 
-              << " -> Target: " << scaled_width_ << "x" << scaled_height_ 
-              << " (pitch: " << encoder_pitch_ << ")" << std::endl;
+    std::cout << "[GPUEncoder] NATIVE RESOLUTION - Processing frame " << entry->frame_id 
+              << " - Dimensions: " << width << "x" << height 
+              << " (no resizing, pitch: " << encoder_pitch_ << ")" << std::endl;
 
-    // Copy frame data from entry to our local buffer
+    // Copy frame data directly from entry (no intermediate buffer needed)
     ck(cudaMemcpyAsync(frame_original.d_orig, entry->d_image, (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
 
-    NppiSize oSrcSize = { width, height };
-    NppiRect oSrcRect = { 0, 0, width, height };
-    NppiSize oDstSize = { scaled_width_, scaled_height_ };
-    NppiRect oDstRect = { 0, 0, scaled_width_, scaled_height_ };
-
     if (camera_params->color) {
-        std::cout << "[GPUEncoder] Processing COLOR frame..." << std::endl;
+        std::cout << "[GPUEncoder] Processing COLOR frame at native resolution..." << std::endl;
         
-        // Color processing path
-        NppStatus nppStatResize = nppiResize_8u_C1R(frame_original.d_orig, width, oSrcSize, oSrcRect,
-                                                   d_scaled_mono_buffer_, scaled_width_, oDstSize, oDstRect, NPPI_INTER_LANCZOS);
-        if (nppStatResize != NPP_SUCCESS) {
-            std::cerr << "Error: NPP Resize (Color) failed with status " << nppStatResize << std::endl;
-            if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
-            CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
-            return false;
-        }
-
-        NppStatus nppStatDebayer = nppiCFAToRGB_8u_C1C3R(d_scaled_mono_buffer_, scaled_width_, oDstSize, oDstRect,
-                                                         d_rgb_temp_, scaled_width_ * 3, debayer.grid, NPPI_INTER_UNDEFINED);
+        // Direct debayer without resizing
+        NppiSize fullSize = { width, height };
+        NppiRect fullRect = { 0, 0, width, height };
+        
+        NppStatus nppStatDebayer = nppiCFAToRGB_8u_C1C3R(frame_original.d_orig, width, fullSize, fullRect,
+                                                         d_rgb_temp_, width * 3, debayer.grid, NPPI_INTER_UNDEFINED);
         if (nppStatDebayer != NPP_SUCCESS) {
-            std::cerr << "Error: NPP Debayer (CFAToRGB) failed with status " << nppStatDebayer << std::endl;
+            std::cerr << "Error: NPP Debayer failed with status " << nppStatDebayer << std::endl;
             if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
             CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
             return false;
         }
 
-        // Use encoder pitch for YUV plane layout
+        // Convert RGB to YUV420 using encoder pitch
         Npp8u* pYuvDst[] = {
             d_iyuv_temp_,
-            d_iyuv_temp_ + (size_t)encoder_pitch_ * scaled_height_,
-            d_iyuv_temp_ + ((size_t)encoder_pitch_ * scaled_height_ * 5 / 4)
+            d_iyuv_temp_ + (size_t)encoder_pitch_ * height,
+            d_iyuv_temp_ + ((size_t)encoder_pitch_ * height * 5 / 4)
         };
         int rYuvDstStep[] = { encoder_pitch_, encoder_pitch_ / 2, encoder_pitch_ / 2 };
 
-        std::cout << "[GPUEncoder] Converting RGB to YUV420 with pitch alignment..." << std::endl;
-        std::cout << "  - Y plane: " << static_cast<void*>(pYuvDst[0]) << " (pitch: " << rYuvDstStep[0] << ")" << std::endl;
-        std::cout << "  - U plane: " << static_cast<void*>(pYuvDst[1]) << " (pitch: " << rYuvDstStep[1] << ")" << std::endl;
-        std::cout << "  - V plane: " << static_cast<void*>(pYuvDst[2]) << " (pitch: " << rYuvDstStep[2] << ")" << std::endl;
-
-        NppStatus nppStatYUV = nppiRGBToYUV420_8u_C3P3R(d_rgb_temp_, scaled_width_ * 3, pYuvDst, rYuvDstStep, oDstSize);
+        NppStatus nppStatYUV = nppiRGBToYUV420_8u_C3P3R(d_rgb_temp_, width * 3, pYuvDst, rYuvDstStep, fullSize);
         if (nppStatYUV != NPP_SUCCESS) {
             std::cerr << "Error: NPP RGBToYUV420 conversion failed with status " << nppStatYUV << std::endl;
             if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
             CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
             return false;
         }
-        std::cout << "[GPUEncoder] RGB to YUV420 conversion completed successfully" << std::endl;
+        std::cout << "[GPUEncoder] RGB to YUV420 conversion at native resolution completed" << std::endl;
         
     } else {
-        std::cout << "[GPUEncoder] Processing MONOCHROME frame..." << std::endl;
+        std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
         
-        // Monochrome processing path
-        NppStatus nppStatResize = nppiResize_8u_C1R(frame_original.d_orig, width, oSrcSize, oSrcRect,
-                                                   d_scaled_mono_buffer_, scaled_width_, oDstSize, oDstRect, NPPI_INTER_LANCZOS);
-        if (nppStatResize != NPP_SUCCESS) {
-            std::cerr << "Error: NPP Resize (Mono) failed with status " << nppStatResize << std::endl;
-            if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
-            CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
-            return false;
-        }
-        std::cout << "[GPUEncoder] Resize completed: " << width << "x" << height 
-                  << " -> " << scaled_width_ << "x" << scaled_height_ << std::endl;
-
-        // Create IYUV format: Y plane + U plane (128) + V plane (128)
+        // Create IYUV format directly from native resolution data
         unsigned char* d_y_plane_dst = d_iyuv_temp_;
-        unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * scaled_height_);
-        unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)encoder_pitch_ * scaled_height_ / 4);
+        unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
+        unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)encoder_pitch_ * height / 4);
         
-        std::cout << "[GPUEncoder] Creating IYUV planes with pitch alignment..." << std::endl;
+        std::cout << "[GPUEncoder] Direct copy at native resolution:" << std::endl;
         std::cout << "  - Y plane: " << static_cast<void*>(d_y_plane_dst) 
-                  << " (copy " << scaled_width_ << "x" << scaled_height_ 
-                  << " with src pitch " << scaled_width_ << " -> dst pitch " << encoder_pitch_ << ")" << std::endl;
-        std::cout << "  - U plane: " << static_cast<void*>(d_u_plane_dst) 
-                  << " (size: " << (encoder_pitch_ * scaled_height_ / 4) << " bytes)" << std::endl;
-        std::cout << "  - V plane: " << static_cast<void*>(d_v_plane_dst) 
-                  << " (size: " << (encoder_pitch_ * scaled_height_ / 4) << " bytes)" << std::endl;
+                  << " (copy " << width << "x" << height 
+                  << " with src pitch " << width << " -> dst pitch " << encoder_pitch_ << ")" << std::endl;
 
-        // Copy with proper pitch - use 2D copy for pitch conversion
+        // Copy Y plane with pitch conversion (native width to encoder pitch)
         ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,
-                            d_scaled_mono_buffer_, scaled_width_,
-                            scaled_width_, scaled_height_,
+                            frame_original.d_orig, width,
+                            width, height,
                             cudaMemcpyDeviceToDevice, m_stream));
 
-        ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * scaled_height_ / 4, m_stream));
-        ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * scaled_height_ / 4, m_stream));
+        ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
+        ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
         
-        std::cout << "[GPUEncoder] IYUV planes created successfully" << std::endl;
+        std::cout << "[GPUEncoder] Native resolution IYUV planes created successfully" << std::endl;
     }
 
     // Get encoder input frame
@@ -336,20 +304,11 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         return false;
     }
 
-    std::cout << "[GPUEncoder] Encoder input frame details:" << std::endl;
-    std::cout << "  - inputPtr: " << encoderInputFrame->inputPtr << std::endl;
-    std::cout << "  - pitch: " << encoderInputFrame->pitch << std::endl;
-    std::cout << "  - bufferFormat: " << NvEncFormatToString(encoderInputFrame->bufferFormat) << std::endl;
-    std::cout << "  - encoder width: " << encoder.pEnc->GetEncodeWidth() << std::endl;
-    std::cout << "  - encoder height: " << encoder.pEnc->GetEncodeHeight() << std::endl;
+    std::cout << "[GPUEncoder] NATIVE RESOLUTION encoding:" << std::endl;
+    std::cout << "  - Source: " << width << "x" << height << std::endl;
+    std::cout << "  - Encoder: " << encoder.pEnc->GetEncodeWidth() << "x" << encoder.pEnc->GetEncodeHeight() << std::endl;
+    std::cout << "  - Pitch match: " << (encoder_pitch_ == encoderInputFrame->pitch ? "YES" : "NO") << std::endl;
 
-    // Verify our pitch matches encoder's expectation
-    if (encoder_pitch_ != encoderInputFrame->pitch) {
-        std::cerr << "[GPUEncoder] WARNING: Pitch mismatch! Our pitch: " << encoder_pitch_ 
-                  << ", Encoder expects: " << encoderInputFrame->pitch << std::endl;
-    }
-
-    std::cout << "[GPUEncoder] Copying IYUV data to encoder input surface..." << std::endl;
     // Copy frame data to encoder input surface
     NvEncoderCuda::CopyToDeviceFrame(m_cuContext, d_iyuv_temp_, encoder_pitch_,
         (CUdeviceptr)encoderInputFrame->inputPtr, encoderInputFrame->pitch,
@@ -357,26 +316,21 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         CU_MEMORYTYPE_DEVICE, encoderInputFrame->bufferFormat,
         encoderInputFrame->chromaOffsets, encoderInputFrame->numChromaPlanes,
         false, (CUstream)m_stream);
-    std::cout << "[GPUEncoder] Copy to encoder input completed" << std::endl;
 
     // Synchronize stream before encoding
     std::cout << "[GPUEncoder] Synchronizing stream before encode..." << std::endl;
     ck(cudaStreamSynchronize(m_stream));
-    std::cout << "[GPUEncoder] Stream synchronized" << std::endl;
 
     // Encode the frame
-    std::cout << "[GPUEncoder] Calling EncodeFrame for frame " << entry->frame_id << "..." << std::endl;
+    std::cout << "[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame " << entry->frame_id << "..." << std::endl;
     encoder.pEnc->EncodeFrame(encoder.vPacket);
-    std::cout << "[GPUEncoder] EncodeFrame completed successfully! Generated " 
-              << encoder.vPacket.size() << " packets" << std::endl;
+    std::cout << "[GPUEncoder] NATIVE RESOLUTION EncodeFrame completed successfully!" << std::endl;
 
     // Process encoded packets
     for (std::vector<uint8_t> &packet : encoder.vPacket) {
         writer.video->push_packet(packet.data(), (int)packet.size(), encoder.num_frame_encode++);
     }
     write_metadata(writer.metadata, entry->frame_id, entry->timestamp, entry->timestamp_sys);
-
-    std::cout << "[GPUEncoder] Frame " << entry->frame_id << " encoding pipeline completed" << std::endl;
 
     // Decrement reference count and recycle if needed
     if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {

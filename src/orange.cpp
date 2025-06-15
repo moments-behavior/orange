@@ -13,6 +13,9 @@
 #include "enet_thread.h"
 #include "yolo_worker.h"
 #include "global.h"
+#include "gpu_video_encoder.h"
+#include "opengldisplay.h"
+#include "image_writer_worker.h"
 
 std::vector<YOLOv8Worker*> yolo_workers; // For managing YOLO workers
 ENetPeer* external_data_consumer_peer = nullptr; // Store the peer for YOLO data
@@ -60,7 +63,7 @@ int main(int argc, char **args) {
     std::string input_folder = orange_root_dir_str + "/exp/unsorted";
 
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
-    std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
+    std::string yolo_model = yolo_model_folder + "/fish_jinyao.engine";
     
     bool camera_is_selected[cam_count]{0};
     CameraParams *cameras_params;
@@ -132,6 +135,9 @@ int main(int argc, char **args) {
     std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder,
                                           &quite_enet);
     std::vector<std::string> color_temps = { "CT_Off", "CT_2800K", "CT_3000K", "CT_4000K", "CT_5000K", "CT_6500K", "CT_Custom"};
+
+    ImageWriterWorker* image_writer = new ImageWriterWorker("ImageSaverThread");
+    image_writer->StartThread();
 
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
@@ -388,19 +394,20 @@ int main(int argc, char **args) {
                     std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
             
                     for (int i = 0; i < num_cameras; i++) {
-                         camera_threads.emplace_back(
-                            &acquire_frames,
-                            cuContext,
-                            &ecams[i], &cameras_params[i], &cameras_select[i],
-                            camera_control,
-                            (cameras_select[i].stream_on ? tex[i].cuda_buffer : nullptr),
-                            encoder_setup, encoder_config->folder_name,
-                            ptp_params, &indigo_signal_builder,
-                            yolo_workers[i],
-                            nullptr, // Pass nullptr for GPUVideoEncoder since it's not used here yet
-                            free_entries_queue,
-                            recycle_queue
-                        );
+                        //  camera_threads.emplace_back(
+                        //     &acquire_frames,
+                        //     cuContext,
+                        //     &ecams[i], &cameras_params[i], &cameras_select[i],
+                        //     camera_control,
+                        //     (cameras_select[i].stream_on ? tex[i].cuda_buffer : nullptr),
+                        //     encoder_setup,
+                        //     std::string(encoder_config->folder_name),
+                        //     ptp_params, &indigo_signal_builder,
+                        //     yolo_workers[i],
+                        //     nullptr, // Pass nullptr for GPUVideoEncoder since it's not used here yet
+                        //     free_entries_queue,
+                        //     recycle_queue
+                        // );
                     }
                 }
                 ImGui::PopStyleColor(1);
@@ -1022,28 +1029,30 @@ int main(int argc, char **args) {
                 if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming")) {
                     (camera_control->subscribe) = !(camera_control->subscribe);
 
-                    if (camera_control->subscribe) {
+                    if (camera_control->subscribe)
+                    {
                         // --- START STREAMING LOGIC ---
-
+                        std::cout << "STARTING a new session..." << std::endl;
+                    
                         // 0. CREATE RECORDING FOLDER IF NEEDED
                         if (std::any_of(cameras_select, cameras_select + num_cameras, [](const CameraEachSelect& cs){ return cs.record; })) {
                             encoder_config->folder_name = input_folder + "/" + get_current_date_time();
                             make_folder(encoder_config->folder_name);
                             std::cout << "Recording session folder created: " << encoder_config->folder_name << std::endl;
                         }
-
+                    
                         // 1. ALLOCATE SHARED RESOURCES (POOLS AND QUEUES)
                         worker_entry_pool = new WORKER_ENTRY[ACQUIRE_WORK_ENTRIES_MAX];
                         free_entries_queue = new SafeQueue<WORKER_ENTRY*>();
                         recycle_queue = new SafeQueue<WORKER_ENTRY*>();
                         openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
                         gpuVideoEncoders = new GPUVideoEncoder*[num_cameras]();
-
+                    
                         for(int i = 0; i < num_cameras; ++i) {
                             openGLDisplayWorkers[i] = nullptr;
                             gpuVideoEncoders[i] = nullptr;
                         }
-
+                    
                         size_t max_frame_size_bytes = 0;
                         for (int i = 0; i < num_cameras; ++i) {
                             size_t current_size = static_cast<size_t>(cameras_params[i].width) * static_cast<size_t>(cameras_params[i].height);
@@ -1052,12 +1061,12 @@ int main(int argc, char **args) {
                             }
                         }
                         std::cout << "Allocating worker pool with max frame size: " << max_frame_size_bytes << " bytes" << std::endl;
-
+                    
                         for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
                             ck(cudaMalloc(&worker_entry_pool[i].d_image, max_frame_size_bytes));
                             free_entries_queue->push(&worker_entry_pool[i]);
                         }
-
+                    
                         // 2. SETUP GPU TEXTURES FOR DISPLAY
                         cudaSetDevice(display_gpu_id);
                         tex = new GL_Texture[num_cameras];
@@ -1068,7 +1077,7 @@ int main(int argc, char **args) {
                                 setup_texture(tex[i], camera_width, camera_height);
                             }
                         }
-
+                    
                         // 3. CREATE WORKER THREAD OBJECTS (ENCODERS, YOLO, DISPLAY)
                         yolo_workers.assign(num_cameras, nullptr);
                         for (int i = 0; i < num_cameras; i++) {
@@ -1090,39 +1099,53 @@ int main(int argc, char **args) {
                             }
                             if (cameras_select[i].record) {
                                 std::string encoder_thread_name = "GPUEncoder_Cam_" + cameras_params[i].camera_serial;
-                                bool encoder_ready_signal = false; // This signal may be used for more advanced sync
+                                bool encoder_ready_signal = false;
                                 gpuVideoEncoders[i] = new GPUVideoEncoder(encoder_thread_name.c_str(), cuContext, &cameras_params[i], encoder_config->encoder_codec, encoder_config->encoder_preset, encoder_config->tuning_info, encoder_config->folder_name, &encoder_ready_signal, *recycle_queue);
                             }
                         }
-
+                    
                         // 4. START ALL WORKER THREADS
                         for (int i = 0; i < num_cameras; i++) {
                             if (openGLDisplayWorkers[i]) openGLDisplayWorkers[i]->StartThread();
                             if (yolo_workers[i]) yolo_workers[i]->StartThread();
                             if (gpuVideoEncoders[i]) gpuVideoEncoders[i]->StartThread();
                         }
-
+                    
                         // 5. PREPARE CAMERAS AND START ACQUISITION THREADS
                         for (int i = 0; i < num_cameras; i++) {
                             camera_open_stream(&ecams[i].camera, &cameras_params[i]);
                             ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
                             allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame, &cameras_params[i], evt_buffer_size);
                         }
-
+                    
                         if (ptp_stream_sync) {
                             for (int i = 0; i < num_cameras; i++) {
                                 ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
                             }
                             camera_control->sync_camera = true;
                         }
-
-                        std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
-
+                    
                         for (int i = 0; i < num_cameras; i++) {
-                            camera_threads.emplace_back(&acquire_frames, cuContext, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, (cameras_select[i].stream_on ? tex[i].cuda_buffer : nullptr), encoder_setup, encoder_config->folder_name, ptp_params, &indigo_signal_builder, yolo_workers[i], gpuVideoEncoders[i], free_entries_queue, recycle_queue);
+                            // --- FIX: This now passes the correct arguments to the acquire_frames thread ---
+                            camera_threads.emplace_back(
+                                &acquire_frames,
+                                cuContext,
+                                &ecams[i],
+                                &cameras_params[i],
+                                &cameras_select[i],
+                                camera_control,
+                                ptp_params,
+                                &indigo_signal_builder,
+                                openGLDisplayWorkers[i],
+                                gpuVideoEncoders[i],
+                                yolo_workers[i],
+                                image_writer,
+                                free_entries_queue,
+                                recycle_queue
+                            );
                         }
-
-                    } else { // --- STOP STREAMING LOGIC ---
+                    }
+                    else {
 
                         // 1. JOIN ACQUISITION THREADS FIRST
                         for (auto &t : camera_threads) {
@@ -1362,6 +1385,9 @@ int main(int argc, char **args) {
     // Pop and destroy the primary context
     ck(cuCtxPopCurrent(&cuContext));
     ck(cuCtxDestroy(cuContext));
+
+    image_writer->StopThread();
+    delete image_writer;
 
     // Cleanup
     gx_cleanup(window);

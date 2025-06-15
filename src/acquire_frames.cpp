@@ -115,8 +115,6 @@ void acquire_frames(
 
             // 4. Handle asynchronous save request (NON-BLOCKING).
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
-                // This block now uses the stable data in current_entry->d_image
-                // --- FIX: Use a temporary FrameGPU struct to correctly pass the pointer ---
                 FrameGPU temp_frame_gpu;
                 temp_frame_gpu.d_orig = current_entry->d_image;
                 temp_frame_gpu.size_pic = current_entry->width * current_entry->height;
@@ -127,13 +125,24 @@ void acquire_frames(
                     duplicate_channel_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
                 }
                 rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, camera_params->width, camera_params->height, stream);
-                ck(cudaMemcpy2D(frame_process_save.frame_cpu.frame, camera_params->width*3, frame_process_save.d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
-                ck(cudaStreamSynchronize(stream));
+                
+                // Asynchronously copy data to the host buffer
+                ck(cudaMemcpy2DAsync(frame_process_save.frame_cpu.frame, camera_params->width*3, frame_process_save.d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost, stream));
 
+                // Create and record a CUDA event to mark when the copy is done
+                cudaEvent_t event;
+                ck(cudaEventCreate(&event));
+                ck(cudaEventRecord(event, stream));
+
+                // Create the save job with the necessary info
                 ImageWriter_Entry* save_job = new ImageWriter_Entry();
-                save_job->image = cv::Mat(camera_params->height, camera_params->width, CV_8UC3, frame_process_save.frame_cpu.frame).clone();
+                save_job->event = event;
+                save_job->cpu_buffer = frame_process_save.frame_cpu.frame;
+                save_job->width = camera_params->width;
+                save_job->height = camera_params->height;
                 save_job->file_path = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
                 
+                // Queue the job; this will no longer block!
                 image_writer->PutObjectToQueueIn(save_job);
                 
                 camera_select->pictures_counter++;

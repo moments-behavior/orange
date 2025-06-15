@@ -136,7 +136,7 @@ int main(int argc, char **args) {
                                           &quite_enet);
     std::vector<std::string> color_temps = { "CT_Off", "CT_2800K", "CT_3000K", "CT_4000K", "CT_5000K", "CT_6500K", "CT_Custom"};
 
-    ImageWriterWorker* image_writer = new ImageWriterWorker("ImageSaverThread");
+    ImageWriterWorker* image_writer = new ImageWriterWorker("ImageSaverThread", cuContext);
     image_writer->StartThread();
 
     while (!glfwWindowShouldClose(window->render_target)) {
@@ -802,16 +802,29 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; ++i) {     
                             std::string label = cameras_params[i].camera_name + ": " + std::to_string(cameras_select[i].pictures_counter) + "##calibration_save";
                             if (ImGui::Selectable(label.c_str(), &cameras_select[i].selected_to_save,
-                                                  ImGuiSelectableFlags_None,
-                                                  ImVec2(150, 50))) {
+                                                    ImGuiSelectableFlags_None,
+                                                    ImVec2(150, 50))) {
                             }
-
+    
                             // Keep items on the same line until end of row
                             if ((i + 1) % cols != 0)
                                 ImGui::SameLine();
                         }
-
+    
                         ImGui::NewLine();
+    
+                        // ===================================================================
+                        // START: ADD THIS NEW DIAGNOSTIC BLOCK
+                        // ===================================================================
+                        ImGui::SeparatorText("Debug Info");
+                        ImGui::Text("Window Focused: %d, Window Hovered: %d", ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow), ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow));
+                        ImGui::Text("camera_control->subscribe = %s", camera_control->subscribe ? "true" : "false");
+                        ImGui::Text("save_image_all_ready = %s", save_image_all_ready ? "true" : "false");
+                        ImGui::Separator();
+                        // ===================================================================
+                        // END: ADD THIS NEW DIAGNOSTIC BLOCK
+                        // ===================================================================
+    
                         if (ImGui::Button("Save selected")) {
                             std::cout << "[GUI] 'Save selected' button clicked. Formatting save name." << std::endl;
                             make_folder(picture_save_folder);
@@ -826,7 +839,7 @@ int main(int argc, char **args) {
                             }
                         }
                         ImGui::SameLine();
-
+    
                         if (ImGui::Button("Save pictures all")) {
                             std::cout << "[GUI] 'Save pictures all' button clicked. Formatting save name." << std::endl;
                             make_folder(picture_save_folder);
@@ -838,6 +851,7 @@ int main(int argc, char **args) {
                             }
                             std::cout << "[GUI]   - Flagging ALL cameras to save frame." << std::endl;
                         }
+    
 
                         if (calib_state == CalibSavePictures) {
                             std::cout << "[GUI] Calibration state is 'CalibSavePictures', triggering next pose." << std::endl;

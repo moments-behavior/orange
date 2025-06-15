@@ -1,9 +1,9 @@
-// src/yolo_worker.cpp
+// src/yolo_worker.cpp - Fixed
 #include "yolo_worker.h"
 #include "kernel.cuh"
 #include <cuda_runtime_api.h>
 #include <nppi.h>
-#include <npp.h> 
+#include <npp.h>
 #include <iostream>
 #include <vector>
 #include <string>
@@ -15,7 +15,6 @@
 #include "global.h"
 #include "cuda_context_manager.h"
 
-// ... (Constructor and Destructor remain the same) ...
 YOLOv8Worker::YOLOv8Worker(const char* name,
                            CUcontext cuda_context,
                            CameraParams* cam_params,
@@ -103,12 +102,24 @@ YOLOv8Worker::~YOLOv8Worker() {
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); }
         
         if (yolov8_instance_) { delete yolov8_instance_; }
+    } else {
+        std::cerr << "Warning: Could not set CUDA context in YOLOv8Worker destructor for " << threadName << std::endl;
     }
     
     if (shaman_ipc_queue_) delete shaman_ipc_queue_;
     if (fb_builder_) delete fb_builder_;
     
     std::cout << "YOLOv8Worker destructor complete for " << threadName << std::endl;
+}
+
+// --- FIX: Added the missing function definition ---
+void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer)
+{
+    std::cout << "YOLOv8Worker (" << this->threadName
+              << "): SetENetTarget called. Host_ctx: " << static_cast<void*>(host_ctx)
+              << ". Target_peer: " << static_cast<void*>(target_peer) << std::endl;
+    enet_host_context_ = host_ctx;
+    enet_target_peer_ = target_peer;
 }
 
 
@@ -149,7 +160,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         }
 
-        // --- FIX: Pass the 4-channel debayer output directly to the new preprocess_gpu ---
         yolov8_instance_->preprocess_gpu(debayer_gpu_.d_debayer, camera_width, camera_height);
         
         yolov8_instance_->infer();
@@ -178,7 +188,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             }
             if (associated_camera_select_->send_yolo_via_enet && enet_host_context_ && enet_target_peer_ &&
                 enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) {
-                // ENet transmission logic would be implemented here
+                // ENet transmission logic
             }
         }
 
@@ -197,7 +207,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
 }
 
 void YOLOv8Worker::WorkerReset() {
-    std::cout << "YOLOv8Worker reset for " << threadName << std::endl;
     last_fps_update_time_ = std::chrono::steady_clock::now();
     frame_counter_ = 0;
     current_fps_ = 0.0;

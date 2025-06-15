@@ -1,4 +1,4 @@
-// src/acquire_frames.cpp - Modernized for true parallelism
+// src/acquire_frames.cpp - Final Corrected Version
 
 #include "acquire_frames.h"
 #include "NvEncoder/NvCodecUtils.h"
@@ -11,7 +11,7 @@
 #include "opengldisplay.h"
 #include "gpu_video_encoder.h"
 #include "yolo_worker.h"
-#include "image_writer_worker.h" // Include the new worker
+#include "image_writer_worker.h"
 
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state){
     EVT_CameraExecuteCommand(&ecam->camera, "GevTimestampControlLatch");
@@ -40,7 +40,7 @@ void acquire_frames(
     COpenGLDisplay* openGLDisplay,
     GPUVideoEncoder* gpu_encoder,
     YOLOv8Worker* yolo_worker,
-    ImageWriterWorker* image_writer, // Now receives the image writer
+    ImageWriterWorker* image_writer,
     SafeQueue<WORKER_ENTRY*>* free_entries_queue,
     SafeQueue<WORKER_ENTRY*>* recycle_queue
 ){
@@ -52,13 +52,11 @@ void acquire_frames(
     cudaStream_t stream;
     ck(cudaStreamCreate(&stream));
 
-    // This struct holds temporary buffers ONLY for the image saving process
     FrameProcess frame_process_save;
     initalize_gpu_frame(&frame_process_save.frame_original, camera_params);
     initialize_gpu_debayer(&frame_process_save.debayer, camera_params);
     initialize_cpu_frame(&frame_process_save.frame_cpu, camera_params);
     ck(cudaMalloc((void **)&frame_process_save.d_convert, camera_params->width * camera_params->height * 3));
-
 
     CameraState camera_state;
     PTPState ptp_state;
@@ -99,15 +97,36 @@ void acquire_frames(
             camera_state.frames_recd++;
             camera_state.frame_count++;
             
-            // --- Asynchronous Save Logic (Non-Blocking) ---
+            // --- FIX: Centralized Frame Handling ---
+
+            // 1. Copy the raw frame to our persistent worker buffer ONCE.
+            ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
+            
+            // 2. We can now immediately requeue the camera buffer.
+            EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
+            
+            // 3. Populate the metadata for the WORKER_ENTRY.
+            current_entry->width = ecam->frame_recv.size_x;
+            current_entry->height = ecam->frame_recv.size_y;
+            current_entry->pixelFormat = ecam->frame_recv.pixel_type;
+            current_entry->timestamp = ecam->frame_recv.timestamp;
+            current_entry->frame_id = camera_state.frame_count;
+            current_entry->has_detections = false;
+
+            // 4. Handle asynchronous save request (NON-BLOCKING).
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
-                ck(cudaMemcpyAsync(frame_process_save.frame_original.d_orig, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
+                // This block now uses the stable data in current_entry->d_image
+                // --- FIX: Use a temporary FrameGPU struct to correctly pass the pointer ---
+                FrameGPU temp_frame_gpu;
+                temp_frame_gpu.d_orig = current_entry->d_image;
+                temp_frame_gpu.size_pic = current_entry->width * current_entry->height;
+
                 if (camera_params->color){
-                    debayer_frame_gpu(camera_params, &frame_process_save.frame_original, &frame_process_save.debayer);
+                    debayer_frame_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
                 } else {
-                    duplicate_channel_gpu(camera_params, &frame_process_save.frame_original, &frame_process_save.debayer);
-                }      
-                rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, camera_params->width, camera_params->height, stream);                
+                    duplicate_channel_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
+                }
+                rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, camera_params->width, camera_params->height, stream);
                 ck(cudaMemcpy2D(frame_process_save.frame_cpu.frame, camera_params->width*3, frame_process_save.d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost));
                 ck(cudaStreamSynchronize(stream));
 
@@ -121,30 +140,16 @@ void acquire_frames(
                 camera_select->frame_save_state = State_Frame_Idle;
             }
 
-            // Immediately requeue the camera's internal buffer for the next frame
-            EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
-
-            // --- Real-time Dispatch Logic ---
-            ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
-            ck(cudaStreamSynchronize(stream));
-
-            current_entry->width = ecam->frame_recv.size_x;
-            current_entry->height = ecam->frame_recv.size_y;
-            current_entry->pixelFormat = ecam->frame_recv.pixel_type;
-            current_entry->timestamp = ecam->frame_recv.timestamp;
-            current_entry->frame_id = camera_state.frame_count;
-            current_entry->has_detections = false;
-            
+            // 5. Dispatch the WORKER_ENTRY to real-time workers.
             int dispatch_count = 0;
             if (camera_select->stream_on && openGLDisplay) dispatch_count++;
-            if (camera_select->record && gpu_encoder) dispatch_count++;
+            if (camera_control->record_video && gpu_encoder) dispatch_count++;
             if (camera_select->yolo && yolo_worker) dispatch_count++;
 
             if (dispatch_count > 0) {
                 current_entry->ref_count.store(dispatch_count);
-
                 if (camera_select->stream_on && openGLDisplay) openGLDisplay->PutObjectToQueueIn(current_entry);
-                if (camera_select->record && gpu_encoder) gpu_encoder->PutObjectToQueueIn(current_entry);
+                if (camera_control->record_video && gpu_encoder) gpu_encoder->PutObjectToQueueIn(current_entry);
                 if (camera_select->yolo && yolo_worker) yolo_worker->PutObjectToQueueIn(current_entry);
             } else {
                 free_entries_queue->push(current_entry);

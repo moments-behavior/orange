@@ -324,15 +324,24 @@ int main(int argc, char **args) {
                     free_entries_queue = new SafeQueue<WORKER_ENTRY*>();
                     recycle_queue = new SafeQueue<WORKER_ENTRY*>();
                     openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
+                    gpuVideoEncoders = new GPUVideoEncoder*[num_cameras]();
+            
                     for(int i = 0; i < num_cameras; ++i) {
                         openGLDisplayWorkers[i] = nullptr;
+                        gpuVideoEncoders[i] = nullptr;
                     }
             
-                    const size_t frame_size_bytes = cameras_params[0].width * cameras_params[0].height;
                     size_t max_frame_size_bytes = 0;
+                    for (int i = 0; i < num_cameras; ++i) {
+                        size_t current_size = static_cast<size_t>(cameras_params[i].width) * static_cast<size_t>(cameras_params[i].height);
+                        if (current_size > max_frame_size_bytes) {
+                            max_frame_size_bytes = current_size;
+                        }
+                    }
+                    std::cout << "Allocating worker pool with max frame size: " << max_frame_size_bytes << " bytes" << std::endl;
+            
                     for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
                         ck(cudaMalloc(&worker_entry_pool[i].d_image, max_frame_size_bytes));
-                        printf("[POOL_ALLOC] Entry: %p, d_image: %p\n", (void*)&worker_entry_pool[i], (void*)worker_entry_pool[i].d_image);
                         free_entries_queue->push(&worker_entry_pool[i]);
                     }
             
@@ -347,12 +356,11 @@ int main(int argc, char **args) {
                         }
                     }
             
-                    // 3. CREATE AND LINK WORKER THREADS
+                    // 3. CREATE WORKER THREAD OBJECTS (ENCODERS, YOLO, DISPLAY)
                     yolo_workers.assign(num_cameras, nullptr);
                     for (int i = 0; i < num_cameras; i++) {
                         if (cameras_select[i].stream_on) {
                             std::string display_name = "OpenGLDisplay_Cam_" + cameras_params[i].camera_serial;
-                            // FIX: Pass the shared cuContext to the display worker constructor
                             openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
                         }
                         if (cameras_select[i].yolo) {
@@ -360,14 +368,17 @@ int main(int argc, char **args) {
                             cameras_select[i].yolo_model = yolo_model.c_str();
                             if (yolo_model.empty()) {
                                 std::cerr << "YOLO model not selected. Please select a YOLO model." << std::endl;
-                                continue; 
+                            } else {
+                                yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], *recycle_queue);
+                                if (openGLDisplayWorkers[i]) {
+                                    yolo_workers[i]->SetDisplayWorker(openGLDisplayWorkers[i]);
+                                }
                             }
-                            // FIX: Pass the shared cuContext to the YOLO worker constructor
-                            yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], *recycle_queue);
-                            
-                            if (openGLDisplayWorkers[i]) {
-                                yolo_workers[i]->SetDisplayWorker(openGLDisplayWorkers[i]);
-                            }
+                        }
+                        if (cameras_select[i].record) {
+                            std::string encoder_thread_name = "GPUEncoder_Cam_" + cameras_params[i].camera_serial;
+                            bool encoder_ready_signal = false;
+                            gpuVideoEncoders[i] = new GPUVideoEncoder(encoder_thread_name.c_str(), cuContext, &cameras_params[i], encoder_config->encoder_codec, encoder_config->encoder_preset, encoder_config->tuning_info, encoder_config->folder_name, &encoder_ready_signal, *recycle_queue);
                         }
                     }
             
@@ -375,9 +386,10 @@ int main(int argc, char **args) {
                     for (int i = 0; i < num_cameras; i++) {
                         if (openGLDisplayWorkers[i]) openGLDisplayWorkers[i]->StartThread();
                         if (yolo_workers[i]) yolo_workers[i]->StartThread();
+                        if (gpuVideoEncoders[i]) gpuVideoEncoders[i]->StartThread();
                     }
             
-                    // 5. START ACQUISITION THREADS
+                    // 5. PREPARE CAMERAS AND START ACQUISITION THREADS
                     for (int i = 0; i < num_cameras; i++) {
                         camera_open_stream(&ecams[i].camera, &cameras_params[i]);
                         ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
@@ -391,23 +403,23 @@ int main(int argc, char **args) {
                         camera_control->sync_camera = true;
                     }
             
-                    std::string encoder_setup = "-codec " + encoder_config->encoder_codec + " -preset " + encoder_config->encoder_preset + " -fps ";
-            
                     for (int i = 0; i < num_cameras; i++) {
-                        //  camera_threads.emplace_back(
-                        //     &acquire_frames,
-                        //     cuContext,
-                        //     &ecams[i], &cameras_params[i], &cameras_select[i],
-                        //     camera_control,
-                        //     (cameras_select[i].stream_on ? tex[i].cuda_buffer : nullptr),
-                        //     encoder_setup,
-                        //     std::string(encoder_config->folder_name),
-                        //     ptp_params, &indigo_signal_builder,
-                        //     yolo_workers[i],
-                        //     nullptr, // Pass nullptr for GPUVideoEncoder since it's not used here yet
-                        //     free_entries_queue,
-                        //     recycle_queue
-                        // );
+                        camera_threads.emplace_back(
+                            &acquire_frames,
+                            cuContext,
+                            &ecams[i],
+                            &cameras_params[i],
+                            &cameras_select[i],
+                            camera_control,
+                            ptp_params,
+                            &indigo_signal_builder,
+                            openGLDisplayWorkers[i],
+                            gpuVideoEncoders[i],
+                            yolo_workers[i],
+                            image_writer,
+                            free_entries_queue,
+                            recycle_queue
+                        );
                     }
                 }
                 ImGui::PopStyleColor(1);
@@ -786,29 +798,12 @@ int main(int argc, char **args) {
                     }
 
                     if (ImGui::TreeNode("Save pictures from capturing")) {
-                        save_image_all_ready = true;
-                        for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].frame_save_state != State_Frame_Idle) {
-                                save_image_all_ready = false;
-                                break;
-                            }  
-                        }
-
-                        // for (int i = 0; i < num_cameras; i++) {
-                        //     ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
-                        //                     &cameras_select[i].selected_to_save);
-                        //     ImGui::SameLine();
-                        //     ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "%d", cameras_select[i].pictures_counter);
-                        //     ImGui::SameLine();
-                        // }
-
                         const int cols = 5;
                         for (int i = 0; i < num_cameras; ++i) {     
                             std::string label = cameras_params[i].camera_name + ": " + std::to_string(cameras_select[i].pictures_counter) + "##calibration_save";
-                            if (ImGui::Selectable(label.c_str(), cameras_select[i].selected_to_save,
+                            if (ImGui::Selectable(label.c_str(), &cameras_select[i].selected_to_save,
                                                   ImGuiSelectableFlags_None,
                                                   ImVec2(150, 50))) {
-                                cameras_select[i].selected_to_save = !cameras_select[i].selected_to_save;
                             }
 
                             // Keep items on the same line until end of row
@@ -816,13 +811,9 @@ int main(int argc, char **args) {
                                 ImGui::SameLine();
                         }
 
-
-                        if (!save_image_all_ready) {
-                            ImGui::BeginDisabled();
-                        }
-
                         ImGui::NewLine();
                         if (ImGui::Button("Save selected")) {
+                            std::cout << "[GUI] 'Save selected' button clicked. Formatting save name." << std::endl;
                             make_folder(picture_save_folder);
                             std::string frame_save_name = get_current_time_milliseconds();
                             for (int i = 0; i < num_cameras; i++) {
@@ -830,12 +821,14 @@ int main(int argc, char **args) {
                                 cameras_select[i].picture_save_folder = picture_save_folder;
                                 if (cameras_select[i].selected_to_save) {
                                     cameras_select[i].frame_save_state = State_Write_New_Frame;
+                                    std::cout << "[GUI]   - Flagging camera " << cameras_params[i].camera_serial << " to save frame." << std::endl;
                                 }
                             }
                         }
                         ImGui::SameLine();
 
                         if (ImGui::Button("Save pictures all")) {
+                            std::cout << "[GUI] 'Save pictures all' button clicked. Formatting save name." << std::endl;
                             make_folder(picture_save_folder);
                             std::string frame_save_name = get_current_time_milliseconds();
                             for (int i = 0; i < num_cameras; i++) {
@@ -843,15 +836,17 @@ int main(int argc, char **args) {
                                 cameras_select[i].picture_save_folder = picture_save_folder;
                                 cameras_select[i].frame_save_state = State_Write_New_Frame;
                             }
+                            std::cout << "[GUI]   - Flagging ALL cameras to save frame." << std::endl;
                         }
 
-                        //order important 
                         if (calib_state == CalibSavePictures) {
+                            std::cout << "[GUI] Calibration state is 'CalibSavePictures', triggering next pose." << std::endl;
                             send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
                             calib_state = CalibNextPose;
                         }
-
+                        
                         if (calib_state == CalibPoseReached) {
+                            std::cout << "[GUI] Calibration state is 'CalibPoseReached', triggering frame save for all cameras." << std::endl;
                             make_folder(calib_save_folder);
                             for (int i = 0; i < num_cameras; i++) {
                                 cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);
@@ -862,6 +857,7 @@ int main(int argc, char **args) {
                         }
 
                         if (ImGui::Button("Calib save images with counter")) {
+                            std::cout << "[GUI] 'Calib save images with counter' button clicked." << std::endl;
                             make_folder(calib_save_folder);
                             for (int i = 0; i < num_cameras; i++) {
                                 cameras_select[i].frame_save_name = std::to_string(cameras_select[i].pictures_counter);
@@ -870,10 +866,6 @@ int main(int argc, char **args) {
                             }
                         } 
                         
-                        if (!save_image_all_ready) {
-                            ImGui::EndDisabled();
-                        }
-
                         ImGui::TreePop();
                     }
                 }

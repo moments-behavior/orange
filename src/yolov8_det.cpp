@@ -184,26 +184,27 @@ void YOLOv8::make_pipe(bool warmup)
     }
 }
 
-void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera) // Renamed for clarity
+void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera, int source_width, int source_height)
 {
     const float inp_h  = (float)inp_h_int;
     const float inp_w  = (float)inp_w_int;
-    float       current_img_width  = img_width;  // Use member img_width
-    float       current_img_height = img_height; // Use member img_height
+    
+    // Use the passed-in dimensions, not the member variables
+    float       current_img_width  = (float)source_width;
+    float       current_img_height = (float)source_height;
 
     float r    = std::min(inp_h / current_img_height, inp_w / current_img_width);
     int   current_padw = std::round(current_img_width * r);
     int   current_padh = std::round(current_img_height * r);
 
-
     NppiSize src_img_size;
-    src_img_size.width = img_width;   // Use member img_width
-    src_img_size.height = img_height; // Use member img_height
+    src_img_size.width = source_width;
+    src_img_size.height = source_height;
     NppiRect src_roi;
     src_roi.x = 0;
     src_roi.y = 0;
-    src_roi.width = img_width;    // Use member img_width
-    src_roi.height = img_height;  // Use member img_height
+    src_roi.width = source_width;
+    src_roi.height = source_height;
 
     NppiSize resized_output_size;
     resized_output_size.width = current_padw;
@@ -214,7 +215,7 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera) // Renamed for cla
 
     // nppiResize_8u_C3R expects pitch in bytes for source and destination
     const NppStatus npp_result_resize = nppiResize_8u_C3R(d_rgb_from_camera,
-                                            img_width * 3 * sizeof(unsigned char), // Source pitch
+                                            source_width * 3 * sizeof(unsigned char), // Source pitch
                                             src_img_size,
                                             src_roi,
                                             this->d_temp, // Using class member
@@ -288,11 +289,11 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera) // Renamed for cla
         std::cerr << "Error executing nppiCopy_32f_C3P3R -- code: " << npp_result_transpose << std::endl;
     }
 
-    this->pparam.ratio  = 1.0f / r; // Corrected ratio calculation
-    this->pparam.dw     = dw_border;
-    this->pparam.dh     = dh_border;
-    this->pparam.height = current_img_height; // Original image height before letterboxing
-    this->pparam.width  = current_img_width;  // Original image width before letterboxing
+    this->pparam.ratio  = 1.0f / r;
+    this->pparam.dw     = (inp_w - current_padw) / 2.0f;
+    this->pparam.dh     = (inp_h - current_padh) / 2.0f;
+    this->pparam.height = current_img_height;
+    this->pparam.width  = current_img_width;
 
 
     const char* binding_name  = this->engine->getIOTensorName(0); // Assuming first binding is input

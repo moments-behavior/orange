@@ -11,6 +11,7 @@
 #include "message_wrapper_generated.h"
 #include "pose_shaman.h"
 #include "thread.h"
+#include "global.h"
 
 YOLOv8Worker::YOLOv8Worker(const char* name,
                            CUcontext cuda_context,
@@ -61,6 +62,9 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
                                      associated_camera_params_->width,
                                      associated_camera_params_->height);
         yolov8_instance_->make_pipe(true);
+
+         // *** ADD THIS LINE TO VERIFY THE MODEL'S INPUT SIZE ***
+         std::cout << "[YOLOv8 MODEL INFO] " << name << " expects input size: " << yolov8_instance_->inp_w_int << "x" << yolov8_instance_->inp_h_int << std::endl;
 
         scaled_width_ = yolov8_instance_->inp_w_int;
         scaled_height_ = yolov8_instance_->inp_h_int;
@@ -147,6 +151,16 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         }
         return false;
     }
+    std::lock_guard<std::mutex> lock(g_gpu_camera_mutex);
+    // ADD THIS LOG:
+    printf("[YOLO_WORKER] ==> START processing entry %p for frame_id %llu\n", (void*)entry, entry->frame_id);
+    fflush(stdout);
+
+    // LOG: Received a frame for processing
+    std::cout << "[" << threadName << "] ==> "
+    << "Received frame_id: " << entry->frame_id
+    << " (WORKER_ENTRY: " << entry << ")"
+    << ", current ref_count: " << entry->ref_count.load() << std::endl;
 
     // --- FIX: Push/Pop context around the worker function body ---
     ck(cuCtxPushCurrent(m_cuContext));
@@ -166,8 +180,9 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         NppiSize oSrcSize = { camera_width, (int)associated_camera_params_->height };
         NppiRect oSrcRect = { 0, 0, camera_width, (int)associated_camera_params_->height };
         NppiSize oDstSize = { yolov8_instance_->inp_w_int, yolov8_instance_->inp_h_int };
+        NppiRect oDstRect = { 0, 0, yolov8_instance_->inp_w_int, yolov8_instance_->inp_h_int };
         
-        nppiResize_8u_C1R(frame_original_gpu_.d_orig, camera_width, oSrcSize, oSrcRect, d_scaled_mono_buffer_, yolov8_instance_->inp_w_int, oDstSize, oSrcRect, NPPI_INTER_LANCZOS);
+        nppiResize_8u_C1R(frame_original_gpu_.d_orig, camera_width, oSrcSize, oSrcRect, d_scaled_mono_buffer_, yolov8_instance_->inp_w_int, oDstSize, oDstRect, NPPI_INTER_LANCZOS);
         
         FrameGPU frame_scaled_gpu;
         frame_scaled_gpu.d_orig = d_scaled_mono_buffer_;
@@ -180,7 +195,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         }
         
         rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer, oDstSize.width, oDstSize.height, yolov8_instance_->stream);
-        yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_);
+        yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, scaled_width_, scaled_height_);
     } 
     else 
     {
@@ -198,7 +213,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         }
         
         rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer, camera_width, associated_camera_params_->height, yolov8_instance_->stream);
-        yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_);
+        yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, scaled_width_, scaled_height_);
     }
 
     yolov8_instance_->infer();
@@ -215,6 +230,11 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         frame_counter_ = 0;
         last_fps_update_time_ = now;
     }
+    // --- FIX: Add this synchronization call ---
+    // This command blocks the CPU thread until all previously issued commands
+    // in this specific stream on the GPU have finished. This guarantees that we are
+    // done reading from entry->d_image before we allow it to be recycled.
+    ck(cudaStreamSynchronize(yolov8_instance_->stream));
     
     if (entry->has_detections) {
         std::cout << threadName << " found " << entry->detections.size() << " objects." << std::endl;
@@ -255,9 +275,23 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
     CUcontext popped_context;
     ck(cuCtxPopCurrent(&popped_context));
 
-    // Return false because we have handled the entry's lifecycle.
-    // The base class CThreadWorker should not do anything further with it.
-    return false;
+        // LOG: Finished processing
+    std::cout << "[" << this->threadName << "] <== "
+              << "Finished frame_id: " << entry->frame_id
+              << ". Decrementing ref_count." << std::endl;
+
+    // Decrement ref count and recycle if we're the last owner.
+    // ADD THIS LOG before recycling:
+    if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        printf("[YOLO_WORKER] <== END processing entry %p. Recycling now.\n", (void*)entry);
+        fflush(stdout);
+        m_recycle_queue.push(entry);
+    } else {
+        printf("[YOLO_WORKER] <== END processing entry %p. Handing off.\n", (void*)entry);
+        fflush(stdout);
+    }
+    
+    return false; 
 }
 
 void YOLOv8Worker::WorkerReset() {

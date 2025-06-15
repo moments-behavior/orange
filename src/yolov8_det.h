@@ -15,7 +15,7 @@ public:
     ~YOLOv8();
 
     void make_pipe(bool warmup = true);
-    void preprocess_gpu(unsigned char *d_rgb);
+    void preprocess_gpu(unsigned char *d_rgb, int source_width, int source_height);
     void infer();
     void postprocess(std::vector<Object> &objs);
     static void draw_objects(const cv::Mat&                                image,

@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <cuda.h>
+#include "global.h"
 
 COpenGLDisplay::COpenGLDisplay(const char* name, CUcontext cuda_context, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer_cuda_pbo, INDIGOSignalBuilder* indigo_signal_builder, SafeQueue<WORKER_ENTRY*>& recycle_queue)
     : CThreadWorker(name),
@@ -55,6 +56,8 @@ COpenGLDisplay::~COpenGLDisplay()
 bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
 {
     if (!f) return false;
+
+    std::lock_guard<std::mutex> lock(g_gpu_camera_mutex);
 
     ck(cuCtxPushCurrent(m_cuContext)); // Ensure the CUDA context is active for this thread
     

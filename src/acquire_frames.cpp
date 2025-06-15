@@ -10,6 +10,7 @@
 #include "yolo_worker.h"
 #include <chrono>
 #include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 #include "global.h"
 #include "thread.h" // Ensures SafeQueue is included
 #include <cuda.h>
@@ -78,6 +79,10 @@ void acquire_frames(
     // Ensure the CUDA context is set for the thread
     CU_CHECK(cuCtxPushCurrent(cuda_context));
 
+    // *** 1. ADD THIS: Create a dedicated stream for this thread's operations ***
+    cudaStream_t stream;
+    CUDA_CHECK(cudaStreamCreate(&stream));
+
     CameraState camera_state;
     PTPState ptp_state;
     StopWatch w;
@@ -92,6 +97,8 @@ void acquire_frames(
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     // --- MODIFICATION --- Replaced ck() with our ew robust macro
     CUDA_CHECK(cudaMalloc(&d_temp_unscrambled_buffer, frame_size_bytes));
+
+    std::vector<unsigned char> intermediate_cpu_buffer(frame_size_bytes);
 
     COpenGLDisplay* openGLDisplay = nullptr;
     if (camera_select->stream_on && display_buffer != nullptr) {
@@ -116,116 +123,122 @@ void acquire_frames(
               << " (need_reorder=" << camera_params->need_reorder << ")" << std::endl;
 
     while (camera_control->subscribe) {
-        // Reclaim recycled entries first
-        WORKER_ENTRY* recycled_entry = nullptr;
-        while(recycle_queue->pop(recycled_entry)) {
-            if (recycled_entry) {
-                free_entries_queue->push(recycled_entry);
-            }
+    // Reclaim recycled entries first
+    WORKER_ENTRY* recycled_entry = nullptr;
+    while(recycle_queue->pop(recycled_entry)) {
+        if (recycled_entry) {
+            // ADD THIS LOG:
+            printf("[ACQUIRE] Recycling entry %p\n", (void*)recycled_entry);
+            free_entries_queue->push(recycled_entry);
         }
+    }
+    // Get a free entry from the pool
+    WORKER_ENTRY* current_entry = nullptr;
+    if (!free_entries_queue->pop(current_entry)) {
+        usleep(100);
+        continue;
+    }
+    // ADD THIS LOG:
+    printf("[ACQUIRE] Popped free entry %p with d_image %p\n", (void*)current_entry, (void*)current_entry->d_image);
+    fflush(stdout);
 
-        // Get a free entry from the pool
-        WORKER_ENTRY* current_entry = nullptr;
-        if (!free_entries_queue->pop(current_entry)) {
-            usleep(100);
-            continue;
+    // Get the frame from the camera SDK
+    camera_state.camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, 1000);
+
+    if (camera_state.camera_return != EVT_SUCCESS && camera_state.camera_return != EVT_ERROR_TIMEDOUT)
+    {
+        check_camera_errors((EVT_ERROR)camera_state.camera_return, camera_params->camera_serial.c_str());
+    }
+
+    if (camera_state.camera_return == EVT_SUCCESS) {
+        if (((ecam->frame_recv.frame_id) != camera_state.id_prev + 1) && (camera_state.frame_count != 0)) {
+            camera_state.dropped_frames++;
+        } else {
+            camera_state.frames_recd++;
         }
-
-        camera_state.camera_return = EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, 1000);
-
-        if (camera_state.camera_return != EVT_SUCCESS && camera_state.camera_return != EVT_ERROR_TIMEDOUT)
-        {
-            check_camera_errors((EVT_ERROR)camera_state.camera_return, camera_params->camera_serial.c_str());
-        }
-
-        if (camera_state.camera_return == EVT_SUCCESS) {
-            acq_frame_count++;
-            auto now = std::chrono::steady_clock::now();
-            std::chrono::duration<double> elapsed = now - last_acq_time;
-            if (elapsed.count() >= 1.0) {
-                acq_fps = acq_frame_count / elapsed.count();
-                acq_frame_count = 0;
-                last_acq_time = now;
-            }
-            
-            void* imageDataSource = ecam->frame_recv.imagePtr;
-            if (imageDataSource != nullptr && ecam->frame_recv.bufferSize > 0) {
-                // Copy data to GPU buffer
-                if (camera_params->need_reorder) {
-                    GSPRINT4521_Convert(current_entry->d_image, static_cast<const unsigned char*>(imageDataSource), camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0);
-                } else {
-                    if (ecam->frame_recv.bufferSize < frame_size_bytes) {
-                        fprintf(stderr, "[WARNING] Buffer size mismatch! Camera sent %zu bytes, but we expected %zu bytes.\n",
-                                ecam->frame_recv.bufferSize, frame_size_bytes);
-                    }
-                    // --- START: MODIFICATION ---
-                    // 1. Get current CUDA device for context verification
-                    int current_device_id;
-                    cudaGetDevice(&current_device_id);
-
-                    // 2. Add detailed logging BEFORE the call
-                    fprintf(stdout, "\n--- [DEBUG | acquire_frames] ---\n");
-                    fprintf(stdout, "Attempting cudaMemcpy for camera %s\n", camera_params->camera_serial.c_str());
-                    fprintf(stdout, "  > Current CUDA Device ID:      %d\n", current_device_id);
-                    fprintf(stdout, "  > Destination (GPU) Pointer:   %p\n", current_entry->d_image);
-                    fprintf(stdout, "  > Source (CPU) Pointer:        %p\n", imageDataSource);
-                    fprintf(stdout, "  > Transfer Size (bytes):       %zu\n", frame_size_bytes);
-                    fprintf(stdout, "---------------------------------\n\n");
-
-                    // 3. Replace the original ck() with our robust CUDA_CHECK() macro
-                    CUDA_CHECK(cudaMemcpy(current_entry->d_image, imageDataSource, frame_size_bytes, cudaMemcpyHostToDevice));
-                    CUDA_CHECK(cudaStreamSynchronize(0)); // Ensure the copy is complete before proceeding
-                    // --- END: MODIFICATION ---
-                }
-                
-                // Populate metadata
-                current_entry->width = ecam->frame_recv.size_x;
-                current_entry->height = ecam->frame_recv.size_y;
-                current_entry->pixelFormat = ecam->frame_recv.pixel_type;
-                current_entry->timestamp = ecam->frame_recv.timestamp;
-                current_entry->has_detections = false;
-                current_entry->detections.clear();
-                camera_state.frame_count++;
-                current_entry->frame_id = camera_state.frame_count;
-
-                bool needs_display = camera_select->stream_on && openGLDisplay != nullptr;
-                bool needs_yolo = camera_select->yolo && yolo_worker_for_this_camera != nullptr;
-                bool needs_record = camera_control->record_video && camera_select->record && gpu_encoder != nullptr;
-                
-                int dispatch_count = 0;
-                if (needs_yolo) dispatch_count++;
-                if (needs_display) dispatch_count++;
-                if (needs_record) dispatch_count++;
-
-                if (dispatch_count > 0)
-                {
-                    current_entry->ref_count.store(dispatch_count);
-
-                    if (needs_yolo) {
-                        yolo_worker_for_this_camera->PutObjectToQueueIn(current_entry);
-                    }
-                    if (needs_display) {
-                        openGLDisplay->PutObjectToQueueIn(current_entry);
-                    }
-                    if (needs_record) {
-                        gpu_encoder->PutObjectToQueueIn(current_entry);
-                    }
-                }
-                else
-                {
-                    free_entries_queue->push(current_entry);
-                }
         
+        // Handle the 16-bit frame_id wrapping around from 65535 to 1
+        if (ecam->frame_recv.frame_id == 65535) {
+            camera_state.id_prev = 0;
+        } else {
+            camera_state.id_prev = ecam->frame_recv.frame_id;
+        }
+        // --- FPS Counter ---
+        acq_frame_count++;
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsed = now - last_acq_time;
+        if (elapsed.count() >= 1.0) {
+            acq_fps = acq_frame_count / elapsed.count();
+            acq_frame_count = 0;
+            last_acq_time = now;
+        }
+        
+        void* imageDataSource = ecam->frame_recv.imagePtr;
+        if (imageDataSource != nullptr && ecam->frame_recv.bufferSize > 0) {
+            // --- Step 1: Safely copy the data from the SDK buffer to a CPU buffer. ---
+            cudaMemcpy(intermediate_cpu_buffer.data(), imageDataSource, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToHost);
+
+            // --- Step 2: Immediately release the SDK's frame buffer. This is critical. ---
+            EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
+
+            // --- Step 3: Move the data to the GPU and handle reordering if necessary. ---
+            if (camera_params->need_reorder) {
+                // For reordering, we need the data on the GPU in a temporary buffer first.
+                CUDA_CHECK(cudaMemcpyAsync(d_temp_unscrambled_buffer, intermediate_cpu_buffer.data(), frame_size_bytes, cudaMemcpyHostToDevice, stream));
+                // Now call the kernel with two valid *device* pointers.
+                GSPRINT4521_Convert(current_entry->d_image, d_temp_unscrambled_buffer, camera_params->width, camera_params->height, camera_params->width, camera_params->width, 0);
             } else {
-                std::cerr << "Invalid frame data: imageDataSource=" << imageDataSource
-                          << ", frame_bufferSize=" << ecam->frame_recv.bufferSize << std::endl;
+                // ADD THIS LOG before the failing line:
+                printf("[ACQUIRE] Copying to d_image: %p for frame_id %llu\n", (void*)current_entry->d_image, camera_state.frame_count + 1);
+                fflush(stdout);
+                CUDA_CHECK(cudaMemcpyAsync(current_entry->d_image, intermediate_cpu_buffer.data(), frame_size_bytes, cudaMemcpyHostToDevice, stream));
+            }
+            CUDA_CHECK(cudaStreamSynchronize(stream)); 
+            
+            // --- Step 4: Populate metadata and dispatch to workers. ---
+            current_entry->width = ecam->frame_recv.size_x;
+            current_entry->height = ecam->frame_recv.size_y;
+            current_entry->pixelFormat = ecam->frame_recv.pixel_type;
+            current_entry->timestamp = ecam->frame_recv.timestamp;
+            current_entry->has_detections = false;
+            current_entry->detections.clear();
+            camera_state.frame_count++;
+            current_entry->frame_id = camera_state.frame_count;
+
+            std::cout << "[ACQUIRE " << camera_params->camera_serial << "] "
+                        << "Acquired frame_id: " << current_entry->frame_id << std::endl;
+
+            bool needs_display = camera_select->stream_on && openGLDisplay != nullptr;
+            bool needs_yolo = camera_select->yolo && yolo_worker_for_this_camera != nullptr;
+            bool needs_record = camera_control->record_video && camera_select->record && gpu_encoder != nullptr;
+            
+            int dispatch_count = (needs_yolo ? 1 : 0) + (needs_display ? 1 : 0) + (needs_record ? 1 : 0);
+
+            if (dispatch_count > 0) {
+                current_entry->ref_count.store(dispatch_count);
+                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] "
+                            << "Dispatching frame_id: " << current_entry->frame_id
+                            << " with ref_count: " << dispatch_count << std::endl;
+
+                if (needs_yolo)    yolo_worker_for_this_camera->PutObjectToQueueIn(current_entry);
+                if (needs_display) openGLDisplay->PutObjectToQueueIn(current_entry);
+                if (needs_record)  gpu_encoder->PutObjectToQueueIn(current_entry);
+            } else {
+                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] "
+                            << "No consumers for frame_id: " << current_entry->frame_id
+                            << ". Recycling." << std::endl;
                 free_entries_queue->push(current_entry);
             }
-            EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
-        } else {
+    
+        } else { // Handle cases where the frame data pointer is invalid
+            std::cerr << "Invalid frame data from SDK: imageDataSource is null or bufferSize is zero." << std::endl;
             free_entries_queue->push(current_entry);
+            EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
         }
-        
+    } else { // Handle cases where EVT_CameraGetFrame did not return EVT_SUCCESS
+        free_entries_queue->push(current_entry);
+    }
+
         if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
             if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {
                 sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
@@ -259,7 +272,7 @@ void acquire_frames(
     report_statistics(camera_params, &camera_state, time_diff);
     std::cout << "Acquire frames thread finished for camera: " << camera_params->camera_serial << std::endl;
 
+    CUDA_CHECK(cudaStreamDestroy(stream));
     CUcontext popped_context;
-    // --- MODIFICATION --- Replaced ck() with our new robust macro
     CU_CHECK(cuCtxPopCurrent(&popped_context));
 }

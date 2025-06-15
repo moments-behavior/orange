@@ -323,8 +323,10 @@ int main(int argc, char **args) {
                     }
             
                     const size_t frame_size_bytes = cameras_params[0].width * cameras_params[0].height;
+                    size_t max_frame_size_bytes = 0;
                     for (int i = 0; i < ACQUIRE_WORK_ENTRIES_MAX; ++i) {
-                        ck(cudaMalloc(&worker_entry_pool[i].d_image, frame_size_bytes));
+                        ck(cudaMalloc(&worker_entry_pool[i].d_image, max_frame_size_bytes));
+                        printf("[POOL_ALLOC] Entry: %p, d_image: %p\n", (void*)&worker_entry_pool[i], (void*)worker_entry_pool[i].d_image);
                         free_entries_queue->push(&worker_entry_pool[i]);
                     }
             

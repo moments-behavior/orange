@@ -6,6 +6,7 @@
 #include <nppi.h>
 #include <nppi_color_conversion.h> 
 #include <iostream>
+#include "global.h"
 
 // Helper to initialize the NvEncoder
 template <class EncoderClass>
@@ -189,6 +190,8 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 {
     if (!entry) return false;
 
+    std::lock_guard<std::mutex> lock(g_gpu_camera_mutex);
+
     ck(cuCtxPushCurrent(m_cuContext));
     ck(cudaSetDevice(camera_params->gpu_id));
 
@@ -218,15 +221,15 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
     NppiRect oDstRect = { 0, 0, scaled_width_, scaled_height_ };
 
     if (camera_params->color){
-        // --- FINAL, SIMPLIFIED COLOR PATH ---
+        // --- CORRECTED COLOR PATH ---
 
-        // 1. Resize the raw MONO Bayer data first. This is more efficient.
+        // 1. Resize the raw MONO Bayer data. This is correct.
         NppStatus nppStatResize = nppiResize_8u_C1R(
             frame_original.d_orig,
             width,
             oSrcSize,
             oSrcRect,
-            d_scaled_mono_buffer_, // Use the dedicated mono buffer for the resized bayer data
+            d_scaled_mono_buffer_,
             scaled_width_,
             oDstSize,
             oDstRect,
@@ -239,32 +242,44 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             return false;
         }
 
-        // 2. Debayer the SCALED Bayer data directly to a 3-channel RGB image.
+        // 2. Debayer the SCALED Bayer data directly to a 3-channel RGB image. This is also correct.
         NppStatus nppStatDebayer = nppiCFAToRGB_8u_C1C3R(
-            d_scaled_mono_buffer_,      // Source is the scaled bayer data
-            scaled_width_,              // Pitch of the source
-            oDstSize,                   // Size of the source
+            d_scaled_mono_buffer_,
+            scaled_width_,
+            oDstSize,
             oDstRect,
-            d_rgb_temp_,                // Destination is our 3-channel RGB buffer
-            scaled_width_ * 3,          // Pitch of the destination
-            debayer.grid,               // Your original grid setting is correct
+            d_rgb_temp_, // Destination is your 3-channel RGB buffer
+            scaled_width_ * 3, // Pitch of the destination is width * 3 channels
+            debayer.grid,
             NPPI_INTER_UNDEFINED
         );
+        if (nppStatDebayer != NPP_SUCCESS) {
+            std::cerr << "Error: NPP Debayer (CFAToRGB) failed with status " << nppStatDebayer << std::endl;
+            if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
+            CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
+            return false;
+        }
 
-        // 3. Convert the SCALED RGB image to planar YUV.
-        const Npp8u* pRgbSrc[] = {d_rgb_temp_, d_rgb_temp_ + 1, d_rgb_temp_ + 2}; // This is now incorrect, see below
-        int nRgbSrcStep[] = {scaled_width_ * 3, scaled_width_ * 3, scaled_width_ * 3};
+        // 3. Convert the SCALED, interleaved RGB image to planar YUV (IYUV format).
+        // The destination pointers for the 3 planes (Y, U, V) are calculated here.
         Npp8u* pYuvDst[] = {
             d_iyuv_temp_,
             d_iyuv_temp_ + (size_t)scaled_width_ * scaled_height_,
             d_iyuv_temp_ + ((size_t)scaled_width_ * scaled_height_ * 5 / 4)
         };
+        // The destination pitches for each plane.
         int rYuvDstStep[] = { scaled_width_, scaled_width_ / 2, scaled_width_ / 2 };
 
-        // Use the standard function for converting interleaved RGB to planar YUV
-        NppStatus nppStatYUV = nppiRGBToYUV420_8u_C3P3R(d_rgb_temp_, scaled_width_ * 3, pYuvDst, rYuvDstStep, oDstSize);
+        // Use the standard function for converting interleaved RGB to 3-plane YUV.
+        NppStatus nppStatYUV = nppiRGBToYUV420_8u_C3P3R(
+            d_rgb_temp_,          // Source is the interleaved RGB buffer
+            scaled_width_ * 3,    // Pitch of the source RGB buffer
+            pYuvDst,              // Array of pointers to the Y, U, and V destination planes
+            rYuvDstStep,          // Array of pitches for the Y, U, and V planes
+            oDstSize);            // The size of the image to convert
+
         if (nppStatYUV != NPP_SUCCESS) {
-            std::cerr << "Error: NPP RGBToYUV420 (3-plane) conversion failed with status " << nppStatYUV << std::endl;
+            std::cerr << "Error: NPP RGBToYUV420 conversion failed with status " << nppStatYUV << std::endl;
             if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { m_recycle_queue.push(entry); }
             CUcontext popped_context; ck(cuCtxPopCurrent(&popped_context));
             return false;

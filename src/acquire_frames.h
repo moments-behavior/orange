@@ -1,10 +1,18 @@
 #ifndef ORANGE_ACQUIRE_FRAMES
 #define ORANGE_ACQUIRE_FRAMES
-#include "video_capture.h"
-#include "yolo_worker.h"
 #include "thread.h"
-#include "image_processing.h"
-#include "gpu_video_encoder.h"
+#include "camera.h"
+#include <iostream>
+#include <fstream>
+#include "network_base.h"
+#include "image_processing.h" // FIX: Include for WORKER_ENTRY definition
+#include <cuda.h>             // FIX: Include for CUcontext definition
+
+// Forward declare worker classes to break include cycles
+class COpenGLDisplay;
+class GPUVideoEncoder;
+class YOLOv8Worker;
+class ImageWriterWorker;
 
 void acquire_frames(
     CUcontext cuda_context,
@@ -12,14 +20,13 @@ void acquire_frames(
     CameraParams *camera_params,
     CameraEachSelect* camera_select,
     CameraControl* camera_control,
-    unsigned char *display_buffer,
-    std::string encoder_setup,
-    std::string folder_name,
     PTPParams* ptp_params,
     INDIGOSignalBuilder* indigo_signal_builder,
-    YOLOv8Worker* yolo_worker_for_this_camera,
+    COpenGLDisplay* openGLDisplay,
     GPUVideoEncoder* gpu_encoder,
+    YOLOv8Worker* yolo_worker,
+    ImageWriterWorker* image_writer,
     SafeQueue<WORKER_ENTRY*>* free_entries_queue,
     SafeQueue<WORKER_ENTRY*>* recycle_queue
-    );
+);
 #endif

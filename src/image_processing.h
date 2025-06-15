@@ -19,7 +19,7 @@ typedef struct {
     // --- Fields for YOLO results ---
     std::vector<pose::Object> detections; // Store YOLO detection results
     bool has_detections;                  // Flag to indicate if detections are present
-    std::atomic<int> ref_count; // Reference count for memory management
+    std::atomic<int> ref_count;           // Reference count for memory management
 } WORKER_ENTRY;
 
 
@@ -81,7 +81,7 @@ static inline void initialize_gpu_debayer(Debayer *debayer, CameraParams *camera
     debayer->roi.width = camera_params->width;
     debayer->roi.height = camera_params->height;
     if (camera_params->need_reorder) {
-        // 100G camera 
+        // 100G camera
         debayer->grid = NPPI_BAYER_GRBG;
     } else if (camera_params->pixel_format.compare("BayerRG8")==0) {
         debayer->grid = NPPI_BAYER_RGGB;

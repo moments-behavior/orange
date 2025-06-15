@@ -1,187 +1,292 @@
+// src/yolov8_det.cpp - Complete implementation with debug logging
 #include "yolov8_det.h"
+
+// Include debug logging if you want it, or comment out for now
+// #include "cuda_context_manager.h"
 
 YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 {
+    std::cout << "YOLOv8 constructor START - Engine: " << engine_file_path << std::endl;
+    
     img_width = width;
     img_height = height;
 
-    // Initialize stream to nullptr, it will be created in make_pipe if needed
-    this->stream = nullptr; 
-    // Initialize other member pointers to nullptr
+    // Initialize all pointers to nullptr for safer cleanup
+    this->stream = nullptr;
     this->d_temp = nullptr;
     this->d_boarder = nullptr;
     this->d_float = nullptr;
     this->d_planar = nullptr;
-
+    this->engine = nullptr;
+    this->runtime = nullptr;
+    this->context = nullptr;
 
     std::ifstream file(engine_file_path, std::ios::binary);
-    assert(file.good());
+    if (!file.good()) {
+        throw std::runtime_error("YOLOv8: Cannot open engine file: " + engine_file_path);
+    }
+    
     file.seekg(0, std::ios::end);
     auto size = file.tellg();
     file.seekg(0, std::ios::beg);
+    std::cout << "Engine file size: " << size << " bytes" << std::endl;
+    
     char* trtModelStream = new char[size];
     assert(trtModelStream);
     file.read(trtModelStream, size);
     file.close();
+    
+    std::cout << "Initializing TensorRT plugins" << std::endl;
     initLibNvInferPlugins(&this->gLogger, "");
+    
+    std::cout << "Creating TensorRT runtime" << std::endl;
     this->runtime = nvinfer1::createInferRuntime(this->gLogger);
-    assert(this->runtime != nullptr);
+    if (!this->runtime) {
+        delete[] trtModelStream;
+        throw std::runtime_error("YOLOv8: Failed to create TensorRT runtime");
+    }
 
+    std::cout << "Deserializing CUDA engine" << std::endl;
     this->engine = this->runtime->deserializeCudaEngine(trtModelStream, size);
-    assert(this->engine != nullptr);
+    if (!this->engine) {
+        delete[] trtModelStream;
+        throw std::runtime_error("YOLOv8: Failed to deserialize CUDA engine");
+    }
     delete[] trtModelStream;
+    
+    std::cout << "Creating execution context" << std::endl;
     this->context = this->engine->createExecutionContext();
-
-    assert(this->context != nullptr);
+    if (!this->context) {
+        throw std::runtime_error("YOLOv8: Failed to create execution context");
+    }
 
     this->num_bindings = this->engine->getNbIOTensors();
+    std::cout << "Number of IO tensors: " << this->num_bindings << std::endl;
 
+    // Log binding information
     for (int i = 0; i < this->num_bindings; ++i) {
-        Binding            binding;
-        nvinfer1::Dims     dims;
-        const char* name  = this->engine->getIOTensorName(i);
-        nvinfer1::DataType dtype = this->engine->getTensorDataType(this->engine->getIOTensorName(i));
-        binding.name             = name;
-        binding.dsize            = type_to_size(dtype);
+        Binding binding;
+        nvinfer1::Dims dims;
+        const char* name = this->engine->getIOTensorName(i);
+        nvinfer1::DataType dtype = this->engine->getTensorDataType(name);
+        binding.name = name;
+        binding.dsize = type_to_size(dtype);
 
         nvinfer1::TensorIOMode ioMode = this->engine->getTensorIOMode(name);
+        std::cout << "Tensor " << i << ": " << name << " | Mode: " 
+                  << (ioMode == nvinfer1::TensorIOMode::kINPUT ? "INPUT" : "OUTPUT")
+                  << " | Data size: " << binding.dsize << std::endl;
+
         if (ioMode == nvinfer1::TensorIOMode::kINPUT) {
             this->num_inputs += 1;
-            dims         = this->engine->getProfileShape(name, 0, nvinfer1::OptProfileSelector::kMAX);
+            dims = this->engine->getProfileShape(name, 0, nvinfer1::OptProfileSelector::kMAX);
             binding.size = get_size_by_dims(dims);
             binding.dims = dims;
             this->input_bindings.push_back(binding);
-            // set max opt shape
-            this->context->setInputShape(name, dims);
+            
+            std::cout << "Input binding - Size: " << binding.size << " | Dims: " 
+                      << dims.d[0] << "x" << dims.d[1] << "x" << dims.d[2] << "x" << dims.d[3] << std::endl;
+            
+            // Set max opt shape
+            if (!this->context->setInputShape(name, dims)) {
+                throw std::runtime_error("YOLOv8: Failed to set input shape for " + std::string(name));
+            }
         }
         else if (ioMode == nvinfer1::TensorIOMode::kOUTPUT) {
-            dims         = this->context->getTensorShape(name);
+            dims = this->context->getTensorShape(name);
             binding.size = get_size_by_dims(dims);
             binding.dims = dims;
             this->output_bindings.push_back(binding);
             this->num_outputs += 1;
+            
+            std::cout << "Output binding - Size: " << binding.size << std::endl;
         }
     }
 
-    auto&    in_binding = this->input_bindings[0];
-
+    auto& in_binding = this->input_bindings[0];
     inp_h_int = in_binding.dims.d[2];
     inp_w_int = in_binding.dims.d[3];
+    
+    std::cout << "Model input size: " << inp_w_int << "x" << inp_h_int << std::endl;
 
-    const float inp_h  = (float)inp_h_int;
-    const float inp_w  = (float)inp_w_int;
-    float       img_width_float  = img_width;
-    float       img_height_float = img_height;
+    const float inp_h = (float)inp_h_int;
+    const float inp_w = (float)inp_w_int;
+    float img_width_float = img_width;
+    float img_height_float = img_height;
 
-    float r    = std::min(inp_h / img_height_float, inp_w / img_width_float);
+    float r = std::min(inp_h / img_height_float, inp_w / img_width_float);
     padw = std::round(img_width_float * r);
     padh = std::round(img_height_float * r);
+    
+    std::cout << "Padding dimensions: " << padw << "x" << padh << " (ratio: " << r << ")" << std::endl;
+    std::cout << "YOLOv8 constructor COMPLETE" << std::endl;
 }
 
 YOLOv8::~YOLOv8()
 {
-    std::cout << "YOLOv8 destructor called." << std::endl;
+    std::cout << "YOLOv8 destructor START" << std::endl;
+    
+    // Synchronize stream first if it exists
     if (this->stream) {
+        std::cout << "Synchronizing stream before destruction" << std::endl;
         cudaError_t stream_sync_err = cudaStreamSynchronize(this->stream);
         if (stream_sync_err != cudaSuccess) {
-             std::cerr << "YOLOv8 destructor: cudaStreamSynchronize failed. Error: " << cudaGetErrorString(stream_sync_err) << std::endl;
+            std::cerr << "YOLOv8 destructor: cudaStreamSynchronize failed. Error: " 
+                      << cudaGetErrorString(stream_sync_err) << std::endl;
         }
     }
 
-    // 1. Free binding buffers
-    for (auto& ptr : this->device_ptrs) {
-        if (ptr) {
-            cudaError_t free_err = cudaFree(ptr);
+    // Destroy TensorRT execution context BEFORE freeing GPU memory
+    if (this->context) {
+        std::cout << "Destroying TensorRT execution context..." << std::endl;
+        delete this->context;
+        this->context = nullptr;
+    }
+
+    // Free binding buffers with logging
+    std::cout << "Freeing " << this->device_ptrs.size() << " device pointers" << std::endl;
+    for (size_t i = 0; i < this->device_ptrs.size(); ++i) {
+        if (this->device_ptrs[i]) {
+            cudaError_t free_err = cudaFree(this->device_ptrs[i]);
             if (free_err != cudaSuccess) {
-                std::cerr << "YOLOv8 destructor: cudaFree for device_ptr (binding) failed. Error: " << cudaGetErrorString(free_err) << std::endl;
+                std::cerr << "YOLOv8 destructor: cudaFree for device_ptr[" << i 
+                          << "] failed. Error: " << cudaGetErrorString(free_err) << std::endl;
             }
         }
     }
     this->device_ptrs.clear();
 
-    for (auto& ptr : this->host_ptrs) {
-        if (ptr) {
-            cudaError_t free_host_err = cudaFreeHost(ptr);
+    std::cout << "Freeing " << this->host_ptrs.size() << " host pointers" << std::endl;
+    for (size_t i = 0; i < this->host_ptrs.size(); ++i) {
+        if (this->host_ptrs[i]) {
+            cudaError_t free_host_err = cudaFreeHost(this->host_ptrs[i]);
             if (free_host_err != cudaSuccess) {
-                std::cerr << "YOLOv8 destructor: cudaFreeHost for host_ptr (binding) failed. Error: " << cudaGetErrorString(free_host_err) << std::endl;
+                std::cerr << "YOLOv8 destructor: cudaFreeHost for host_ptr[" << i 
+                          << "] failed. Error: " << cudaGetErrorString(free_host_err) << std::endl;
             }
         }
     }
     this->host_ptrs.clear();
 
-    // 2. Free other manually allocated GPU buffers that are class members
-    if (this->d_planar) { cudaFree(this->d_planar); this->d_planar = nullptr; }
-    if (this->d_float) { cudaFree(this->d_float); this->d_float = nullptr; }
-    if (this->d_boarder) { cudaFree(this->d_boarder); this->d_boarder = nullptr; }
-    if (this->d_temp) { cudaFree(this->d_temp); this->d_temp = nullptr; }
+    // Free manually allocated GPU buffers
+    if (this->d_planar) { 
+        std::cout << "Freeing d_planar" << std::endl;
+        cudaFree(this->d_planar); 
+        this->d_planar = nullptr; 
+    }
+    if (this->d_float) { 
+        std::cout << "Freeing d_float" << std::endl;
+        cudaFree(this->d_float); 
+        this->d_float = nullptr; 
+    }
+    if (this->d_boarder) { 
+        std::cout << "Freeing d_boarder" << std::endl;
+        cudaFree(this->d_boarder); 
+        this->d_boarder = nullptr; 
+    }
+    if (this->d_temp) { 
+        std::cout << "Freeing d_temp" << std::endl;
+        cudaFree(this->d_temp); 
+        this->d_temp = nullptr; 
+    }
 
-    // 3. Destroy the CUDA stream
+    // Destroy CUDA stream
     if (this->stream) {
+        std::cout << "Destroying stream" << std::endl;
         cudaError_t stream_destroy_err = cudaStreamDestroy(this->stream);
         if (stream_destroy_err != cudaSuccess) {
-             std::cerr << "YOLOv8 destructor: cudaStreamDestroy failed. Error: " << cudaGetErrorString(stream_destroy_err) << std::endl;
+            std::cerr << "YOLOv8 destructor: cudaStreamDestroy failed. Error: " 
+                      << cudaGetErrorString(stream_destroy_err) << std::endl;
         }
         this->stream = nullptr;
     }
 
-    // 4. Destroy TensorRT objects (RAII through delete)
-    if (this->context) {
-        delete this->context;
-        this->context = nullptr;
-    }
+    // Destroy TensorRT objects
     if (this->engine) {
+        std::cout << "Destroying engine" << std::endl;
         delete this->engine;
         this->engine = nullptr;
     }
     if (this->runtime) {
+        std::cout << "Destroying runtime" << std::endl;
         delete this->runtime;
         this->runtime = nullptr;
     }
-    std::cout << "YOLOv8 destructor finished." << std::endl;
+    
+    std::cout << "YOLOv8 destructor COMPLETE" << std::endl;
 }
 
 void YOLOv8::make_pipe(bool warmup)
 {
+    std::cout << "make_pipe START (warmup=" << warmup << ")" << std::endl;
+
     // Create stream if it hasn't been created already
     if (this->stream == nullptr) {
+        std::cout << "Creating new CUDA stream" << std::endl;
         CHECK(cudaStreamCreate(&this->stream));
     }
 
-    // Use class members for these allocations
-    CHECK(cudaMalloc((void **)&this->d_temp, padw * padh * 3 * sizeof(unsigned char))); // added sizeof
-    CHECK(cudaMalloc((void **)&this->d_boarder, inp_w_int * inp_h_int * 3 * sizeof(unsigned char))); // used inp_h_int, added sizeof
-    CHECK(cudaMalloc((void **)&this->d_float, sizeof(float) * inp_w_int * inp_h_int * 3)); // used inp_h_int
-    CHECK(cudaMalloc((void **)&this->d_planar, sizeof(float) * inp_w_int * inp_h_int * 3)); // used inp_h_int
+    // Allocate preprocessing buffers
+    size_t temp_size = padw * padh * 3 * sizeof(unsigned char);
+    size_t border_size = inp_w_int * inp_h_int * 3 * sizeof(unsigned char);
+    size_t float_size = sizeof(float) * inp_w_int * inp_h_int * 3;
+    size_t planar_size = sizeof(float) * inp_w_int * inp_h_int * 3;
 
-    for (auto& bindings : this->input_bindings) {
+    std::cout << "Allocating preprocessing buffers - temp:" << temp_size 
+              << " border:" << border_size << " float:" << float_size << " planar:" << planar_size << std::endl;
+
+    CHECK(cudaMalloc((void **)&this->d_temp, temp_size));
+    CHECK(cudaMalloc((void **)&this->d_boarder, border_size));
+    CHECK(cudaMalloc((void **)&this->d_float, float_size));
+    CHECK(cudaMalloc((void **)&this->d_planar, planar_size));
+
+    // Allocate input bindings
+    std::cout << "Allocating " << this->input_bindings.size() << " input bindings" << std::endl;
+    for (size_t i = 0; i < this->input_bindings.size(); ++i) {
+        auto& bindings = this->input_bindings[i];
         void* d_ptr;
-        CHECK(cudaMallocAsync(&d_ptr, bindings.size * bindings.dsize, this->stream));
+        size_t size = bindings.size * bindings.dsize;
+        
+        std::cout << "Allocating input binding " << i << " (" << bindings.name << ") size: " << size << std::endl;
+        CHECK(cudaMallocAsync(&d_ptr, size, this->stream));
         this->device_ptrs.push_back(d_ptr);
     }
 
-    for (auto& bindings : this->output_bindings) {
-        void * d_ptr, *h_ptr;
+    // Allocate output bindings
+    std::cout << "Allocating " << this->output_bindings.size() << " output bindings" << std::endl;
+    for (size_t i = 0; i < this->output_bindings.size(); ++i) {
+        auto& bindings = this->output_bindings[i];
+        void* d_ptr;
+        void* h_ptr;
         size_t size = bindings.size * bindings.dsize;
+        
+        std::cout << "Allocating output binding " << i << " (" << bindings.name << ") size: " << size << std::endl;
         CHECK(cudaMallocAsync(&d_ptr, size, this->stream));
         CHECK(cudaHostAlloc(&h_ptr, size, 0));
-        this->device_ptrs.push_back(d_ptr); // This correctly adds output device pointers after input ones
+        
+        this->device_ptrs.push_back(d_ptr);
         this->host_ptrs.push_back(h_ptr);
     }
 
     if (warmup) {
+        std::cout << "Starting warmup iterations" << std::endl;
         for (int i = 0; i < 10; i++) {
-            for (size_t j = 0; j < this->input_bindings.size(); ++j) { // Iterate through actual input bindings
-                size_t size  = this->input_bindings[j].size * this->input_bindings[j].dsize;
+            std::cout << "Warmup iteration " << (i + 1) << "/10" << std::endl;
+            
+            for (size_t j = 0; j < this->input_bindings.size(); ++j) {
+                size_t size = this->input_bindings[j].size * this->input_bindings[j].dsize;
                 void* h_ptr = malloc(size);
                 memset(h_ptr, 0, size);
-                // Use the correct device_ptrs index for inputs
+                
                 CHECK(cudaMemcpyAsync(this->device_ptrs[j], h_ptr, size, cudaMemcpyHostToDevice, this->stream));
                 free(h_ptr);
             }
             this->infer();
         }
-        printf("model warmup 10 times\n");
+        std::cout << "Warmup completed" << std::endl;
     }
+    
+    std::cout << "make_pipe COMPLETE" << std::endl;
 }
 
 void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera, int source_width, int source_height)
@@ -211,7 +316,6 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera, int source_width, 
     resized_output_size.height = current_padh;
     // ROI for resize output is the full resized image
     NppiRect resized_output_roi = {0, 0, current_padw, current_padh};
-
 
     // nppiResize_8u_C3R expects pitch in bytes for source and destination
     const NppStatus npp_result_resize = nppiResize_8u_C3R(d_rgb_from_camera,
@@ -295,7 +399,6 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera, int source_width, 
     this->pparam.height = current_img_height;
     this->pparam.width  = current_img_width;
 
-
     const char* binding_name  = this->engine->getIOTensorName(0); // Assuming first binding is input
     // setInputShape might not be needed if profile shapes are fixed and kMAX is always used
     // However, if dynamic shapes are involved, it might be necessary.
@@ -304,25 +407,72 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgb_from_camera, int source_width, 
     CHECK(cudaMemcpyAsync(this->device_ptrs[0], this->d_planar, inp_h_int * inp_w_int * 3 * sizeof(float), cudaMemcpyDeviceToDevice, this->stream));
 }
 
-
 void YOLOv8::infer()
 {
-    for (int32_t i = 0; i < this->num_bindings; ++i) // Use num_bindings
-    {
-        auto const name = this->engine->getIOTensorName(i);
-        this->context->setTensorAddress(name, this->device_ptrs[i]);
+    // Validate context and stream
+    if (!this->context) {
+        throw std::runtime_error("YOLOv8::infer: Execution context is null");
+    }
+    
+    if (!this->stream) {
+        throw std::runtime_error("YOLOv8::infer: CUDA stream is null");
+    }
+    
+    // Validate that we have the expected number of device pointers
+    size_t expected_device_ptrs = this->num_inputs + this->num_outputs;
+    if (this->device_ptrs.size() != expected_device_ptrs) {
+        std::cerr << "ERROR: Expected " << expected_device_ptrs << " device pointers, have " << this->device_ptrs.size() << std::endl;
+        throw std::runtime_error("YOLOv8::infer: Device pointer count mismatch");
     }
 
-    this->context->enqueueV3(this->stream);
+    // Set tensor addresses with validation
+    for (int32_t i = 0; i < this->num_bindings; ++i) {
+        auto const name = this->engine->getIOTensorName(i);
+        if (!name) {
+            std::cerr << "ERROR: Null tensor name for binding " << i << std::endl;
+            throw std::runtime_error("YOLOv8::infer: Null tensor name");
+        }
+        
+        if (i >= this->device_ptrs.size()) {
+            std::cerr << "ERROR: Device pointer index " << i << " out of bounds (size: " << this->device_ptrs.size() << ")" << std::endl;
+            throw std::runtime_error("YOLOv8::infer: Device pointer index out of bounds");
+        }
+        
+        if (!this->device_ptrs[i]) {
+            std::cerr << "ERROR: Device pointer " << i << " (" << name << ") is null" << std::endl;
+            throw std::runtime_error("YOLOv8::infer: Null device pointer");
+        }
+        
+        if (!this->context->setTensorAddress(name, this->device_ptrs[i])) {
+            std::cerr << "ERROR: Failed to set tensor address for " << name << std::endl;
+            throw std::runtime_error("YOLOv8::infer: Failed to set tensor address for " + std::string(name));
+        }
+    }
 
-    // Correctly iterate only through output bindings for copying back to host
+    bool success = this->context->enqueueV3(this->stream);
+    if (!success) {
+        std::cerr << "ERROR: enqueueV3 failed" << std::endl;
+        throw std::runtime_error("YOLOv8::infer: enqueueV3 failed");
+    }
+
+    // Copy output data back to host
     for (int i = 0; i < this->num_outputs; ++i) {
-        // Output bindings are stored in device_ptrs after input bindings
         size_t output_binding_index_in_device_ptrs = this->num_inputs + i;
         size_t osize = this->output_bindings[i].size * this->output_bindings[i].dsize;
+        
+        if (output_binding_index_in_device_ptrs >= this->device_ptrs.size()) {
+            std::cerr << "ERROR: Output device pointer index out of bounds" << std::endl;
+            throw std::runtime_error("YOLOv8::infer: Output device pointer index out of bounds");
+        }
+        
+        if (i >= this->host_ptrs.size()) {
+            std::cerr << "ERROR: Host pointer index out of bounds" << std::endl;
+            throw std::runtime_error("YOLOv8::infer: Host pointer index out of bounds");
+        }
+        
         CHECK(cudaMemcpyAsync(
-            this->host_ptrs[i], // host_ptrs stores output host buffers
-            this->device_ptrs[output_binding_index_in_device_ptrs], // Corresponding device buffer for this output
+            this->host_ptrs[i],
+            this->device_ptrs[output_binding_index_in_device_ptrs],
             osize,
             cudaMemcpyDeviceToHost,
             this->stream));
@@ -377,7 +527,6 @@ void YOLOv8::postprocess(std::vector<Object>& objs)
         objs.push_back(obj);
     }
 }
-
 
 void YOLOv8::copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs)
 {

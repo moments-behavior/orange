@@ -53,7 +53,7 @@ FFmpegWriter::~FFmpegWriter()
     // (GPUVideoEncoder::close_writer) *before* this destructor is called.
     // This ensures all packets are processed before we write the trailer.
     if (oc) {
-        av_write_frame(oc, NULL);
+        av_write_frame(oc, NULL); // Flush remaining packets
         av_write_trailer(oc);
         avio_close(oc->pb);
         avformat_free_context(oc);
@@ -67,11 +67,11 @@ void FFmpegWriter::push_packet(uint8_t* pData, int nBytes, int nPts)
         std::cout << "Error, av_new_packet..." << std::endl;
         return;
     }
-    memcpy(pkt->data, pData, nBytes);   
+    memcpy(pkt->data, pData, nBytes);
     pkt->pts = av_rescale_q(nPts, AVRational {1, nFps}, vs->time_base);
     // No B-frames
     pkt->dts = pkt->pts;
-    pkt->stream_index = vs->index;    
+    pkt->stream_index = vs->index;
     if(!memcmp(pData, "\x00\x00\x00\x01\x67", 5)) {
         pkt->flags |= AV_PKT_FLAG_KEY;
     }
@@ -90,19 +90,18 @@ void FFmpegWriter::quit_thread()
 
 void FFmpegWriter::join_thread()
 {
-    m_thread.join();
+    if (m_thread.joinable()) {
+        m_thread.join();
+    }
 };
 
-void FFmpegWriter::write_one_pkt(AVPacket* pkt) 
+void FFmpegWriter::write_one_pkt(AVPacket* pkt)
 {
     int ret = av_write_frame(oc, pkt);
-    // FIX: Removed the flush call from here.
-    // av_write_frame(oc, NULL); 
     if (ret < 0) {
         std::cout << "FFMPEG: Error while writing video frame" << std::endl;
-    } else {
-        av_packet_unref(pkt);
     }
+    // We don't unref the packet here because the caller (write_thread) will free it
 }
 
 // off-thread saving
@@ -116,14 +115,14 @@ void FFmpegWriter::write_thread()
                 av_packet_free(&pkt);
             }
         }
-    }   
+    }
 
-    // check if there is more in the queue 
+    // check if there is more in the queue
     while(true) {
         AVPacket* pkt = nullptr;
         if (!m_queue.pop(pkt)) {
             break;
-        } 
+        }
         else {
             if (pkt) {
                 write_one_pkt(pkt);
@@ -153,9 +152,10 @@ bool FFmpegWriter::write_packet(uint8_t * pData, int nBytes, int nPts)
 
     // Write the compressed frame into the output
     int ret = av_write_frame(oc, pkt);
+    av_packet_free(&pkt); // Free the packet after writing
     if (ret < 0) {
         std::cout << "FFMPEG: Error while writing video frame" << std::endl;
-
+        return false;
     }
     return true;
 }

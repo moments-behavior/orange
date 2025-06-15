@@ -12,6 +12,7 @@
 #include "pose_shaman.h"
 #include "thread.h"
 #include "global.h"
+#include <npp.h>
 #include "cuda_context_manager.h" // Include RAII context manager
 
 // Enable context debugging
@@ -38,14 +39,14 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
       m_recycle_queue(recycle_queue)
 {
     std::cout << "YOLOv8Worker constructor for: " << name << std::endl;
-    
+
     if (!cuda_context) {
         throw std::runtime_error("YOLOv8Worker: Null CUDA context provided");
     }
-    
+
     // Use RAII context management
     CUDA_CONTEXT_SCOPE_AT(m_cuContext, "YOLOv8Worker constructor");
-    
+
     if (!ctx_manager.is_valid()) {
         throw std::runtime_error("YOLOv8Worker: Failed to set CUDA context");
     }
@@ -70,7 +71,7 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
                                      associated_camera_params_->height);
         yolov8_instance_->make_pipe(true);
 
-        std::cout << "[YOLOv8 MODEL INFO] " << name << " expects input size: " 
+        std::cout << "[YOLOv8 MODEL INFO] " << name << " expects input size: "
                   << yolov8_instance_->inp_w_int << "x" << yolov8_instance_->inp_h_int << std::endl;
 
         // Allocate GPU buffers within the context
@@ -86,41 +87,41 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
 
     } catch (const std::exception& e) {
         std::cerr << "YOLOv8Worker Error for " << name << ": " << e.what() << std::endl;
-        
+
         // Cleanup within the same context
         if (fb_builder_) { delete fb_builder_; fb_builder_ = nullptr; }
         if (yolov8_instance_) { delete yolov8_instance_; yolov8_instance_ = nullptr; }
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); frame_original_gpu_.d_orig = nullptr; }
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); debayer_gpu_.d_debayer = nullptr; }
         if (d_rgb_yolo_input_gpu_) { cudaFree(d_rgb_yolo_input_gpu_); d_rgb_yolo_input_gpu_ = nullptr; }
-        
-        throw; 
+
+        throw;
     }
     // Context is automatically popped by RAII destructor
 }
 
 YOLOv8Worker::~YOLOv8Worker() {
     std::cout << "YOLOv8Worker destructor for " << threadName << std::endl;
-    
+
     // Use RAII context management for cleanup
     CUDA_CONTEXT_SCOPE_AT(m_cuContext, "YOLOv8Worker destructor");
-    
+
     if (ctx_manager.is_valid() && associated_camera_params_) {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
-        
+
         // Clean up in reverse order of allocation
         if (d_rgb_yolo_input_gpu_) { cudaFree(d_rgb_yolo_input_gpu_); }
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); }
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); }
-        
+
         // Delete YOLOv8 instance (this will synchronize streams and clean up TensorRT)
         if (yolov8_instance_) { delete yolov8_instance_; }
     }
-    
+
     // Clean up CPU resources
     if (shaman_ipc_queue_) delete shaman_ipc_queue_;
     if (fb_builder_) delete fb_builder_;
-    
+
     std::cout << "YOLOv8Worker destructor complete for " << threadName << std::endl;
 }
 
@@ -133,7 +134,6 @@ void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer) {
 }
 
 bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
-    // Validate inputs first
     if (!yolov8_instance_ || !entry || !entry->d_image) {
         std::cerr << "[" << threadName << "] ERROR: Invalid input to WorkerFunction" << std::endl;
         if (entry && entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
@@ -142,12 +142,8 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         return false;
     }
 
-    // Lock global mutex for GPU access
-    std::lock_guard<std::mutex> lock(g_gpu_camera_mutex);
-    
-    // Use RAII context management
     CUDA_CONTEXT_SCOPE_AT(m_cuContext, "YOLOv8Worker::WorkerFunction");
-    
+
     if (!ctx_manager.is_valid()) {
         std::cerr << "[" << threadName << "] ERROR: Failed to set CUDA context in WorkerFunction" << std::endl;
         if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
@@ -160,56 +156,46 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         const int camera_width = associated_camera_params_->width;
         const int camera_height = associated_camera_params_->height;
 
-        // Set device for this context
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
+        nppSetStream(yolov8_instance_->stream); // Associate NPP calls with the YOLO stream
 
-        // Validate that YOLOv8 stream is valid
         if (!yolov8_instance_->stream) {
             throw std::runtime_error("YOLOv8 stream is null");
         }
 
-        // Process frame
         size_t buffer_size = static_cast<size_t>(entry->width) * static_cast<size_t>(entry->height);
-        ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, entry->d_image, buffer_size, 
+        ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, entry->d_image, buffer_size,
                           cudaMemcpyDeviceToDevice, yolov8_instance_->stream));
 
-        // Update debayer size for this frame
         debayer_gpu_.size.width = camera_width;
         debayer_gpu_.size.height = camera_height;
 
-        // Convert/debayer
         if (associated_camera_params_->color) {
             debayer_frame_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         } else {
             duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         }
 
-        // Convert RGBA to RGB
         rgba2rgb_convert(d_rgb_yolo_input_gpu_, debayer_gpu_.d_debayer, camera_width, camera_height, yolov8_instance_->stream);
 
-        // YOLOv8 inference pipeline
         yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, camera_width, camera_height);
         yolov8_instance_->infer();
         yolov8_instance_->postprocess(entry->detections);
         entry->has_detections = !entry->detections.empty();
 
-        // FPS tracking
         frame_counter_++;
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = now - last_fps_update_time_;
         if (elapsed.count() >= 1.0) {
             current_fps_ = frame_counter_ / elapsed.count();
-            std::cout << threadName << " Inference FPS: " << current_fps_ 
+            std::cout << threadName << " Inference FPS: " << current_fps_
                       << " (Queue: " << this->GetCountQueueInSize() << ")" << std::endl;
             frame_counter_ = 0;
             last_fps_update_time_ = now;
         }
 
-        // CRITICAL: Synchronize stream before allowing frame recycling
-        // This ensures all GPU operations complete before the frame buffer can be reused
         ck(cudaStreamSynchronize(yolov8_instance_->stream));
 
-        // Handle detection outputs
         if (entry->has_detections) {
             if (associated_camera_select_->send_yolo_via_ipc && shaman_ipc_queue_) {
                 std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
@@ -225,20 +211,17 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
 
     } catch (const std::exception& e) {
         std::cerr << "[" << threadName << "] Exception in WorkerFunction: " << e.what() << std::endl;
-        
-        // Force stream synchronization on error to prevent resource corruption
+
         if (yolov8_instance_ && yolov8_instance_->stream) {
             cudaStreamSynchronize(yolov8_instance_->stream);
         }
     }
 
-    // Decrement reference count and recycle if needed
     int prev_ref_count = entry->ref_count.fetch_sub(1, std::memory_order_acq_rel);
     if (prev_ref_count == 1) {
         m_recycle_queue.push(entry);
     }
 
-    // Context is automatically popped by RAII destructor
     return false;
 }
 

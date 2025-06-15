@@ -7,6 +7,7 @@ echo "========================================"
 # Parse command line arguments
 DEBUG=0
 CLEAN=0
+CUDA_DEBUG=0
 for arg in "$@"; do
   case $arg in
     --debug)
@@ -17,12 +18,17 @@ for arg in "$@"; do
     CLEAN=1
     shift
     ;;
+    --cuda-debug)
+    CUDA_DEBUG=1
+    shift
+    ;;
     --help)
     echo "Usage: $0 [options]"
     echo "Options:"
-    echo "  --debug    Build in debug mode"
-    echo "  --clean    Remove all generated files and rebuild"
-    echo "  --help     Show this help message"
+    echo "  --debug       Build in debug mode"
+    echo "  --clean       Remove all generated files and rebuild"
+    echo "  --cuda-debug  Enable CUDA context debugging (can be combined with --debug)"
+    echo "  --help        Show this help message"
     exit 0
     ;;
   esac
@@ -39,7 +45,19 @@ else
   BUILD_DIR="targets/release"
 fi
 
+# Add CUDA debug flag if requested
+if [ $CUDA_DEBUG -eq 1 ]; then
+  echo "==> Enabling CUDA context debugging"
+  CFLAGS="$CFLAGS -DDEBUG_CUDA_CONTEXT"
+  if [ $DEBUG -eq 1 ]; then
+    BUILD_DIR="targets/debug_cuda"
+  else
+    BUILD_DIR="targets/release_cuda"
+  fi
+fi
+
 echo "==> Using build directory: $BUILD_DIR"
+echo "==> Compiler flags: $CFLAGS"
 
 # Handle clean option
 if [ $CLEAN -eq 1 ]; then
@@ -48,7 +66,7 @@ if [ $CLEAN -eq 1 ]; then
   echo "========================================"
   echo "==> Removing all build artifacts from $BUILD_DIR"
   rm -rf $BUILD_DIR
-  rm -f targets/orange targets/orange_debug
+  rm -f targets/orange targets/orange_debug targets/orange_cuda_debug
   echo "==> Clean completed"
 fi
 
@@ -89,6 +107,37 @@ is_outdated() {
   return 1
 }
 
+# Check if any header files have changed
+headers_changed() {
+  local executable="$1"
+  
+  # Check if any header file is newer than the executable
+  for header in src/*.h src/*.hpp; do
+    if [ -f "$header" ] && [ "$header" -nt "$executable" ]; then
+      echo "    - Header file $header is newer than executable"
+      return 0
+    fi
+  done
+  
+  # Check for the new cuda_context_manager.h header specifically
+  if [ -f "src/cuda_context_manager.h" ] && [ "src/cuda_context_manager.h" -nt "$executable" ]; then
+    echo "    - CUDA context manager header is newer than executable"
+    return 0
+  fi
+  
+  return 1
+}
+
+echo "========================================"
+echo "Checking for cuda_context_manager.h"
+echo "========================================"
+# Check if the new CUDA context manager header exists
+if [ ! -f "src/cuda_context_manager.h" ]; then
+  echo "WARNING: cuda_context_manager.h not found in src/"
+  echo "         This file is required for enhanced CUDA debugging"
+  echo "         Please create it as shown in the provided artifacts"
+fi
+
 echo "========================================"
 echo "Compiling CUDA kernel"
 echo "========================================"
@@ -96,7 +145,7 @@ echo "========================================"
 if [ $DEBUG -eq 1 ]; then
   if is_outdated "src/kernel.cu" "$BUILD_DIR/kernel.o"; then
     echo "==> Compiling CUDA kernel (debug mode)"
-    nvcc -c src/kernel.cu -G -g -O0 -arch=sm_86 -o $BUILD_DIR/kernel.o
+    nvcc -c src/kernel.cu -G -g -O0 -arch=sm_86 $CFLAGS -o $BUILD_DIR/kernel.o
     echo "==> CUDA kernel compilation complete"
   else
     echo "==> CUDA kernel is up to date, skipping compilation"
@@ -104,7 +153,7 @@ if [ $DEBUG -eq 1 ]; then
 else
   if is_outdated "src/kernel.cu" "$BUILD_DIR/kernel.o"; then
     echo "==> Compiling CUDA kernel (release mode)"
-    nvcc -c src/kernel.cu -arch=sm_86 -o $BUILD_DIR/kernel.o
+    nvcc -c src/kernel.cu -arch=sm_86 $CFLAGS -o $BUILD_DIR/kernel.o
     echo "==> CUDA kernel compilation complete"
   else
     echo "==> CUDA kernel is up to date, skipping compilation"
@@ -190,6 +239,14 @@ else
       fi
     done
   fi
+  
+  # Check if any header file is newer than the executable
+  if [ $need_link -eq 0 ]; then
+    echo "==> Checking if header files changed"
+    if headers_changed "$BUILD_DIR/orange"; then
+      need_link=1
+    fi
+  fi
 fi
 
 # Main compilation command with all the libraries
@@ -198,6 +255,15 @@ if [ $need_link -eq 1 ]; then
   echo "Linking final executable"
   echo "========================================"
   echo "==> Starting link process"
+  
+  # Show what debugging options are enabled
+  if [ $CUDA_DEBUG -eq 1 ]; then
+    echo "==> CUDA context debugging ENABLED"
+    echo "    - Enhanced logging for CUDA operations"
+    echo "    - RAII context management"
+    echo "    - Resource tracking"
+  fi
+  
   g++ $CFLAGS -std=c++17 $BUILD_DIR/*.o \
       -o $BUILD_DIR/orange \
       -I./src/ \
@@ -242,7 +308,13 @@ if [ $need_link -eq 1 ]; then
       -I$TENSORRT_ROOT/include \
       -L$TENSORRT_ROOT/lib -lnvinfer -lnvinfer_plugin \
       `pkg-config --static --libs glfw3`
-  echo "==> Linking complete"
+  
+  if [ $? -eq 0 ]; then
+    echo "==> Linking complete"
+  else
+    echo "==> ERROR: Linking failed!"
+    exit 1
+  fi
 else
   echo "==> Final executable is up to date, skipping linking"
 fi
@@ -251,9 +323,15 @@ echo "========================================"
 echo "Creating symbolic links"
 echo "========================================"
 # Create a symbolic link to the built binary
-if [ $DEBUG -eq 1 ]; then
+if [ $DEBUG -eq 1 ] && [ $CUDA_DEBUG -eq 1 ]; then
+  echo "==> Creating symbolic link for debug+CUDA debug binary"
+  ln -sf $BUILD_DIR/orange targets/orange_cuda_debug
+elif [ $DEBUG -eq 1 ]; then
   echo "==> Creating symbolic link for debug binary"
   ln -sf $BUILD_DIR/orange targets/orange_debug
+elif [ $CUDA_DEBUG -eq 1 ]; then
+  echo "==> Creating symbolic link for CUDA debug binary"
+  ln -sf $BUILD_DIR/orange targets/orange_cuda_debug
 else
   echo "==> Creating symbolic link for release binary"
   ln -sf $BUILD_DIR/orange targets/orange
@@ -266,5 +344,15 @@ else
   echo "Build completed successfully!"
 fi
 echo "Binary location: $BUILD_DIR/orange"
+
+if [ $CUDA_DEBUG -eq 1 ]; then
+  echo ""
+  echo "CUDA DEBUGGING ENABLED:"
+  echo "- Enhanced context logging will be displayed"
+  echo "- Resource allocation/deallocation tracking"
+  echo "- TensorRT operation monitoring"
+  echo "- Run with 2>&1 | tee debug.log to capture all output"
+fi
+
 echo "========================================"
 echo "Run with --help to see available options"

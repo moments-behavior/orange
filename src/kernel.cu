@@ -11,6 +11,8 @@
     *N
     *
 **/
+
+
 __global__ void GSPRINT4521_ConvertKernel(unsigned char* dest, const unsigned char* src, int width, int height, int strideS, int strideD, int leftShift)
 {
     //int x = threadIdx.x;  // 1

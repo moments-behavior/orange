@@ -12,6 +12,8 @@
 #include "gpu_video_encoder.h"
 #include "yolo_worker.h"
 #include "image_writer_worker.h"
+#include "cuda_context_debug.h"
+#include "cuda_context_debug.h"
 
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state){
     EVT_CameraExecuteCommand(&ecam->camera, "GevTimestampControlLatch");
@@ -46,11 +48,15 @@ void acquire_frames(
 ){
     std::cout << "Starting acquisition loop for camera " << camera_params->camera_serial << std::endl;
 
+    CUDA_CTX_LOG("=== ACQUIRE FRAMES START ===");
     ck(cuCtxPushCurrent(cuda_context));
+    dumpCudaState("Acquire frames startup");
     ck(cudaSetDevice(camera_params->gpu_id));
+    CUDA_RT_LOG("Set device to " + std::to_string(camera_params->gpu_id));
 
     cudaStream_t stream;
     ck(cudaStreamCreate(&stream));
+    CUDA_STREAM_LOG("Created acquisition stream", stream);
 
     FrameProcess frame_process_save;
     initalize_gpu_frame(&frame_process_save.frame_original, camera_params);
@@ -97,12 +103,19 @@ void acquire_frames(
             camera_state.frames_recd++;
             camera_state.frame_count++;
             
+            CUDA_CTX_LOG("=== FRAME " + std::to_string(camera_state.frame_count) + " PROCESSING ===");
+            
             // --- FIX: Centralized Frame Handling ---
 
             // 1. Copy the raw frame to our persistent worker buffer ONCE.
+            CUDA_MEM_LOG("Copying camera frame to worker buffer", current_entry->d_image, 
+                        ecam->frame_recv.bufferSize, camera_state.frame_count);
             ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
+            VALIDATE_CUDA_OP("Camera frame copy", camera_state.frame_count);
 
+            CUDA_SYNC_LOG("Synchronizing stream after camera copy", stream, camera_state.frame_count);
             ck(cudaStreamSynchronize(stream));
+            VALIDATE_CUDA_OP("Stream synchronization", camera_state.frame_count);
             
             // 2. We can now immediately requeue the camera buffer.
             EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
@@ -117,6 +130,8 @@ void acquire_frames(
 
             // 4. Handle asynchronous save request (NON-BLOCKING).
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
+                CUDA_CTX_LOG("Processing frame save request for frame " + std::to_string(camera_state.frame_count));
+                
                 FrameGPU temp_frame_gpu;
                 temp_frame_gpu.d_orig = current_entry->d_image;
                 temp_frame_gpu.size_pic = current_entry->width * current_entry->height;
@@ -157,6 +172,10 @@ void acquire_frames(
             if (camera_control->record_video && gpu_encoder) dispatch_count++;
             if (camera_select->yolo && yolo_worker) dispatch_count++;
 
+            // Log dispatch analysis with context info
+            CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatch analysis");
+            dumpCudaState("Before frame dispatch", camera_state.frame_count);
+
             std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " << current_entry->frame_id 
                     << " dispatch analysis:" << std::endl;
             std::cout << "  - stream_on: " << (camera_select->stream_on ? "true" : "false") 
@@ -170,35 +189,50 @@ void acquire_frames(
             if (dispatch_count > 0) {
                 current_entry->ref_count.store(dispatch_count);
                 
+                CUDA_CTX_LOG("Setting ref_count to " + std::to_string(dispatch_count) + " for frame " + std::to_string(camera_state.frame_count));
+                
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Dispatching frame " 
                         << current_entry->frame_id << " to " << dispatch_count << " consumers:" << std::endl;
                 
+                // Dispatch with detailed logging
                 if (camera_select->stream_on && openGLDisplay) {
+                    CUDA_CTX_LOG("Dispatching to OpenGL Display");
                     std::cout << "  -> Sending to OpenGL Display" << std::endl;
                     openGLDisplay->PutObjectToQueueIn(current_entry);
                 }
+                
                 if (camera_control->record_video && gpu_encoder) {
+                    CUDA_CTX_LOG("Dispatching to GPU Encoder - CRITICAL DISPATCH");
+                    dumpCudaState("Pre-GPU-Encoder-Dispatch", camera_state.frame_count);
                     std::cout << "  -> Sending to GPU Encoder" << std::endl;
                     gpu_encoder->PutObjectToQueueIn(current_entry);
+                    CUDA_CTX_LOG("GPU Encoder dispatch completed");
                 }
+                
                 if (camera_select->yolo && yolo_worker) {
+                    CUDA_CTX_LOG("Dispatching to YOLO Worker");
                     std::cout << "  -> Sending to YOLO Worker" << std::endl;
                     yolo_worker->PutObjectToQueueIn(current_entry);
                 }
                 
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
                         << current_entry->frame_id << " dispatched successfully" << std::endl;
+                CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatched successfully");
+                
             } else {
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
                         << current_entry->frame_id << " has no consumers - recycling immediately" << std::endl;
+                CUDA_CTX_LOG("No consumers, recycling frame " + std::to_string(camera_state.frame_count));
                 free_entries_queue->push(current_entry);
             }
         } else {
+            CUDA_CTX_LOG("Camera frame acquisition failed");
             free_entries_queue->push(current_entry);
         }
     }
 
     // Cleanup
+    CUDA_CTX_LOG("=== ACQUIRE FRAMES CLEANUP ===");
     check_camera_errors(EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStop"), camera_params->camera_serial.c_str());
     if (!ptp_params->network_sync) {
         try_stop_timer();
@@ -211,8 +245,10 @@ void acquire_frames(
     cudaFree(frame_process_save.d_convert);
     free(frame_process_save.frame_cpu.frame);
     
+    CUDA_STREAM_LOG("Destroying acquisition stream", stream);
     cudaStreamDestroy(stream);
     CUcontext popped_context;
     ck(cuCtxPopCurrent(&popped_context));
+    CUDA_CTX_LOG("=== ACQUIRE FRAMES END ===");
     std::cout << "Acquire frames thread finished for camera: " << camera_params->camera_serial << std::endl;
 }

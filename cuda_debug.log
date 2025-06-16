@@ -1,6 +1,6 @@
 Server Initiated
 Child Thread Start 0
-enet_thread.cpp: Address of EnetContext 'server_enet_context' received: 0x7fffb197a5b0
+enet_thread.cpp: Address of EnetContext 'server_enet_context' received: 0x7ffe659dc340
 Load camera json file: /home/jeremy/orange_data/config/local/javier_no_shelf/02010096.json
 Resolution: 		4512 x 4512
 OffsetX Max: 		0
@@ -13,1139 +13,843 @@ OffsetY Inc: 		16
 OffsetX Set: 		0
 PixelFormat: 		Mono8
 STARTING STREAMING SESSION...
-Recording session folder: /home/jeremy/orange_data/exp/unsorted/2025_06_15_20_41_30
+Recording session folder: /home/jeremy/orange_data/exp/unsorted/2025_06_15_20_55_37
 Allocating 120 worker entries with max frame size: 20358144 bytes
 YOLOv8Worker constructor for: YOLO_Worker_Cam_2010096
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker constructor (thread 7ab3f27d3000)
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker constructor (thread 794a6f297000)
 YOLOv8Worker set to CUDA device: 0
 [YOLOv8 MODEL INFO] YOLO_Worker_Cam_2010096 expects input size: 2272x2272
 YOLOv8Worker for YOLO_Worker_Cam_2010096 initialized successfully.
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker constructor (thread 7ab3f27d3000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker constructor (thread 794a6f297000)
 Creating GPUVideoEncoder for camera 2010096 with codec: hevc, preset: p1, tuning: ll
-[CUDA_CTX] [Thread 7ab3f27d3000] === GPU Video Encoder Constructor START === | Current context: 0x625d6427dd70
+[CUDA_CTX] [Thread 794a6f297000] === GPU Video Encoder Constructor START === | Current context: 0x567619b27d60
 [GPUVideoEncoder] Constructor for GPUEncoder_Cam_2010096 on GPU 0
 [GPUVideoEncoder] NATIVE RESOLUTION MODE: 4512x4512
-[CUDA_CTX] [Thread 7ab3f27d3000] Pushing CUDA context in constructor | Current context: 0x625d6427dd70
-[CUDA_STATE] Constructor - After context push | Thread: 7ab3f27d3000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 43280MB | Total mem: 48674MB
-[CUDA_CTX] [Thread 7ab3f27d3000] Creating NVIDIA encoder | Current context: 0x625d6427dd70
-[CUDA_CTX] [Thread 7ab3f27d3000] NVIDIA encoder created successfully | Current context: 0x625d6427dd70
+[CUDA_CTX] [Thread 794a6f297000] Pushing CUDA context in constructor | Current context: 0x567619b27d60
+[CUDA_STATE] Constructor - After context push | Thread: 794a6f297000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 43291MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794a6f297000] Creating NVIDIA encoder | Current context: 0x567619b27d60
+[CUDA_CTX] [Thread 794a6f297000] NVIDIA encoder created successfully | Current context: 0x567619b27d60
 [GPUVideoEncoder] Native resolution 4512x4512 with encoder pitch: 4608
 [GPUVideoEncoder] Successfully initialized NATIVE RESOLUTION encoder for GPUEncoder_Cam_2010096 - Codec: hevc, Preset: p1, Tuning: ll
-[CUDA_CTX] [Thread 7ab3f27d3000] Popping CUDA context in constructor | Current context: 0x625d6427dd70
-[CUDA_CTX] [Thread 7ab3f27d3000] === GPU Video Encoder Constructor END === | Current context: 0x625d6427dd70
+[CUDA_CTX] [Thread 794a6f297000] Popping CUDA context in constructor | Current context: 0x567619b27d60
+[CUDA_CTX] [Thread 794a6f297000] === GPU Video Encoder Constructor END === | Current context: 0x567619b27d60
 GPUVideoEncoder created for 2010096
 Child Thread Start 0
 Child Thread Start 0
 Child Thread Start 0
 Starting acquisition loop for camera 2010096
-[CUDA_CTX] [Thread 7ab2167fc000] === ACQUIRE FRAMES START === | Current context: 0
-[CUDA_STATE] Acquire frames startup | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40796MB | Total mem: 48674MB
-[CUDA_RT] [Thread 7ab2167fc000] Set device to 0 | Device: 0 | Context: 0x625d6430c720
-[CUDA_STREAM] [Thread 7ab2167fc000] Created acquisition stream | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 1 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 1 | Copying camera frame to worker buffer | Ptr: 0x7ab3a2600000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 1 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 1 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 1) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] === ACQUIRE FRAMES START === | Current context: 0
+[CUDA_STATE] Acquire frames startup | Thread: 794816ffd000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40807MB | Total mem: 48674MB
+[CUDA_RT] [Thread 794816ffd000] Set device to 0 | Device: 0 | Context: 0x567619bb6720
+[CUDA_STREAM] [Thread 794816ffd000] Created acquisition stream | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 1 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 1 | Copying camera frame to worker buffer | Ptr: 0x794a22600000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 1 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 1 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 1) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 1 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
   - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
   - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 1 | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 2 for frame 1 | Current context: 0x567619bb6720
 [ACQUIRE 2010096] Dispatching frame 1 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 1 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 1 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 2 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 2 | Copying camera frame to worker buffer | Ptr: 0x7ab3a6c00000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 2 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 2 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 2) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 1 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 2 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 2 | Copying camera frame to worker buffer | Ptr: 0x794a26c00000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 2 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 2 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 2) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 2 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
   - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
   - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 2 | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 2 for frame 2 | Current context: 0x567619bb6720
 [ACQUIRE 2010096] Dispatching frame 2 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 2 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 2 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 3 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 3 | Copying camera frame to worker buffer | Ptr: 0x7ab38a000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 3 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 3 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 3) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 2 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 3 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 3 | Copying camera frame to worker buffer | Ptr: 0x794a0a000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 3 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 3 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 3) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 3 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
   - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
   - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 3 | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 2 for frame 3 | Current context: 0x567619bb6720
 [ACQUIRE 2010096] Dispatching frame 3 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 3 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 3 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-YOLO_Worker_Cam_2010096 Inference FPS: 2.76377 (Queue: 0)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 4 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 4 | Copying camera frame to worker buffer | Ptr: 0x7ab388000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 4 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 4 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 4) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 3 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+YOLO_Worker_Cam_2010096 Inference FPS: 2.81016 (Queue: 0)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 4 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 4 | Copying camera frame to worker buffer | Ptr: 0x794a08000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 4 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 4 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 4) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 4 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
   - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
   - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 4 | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 2 for frame 4 | Current context: 0x567619bb6720
 [ACQUIRE 2010096] Dispatching frame 4 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 4 dispatched successfully
-[CTX_SCOPE] Pushed context [CUDA_CTX] [Thread 0x625d6427dd700x7ab2167fc000 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-] Frame 4 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 5 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 5 | Copying camera frame to worker buffer | Ptr: 0x7ab386000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 5 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 5 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 5) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 4 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 5 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 5 | Copying camera frame to worker buffer | Ptr: 0x794a06000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 5 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 5 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 5) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 5 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
   - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
   - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 5 | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 2 for frame 5 | Current context: 0x567619bb6720
 [ACQUIRE 2010096] Dispatching frame 5 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 5 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 5 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 6 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 6 | Copying camera frame to worker buffer | Ptr: 0x7ab384000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 6 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 6 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 6) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 5 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 6 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 6 | Copying camera frame to worker buffer | Ptr: 0x794a04000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 6 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 6 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 6) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 6 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
   - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
   - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 6 | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 2 for frame 6 | Current context: 0x567619bb6720
 [ACQUIRE 2010096] Dispatching frame 6 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 6 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 6 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 7 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 7 | Copying camera frame to worker buffer | Ptr: 0x7ab382000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 7 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 7 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 7) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 6 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+Recording toggled ON.
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 7 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 7 | Copying camera frame to worker buffer | Ptr: 0x794a02000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 7 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 7 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 7) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 7 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 7 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 7 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 3 for frame 7 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 7 to 3 consumers:
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 7) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40649MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 7 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 7 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 8 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 8 | Copying camera frame to worker buffer | Ptr: 0x7ab380000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 8 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 8 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 8) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 7 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | === ENTERING WorkerFunction === | Device: 0 | Context: 0
+[CUDA_STATE] WorkerFunction Entry (Frame 7) | Thread: 7948acf75000 | Device: 0 | Context: 0 | Free mem: 40649MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder_Cam_2010096] Encoding FPS: 0.707933 (Queue depth: 0)
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 7 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 7948acf75000] Frame 7 | Copying frame data from entry | Ptr: 0x794a02000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 7948acf75000] Frame 7 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 7948acf75000] Frame 7 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 7) | Thread: 7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40649MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 7...
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 7 encoded successfully
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 7948acf75000] Frame 7 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 7948c0a26000)
+[CUDA_CTX] [Thread 794816ffd000] === FRAME 8 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 794816ffd000] Frame 8 | Copying camera frame to worker buffer | Ptr: 0x794a00000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 794816ffd000] Frame 8 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Frame 8 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 8) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 8 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 8 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 8 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 794816ffd000] Setting ref_count to 3 for frame 8 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 8 to 3 consumers:
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 8) | Thread: 794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 8 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 8 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-YOLO_Worker_Cam_2010096 Inference FPS: 4.996 (Queue: 0)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 9 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 9 | Copying camera frame to worker buffer | Ptr: 0x7ab37e000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 9 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 9 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 9) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 794816ffd000] Frame 8 dispatched successfully | Current context: 0x567619bb6720
+[ENCODER_CTX] [Thread 7948acf75000] Frame 8 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CUDA_STATE] WorkerFunction Entry (Frame 8) | Thread: 7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 7948acf75000] Frame 8 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 7948acf75000] Frame 8 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 7948acf75000] Frame 8 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 8 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 7948acf75000] Frame 8 | Copying frame data from entry | Ptr: 0x794a00000000 | Size: 20358144 | Context: [CTX_SCOPE] Pushed context 0x567619b27d60
+0x567619b27d60[ENCODER_CTX] [Thread  at 0x7948acf75000YOLOv8Worker::WorkerFunction]  (thread Frame 0x80x7948c0a26000 | About to copy frame data | Device: )0
+ | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 8 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 8 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 8) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 8...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 8 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 8 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+YOLO_Worker_Cam_2010096 Inference FPS: 4.99151 (Queue: 0)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 9 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 9 | Copying camera frame to worker buffer | Ptr: 0x7949fe000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 9 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 9 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 9) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 9 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 9 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 9 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 3 for frame 9 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 9 to 3 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 9) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 0x794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 9 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 9 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 10 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 10 | Copying camera frame to worker buffer | Ptr: 0x7ab37c000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 10 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 10 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 10) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 9 dispatched successfully | Current context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_STATE] WorkerFunction Entry (Frame 9) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 9 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 9 | Copying frame data from entry | Ptr: 0x7949fe000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 9 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 9 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 9) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 9...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 9 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 9 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 10 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 10 | Copying camera frame to worker buffer | Ptr: 0x7949fc000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 10 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 10 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 10) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 10 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 10 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 10 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 3 for frame 10 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 10 to 3 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 10) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 0x794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 10 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 10 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 11 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 11 | Copying camera frame to worker buffer | Ptr: 0x7ab37a000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 11 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 11 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 11) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 10 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CUDA_STATE] WorkerFunction Entry (Frame 10) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 10 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 10 | Copying frame data from entry | Ptr: 0x7949fc000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 10 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 10 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 10) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 10...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 10 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 10 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 11 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 11 | Copying camera frame to worker buffer | Ptr: 0x7949fa000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 11 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 11 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 11) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 11 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 11 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 11 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 3 for frame 11 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 11 to 3 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 11) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 0x794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 11 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 11 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 12 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 12 | Copying camera frame to worker buffer | Ptr: 0x7ab378000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 12 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 12 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 12) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40638MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 11 dispatched successfully | Current context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_STATE] WorkerFunction Entry (Frame 11) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 11 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 11 | Copying frame data from entry | Ptr: 0x7949fa000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 11 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 11 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 11) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 11...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 11 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 11 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 12 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 12 | Copying camera frame to worker buffer | Ptr: 0x7949f8000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 12 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 12 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 12) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 12 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 12 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 12 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 3 for frame 12 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 12 to 3 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 12) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 0x794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 12 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 12 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 13 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 13 | Copying camera frame to worker buffer | Ptr: 0x7ab376000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 13 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 13 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 13) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40650MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 12 dispatched successfully | Current context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_STATE] WorkerFunction Entry (Frame 12) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 12 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 12 | Copying frame data from entry | Ptr: 0x7949f8000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 12 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 12 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 12) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 12...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 12 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 12 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 13 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 13 | Copying camera frame to worker buffer | Ptr: 0x7949f6000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 13 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 13 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 13) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 13 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 13 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 13 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 3 for frame 13 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 13 to 3 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 13) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 0x794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 13 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 13 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 14 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 14 | Copying camera frame to worker buffer | Ptr: 0x7ab374000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 14 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 14 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 14) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40650MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 13 dispatched successfully | Current context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_STATE] WorkerFunction Entry (Frame 13) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder_Cam_2010096] Encoding FPS: 5.00421 (Queue depth: 0)
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 13 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 13 | Copying frame data from entry | Ptr: 0x7949f6000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 13 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 13 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 13) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 13...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 13 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 13 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 14 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 14 | Copying camera frame to worker buffer | Ptr: 0x7949f4000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 14 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 14 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 14) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 14 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 14 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 14 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 3 for frame 14 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 14 to 3 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 14) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 0x794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 14 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 14 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-YOLO_Worker_Cam_2010096 Inference FPS: 5.00004 (Queue: 0)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 15 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 15 | Copying camera frame to worker buffer | Ptr: 0x7ab372000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 15 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 15 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 15) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40650MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 14 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CUDA_STATE] WorkerFunction Entry (Frame 14) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 14 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 14 | Copying frame data from entry | Ptr: 0x7949f4000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 14 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 14 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 14) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 14...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 14 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 14 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+YOLO_Worker_Cam_2010096 Inference FPS: 5.00039 (Queue: 0)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 15 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 15 | Copying camera frame to worker buffer | Ptr: 0x7949f2000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 15 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 15 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 15) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 15 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
+  - record_video: true, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 15 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 15 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 3
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 3 for frame 15 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 15 to 3 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x567619bb6720
+[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 15) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+  -> Sending to GPU Encoder
+[CUDA_CTX] [Thread 0x794816ffd000] GPU Encoder dispatch completed | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 15 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 15 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-Recording toggled ON.
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 16 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 16 | Copying camera frame to worker buffer | Ptr: 0x7ab370000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 16 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 16 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 16) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40650MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 15 dispatched successfully | Current context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_STATE] WorkerFunction Entry (Frame 15) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | About to push CUDA context | Device: 0 | Context: 0x567619bb6720
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | Setting NPP stream | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | Processing frame dimensions | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] NATIVE RESOLUTION - Processing frame 15 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 15 | Copying frame data from entry | Ptr: 0x7949f2000000 | Size: 20358144 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | About to copy frame data | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | Processing MONOCHROME frame | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Processing MONOCHROME frame at native resolution...
+[GPUEncoder] Direct copy at native resolution:
+  - Y plane: 0x794894000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
+[CUDA_MEM] [Thread 0x7948acf75000] Frame 15 | Converting to IYUV | Ptr: 0x794894000000 | Size: 31186944 | Context: 0x567619b27d60
+[GPUEncoder] Native resolution IYUV planes created successfully
+[GPUEncoder] NATIVE RESOLUTION encoding:
+  - Source: 4512x4512
+  - Encoder: 4512x4512
+  - Pitch match: YES
+[CUDA_SYNC] [Thread 0x7948acf75000] Frame 15 | Synchronizing stream before encode | Stream: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | Synchronizing stream before encode | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Synchronizing stream before encode...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x567619b27d60
+[CUDA_STATE] Pre-EncodeFrame (Frame 15) | Thread: 0x7948acf75000 | Device: 0 | Context: 0x567619b27d60 | Free mem: 40589MB | Total mem: 48674MB
+[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 15...
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | EncodeFrame completed successfully | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | Processing encoded packets | Device: 0 | Context: 0x567619b27d60
+[GPUEncoder] Frame 15 encoded successfully
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | Handling reference count | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | Popping CUDA context | Device: 0 | Context: 0x567619b27d60
+[ENCODER_CTX] [Thread 0x7948acf75000] Frame 15 | === EXITING WorkerFunction === | Device: 0 | Context: 0x567619bb6720
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+Recording toggled OFF.
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 16 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 16 | Copying camera frame to worker buffer | Ptr: 0x7949f0000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 16 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 16 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 16) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 16 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 16 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 16 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 16 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 16 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 16) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40650MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 16 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 16 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | === ENTERING WorkerFunction === | Device: 0 | Context: 0
-[CUDA_STATE] WorkerFunction Entry (Frame 16) | Thread: 7ab222e61000 | Device: 0 | Context: 0 | Free mem: 40650MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 16) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder_Cam_2010096] Encoding FPS: 0.310808 (Queue depth: 0)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 16 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 16 | Copying frame data from entry | Ptr: 0x7ab370000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 16 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 16 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 16) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40650MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 16...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 16 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 16) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 16 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 17 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 17 | Copying camera frame to worker buffer | Ptr: 0x7ab36e000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 17 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 17 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 17) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 16 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 17 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 17 | Copying camera frame to worker buffer | Ptr: 0x7949ee000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 17 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 17 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 17) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 17 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 17 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 17 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 17 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 17 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 17) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 17 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 17 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context [ENCODER_CTX] [Thread 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab222e610007ab230f75000] Frame )17
- | === ENTERING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CUDA_STATE] WorkerFunction Entry (Frame 17) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 17) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 17 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 17 | Copying frame data from entry | Ptr: 0x7ab36e000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 17 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 17 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 17) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 17...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 17 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 17) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 17 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 18 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 18 | Copying camera frame to worker buffer | Ptr: 0x7ab36c000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 18 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 18 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 18) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 17 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 18 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 18 | Copying camera frame to worker buffer | Ptr: 0x7949ec000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 18 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 18 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 18) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 18 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 18 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 18 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 18 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 18 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 18) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 18 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 18 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context [ENCODER_CTX] [Thread 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 134905508270080] Frame 134905744281600)18 | === ENTERING WorkerFunction ===
- | Device: 0 | Context: 0x625d6430c720
-[CUDA_STATE] WorkerFunction Entry (Frame 18) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 18) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 18 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 18 | Copying frame data from entry | Ptr: 0x7ab36c000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 18 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 18 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 18) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 18...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 18 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 18) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 18 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 19 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 19 | Copying camera frame to worker buffer | Ptr: 0x7ab36a000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 19 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 19 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 19) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 18 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 19 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 19 | Copying camera frame to worker buffer | Ptr: 0x7949ea000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 19 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 19 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 19) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 19 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 19 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 19 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 19 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 19 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 19) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 19 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 19 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context [ENCODER_CTX] [Thread 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab222e610007ab230f75000] Frame 19) | === ENTERING WorkerFunction === | Device: 0
- | Context: 0x625d6430c720
-[CUDA_STATE] WorkerFunction Entry (Frame 19) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 19) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 19 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 19 | Copying frame data from entry | Ptr: 0x7ab36a000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 19 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 19 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 19) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 19...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 19 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 19) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 19 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-YOLO_Worker_Cam_2010096 Inference FPS: 4.99442 (Queue: 0)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 20 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 20 | Copying camera frame to worker buffer | Ptr: 0x7ab368000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 20 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 20 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 20) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 19 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 20 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 20 | Copying camera frame to worker buffer | Ptr: 0x7949e8000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 20 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 20 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 20) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 20 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 20 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 20 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 20 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 20 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 20) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 20 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 20 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at [ENCODER_CTX] [Thread YOLOv8Worker::WorkerFunction (thread 7ab222e610007ab230f75000] Frame )20 | 
-=== ENTERING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CUDA_STATE] WorkerFunction Entry (Frame 20) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 20) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 20 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 20 | Copying frame data from entry | Ptr: 0x7ab368000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 20 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 20 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 20) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 20...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 20 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 20) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 20 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 21 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 21 | Copying camera frame to worker buffer | Ptr: 0x7ab366000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 21 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 21 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 21) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 20 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+YOLO_Worker_Cam_2010096 Inference FPS: 5.00066 (Queue: 0)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 21 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 21 | Copying camera frame to worker buffer | Ptr: 0x7949e6000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 21 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 21 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 21) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 21 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 21 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 21 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 21 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 21 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 21) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 21 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 21 dispatched successfully | Current context: 0x625d6430c720
-[ENCODER_CTX] [Thread [CTX_SCOPE] Pushed context 7ab222e61000] Frame 0x625d6427dd70 at 21YOLOv8Worker::WorkerFunction (thread  | === ENTERING WorkerFunction === | Device: 0 | Context: 7ab230f750000x625d6430c720)
-
-[CUDA_STATE] WorkerFunction Entry (Frame 15) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 21) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 21 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 21 | Copying frame data from entry | Ptr: 0x7ab366000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 21 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 21 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 21) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 21...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 21 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 21) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 21 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 22 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 22 | Copying camera frame to worker buffer | Ptr: 0x7ab364000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 22 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 22 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 22) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 21 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 22 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 22 | Copying camera frame to worker buffer | Ptr: 0x7949e4000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 22 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 22 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 22) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 22 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 22 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 22 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 22 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 22 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 22) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 22 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 22 dispatched successfully | Current context: 0x625d6430c720
-[ENCODER_CTX] [Thread [CTX_SCOPE] Pushed context 7ab222e61000] Frame 0x160x625d6427dd70 | === ENTERING WorkerFunction === | Device:  at 0 | Context: YOLOv8Worker::WorkerFunction (thread 0x625d6430c7200x7ab230f75000)
-
-[CUDA_STATE] WorkerFunction Entry (Frame 22) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 22) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder_Cam_2010096] Encoding FPS: 4.9992 (Queue depth: 0)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 22 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 22 | Copying frame data from entry | Ptr: 0x7ab364000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 22 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 22 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 22) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 22...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 22 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 22) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 22 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 23 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 23 | Copying camera frame to worker buffer | Ptr: 0x7ab362000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 23 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 23 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 23) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 22 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 23 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 23 | Copying camera frame to worker buffer | Ptr: 0x7949e2000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 23 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 23 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 23) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 23 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 23 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 23 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 23 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 23 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 23) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 23 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 23 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | === ENTERING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CUDA_STATE] WorkerFunction Entry (Frame 23) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 23) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 23 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 23 | Copying frame data from entry | Ptr: 0x7ab362000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 23 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 23 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 23) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 23...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 23 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 23) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 23 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 24 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 24 | Copying camera frame to worker buffer | Ptr: 0x7ab360000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 24 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 24 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 24) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 23 dispatched successfully | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
+STOPPING STREAMING SESSION...
+[CUDA_CTX] [Thread 0x794816ffd000] === FRAME 24 PROCESSING === | Current context: 0x567619bb6720
+[CUDA_MEM] [Thread 0x794816ffd000] Frame 24 | Copying camera frame to worker buffer | Ptr: 0x7949e0000000 | Size: 20358144 | Context: 0x567619bb6720
+[CUDA_SYNC] [Thread 0x794816ffd000] Frame 24 | Synchronizing stream after camera copy | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 24 dispatch analysis | Current context: 0x567619bb6720
+[CUDA_STATE] Before frame dispatch (Frame 24) | Thread: 0x794816ffd000 | Device: 0 | Context: 0x567619bb6720 | Free mem: 40589MB | Total mem: 48674MB
 [ACQUIRE 2010096] Frame 24 dispatch analysis:
   - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
+  - record_video: false, gpu_encoder: valid
   - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 24 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 24 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
+  - Total dispatch_count: 2
+[CUDA_CTX] [Thread 0x794816ffd000] Setting ref_count to 2 for frame 24 | Current context: 0x567619bb6720
+[ACQUIRE 2010096] Dispatching frame 24 to 2 consumers:
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to OpenGL Display | Current context: 0x567619bb6720
   -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 24) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Dispatching to YOLO Worker | Current context: 0x567619bb6720
   -> Sending to YOLO Worker
 [ACQUIRE 2010096] Frame 24 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 24 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context [ENCODER_CTX] [Thread 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 134905508270080] Frame 134905744281600)24
- | === ENTERING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CUDA_STATE] WorkerFunction Entry (Frame 24) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 24) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 24 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 24 | Copying frame data from entry | Ptr: 0x7ab360000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 24 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 24 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 24) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 24...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 24 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 24) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 24 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 25 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 25 | Copying camera frame to worker buffer | Ptr: 0x7ab35e000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 25 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 25 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 25) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 25 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 25 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 25 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 25) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 25 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 25 dispatched successfully | Current context: 0x625d6430c720
-[ENCODER_CTX] [Thread [CTX_SCOPE] Pushed context 7ab222e61000] 108153251814768Frame  at 19 | YOLOv8Worker::WorkerFunction (thread === ENTERING WorkerFunction === | Device: 7ab230f750000) | Context: 
-0x625d6430c720
-[CUDA_STATE] WorkerFunction Entry (Frame 25) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 25) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 25 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 25 | Copying frame data from entry | Ptr: 0x7ab35e000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 25 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 25 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 25) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 25...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 25 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 25) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 25 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-YOLO_Worker_Cam_2010096 Inference FPS: 5.00176 (Queue: 0)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 26 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 26 | Copying camera frame to worker buffer | Ptr: 0x7ab35c000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 26 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 26 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 26) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 26 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: true, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 3
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 3 for frame 26 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 26 to 3 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to GPU Encoder - CRITICAL DISPATCH | Current context: 0x625d6430c720
-[CUDA_STATE] Pre-GPU-Encoder-Dispatch (Frame 26) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-  -> Sending to GPU Encoder
-[CUDA_CTX] [Thread 7ab2167fc000] GPU Encoder dispatch completed | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 26 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 26 dispatched successfully | Current context: 0x625d6430c720
-[ENCODER_CTX] [Thread [CTX_SCOPE] Pushed context 7ab222e61000] Frame 0x1a0x625d6427dd70 | === ENTERING WorkerFunction === at YOLOv8Worker::WorkerFunction (thread  | Device: 7ab230f750000) | Context: 0x625d6430c720
+[CUDA_CTX] [Thread 0x794816ffd000] Frame 24 dispatched successfully | Current context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] === ACQUIRE FRAMES CLEANUP === | Current context: 0x567619bb6720
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
 
-[CUDA_STATE] WorkerFunction Entry (Frame 26) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | About to push CUDA context | Device: 0 | Context: 0x625d6430c720
-[CTX_PUSH] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (Frame 26) | Before: 0x625d6430c720 | Pushing: 0x625d6427dd70 | After: 0x625d6427dd70 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Setting NPP stream | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Processing frame dimensions | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] NATIVE RESOLUTION - Processing frame 26 - Dimensions: 4512x4512 (no resizing, pitch: 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 26 | Copying frame data from entry | Ptr: 0x7ab35c000000 | Size: 20358144 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | About to copy frame data | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab280c00000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Processing MONOCHROME frame | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Processing MONOCHROME frame at native resolution...
-[GPUEncoder] Direct copy at native resolution:
-  - Y plane: 0x7ab218000000 (copy 4512x4512 with src pitch 4512 -> dst pitch 4608)
-[CUDA_MEM] [Thread 7ab222e61000] Frame 26 | Converting to IYUV | Ptr: 0x7ab218000000 | Size: 31186944 | Context: 0x625d6427dd70
-[GPUEncoder] Native resolution IYUV planes created successfully
-[GPUEncoder] NATIVE RESOLUTION encoding:
-  - Source: 4512x4512
-  - Encoder: 4512x4512
-  - Pitch match: YES
-[CUDA_SYNC] [Thread 7ab222e61000] Frame 26 | Synchronizing stream before encode | Stream: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Synchronizing stream before encode | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Synchronizing stream before encode...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | About to call NVIDIA EncodeFrame - CRITICAL POINT | Device: 0 | Context: 0x625d6427dd70
-[CUDA_STATE] Pre-EncodeFrame (Frame 26) | Thread: 7ab222e61000 | Device: 0 | Context: 0x625d6427dd70 | Free mem: 40590MB | Total mem: 48674MB
-[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame 26...
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | EncodeFrame completed successfully | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Processing encoded packets | Device: 0 | Context: 0x625d6427dd70
-[GPUEncoder] Frame 26 encoded successfully
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Handling reference count | Device: 0 | Context: 0x625d6427dd70
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | Popping CUDA context | Device: 0 | Context: 0x625d6427dd70
-[CTX_POP] [Thread 7ab222e61000] GPUVideoEncoder::WorkerFunction (normal exit) (Frame 26) | Before: 0x625d6427dd70 | Popped: 0x625d6427dd70 | After: 0x625d6430c720 | Result: SUCCESS
-[ENCODER_CTX] [Thread 7ab222e61000] Frame 26 | === EXITING WorkerFunction === | Device: 0 | Context: 0x625d6430c720
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-Recording toggled OFF.
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 27 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 27 | Copying camera frame to worker buffer | Ptr: 0x7ab35a000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 27 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 27 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 27) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 27 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 27 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 27 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 27 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 27 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 28 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 28 | Copying camera frame to worker buffer | Ptr: 0x7ab358000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 28 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 28 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 28) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 28 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 28 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 28 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 28 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 28 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 29 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 29 | Copying camera frame to worker buffer | Ptr: 0x7ab356000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 29 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 29 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 29) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 29 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 29 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 29 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 29 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 29 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 30 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 30 | Copying camera frame to worker buffer | Ptr: 0x7ab354000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 30 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 30 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 30) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 30 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 30 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 30 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 30 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 30 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 31 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 31 | Copying camera frame to worker buffer | Ptr: 0x7ab352000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 31 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 31 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 31) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 31 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 31 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 31 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 31 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 31 dispatched successfully | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-YOLO_Worker_Cam_2010096 Inference FPS: 5.00586 (Queue: 0)
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-STOPPING STREAMING SESSION...
-[CUDA_CTX] [Thread 7ab2167fc000] === FRAME 32 PROCESSING === | Current context: 0x625d6430c720
-[CUDA_MEM] [Thread 7ab2167fc000] Frame 32 | Copying camera frame to worker buffer | Ptr: 0x7ab350000000 | Size: 20358144 | Context: 0x625d6430c720
-[CUDA_SYNC] [Thread 7ab2167fc000] Frame 32 | Synchronizing stream after camera copy | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 32 dispatch analysis | Current context: 0x625d6430c720
-[CUDA_STATE] Before frame dispatch (Frame 32) | Thread: 7ab2167fc000 | Device: 0 | Context: 0x625d6430c720 | Free mem: 40590MB | Total mem: 48674MB
-[ACQUIRE 2010096] Frame 32 dispatch analysis:
-  - stream_on: true, openGLDisplay: valid
-  - record_video: false, gpu_encoder: valid
-  - yolo: true, yolo_worker: valid
-  - Total dispatch_count: 2
-[CUDA_CTX] [Thread 7ab2167fc000] Setting ref_count to 2 for frame 32 | Current context: 0x625d6430c720
-[ACQUIRE 2010096] Dispatching frame 32 to 2 consumers:
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to OpenGL Display | Current context: 0x625d6430c720
-  -> Sending to OpenGL Display
-[CUDA_CTX] [Thread 7ab2167fc000] Dispatching to YOLO Worker | Current context: 0x625d6430c720
-  -> Sending to YOLO Worker
-[ACQUIRE 2010096] Frame 32 dispatched successfully
-[CUDA_CTX] [Thread 7ab2167fc000] Frame 32 dispatched successfully | Current context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] === ACQUIRE FRAMES CLEANUP === | Current context: 0x625d6430c720
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
-
-2010096, Frame count: 32, Frame received: 32, Dropped Frames: 0, Calculated Frame Rate: 5.153109
-[CUDA_STREAM] [Thread 7ab2167fc000] Destroying acquisition stream | Stream: 0x7ab190000e80 | Context: 0x625d6430c720
-[CUDA_CTX] [Thread 7ab2167fc000] === ACQUIRE FRAMES END === | Current context: 0
+2010096, Frame count: 24, Frame received: 24, Dropped Frames: 0, Calculated Frame Rate: 5.206243
+[CUDA_STREAM] [Thread 0x794816ffd000] Destroying acquisition stream | Stream: 0x794810000e80 | Context: 0x567619bb6720
+[CUDA_CTX] [Thread 0x794816ffd000] === ACQUIRE FRAMES END === | Current context: 0
 Acquire frames thread finished for camera: 2010096
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker::WorkerFunction (thread 7ab230f75000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker::WorkerFunction (thread 0x7948c0a26000)
 Child Thread DONE 0
 Child Thread DONE 0
 Child Thread DONE 0
 YOLOv8Worker destructor for YOLO_Worker_Cam_2010096
-[CTX_SCOPE] Pushed context 0x625d6427dd70 at YOLOv8Worker destructor (thread 7ab3f27d3000)
+[CTX_SCOPE] Pushed context 0x567619b27d60 at YOLOv8Worker destructor (thread 0x794a6f297000)
 YOLOv8Worker destructor complete for YOLO_Worker_Cam_2010096
-[CTX_SCOPE] Popped context 0x625d6430c720 at YOLOv8Worker destructor (thread 7ab3f27d3000)
+[CTX_SCOPE] Popped context 0x567619bb6720 at YOLOv8Worker destructor (thread 0x794a6f297000)
 [GPUVideoEncoder] Destructor for GPUEncoder_Cam_2010096
 
 Close Camera: 		Camera Closed

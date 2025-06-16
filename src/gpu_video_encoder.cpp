@@ -225,148 +225,157 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 
     // Context management with debug logging
     ENCODER_CTX_LOG("About to push CUDA context", entry->frame_id);
-    CUresult push_result = cuCtxPushCurrentDebug(m_cuContext, "GPUVideoEncoder::WorkerFunction", entry->frame_id);
+    CUresult push_result = cuCtxPushCurrent(m_cuContext);
     if (push_result != CUDA_SUCCESS) {
         ENCODER_CTX_LOG("FAILED to push CUDA context!", entry->frame_id);
+        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { 
+            m_recycle_queue.push(entry); 
+        }
         return false;
     }
-    
-    ENCODER_CTX_LOG("Setting NPP stream", entry->frame_id);
-    nppSetStream(m_stream);
 
-    const int width = camera_params->width;
-    const int height = camera_params->height;
-
-    // FPS tracking (existing code)
-    frame_counter_++;
-    auto now = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed = now - last_fps_update_time_;
-    if (elapsed.count() >= 1.0) {
-        current_fps_ = frame_counter_ / elapsed.count();
-        std::cout << "[" << this->threadName << "] Encoding FPS: " << current_fps_
-                  << " (Queue depth: " << this->GetCountQueueInSize() << ")" << std::endl;
-        frame_counter_ = 0;
-        last_fps_update_time_ = now;
-    }
-
-    ENCODER_CTX_LOG("Processing frame dimensions", entry->frame_id);
-    std::cout << "[GPUEncoder] NATIVE RESOLUTION - Processing frame " << entry->frame_id 
-              << " - Dimensions: " << width << "x" << height 
-              << " (no resizing, pitch: " << encoder_pitch_ << ")" << std::endl;
-
-    // Memory copy with detailed logging
-    CUDA_MEM_LOG("Copying frame data from entry", entry->d_image, width * height, entry->frame_id);
-    ENCODER_CTX_LOG("About to copy frame data", entry->frame_id);
-    ck(cudaMemcpyAsync(frame_original.d_orig, entry->d_image, 
-                       (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
-    VALIDATE_CUDA_OP("cudaMemcpyAsync (frame data)", entry->frame_id);
-
-    // Monochrome processing
-    ENCODER_CTX_LOG("Processing MONOCHROME frame", entry->frame_id);
-    std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
-    
-    // Color conversion for MONOCHROME
-    std::cout << "[GPUEncoder] Direct copy at native resolution:" << std::endl;
-    std::cout << "  - Y plane: " << static_cast<void*>(frame_original.d_orig) 
-              << " (copy " << width << "x" << height << " with src pitch " << width 
-              << " -> dst pitch " << encoder_pitch_ << ")" << std::endl;
-
-              ENCODER_CTX_LOG("Processing MONOCHROME frame", entry->frame_id);
-              std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
-              
-              // Create IYUV format directly from native resolution data
-              unsigned char* d_y_plane_dst = d_iyuv_temp_;
-              unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
-              unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)encoder_pitch_ * height / 4);
-              
-              std::cout << "[GPUEncoder] Direct copy at native resolution:" << std::endl;
-              std::cout << "  - Y plane: " << static_cast<void*>(d_y_plane_dst) 
-                        << " (copy " << width << "x" << height 
-                        << " with src pitch " << width << " -> dst pitch " << encoder_pitch_ << ")" << std::endl;
-          
-              CUDA_MEM_LOG("Converting to IYUV", d_iyuv_temp_, encoder_pitch_ * height * 3 / 2, entry->frame_id);
-              
-              // Copy Y plane with pitch conversion (native width to encoder pitch)
-              ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,
-                                  frame_original.d_orig, width,
-                                  width, height,
-                                  cudaMemcpyDeviceToDevice, m_stream));
-          
-              ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
-              ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
-              
-              VALIDATE_CUDA_OP("IYUV conversion operations", entry->frame_id);
-          
-              std::cout << "[GPUEncoder] Native resolution IYUV planes created successfully" << std::endl;
-
-    std::cout << "[GPUEncoder] NATIVE RESOLUTION encoding:" << std::endl;
-    std::cout << "  - Source: " << width << "x" << height << std::endl;
-    std::cout << "  - Encoder: " << width << "x" << height << std::endl;
-    std::cout << "  - Pitch match: YES" << std::endl;
-
-    // Stream synchronization with logging
-    CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
-    ENCODER_CTX_LOG("Synchronizing stream before encode", entry->frame_id);
-    std::cout << "[GPUEncoder] Synchronizing stream before encode..." << std::endl;
-    ck(cudaStreamSynchronize(m_stream));
-    VALIDATE_CUDA_OP("cudaStreamSynchronize (before encode)", entry->frame_id);
-
-    // CRITICAL: Log state right before NVIDIA encoder call
-    ENCODER_CTX_LOG("About to call NVIDIA EncodeFrame - CRITICAL POINT", entry->frame_id);
-    dumpCudaState("Pre-EncodeFrame", entry->frame_id);
-    
-    // Validate context is still correct
-    CUcontext current_ctx = nullptr;
-    cuCtxGetCurrent(&current_ctx);
-    if (current_ctx != m_cuContext) {
-        ENCODER_CTX_LOG("ERROR: Context mismatch before EncodeFrame!", entry->frame_id);
-        std::cerr << "[CONTEXT ERROR] Expected: " << static_cast<void*>(m_cuContext) 
-                  << " | Actual: " << static_cast<void*>(current_ctx) << std::endl;
-    }
-
-    // The critical NVIDIA encoder call
-    std::cout << "[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame " << entry->frame_id << "..." << std::endl;
-    
     try {
-        // Clear any previous CUDA errors
-        cudaGetLastError();
+        ENCODER_CTX_LOG("Setting NPP stream", entry->frame_id);
+        nppSetStream(m_stream);
+
+        const int width = camera_params->width;
+        const int height = camera_params->height;
+
+        // FPS tracking
+        frame_counter_++;
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsed = now - last_fps_update_time_;
+        if (elapsed.count() >= 1.0) {
+            current_fps_ = frame_counter_ / elapsed.count();
+            std::cout << "[" << this->threadName << "] Encoding FPS: " << current_fps_
+                      << " (Queue depth: " << this->GetCountQueueInSize() << ")" << std::endl;
+            frame_counter_ = 0;
+            last_fps_update_time_ = now;
+        }
+
+        ENCODER_CTX_LOG("Processing frame dimensions", entry->frame_id);
+        std::cout << "[GPUEncoder] NATIVE RESOLUTION - Processing frame " << entry->frame_id 
+                  << " - Dimensions: " << width << "x" << height 
+                  << " (no resizing, pitch: " << encoder_pitch_ << ")" << std::endl;
+
+        // Copy frame data from entry to local buffer
+        CUDA_MEM_LOG("Copying frame data from entry", entry->d_image, width * height, entry->frame_id);
+        ENCODER_CTX_LOG("About to copy frame data", entry->frame_id);
+        ck(cudaMemcpyAsync(frame_original.d_orig, entry->d_image, 
+                           (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
+
+        if (camera_params->color) {
+            // === COLOR PATH (existing logic) ===
+            ENCODER_CTX_LOG("Processing COLOR frame", entry->frame_id);
+            std::cout << "[GPUEncoder] Processing COLOR frame at native resolution..." << std::endl;
+            
+            // For color, we'd need to implement the full RGB->YUV pipeline
+            // This would involve debayering and color space conversion
+            // (Implementation would go here if needed)
+            
+        } else {
+            // === FIXED MONOCHROME PATH ===
+            ENCODER_CTX_LOG("Processing MONOCHROME frame", entry->frame_id);
+            std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
+            
+            // Calculate plane pointers with ENCODER PITCH
+            unsigned char* d_y_plane_dst = d_iyuv_temp_;
+            unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
+            unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)encoder_pitch_ * height / 4);
+            
+            std::cout << "[GPUEncoder] Direct copy at native resolution:" << std::endl;
+            std::cout << "  - Y plane: " << static_cast<void*>(d_y_plane_dst) 
+                      << " (copy " << width << "x" << height 
+                      << " with src pitch " << width << " -> dst pitch " << encoder_pitch_ << ")" << std::endl;
         
-        encoder.pEnc->EncodeFrame(encoder.vPacket, nullptr);
+            CUDA_MEM_LOG("Converting to IYUV", d_iyuv_temp_, encoder_pitch_ * height * 3 / 2, entry->frame_id);
+            
+            // CRITICAL FIX: Use cudaMemcpy2DAsync for proper pitch conversion
+            ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,              // dst, dst_pitch
+                                frame_original.d_orig, width,                // src, src_pitch  
+                                width, height,                               // width, height
+                                cudaMemcpyDeviceToDevice, m_stream));
+        
+            // CRITICAL FIX: Use encoder_pitch for U/V plane calculations
+            ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
+            ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
+            
+            std::cout << "[GPUEncoder] Native resolution IYUV planes created successfully" << std::endl;
+        }
+
+        std::cout << "[GPUEncoder] NATIVE RESOLUTION encoding:" << std::endl;
+        std::cout << "  - Source: " << width << "x" << height << std::endl;
+        std::cout << "  - Encoder: " << width << "x" << height << std::endl;
+        std::cout << "  - Pitch match: YES" << std::endl;
+
+        // Stream synchronization
+        CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
+        ENCODER_CTX_LOG("Synchronizing stream before encode", entry->frame_id);
+        std::cout << "[GPUEncoder] Synchronizing stream before encode..." << std::endl;
+        ck(cudaStreamSynchronize(m_stream));
+
+        // NVIDIA encoder call
+        ENCODER_CTX_LOG("About to call NVIDIA EncodeFrame - CRITICAL POINT", entry->frame_id);
+        dumpCudaState("Pre-EncodeFrame", entry->frame_id);
+        
+        std::cout << "[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame " << entry->frame_id << "..." << std::endl;
+        
+        // Get encoder input frame and copy our IYUV data to it
+        const NvEncInputFrame *encoderInputFrame = encoder.pEnc->GetNextInputFrame();
+        NvEncoderCuda::CopyToDeviceFrame(encoder.cuContext,
+                                         d_iyuv_temp_,
+                                         encoder_pitch_, 
+                                         (CUdeviceptr)encoderInputFrame->inputPtr,
+                                         encoderInputFrame->pitch,
+                                         encoder.pEnc->GetEncodeWidth(),
+                                         encoder.pEnc->GetEncodeHeight(),
+                                         CU_MEMORYTYPE_DEVICE,
+                                         encoderInputFrame->bufferFormat,
+                                         encoderInputFrame->chromaOffsets,
+                                         encoderInputFrame->numChromaPlanes);
+
+        // Encode the frame
+        encoder.pEnc->EncodeFrame(encoder.vPacket);
         
         ENCODER_CTX_LOG("EncodeFrame completed successfully", entry->frame_id);
-    }
-    catch (const std::exception& e) {
-        ENCODER_CTX_LOG("EncodeFrame threw exception", entry->frame_id);
-        std::cerr << "[ENCODER ERROR] Frame " << entry->frame_id << " | Exception: " << e.what() << std::endl;
-        dumpCudaState("Post-Exception", entry->frame_id);
+        ENCODER_CTX_LOG("Processing encoded packets", entry->frame_id);
+
+        // Push encoded packets to writer
+        for (std::vector<uint8_t> &packet : encoder.vPacket) {
+            writer.video->push_packet(packet.data(), (int)packet.size(), encoder.num_frame_encode++);
+        }
         
-        // Clean up and exit
+        // Write metadata
+        write_metadata(writer.metadata, entry->frame_id, entry->timestamp, entry->timestamp_sys);
+        
+        std::cout << "[GPUEncoder] Frame " << entry->frame_id << " encoded successfully" << std::endl;
+
+        // Handle reference counting
+        ENCODER_CTX_LOG("Handling reference count", entry->frame_id);
+        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            m_recycle_queue.push(entry);
+        }
+
+    } catch (const std::exception& e) {
+        std::cerr << "[GPUEncoder] Exception in WorkerFunction: " << e.what() << std::endl;
+        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            m_recycle_queue.push(entry);
+        }
+        
+        ENCODER_CTX_LOG("Exception occurred, popping context", entry->frame_id);
         CUcontext popped_context;
-        cuCtxPopCurrentDebug(&popped_context, "GPUVideoEncoder::WorkerFunction (exception cleanup)", entry->frame_id);
+        ck(cuCtxPopCurrent(&popped_context));
         return false;
     }
 
-    ENCODER_CTX_LOG("Processing encoded packets", entry->frame_id);
-    std::cout << "[GPUEncoder] Frame " << entry->frame_id << " encoded successfully" << std::endl;
-
-    // Process encoded packets (existing code)
-    for (std::vector<uint8_t> &packet : encoder.vPacket) {
-        writer.video->push_packet(packet.data(), (int)packet.size(), encoder.num_frame_encode++);
-    }
-    write_metadata(writer.metadata, entry->frame_id, entry->timestamp, entry->timestamp_sys);
-
-    // Reference counting and cleanup
-    ENCODER_CTX_LOG("Handling reference count", entry->frame_id);
-    if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-        ENCODER_CTX_LOG("Recycling entry (ref_count reached 0)", entry->frame_id);
-        m_recycle_queue.push(entry);
-    }
-
-    // Context cleanup
+    // Normal exit - pop context
     ENCODER_CTX_LOG("Popping CUDA context", entry->frame_id);
     CUcontext popped_context;
-    cuCtxPopCurrentDebug(&popped_context, "GPUVideoEncoder::WorkerFunction (normal exit)", entry->frame_id);
-
+    CUresult pop_result = cuCtxPopCurrent(&popped_context);
+    if (pop_result != CUDA_SUCCESS) {
+        ENCODER_CTX_LOG("WARNING: Failed to pop CUDA context on normal exit", entry->frame_id);
+    }
+    
     ENCODER_CTX_LOG("=== EXITING WorkerFunction ===", entry->frame_id);
     return false;
 }

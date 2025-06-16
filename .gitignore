@@ -60,3 +60,5 @@ imgui.ini
 .vscode/
 profile/
 imgui.ini
+cuda_debug.log
+third_party/flatbuffers

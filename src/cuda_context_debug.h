@@ -1,4 +1,4 @@
-// src/cuda_context_debug.h - Fixed version to match build script
+// src/cuda_context_debug.h - Enhanced version with context failure detection
 #ifndef CUDA_CONTEXT_DEBUG_H
 #define CUDA_CONTEXT_DEBUG_H
 
@@ -9,21 +9,84 @@
 #include <mutex>
 #include <iomanip>
 #include <sstream>
+#include <atomic>
 
 // Thread-safe logging mutex
 static std::mutex g_debug_log_mutex;
+static std::atomic<bool> g_context_failure_detected{false};
+static std::atomic<int> g_context_failure_count{0};
 
 // Enable debug logging - match what the build script uses
 #if defined(DEBUG_CUDA_CONTEXT) || defined(ENABLE_CUDA_DEBUG_LOGGING)
 
-// Core context logging macro
+// Enhanced context logging macro with failure detection and diagnostics
 #define CUDA_CTX_LOG(msg) \
 do { \
     std::lock_guard<std::mutex> lock(g_debug_log_mutex); \
     CUcontext current_ctx = nullptr; \
     cuCtxGetCurrent(&current_ctx); \
-    std::cout << "[CUDA_CTX] [Thread " << std::hex << std::this_thread::get_id() << std::dec << "] " \
-              << msg << " | Current context: " << static_cast<void*>(current_ctx) << std::endl; \
+    \
+    /* Check for context failure */ \
+    if (current_ctx == nullptr) { \
+        int failure_count = g_context_failure_count.fetch_add(1); \
+        \
+        /* On FIRST failure, dump detailed diagnostics and throw */ \
+        if (failure_count == 0 && !g_context_failure_detected.exchange(true)) { \
+            std::cerr << "\n" << std::string(80, '=') << std::endl; \
+            std::cerr << "🚨 CRITICAL: CUDA CONTEXT FAILURE DETECTED!" << std::endl; \
+            std::cerr << std::string(80, '=') << std::endl; \
+            \
+            /* Log the specific failure */ \
+            std::cerr << "[CUDA_CTX_FAILURE] [Thread " << std::hex << std::this_thread::get_id() << std::dec << "] " \
+                      << msg << " | Current context: " << static_cast<void*>(current_ctx) << std::endl; \
+            \
+            /* Dump GPU memory state */ \
+            size_t free_mem = 0, total_mem = 0; \
+            cudaError_t mem_err = cudaMemGetInfo(&free_mem, &total_mem); \
+            if (mem_err == cudaSuccess) { \
+                std::cerr << "[MEMORY_STATE] GPU Memory: " << (free_mem / 1024 / 1024) << "MB free / " \
+                          << (total_mem / 1024 / 1024) << "MB total" << std::endl; \
+                std::cerr << "[MEMORY_STATE] Memory usage: " << (100.0 * (total_mem - free_mem) / total_mem) \
+                          << "% used" << std::endl; \
+            } else { \
+                std::cerr << "[MEMORY_STATE] ERROR: Cannot query GPU memory: " \
+                          << cudaGetErrorString(mem_err) << std::endl; \
+            } \
+            \
+            /* Dump device state */ \
+            int current_device = -1; \
+            cudaError_t dev_err = cudaGetDevice(&current_device); \
+            std::cerr << "[DEVICE_STATE] Current device: " << current_device; \
+            if (dev_err != cudaSuccess) { \
+                std::cerr << " (ERROR: " << cudaGetErrorString(dev_err) << ")"; \
+            } \
+            std::cerr << std::endl; \
+            \
+            /* Check last CUDA error */ \
+            cudaError_t last_err = cudaGetLastError(); \
+            if (last_err != cudaSuccess) { \
+                std::cerr << "[CUDA_ERROR] Last CUDA error: " << cudaGetErrorString(last_err) << std::endl; \
+            } \
+            \
+            std::cerr << std::string(80, '=') << std::endl; \
+            std::cerr << "💀 STOPPING EXECUTION TO PREVENT SPAM - CHECK LOGS ABOVE!" << std::endl; \
+            std::cerr << std::string(80, '=') << "\n" << std::endl; \
+            \
+            /* Throw exception to stop the spam and crash gracefully */ \
+            throw std::runtime_error("CUDA context became null - check memory usage and GPU state above"); \
+        } \
+        /* After first failure, just count but don't spam */ \
+        else if (failure_count < 5) { \
+            std::cerr << "[CUDA_CTX_FAILURE] Additional failure #" << failure_count \
+                      << " (suppressing further output)" << std::endl; \
+        } \
+        /* After 5 failures, completely silent to prevent spam */ \
+    } \
+    /* Normal case - context is valid */ \
+    else { \
+        std::cout << "[CUDA_CTX] [Thread " << std::hex << std::this_thread::get_id() << std::dec << "] " \
+                  << msg << " | Current context: " << static_cast<void*>(current_ctx) << std::endl; \
+    } \
 } while(0)
 
 // Enhanced runtime logging with device info

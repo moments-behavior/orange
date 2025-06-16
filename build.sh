@@ -323,19 +323,18 @@ fi
 echo "========================================"
 echo "Creating symbolic links"
 echo "========================================"
-# Create a symbolic link to the built binary
 if [ $DEBUG -eq 1 ] && [ $CUDA_DEBUG -eq 1 ]; then
   echo "==> Creating symbolic link for debug+CUDA debug binary"
-  ln -sf $BUILD_DIR/orange targets/orange_cuda_debug
+  ln -sf debug_cuda/orange targets/orange_cuda_debug
 elif [ $DEBUG -eq 1 ]; then
   echo "==> Creating symbolic link for debug binary"
-  ln -sf $BUILD_DIR/orange targets/orange_debug
+  ln -sf debug/orange targets/orange_debug
 elif [ $CUDA_DEBUG -eq 1 ]; then
   echo "==> Creating symbolic link for CUDA debug binary"
-  ln -sf $BUILD_DIR/orange targets/orange_cuda_debug
+  ln -sf release_cuda/orange targets/orange_cuda_debug
 else
   echo "==> Creating symbolic link for release binary"
-  ln -sf $BUILD_DIR/orange targets/orange
+  ln -sf release/orange targets/orange
 fi
 
 echo "========================================"

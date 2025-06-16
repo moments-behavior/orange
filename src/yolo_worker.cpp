@@ -13,7 +13,7 @@
 #include "pose_shaman.h"
 #include "thread.h"
 #include "global.h"
-#include "cuda_context_manager.h"
+#include "cuda_context_debug.h"
 
 YOLOv8Worker::YOLOv8Worker(const char* name,
                            CUcontext cuda_context,

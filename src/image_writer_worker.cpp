@@ -1,7 +1,7 @@
 // src/image_writer_worker.cpp - CORRECTED
 
 #include "image_writer_worker.h"
-#include "cuda_context_manager.h"   // Provides CUDA_CONTEXT_SCOPE for robust context handling
+#include "cuda_context_debug.h"   // Provides CUDA_CONTEXT_SCOPE for robust context handling
 #include "NvEncoder/NvCodecUtils.h" // For the 'ck' macro for CUDA error checking
 #include <iostream>
 #include <opencv2/opencv.hpp>

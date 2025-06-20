@@ -8,7 +8,7 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
     img_height = height;
 
     this->stream = nullptr;
-    this->d_bgr_temp = nullptr; 
+    // this->d_bgr_temp = nullptr; 
     this->d_temp = nullptr;
     this->d_boarder = nullptr;
     this->d_float = nullptr;
@@ -111,7 +111,7 @@ YOLOv8::~YOLOv8()
     if (this->d_float) { cudaFree(this->d_float); }
     if (this->d_boarder) { cudaFree(this->d_boarder); }
     if (this->d_temp) { cudaFree(this->d_temp); }
-    if (this->d_bgr_temp) { cudaFree(this->d_bgr_temp); }
+    // if (this->d_bgr_temp) { cudaFree(this->d_bgr_temp); }
     if (this->stream) { cudaStreamDestroy(this->stream); }
 }
 
@@ -121,7 +121,7 @@ void YOLOv8::make_pipe(bool warmup)
         CHECK(cudaStreamCreate(&this->stream));
     }
     
-    CHECK(cudaMalloc((void **)&this->d_bgr_temp, img_width * img_height * 3 * sizeof(unsigned char)));
+    // CHECK(cudaMalloc((void **)&this->d_bgr_temp, img_width * img_height * 3 * sizeof(unsigned char)));
     CHECK(cudaMalloc((void **)&this->d_temp, padw * padh * 3 * sizeof(unsigned char)));
     CHECK(cudaMalloc((void **)&this->d_boarder, inp_w_int * inp_h_int * 3 * sizeof(unsigned char)));
     CHECK(cudaMalloc((void **)&this->d_float, sizeof(float) * inp_w_int * inp_h_int * 3));
@@ -158,13 +158,8 @@ void YOLOv8::make_pipe(bool warmup)
     }
 }
 
-void YOLOv8::preprocess_gpu(unsigned char *d_rgba, int source_width, int source_height)
+void YOLOv8::preprocess_gpu(unsigned char *d_bgr, int source_width, int source_height)
 {
-    NppiSize src_size_4c = {source_width, source_height};
-    const int dst_order[4] = {2, 1, 0, 3}; 
-    // --- FIX: Removed the extra '0' argument ---
-    nppiSwapChannels_8u_C4R(d_rgba, source_width * 4, d_bgr_temp, source_width * 3, src_size_4c, dst_order);
-    
     const float inp_h  = (float)inp_h_int;
     const float inp_w  = (float)inp_w_int;
     float       current_img_width  = (float)source_width;
@@ -178,7 +173,8 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgba, int source_width, int source_
     NppiSize resized_output_size = {current_padw, current_padh};
     NppiRect resized_output_roi = {0, 0, current_padw, current_padh};
 
-    nppiResize_8u_C3R(d_bgr_temp, source_width * 3, src_img_size, src_roi, this->d_temp, current_padw * 3, resized_output_size, resized_output_roi, NPPI_INTER_SUPER);
+    // The first conversion from RGBA to BGR is removed. We now start with resizing the provided BGR image.
+    nppiResize_8u_C3R(d_bgr, source_width * 3, src_img_size, src_roi, this->d_temp, current_padw * 3, resized_output_size, resized_output_roi, NPPI_INTER_SUPER);
 
     NppiSize final_input_tensor_size = {inp_w_int, inp_h_int};
     float dw_border = (inp_w - current_padw) / 2.0f;
@@ -190,7 +186,7 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgba, int source_width, int source_
     nppiCopyConstBorder_8u_C3R(this->d_temp, current_padw * 3, resized_output_size, this->d_boarder, inp_w_int * 3, final_input_tensor_size, top_border, left_border, border_val);
 
     nppiConvert_8u32f_C3R(this->d_boarder, inp_w_int * 3, this->d_float, inp_w_int * 3 * sizeof(float), final_input_tensor_size);
-    
+
     Npp32f norm_scale_factor[3] = {255.0f, 255.0f, 255.0f};
     nppiDivC_32f_C3IR(norm_scale_factor, this->d_float, inp_w_int * 3 * sizeof(float), final_input_tensor_size);
 
@@ -205,6 +201,7 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgba, int source_width, int source_
 
     CHECK(cudaMemcpyAsync(this->device_ptrs[0], this->d_planar, inp_h_int * inp_w_int * 3 * sizeof(float), cudaMemcpyDeviceToDevice, this->stream));
 }
+
 
 void YOLOv8::infer()
 {

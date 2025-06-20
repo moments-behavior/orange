@@ -48,8 +48,8 @@ void acquire_frames(
 ){
     std::cout << "Starting acquisition loop for camera " << camera_params->camera_serial << std::endl;
 
-    CUDA_CTX_LOG("=== ACQUIRE FRAMES START ===");
     ck(cuCtxPushCurrent(cuda_context));
+    CUDA_CTX_LOG("=== ACQUIRE FRAMES START ===");
     dumpCudaState("Acquire frames startup");
     ck(cudaSetDevice(camera_params->gpu_id));
     CUDA_RT_LOG("Set device to " + std::to_string(camera_params->gpu_id));

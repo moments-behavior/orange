@@ -16,6 +16,7 @@
 #include <chrono>
 #include "opengldisplay.h"
 #include <cuda.h>
+#include <atomic>
 
 
 class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
@@ -42,6 +43,10 @@ public:
         std::vector<pose::Object> detections;
     };
 
+    double get_fps() const {
+        return current_fps_.load(std::memory_order_relaxed);
+    }
+
 private:
     bool WorkerFunction(WORKER_ENTRY* f) override;
     void WorkerReset() override;
@@ -65,6 +70,10 @@ private:
     std::chrono::steady_clock::time_point last_fps_update_time_;
     int frame_counter_;
     double current_fps_;
+
+    std::chrono::steady_clock::time_point last_fps_update_time_;
+    int frame_counter_;
+    std::atomic<double> current_fps_;
 
     // Shared memory IPC
     shaman::SharedBoxQueue* shaman_ipc_queue_;

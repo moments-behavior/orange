@@ -228,7 +228,9 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
                               << ", Rect: [x=" << sh_obj.rect.x << ", y=" << sh_obj.rect.y
                               << ", w=" << sh_obj.rect.width << ", h=" << sh_obj.rect.height << "]" << std::endl;
                 }
-                if (!shaman_ipc_queue_->push(shaman_objects)) {
+                
+                // --- FIX: Add the missing frame_id and camera_id arguments ---
+                if (!shaman_ipc_queue_->push(shaman_objects, entry->frame_id, associated_camera_params_->camera_id)) {
                     std::cerr << "[" << threadName << "] Failed to push to IPC queue." << std::endl;
                 }
             }

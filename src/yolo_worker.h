@@ -47,7 +47,7 @@ public:
         return current_fps_.load(std::memory_order_relaxed);
     }
 
-private:
+    private:
     bool WorkerFunction(WORKER_ENTRY* f) override;
     void WorkerReset() override;
 
@@ -66,20 +66,15 @@ private:
     Debayer debayer_gpu_;
     unsigned char* d_rgb_yolo_input_gpu_;
 
-    // FPS Counter members
     std::chrono::steady_clock::time_point last_fps_update_time_;
     int frame_counter_;
-    double current_fps_;
-
-    std::chrono::steady_clock::time_point last_fps_update_time_;
-    int frame_counter_;
-    std::atomic<double> current_fps_;
+    std::atomic<double> current_fps_; // This is the only line that should be changed here
 
     // Shared memory IPC
     shaman::SharedBoxQueue* shaman_ipc_queue_;
-    COpenGLDisplay* m_display_worker = nullptr; // Pointer to OpenGL display worker
+    COpenGLDisplay* m_display_worker = nullptr;
     CUcontext m_cuContext;
-    SafeQueue<WORKER_ENTRY*>& m_recycle_queue; // Reference to the central recycle queue
+    SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };
 
 #endif // YOLO_WORKER_H

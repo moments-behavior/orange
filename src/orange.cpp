@@ -1326,7 +1326,12 @@ int main(int argc, char **args) {
                             ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, "Recording starting...");
                         }
                         ImGui::SameLine();
-                        ImGui::Text("FPS: %.1f", streaming_fps.load());                    
+                        ImGui::Text("FPS: %.1f", streaming_fps.load());    
+                        
+                        if (cameras_select[i].yolo && i < yolo_workers.size() && yolo_workers[i]) {
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.0f, 1.0f), "YOLO FPS: %.1f", yolo_workers[i]->get_fps());
+                        }
             
                         ImVec2 avail_size = ImGui::GetContentRegionAvail();
     
@@ -1359,6 +1364,11 @@ int main(int argc, char **args) {
                         ImGui::SameLine();
                         ImGui::Text("FPS: %.1f", streaming_fps.load());    
                         ImVec2 avail_size = ImGui::GetContentRegionAvail();
+
+                        if (cameras_select[i].yolo && i < yolo_workers.size() && yolo_workers[i]) {
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.0f, 1.0f), "YOLO FPS: %.1f", yolo_workers[i]->get_fps());
+                        }
     
                         static ImVec2 bmin(0, 0);
                         static ImVec2 uv0(0, 0);

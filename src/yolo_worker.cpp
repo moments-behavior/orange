@@ -207,8 +207,9 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = now - last_fps_update_time_;
         if (elapsed.count() >= 1.0) {
-            current_fps_ = frame_counter_ / elapsed.count();
-            std::cout << threadName << " Inference FPS: " << current_fps_ 
+            // --- FIX: Use store() to update the atomic FPS counter ---
+            current_fps_.store(frame_counter_ / elapsed.count());
+            std::cout << threadName << " Inference FPS: " << current_fps_.load()
                       << " (Queue: " << this->GetCountQueueInSize() << ")" << std::endl;
             frame_counter_ = 0;
             last_fps_update_time_ = now;

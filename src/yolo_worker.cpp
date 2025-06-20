@@ -33,7 +33,8 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
       frame_counter_(0),
       current_fps_(0.0),
       shaman_ipc_queue_(nullptr),
-      m_recycle_queue(recycle_queue)
+      m_recycle_queue(recycle_queue),
+      m_dump_next_frame(false)
 {
     std::cout << "YOLOv8Worker constructor for: " << name << std::endl;
     
@@ -72,6 +73,9 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
         initalize_gpu_frame(&frame_original_gpu_, associated_camera_params_);
         initialize_gpu_debayer(&debayer_gpu_, associated_camera_params_);
         
+        size_t bgr_buffer_size = (size_t)associated_camera_params_->width * associated_camera_params_->height * 3;
+        ck(cudaMalloc(&d_rgb_yolo_input_gpu_, bgr_buffer_size));
+
         if (associated_camera_select_->yolo && associated_camera_select_->send_yolo_via_ipc) {
             shaman_ipc_queue_ = new shaman::SharedBoxQueue(true /* is_writer */);
         }
@@ -100,6 +104,7 @@ YOLOv8Worker::~YOLOv8Worker() {
         
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); }
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); }
+        if (d_rgb_yolo_input_gpu_) { cudaFree(d_rgb_yolo_input_gpu_); }
         
         if (yolov8_instance_) { delete yolov8_instance_; }
     } else {
@@ -112,7 +117,7 @@ YOLOv8Worker::~YOLOv8Worker() {
     std::cout << "YOLOv8Worker destructor complete for " << threadName << std::endl;
 }
 
-// --- FIX: Added the missing function definition ---
+
 void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer)
 {
     std::cout << "YOLOv8Worker (" << this->threadName
@@ -160,7 +165,39 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         }
 
-        yolov8_instance_->preprocess_gpu(debayer_gpu_.d_debayer, camera_width, camera_height);
+        // --- NEW CONVERSION STEP ---
+        // Convert the 4-channel RGBA debayer output to 3-channel BGR for the network.
+        NppiSize image_size = {camera_width, camera_height};
+        // The order of channels to extract from RGBA to get BGR
+        const int channel_order[4] = {2, 1, 0, 3}; // B<-R, G<-G, R<-B
+        nppiSwapChannels_8u_C4C3R(debayer_gpu_.d_debayer, camera_width * 4,
+                                 d_rgb_yolo_input_gpu_, camera_width * 3,
+                                 image_size, channel_order);
+
+        bool dump_this_frame = m_dump_next_frame.exchange(false);
+        if (dump_this_frame)
+        {
+            std::cout << "[" << threadName << "] Dumping pre-YOLO input for frame " << entry->frame_id << std::endl;
+            size_t image_size_bytes = (size_t)camera_width * camera_height * 4;
+            unsigned char* h_rgba_buffer = new unsigned char[image_size_bytes];
+
+            ck(cudaMemcpy(h_rgba_buffer, debayer_gpu_.d_debayer, image_size_bytes, cudaMemcpyDeviceToHost));
+
+            try {
+                cv::Mat rgba_image(camera_height, camera_width, CV_8UC4, h_rgba_buffer);
+                cv::Mat bgr_image;
+                cv::cvtColor(rgba_image, bgr_image, cv::COLOR_RGBA2BGR);
+                std::string filename = "debug_pre_yolo_" + std::string(associated_camera_params_->camera_serial) + "_" + std::to_string(entry->frame_id) + ".png";
+                cv::imwrite(filename, bgr_image);
+                std::cout << "[" << threadName << "] Saved debug image to " << filename << std::endl;
+            } catch (const cv::Exception& ex) {
+                std::cerr << "OpenCV exception while saving debug image: " << ex.what() << std::endl;
+            }
+
+            delete[] h_rgba_buffer;
+        }
+
+        yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, camera_width, camera_height);
         
         yolov8_instance_->infer();
         yolov8_instance_->postprocess(entry->detections);
@@ -180,8 +217,17 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         ck(cudaStreamSynchronize(yolov8_instance_->stream));
 
         if (entry->has_detections) {
+            std::cout << "[" << threadName << "] SUCCESS: Detected " << entry->detections.size() << " object(s) in frame " << entry->frame_id << "." << std::endl;
             if (associated_camera_select_->send_yolo_via_ipc && shaman_ipc_queue_) {
                 std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
+
+                std::cout << "  > Writing " << shaman_objects.size() << " object(s) to shared memory:" << std::endl;
+                for (const auto& sh_obj : shaman_objects) {
+                    std::cout << "    - Label: " << sh_obj.label
+                              << ", Prob: " << sh_obj.prob
+                              << ", Rect: [x=" << sh_obj.rect.x << ", y=" << sh_obj.rect.y
+                              << ", w=" << sh_obj.rect.width << ", h=" << sh_obj.rect.height << "]" << std::endl;
+                }
                 if (!shaman_ipc_queue_->push(shaman_objects)) {
                     std::cerr << "[" << threadName << "] Failed to push to IPC queue." << std::endl;
                 }
@@ -190,6 +236,9 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
                 enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) {
                 // ENet transmission logic
             }
+        }
+        else {
+            std::cout << "[" << threadName << "] No objects detected in frame " << entry->frame_id << "." << std::endl;
         }
 
     } catch (const std::exception& e) {

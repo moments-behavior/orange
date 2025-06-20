@@ -534,7 +534,7 @@ int main(int argc, char **args) {
             //            ImGui::GetIO().Framerate);
 
             if (camera_control->open) {
-                ImGui::BeginDisabled();
+                // ImGui::BeginDisabled();
             }
 
             if (ImGui::BeginTable("Cameras", 3,
@@ -567,11 +567,11 @@ int main(int argc, char **args) {
             }
 
             if (camera_control->open) {
-                ImGui::EndDisabled();
+                // ImGui::EndDisabled();
             }
 
             if (camera_control->subscribe) {
-                ImGui::BeginDisabled();
+                // ImGui::BeginDisabled();
             }
 
             ImGui::Separator();
@@ -588,11 +588,11 @@ int main(int argc, char **args) {
             ImGui::Text("%s", yolo_model.c_str());
 
             if (camera_control->subscribe) {
-                ImGui::EndDisabled();
+                // ImGui::EndDisabled();
             }
 
             if (camera_control->record_video) {
-                ImGui::BeginDisabled();
+                // ImGui::BeginDisabled();
             }
 
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
@@ -653,12 +653,12 @@ int main(int argc, char **args) {
             
    
             if (camera_control->record_video) {
-                ImGui::EndDisabled();
+                // ImGui::EndDisabled();
             }
 
             if (camera_control->open) {
                 if (camera_control->record_video) {
-                    ImGui::BeginDisabled();
+                    // ImGui::BeginDisabled();
                 }
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
@@ -666,11 +666,11 @@ int main(int argc, char **args) {
                 set_camera_properties(ecams, cameras_params, num_cameras, color_temps);
 
                 if (camera_control->record_video) {
-                    ImGui::EndDisabled();
+                    // ImGui::EndDisabled();
                 }
 
                 if (camera_control->subscribe) {
-                    ImGui::BeginDisabled();
+                    // ImGui::BeginDisabled();
                 }
 
                 bool stream_all_cameras = true;
@@ -730,6 +730,9 @@ int main(int argc, char **args) {
                     ImGui::TableNextColumn();
                     ImGui::Text("YOLO "); ImGui::SameLine();
 
+                    ImGui::TableNextColumn();
+                    ImGui::Text("YOLO Debug");
+
                     // New Columns for IPC and ENet selection for YOLO
                     ImGui::TableNextColumn();
                     ImGui::Text("YOLO IPC"); // New header
@@ -754,6 +757,32 @@ int main(int argc, char **args) {
                         sprintf(temp_string, "##checkbox_yolo%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].yolo);
 
+                        ImGui::TableNextColumn();
+                        if (cameras_select[i].yolo)
+                        {
+                            // Button is always visible and clickable if YOLO is selected.
+                            sprintf(temp_string, "Dump Input##yolo_debug%d", i);
+                            if (ImGui::Button(temp_string))
+                            {
+                                // We still check if the worker is ready before calling the function
+                                // to prevent a crash, but the button is never grayed out.
+                                if (camera_control->subscribe && i < yolo_workers.size() && yolo_workers[i])
+                                {
+                                    yolo_workers[i]->DumpNextFrame();
+                                }
+                                else
+                                {
+                                    std::cout << "Warning: Cannot dump frame. YOLO worker is not ready for camera "
+                                              << cameras_params[i].camera_serial << std::endl;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Add an empty cell to keep table alignment correct
+                            ImGui::Text("");
+                        }
+
                         // New Checkboxes for IPC and ENet
                         ImGui::TableNextColumn();
                         sprintf(temp_string, "##yolo_ipc%d", i);
@@ -767,7 +796,7 @@ int main(int argc, char **args) {
                 }
 
                 if (camera_control->subscribe) {
-                    ImGui::EndDisabled();
+                    // ImGui::EndDisabled();
                 }
 
                 if (camera_control->subscribe == true) {
@@ -920,7 +949,7 @@ int main(int argc, char **args) {
 
         if (ImGui::Begin("Local")) {
             if (camera_control->open) {
-                ImGui::BeginDisabled();
+                // ImGui::BeginDisabled();
             }
 
             for (int i = 0; i < local_config_folders.size(); i++) {
@@ -932,11 +961,11 @@ int main(int argc, char **args) {
             ImGui::RadioButton("Null", &local_config_select, local_config_folders.size());
 
             if (camera_control->open) {
-                ImGui::EndDisabled();
+                // ImGui::EndDisabled();
             }
 
             if (camera_control->subscribe) {
-                ImGui::BeginDisabled();
+                // ImGui::BeginDisabled();
             }
 
             if (ImGui::Button(camera_control->open ? "Close Camera" : "Open camera")) {
@@ -1016,17 +1045,17 @@ int main(int argc, char **args) {
                 }
             }
             if (camera_control->subscribe) {
-                ImGui::EndDisabled();
+                // ImGui::EndDisabled();
             }
 
             if (!camera_control->record_video && camera_control->open) {
                 if (camera_control->subscribe) {
-                    ImGui::BeginDisabled();
+                    // ImGui::BeginDisabled();
                 }
                 ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync);
                 ImGui::SameLine();
                 if (camera_control->subscribe) {
-                    ImGui::EndDisabled();
+                    // ImGui::EndDisabled();
                 }
                 if (ImGui::Button(camera_control->subscribe ? "Stop streaming" : "Start streaming")) {
                     (camera_control->subscribe) = !(camera_control->subscribe);
@@ -1240,7 +1269,7 @@ int main(int argc, char **args) {
             if (camera_control->open) {
 
                 if (!camera_control->subscribe) {
-                    ImGui::BeginDisabled();
+                    // ImGui::BeginDisabled();
                 }
 
                 if (ImGui::Button(camera_control->record_video ? ICON_FK_PAUSE : ICON_FK_PLAY)) {
@@ -1258,7 +1287,7 @@ int main(int argc, char **args) {
                 }
                 
                 if (!camera_control->subscribe) {
-                    ImGui::EndDisabled();
+                    // ImGui::EndDisabled();
                 }
             }
 

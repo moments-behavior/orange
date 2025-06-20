@@ -15,8 +15,7 @@ public:
     ~YOLOv8();
 
     void make_pipe(bool warmup = true);
-    // FIX: Changed function to accept a 4-channel buffer
-    void preprocess_gpu(unsigned char *d_bgra, int source_width, int source_height);
+    void preprocess_gpu(unsigned char *d_bgr, int source_width, int source_height);
     void infer();
     void postprocess(std::vector<Object> &objs);
     static void draw_objects(const cv::Mat&                                image,
@@ -43,7 +42,7 @@ public:
 
 private:
     // FIX: Added a 3-channel buffer for intermediate conversion
-    unsigned char *d_bgr_temp = nullptr;
+    // unsigned char *d_bgr_temp = nullptr;
     unsigned char *d_temp = nullptr;
     unsigned char *d_boarder = nullptr;
     float *d_float = nullptr;

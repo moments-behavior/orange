@@ -31,6 +31,7 @@ public:
 
     void SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer);
     void SetDisplayWorker(COpenGLDisplay* display_worker) { m_display_worker = display_worker; }
+    void DumpNextFrame() { m_dump_next_frame.store(true);}
 
     // New: Define a structure for passing detection results (or use pose::Object directly)
     // This could also be part of WORKER_ENTRY if you modify it globally
@@ -44,6 +45,8 @@ public:
 private:
     bool WorkerFunction(WORKER_ENTRY* f) override;
     void WorkerReset() override;
+
+    std::atomic<bool> m_dump_next_frame;
 
     YOLOv8* yolov8_instance_;
     CameraParams* associated_camera_params_;

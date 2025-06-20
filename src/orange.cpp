@@ -528,7 +528,7 @@ int main(int argc, char **args) {
             {
                 const char *items[] = {"1", "2", "4", "8", "16"};
                 static const int item_numbers[] = {1, 2, 4, 8, 16};
-                static int downsample_current = 0;
+                static int downsample_current = 1;
                 if(ImGui::Combo("downsample streaming", &downsample_current, items, IM_ARRAYSIZE(items))) {
                     for (int i = 0; i < num_cameras; i++) {
                         cameras_select[i].downsample = item_numbers[downsample_current];
@@ -866,7 +866,7 @@ int main(int argc, char **args) {
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name == "ceiling_center") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = false;
+                                cameras_select[i].yolo = true;
                             }
 
                             if (cameras_params[i].camera_name == "shelter") {
@@ -906,7 +906,8 @@ int main(int argc, char **args) {
                     ImGui::BeginDisabled();
                 }
                 ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync);
-                ImGui::Checkbox("Trigger Mode", &camera_control->trigger_mode);
+                ImGui::SameLine();
+                // ImGui::Checkbox("Trigger Mode", &camera_control->trigger_mode);
                 if (camera_control->subscribe) {
                     ImGui::EndDisabled();
                 }

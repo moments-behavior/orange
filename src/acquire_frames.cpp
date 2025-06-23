@@ -239,16 +239,20 @@ void acquire_frames(
     }
     double time_diff = w.Stop();
     report_statistics(camera_params, &camera_state, time_diff);
-    
+
     cudaFree(frame_process_save.frame_original.d_orig);
     cudaFree(frame_process_save.debayer.d_debayer);
     cudaFree(frame_process_save.d_convert);
     free(frame_process_save.frame_cpu.frame);
-    
+
     CUDA_STREAM_LOG("Destroying acquisition stream", stream);
     cudaStreamDestroy(stream);
-    CUcontext popped_context;
-    ck(cuCtxPopCurrent(&popped_context));
+
+    // 1. Log that the thread is ending (while context is still active)
     CUDA_CTX_LOG("=== ACQUIRE FRAMES END ===");
     std::cout << "Acquire frames thread finished for camera: " << camera_params->camera_serial << std::endl;
+
+    // 2. Now, pop the context as the final step
+    CUcontext popped_context;
+    ck(cuCtxPopCurrent(&popped_context));
 }

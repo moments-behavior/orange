@@ -31,19 +31,11 @@ list(REMOVE_ITEM ORANGE_SOURCES ${SRC_DIR}/orange_headless_client.cpp)
 
 file(GLOB NVENCODER_SOURCES ${PROJECT_SOURCE_DIR}/src/NvEncoder/*.cpp)
 # Add sourc files for orange_client
-set(ORANGE_CLIENT_SOURCES
-    src/orange_headless_client.cpp
-    src/network_base.cpp
-    src/FFmpegWriter.cpp
-    src/camera.cpp
-    src/video_capture.cpp
-    src/offthreadmachine.cpp
-    src/acquire_frames_headless.cpp
-    src/threadworker.cpp
-    src/gpu_video_encoder.cpp
-        src/global.cpp
-    ${NVENCODER_SOURCES}
+file(GLOB ORANGE_CLIENT_SOURCES
+    ${SRC_DIR}/*.cpp
+    ${DIR_NVENCODER}/*.cpp
 )
+list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp)
 
 set(YOLO_OFFLINE_SOURCES
     benchmark/yolo_offline.cpp
@@ -174,8 +166,12 @@ target_link_libraries(orange_client
     avutil
     avcodec
     m
+    opencv_sfm
+    opencv_core
+    opencv_imgcodecs
+    opencv_imgproc
 )
-
+target_compile_definitions(orange_client PRIVATE HEADLESS)
 
 target_link_libraries(yolo_offline
     opencv_sfm

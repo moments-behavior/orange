@@ -38,10 +38,24 @@ struct Debayer
     NppiBayerGridPosition grid;
 };
 
+struct FrameProcess
+{
+    FrameGPU frame_original;
+    Debayer debayer;
+    unsigned char *d_convert;
+    FrameCPU frame_cpu;
+};
+
 static inline void initialize_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
 {
     int size_pic = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
     cpu_buffer->frame = (unsigned char *)malloc(size_pic);
+}
+
+static inline void initialize_pinned_cpu_frame(FrameCPU *cpu_buffer, CameraParams *camera_params)
+{
+    int size_pic = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
+    ck(cudaMallocHost((void**)&cpu_buffer->frame, size_pic));  // pinned memory
 }
 
 static inline void initalize_gpu_frame(FrameGPU *frame_original, CameraParams *camera_params)

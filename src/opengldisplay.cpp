@@ -41,6 +41,11 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params, Ca
 
 COpenGLDisplay::~COpenGLDisplay()
 {
+    cudaFree(frame_original.d_orig);
+    cudaFree(debayer.d_debayer);
+    if (camera_select->yolo) {
+        delete yolov8;
+    }
 }
 
 void COpenGLDisplay::ThreadRunning()
@@ -190,11 +195,6 @@ void COpenGLDisplay::ThreadRunning()
         if (frameDuration < targetFrameDuration) {
             std::this_thread::sleep_for(targetFrameDuration - frameDuration);
         }
-    }
-    cudaFree(frame_original.d_orig);
-    cudaFree(debayer.d_debayer);
-    if (camera_select->yolo) {
-        delete yolov8;
     }
 }
 

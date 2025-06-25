@@ -124,8 +124,9 @@ void configure_factory_defaults(Emergent::CEmergentCamera *camera, CameraParams*
     check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSelector", "AcquisitionStart"), camera_params->camera_serial.c_str());
     check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerMode", "Off"), camera_params->camera_serial.c_str());
     check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"), camera_params->camera_serial.c_str());
-    // check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "BufferMode", "Off"));
-    // check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "BufferNum", 0));
+
+    //check_camera_errors(Emergent::EVT_CameraSetEnumParam(camera, "BufferMode", "Off"), camera_params->camera_serial.c_str());
+    //check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "BufferNum", 0), camera_params->camera_serial.c_str());
 
     check_camera_errors(Emergent::EVT_CameraGetUInt32ParamMax(camera, "GevSCPSPacketSize", &param_val_max), camera_params->camera_serial.c_str());
     check_camera_errors(Emergent::EVT_CameraSetUInt32Param(camera, "GevSCPSPacketSize", param_val_max), camera_params->camera_serial.c_str());
@@ -441,6 +442,14 @@ void update_camera_params(Emergent::CEmergentCamera *camera, GigEVisionDeviceInf
         check_camera_errors(EVT_CameraSetEnumParam(camera, "ColorTemp", enum_member), camera_params->camera_serial.c_str());
         camera_params->color_temp = std::string(enum_member);
     }
+}
+
+void camera_trigger_mode(Emergent::CEmergentCamera *camera, CameraParams *camera_params)
+{
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "AcquisitionMode", "MultiFrame"), camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 76), camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerSelector", "FrameStart"),  camera_params->camera_serial.c_str());
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"),  camera_params->camera_serial.c_str());
 }
 
 // **********************************************sync*****************************************************

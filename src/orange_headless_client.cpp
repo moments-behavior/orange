@@ -1,7 +1,6 @@
 #include <iostream>
 #include <thread>
 #include <filesystem>
-#include <iostream>
 #include "network_base.h"
 #include "thread.h"
 #include "types.h"
@@ -9,9 +8,7 @@
 #include "video_capture.h"
 #include "NvEncoder/NvCodecUtils.h"
 #include "project.h"
-#include "video_capture.h"
 #include "fetch_generated.h"
-#include "acquire_frames_headless.h"
 #include <signal.h>
 
 #define evt_buffer_size 100
@@ -45,8 +42,17 @@ bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams, CameraEac
 }
 
 
-bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams *cameras_params, CameraEmergent *ecams, CameraControl *camera_control, CameraEachSelect *cameras_select, 
-    GigEVisionDeviceInfo *device_info, int num_cameras, PTPParams *ptp_params, std::string record_folder, std::string encoder_basic_setup)
+bool start_camera_thread(std::vector<std::thread> &camera_threads, 
+    CameraParams *cameras_params, 
+    CameraEmergent *ecams, 
+    CameraControl *camera_control, 
+    CameraEachSelect *cameras_select, 
+    GigEVisionDeviceInfo *device_info, 
+    int num_cameras, 
+    PTPParams *ptp_params, 
+    std::string record_folder, 
+    std::string encoder_basic_setup,
+    INDIGOSignalBuilder* indigo_signal_builder)
 {
     std::cout << "start camera sthread..." << std::endl;
     try {
@@ -83,7 +89,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads, CameraParams 
 
     for (int i = 0; i < num_cameras; i++)
     {
-        camera_threads.push_back(std::thread(&acquire_frames_headless, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, encoder_basic_setup, record_folder, ptp_params));
+        camera_threads.push_back(std::thread(&acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i], camera_control, nullptr, encoder_basic_setup, record_folder, ptp_params, indigo_signal_builder));
     }
 
     // wait for all camera ready
@@ -123,7 +129,7 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
     std::vector<std::thread> camera_threads;
     CameraEachSelect *cameras_select;
     CameraControl *camera_control = new CameraControl;
-
+    INDIGOSignalBuilder indigo_signal_builder{};
     manager_context->state = FetchGame::ManagerState_IDLE;
     while(!manager_context->quit) {
         switch (manager_context->state) {
@@ -145,7 +151,7 @@ void create_camera_manager(int* cam_count, ManagerContext* manager_context, GigE
                 }
                 break;
             case FetchGame::ManagerState_STARTCAMTHREAD:
-                if (start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, *cam_count, ptp_params, recording_setup->record_folder, recording_setup->encoder_basic_setup))
+                if (start_camera_thread(camera_threads, cameras_params, ecams, camera_control, cameras_select, device_info, *cam_count, ptp_params, recording_setup->record_folder, recording_setup->encoder_basic_setup, &indigo_signal_builder))
                 {
                     manager_context->state = FetchGame::ManagerState_THREADREADY;
                 } else {

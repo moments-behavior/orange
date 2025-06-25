@@ -7,8 +7,9 @@
 #include "network_base.h"
 
 enum PictureSaveState {
-    State_Frame_Idle = 0, 
-    State_Write_New_Frame = 1
+    State_Frame_Idle = 0,
+    State_Write_New_Frame = 1,
+    State_Frame_Copy_Done = 2
 };
 
 struct CameraControl
@@ -18,6 +19,7 @@ struct CameraControl
     bool stop_record = false;
     bool record_video = false;
     bool sync_camera = false;
+    bool trigger_mode = false;
 };
 
 struct CameraEachSelect
@@ -26,13 +28,14 @@ struct CameraEachSelect
     bool record = true;
     bool yolo = false;
     int downsample = 1;
-    PictureSaveState frame_save_state = State_Frame_Idle;
+    std::atomic<PictureSaveState> frame_save_state;
     std::string frame_save_format;
     std::string frame_save_name;
     int pictures_counter = 0;
     bool selected_to_save = false;
     std::string picture_save_folder;
     const char* yolo_model;
+    CameraEachSelect() : frame_save_state(State_Frame_Idle) {}
 };
 
 struct CameraState
@@ -74,4 +77,13 @@ void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, CameraParams *ca
 void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam);
 bool try_start_timer();
 bool try_stop_timer();
+void acquire_frames(CameraEmergent *ecam, 
+    CameraParams *camera_params, 
+    CameraEachSelect* camera_select, 
+    CameraControl* camera_control, 
+    unsigned char *display_buffer, 
+    std::string encoder_setup, 
+    std::string folder_name, 
+    PTPParams* ptp_params, 
+    INDIGOSignalBuilder* indigo_signal_builder);
 #endif

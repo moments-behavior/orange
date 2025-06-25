@@ -55,7 +55,7 @@ int main(int argc, char **args) {
     GL_Texture *tex;
     int num_cameras = 0;
     int stream_downsample = 1;
-    CameraControl *camera_control = new CameraControl{false, false, false, false};
+    CameraControl *camera_control = new CameraControl{false, false, false, false, false};
 
     int evt_buffer_size{100};
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
@@ -489,24 +489,46 @@ int main(int argc, char **args) {
             ImGui::Text("%s", input_folder.c_str()); 
 
             {
-                const char *items[] = {"h264", "hevc"};
-                static int codec_current = 0;
-                if (ImGui::Combo("codec", &codec_current, items, IM_ARRAYSIZE(items))) {
-                    encoder_config->encoder_codec = items[codec_current];
+                const char* codecs[] = { "h264", "hevc" };
+                static int codec_current = -1;
+            
+                if (codec_current == -1) {
+                    for (int i = 0; i < IM_ARRAYSIZE(codecs); ++i) {
+                        if (encoder_config->encoder_codec == codecs[i]) {
+                            codec_current = i;
+                            break;
+                        }
+                    }
                 }
-            } 
-            {
-                const char *items[] = {"p1", "p3", "p5", "p7"};
-                static int preset_current = 0;
-                if (ImGui::Combo("preset", &preset_current, items, IM_ARRAYSIZE(items))) {
-                    encoder_config->encoder_preset = items[preset_current];
+            
+                if (ImGui::Combo("Codec", &codec_current, codecs, IM_ARRAYSIZE(codecs))) {
+                    encoder_config->encoder_codec = codecs[codec_current];
                 }
             }
 
             {
+                const char* presets[] = { "p1", "p3", "p5", "p7" };
+                static int preset_current = -1;
+            
+                if (preset_current == -1) {
+                    for (int i = 0; i < IM_ARRAYSIZE(presets); ++i) {
+                        if (encoder_config->encoder_preset == presets[i]) {
+                            preset_current = i;
+                            break;
+                        }
+                    }
+                }
+            
+                if (ImGui::Combo("Preset", &preset_current, presets, IM_ARRAYSIZE(presets))) {
+                    encoder_config->encoder_preset = presets[preset_current];
+                }
+            }
+            
+
+            {
                 const char *items[] = {"1", "2", "4", "8", "16"};
                 static const int item_numbers[] = {1, 2, 4, 8, 16};
-                static int downsample_current = 0;
+                static int downsample_current = 1;
                 if(ImGui::Combo("downsample streaming", &downsample_current, items, IM_ARRAYSIZE(items))) {
                     for (int i = 0; i < num_cameras; i++) {
                         cameras_select[i].downsample = item_numbers[downsample_current];
@@ -522,8 +544,7 @@ int main(int argc, char **args) {
                 if (fps_temp > 240) fps_temp = 240;
                 streaming_target_fps.store(fps_temp); // write it back safely
             }
-            
-   
+               
             if (camera_control->record_video) {
                 ImGui::EndDisabled();
             }
@@ -650,7 +671,7 @@ int main(int argc, char **args) {
                     if (ImGui::TreeNode("Save pictures from capturing")) {
                         save_image_all_ready = true;
                         for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].frame_save_state != State_Frame_Idle) {
+                            if (cameras_select[i].frame_save_state.load() != State_Frame_Idle) {
                                 save_image_all_ready = false;
                                 break;
                             }  
@@ -708,8 +729,11 @@ int main(int argc, char **args) {
                         }
 
                         //order important 
-                        if (calib_state == CalibSavePictures) {
-                            send_indigo_message(indigo_signal_builder.server, indigo_signal_builder.builder, indigo_signal_builder.indigo_connection, FetchGame::SignalType_CalibrationNextPose);
+                        if (save_image_all_ready && calib_state == CalibSavePictures) {
+                            send_indigo_message(indigo_signal_builder.server, 
+                                indigo_signal_builder.builder, 
+                                indigo_signal_builder.indigo_connection, 
+                                FetchGame::SignalType_CalibrationNextPose);
                             calib_state = CalibNextPose;
                         }
 
@@ -837,13 +861,12 @@ int main(int argc, char **args) {
 
                             }
                         }
-
                         
                         for (int i = 0; i < num_cameras; i++) {
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name == "ceiling_center") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = false;
+                                cameras_select[i].yolo = true;
                             }
 
                             if (cameras_params[i].camera_name == "shelter") {
@@ -856,12 +879,11 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             if (!skip_setting_params[i]) {
                                 open_camera_with_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
-                                                    &cameras_params[i]);                                
+                                                    &cameras_params[i]);
                             } else {
                                 update_camera_params(&ecams[i].camera, &device_info[cameras_params[i].camera_id],
                                                     &cameras_params[i]);
                             }
-
                         }
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
                         
@@ -885,6 +907,7 @@ int main(int argc, char **args) {
                 }
                 ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync);
                 ImGui::SameLine();
+                // ImGui::Checkbox("Trigger Mode", &camera_control->trigger_mode);
                 if (camera_control->subscribe) {
                     ImGui::EndDisabled();
                 }
@@ -1058,9 +1081,9 @@ int main(int argc, char **args) {
                         ImGui::Begin(window_name.c_str());
                         ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f}, "NOT RECORDING, ");
                         ImGui::SameLine();
-                        ImGui::Text("FPS: %.1f", streaming_fps.load());    
+                        ImGui::Text("FPS: %.1f", streaming_fps.load());
                         ImVec2 avail_size = ImGui::GetContentRegionAvail();
-    
+
                         static ImVec2 bmin(0, 0);
                         static ImVec2 uv0(0, 0);
                         static ImVec2 uv1(1, 1);
@@ -1082,8 +1105,6 @@ int main(int argc, char **args) {
                     }
                 }
             }
-
-
         }
 
         if (camera_control->open && show_realtime_plot) {

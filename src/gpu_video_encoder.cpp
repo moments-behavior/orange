@@ -119,7 +119,7 @@ encoder_pitch_(0)
         // DON'T allocate d_iyuv_temp_ yet - we need encoder pitch first
 
         encoder.cuContext = m_cuContext;
-        encoder.eFormat = NV_ENC_BUFFER_FORMAT_IYUV;
+        encoder.eFormat = NV_ENC_BUFFER_FORMAT_NV12;
         
         CUDA_CTX_LOG("Creating NVIDIA encoder");
         encoder.pEnc = new NvEncoderCuda(m_cuContext, camera_params->width, camera_params->height, encoder.eFormat);
@@ -157,6 +157,16 @@ encoder_pitch_(0)
             std::cout << "[GPUVideoEncoder] Mono camera detected, setting monoChromeEncoding to 1" << std::endl;
             encodeConfig.monoChromeEncoding = 1;
         }
+
+        std::cout << "===== NVENC Initialization Parameters =====" << std::endl;
+        std::cout << "  Width: " << initializeParams.encodeWidth << std::endl;
+        std::cout << "  Height: " << initializeParams.encodeHeight << std::endl;
+        std::cout << "  Frame Rate: " << initializeParams.frameRateNum << "/" << initializeParams.frameRateDen << std::endl;
+        std::cout << "  Rate Control: " << encodeConfig.rcParams.rateControlMode << std::endl;
+        std::cout << "  Avg Bitrate: " << encodeConfig.rcParams.averageBitRate << std::endl;
+        // This is the most likely culprit:
+        std::cout << "  Input Format: " << encoder.eFormat << std::endl;
+        std::cout << "========================================" << std::endl;
 
         encoder.pEnc->CreateEncoder(&initializeParams);
         encoder.pEnc->SetIOCudaStreams((NV_ENC_CUSTREAM_PTR)&m_stream, (NV_ENC_CUSTREAM_PTR)&m_stream);
@@ -231,9 +241,7 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
     ENCODER_CTX_LOG("=== ENTERING WorkerFunction ===", entry->frame_id);
     dumpCudaState("WorkerFunction Entry", entry->frame_id);
 
-
     try {
-
         // Ensure we're using the correct CUDA device
         ck(cudaSetDevice(camera_params->gpu_id));
         ENCODER_CTX_LOG("Setting NPP stream", entry->frame_id);
@@ -266,54 +274,71 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
                            (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
 
         if (camera_params->color) {
-            // === COLOR PATH (existing logic) ===
+            // === COLOR PATH ===
             ENCODER_CTX_LOG("Processing COLOR frame", entry->frame_id);
             std::cout << "[GPUEncoder] Processing COLOR frame at native resolution..." << std::endl;
             
-            // For color, we'd need to implement the full RGB->YUV pipeline
-            // This would involve debayering and color space conversion
-            // (Implementation would go here if needed)
+            // Debayer the raw Bayer data to RGBA
+            debayer_frame_gpu(camera_params, &frame_original, &debayer);
             
-        } else {
-            // === FIXED MONOCHROME PATH ===
-            ENCODER_CTX_LOG("Processing MONOCHROME frame", entry->frame_id);
-            std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
+            // Convert RGBA to RGB first
+            ck(cudaMalloc(&d_rgb_temp_, width * height * 3));
+            
+            // Convert RGBA to RGB (remove alpha channel)
+            rgba2rgb_convert(d_rgb_temp_, debayer.d_debayer, width, height, m_stream);
+            
+            // Now convert RGB to IYUV using NPP
+            NppiSize image_size = {width, height};
             
             // Calculate plane pointers with ENCODER PITCH
+            unsigned char* d_y_plane = d_iyuv_temp_;
+            unsigned char* d_u_plane = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
+            unsigned char* d_v_plane = d_u_plane + ((size_t)encoder_pitch_ * height / 4);
+            
+            // Convert RGB to YUV420 planar (IYUV format)
+            const unsigned char* rgb_planes[3] = {
+                d_rgb_temp_,                    // R plane
+                d_rgb_temp_ + width * height,   // G plane  
+                d_rgb_temp_ + 2 * width * height // B plane
+            };
+            
+            unsigned char* yuv_planes[3] = {d_y_plane, d_u_plane, d_v_plane};
+            int yuv_steps[3] = {encoder_pitch_, encoder_pitch_ / 2, encoder_pitch_ / 2};
+            
+            // Use NPP to convert RGB to YUV420
+            NppStatus npp_status = nppiRGBToYUV420_8u_C3P3R(
+                d_rgb_temp_, width * 3,     // RGB source
+                yuv_planes, yuv_steps,      // YUV destination planes
+                image_size                  // Image size
+            );
+            
+            if (npp_status != NPP_SUCCESS) {
+                std::cerr << "[GPUEncoder] NPP RGB to YUV420 conversion failed: " << npp_status << std::endl;
+            }
+            
+            cudaFree(d_rgb_temp_);
+            d_rgb_temp_ = nullptr;
+            
+        } else {
+            // === NEW **ASYNCHRONOUS** MONOCHROME PATH ===
             unsigned char* d_y_plane_dst = d_iyuv_temp_;
-            unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
-            unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)encoder_pitch_ * height / 4);
+            unsigned char* d_uv_plane_dst = d_y_plane_dst + ((size_t)encoder_pitch_ * height);
             
-            std::cout << "[GPUEncoder] Direct copy at native resolution:" << std::endl;
-            std::cout << "  - Y plane: " << static_cast<void*>(d_y_plane_dst) 
-                      << " (copy " << width << "x" << height 
-                      << " with src pitch " << width << " -> dst pitch " << encoder_pitch_ << ")" << std::endl;
-        
-            CUDA_MEM_LOG("Converting to IYUV", d_iyuv_temp_, encoder_pitch_ * height * 3 / 2, entry->frame_id);
-            
-            // Use cudaMemcpy2DAsync for proper pitch conversion
-            ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,              // dst, dst_pitch
-                                frame_original.d_orig, width,                // src, src_pitch  
-                                width, height,                               // width, height
-                                cudaMemcpyDeviceToDevice, m_stream));
-        
-            // Use encoder_pitch for U/V plane calculations
-            ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
-            ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
-            
-            std::cout << "[GPUEncoder] Native resolution IYUV planes created successfully" << std::endl;
+            // 1. Asynchronously copy the grayscale image data into the Y plane on our stream.
+            ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,
+                                 frame_original.d_orig, width,
+                                 width, height,
+                                 cudaMemcpyDeviceToDevice, m_stream));
+    
+            // 2. Asynchronously set the UV plane to the neutral chroma value (128) on the same stream.
+            ck(cudaMemset2DAsync(d_uv_plane_dst, encoder_pitch_, 128, 
+                                 encoder_pitch_, height / 2, m_stream));
         }
 
-        std::cout << "[GPUEncoder] NATIVE RESOLUTION encoding:" << std::endl;
-        std::cout << "  - Source: " << width << "x" << height << std::endl;
-        std::cout << "  - Encoder: " << width << "x" << height << std::endl;
-        std::cout << "  - Pitch match: YES" << std::endl;
-
-        // Stream synchronization
-        CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
-        ENCODER_CTX_LOG("Synchronizing stream before encode", entry->frame_id);
-        std::cout << "[GPUEncoder] Synchronizing stream before encode..." << std::endl;
-        ck(cudaStreamSynchronize(m_stream));
+        // The stream synchronize call here is now redundant but harmless.
+        // It ensures all previous work on the stream is done before encoding.
+        // CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
+        // ck(cudaStreamSynchronize(m_stream));
 
         // NVIDIA encoder call
         ENCODER_CTX_LOG("About to call NVIDIA EncodeFrame - CRITICAL POINT", entry->frame_id);

@@ -164,7 +164,6 @@ encoder_pitch_(0)
         std::cout << "  Frame Rate: " << initializeParams.frameRateNum << "/" << initializeParams.frameRateDen << std::endl;
         std::cout << "  Rate Control: " << encodeConfig.rcParams.rateControlMode << std::endl;
         std::cout << "  Avg Bitrate: " << encodeConfig.rcParams.averageBitRate << std::endl;
-        // This is the most likely culprit:
         std::cout << "  Input Format: " << encoder.eFormat << std::endl;
         std::cout << "========================================" << std::endl;
 
@@ -263,15 +262,26 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         }
 
         ENCODER_CTX_LOG("Processing frame dimensions", entry->frame_id);
-        std::cout << "[GPUEncoder] NATIVE RESOLUTION - Processing frame " << entry->frame_id 
-                  << " - Dimensions: " << width << "x" << height 
-                  << " (no resizing, pitch: " << encoder_pitch_ << ")" << std::endl;
-
-        // Copy frame data from entry to local buffer
-        CUDA_MEM_LOG("Copying frame data from entry", entry->d_image, width * height, entry->frame_id);
-        ENCODER_CTX_LOG("About to copy frame data", entry->frame_id);
-        ck(cudaMemcpyAsync(frame_original.d_orig, entry->d_image, 
-                           (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
+        
+        // GPU DIRECT OPTIMIZATION: Check if we can skip the copy
+        if (entry->gpu_direct_mode) {
+            std::cout << "[GPUEncoder] 🚀 GPU DIRECT Frame " << entry->frame_id 
+                      << " - Using camera buffer directly (ZERO COPY!)" << std::endl;
+            
+            // Use the GPU Direct pointer directly - NO COPY!
+            frame_original.d_orig = entry->d_image;
+            
+            ENCODER_CTX_LOG("GPU Direct path - no copy needed", entry->frame_id);
+        } else {
+            std::cout << "[GPUEncoder] 🐌 COPY PATH Frame " << entry->frame_id 
+                      << " - Copying frame data (" << (width * height / 1024 / 1024) << "MB)" << std::endl;
+            
+            // Traditional copy path
+            CUDA_MEM_LOG("Copying frame data from entry", entry->d_image, width * height, entry->frame_id);
+            ENCODER_CTX_LOG("About to copy frame data", entry->frame_id);
+            ck(cudaMemcpyAsync(frame_original.d_orig, entry->d_image, 
+                               (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
+        }
 
         if (camera_params->color) {
             // === COLOR PATH ===
@@ -320,47 +330,36 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             d_rgb_temp_ = nullptr;
             
         } else {
-                // === NEW NV12 MONOCHROME PATH ===
-                ENCODER_CTX_LOG("Processing MONOCHROME frame for NV12", entry->frame_id);
+            // === MONOCHROME PATH ===
+            ENCODER_CTX_LOG("Processing MONOCHROME frame", entry->frame_id);
+            std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
+            
+            // Calculate plane pointers with ENCODER PITCH
+            unsigned char* d_y_plane_dst = d_iyuv_temp_;
+            unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
+            unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)encoder_pitch_ * height / 4);
+            
+            CUDA_MEM_LOG("Converting to IYUV", d_iyuv_temp_, encoder_pitch_ * height * 3 / 2, entry->frame_id);
+            
+            // Use cudaMemcpy2DAsync for proper pitch conversion
+            ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,              // dst, dst_pitch
+                                frame_original.d_orig, width,                // src, src_pitch  
+                                width, height,                               // width, height
+                                cudaMemcpyDeviceToDevice, m_stream));
+        
+            // Use encoder_pitch for U/V plane calculations
+            ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
+            ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
+        }
 
-                // NV12 Layout:
-                // 1. A full-size Y plane.
-                // 2. A half-height plane with interleaved UV pairs (U0, V0, U1, V1, ...)
-
-                // Define the destination for the Y plane (same as before)
-                unsigned char* d_y_plane_dst = d_iyuv_temp_; // We can reuse this buffer
-
-                // 1. Copy the grayscale image data into the Y plane.
-                ck(cudaMemcpy2D(d_y_plane_dst, encoder_pitch_,
-                                frame_original.d_orig, width,
-                                width, height,
-                                cudaMemcpyDeviceToDevice));
-
-                // 2. Calculate the starting address of the interleaved UV plane.
-                unsigned char* d_uv_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
-
-                // 3. Create a temporary host buffer filled with the neutral chroma value (128).
-                //    The UV plane is half the height and the same pitch as the Y plane.
-                // size_t uv_plane_size = (size_t)encoder_pitch_ * (height / 2);
-                // std::vector<uint8_t> h_uv_plane(uv_plane_size, 128);
-                // 3. Calculate the size of the UV plane.
-                size_t uv_plane_size = (size_t)encoder_pitch_ * (height / 2);
-
-                // 4. Copy the neutral chroma data to the device.
-                //    This single, simple bulk copy is very robust.
-                ck(cudaMemsetAsync(d_uv_plane_dst, 128, uv_plane_size, m_stream));
-            }
-
-        // The stream synchronize call here is now redundant but harmless.
-        // It ensures all previous work on the stream is done before encoding.
-        // CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
-        // ck(cudaStreamSynchronize(m_stream));
+        // Stream synchronization
+        CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
+        ENCODER_CTX_LOG("Synchronizing stream before encode", entry->frame_id);
+        ck(cudaStreamSynchronize(m_stream));
 
         // NVIDIA encoder call
         ENCODER_CTX_LOG("About to call NVIDIA EncodeFrame - CRITICAL POINT", entry->frame_id);
         dumpCudaState("Pre-EncodeFrame", entry->frame_id);
-        
-        std::cout << "[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame " << entry->frame_id << "..." << std::endl;
         
         // Get encoder input frame and copy our IYUV data to it
         const NvEncInputFrame *encoderInputFrame = encoder.pEnc->GetNextInputFrame();
@@ -392,15 +391,51 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         
         std::cout << "[GPUEncoder] Frame " << entry->frame_id << " encoded successfully" << std::endl;
 
-        // Handle reference counting
+        // Handle reference counting and GPU Direct camera buffer management
         ENCODER_CTX_LOG("Handling reference count", entry->frame_id);
-        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        int remaining_refs = entry->ref_count.fetch_sub(1, std::memory_order_acq_rel);
+        
+        if (remaining_refs == 1) {
+            // This is the last worker - handle cleanup
+            if (entry->gpu_direct_mode && entry->camera_instance && entry->camera_frame_struct) {
+                // GPU Direct: Requeue the camera buffer now that all workers are done
+                EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);
+                std::cout << "[GPUEncoder] 🔄 GPU DIRECT Frame " << entry->frame_id 
+                          << " - Last worker requeued camera buffer" << std::endl;
+                ENCODER_CTX_LOG("GPU Direct camera buffer requeued by last worker", entry->frame_id);
+            }
+            
+            // Reset GPU Direct fields for recycling
+            entry->gpu_direct_mode = false;
+            entry->owns_memory = true;
+            entry->camera_buffer_ptr = nullptr;
+            entry->camera_instance = nullptr;
+            entry->camera_frame_struct = nullptr;
+            
+            // Recycle the worker entry
             m_recycle_queue.push(entry);
+            
+            std::cout << "[GPUEncoder] Frame " << entry->frame_id 
+                      << " - Last worker recycled entry" << std::endl;
+        } else {
+            std::cout << "[GPUEncoder] Frame " << entry->frame_id 
+                      << " - Worker finished, " << (remaining_refs - 1) << " workers remaining" << std::endl;
         }
 
     } catch (const std::exception& e) {
         std::cerr << "[GPUEncoder] Exception in WorkerFunction: " << e.what() << std::endl;
-        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        
+        // Handle reference counting even on error
+        int remaining_refs = entry->ref_count.fetch_sub(1, std::memory_order_acq_rel);
+        if (remaining_refs == 1) {
+            if (entry->gpu_direct_mode && entry->camera_instance && entry->camera_frame_struct) {
+                EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);
+            }
+            entry->gpu_direct_mode = false;
+            entry->owns_memory = true;
+            entry->camera_buffer_ptr = nullptr;
+            entry->camera_instance = nullptr;
+            entry->camera_frame_struct = nullptr;
             m_recycle_queue.push(entry);
         }
         

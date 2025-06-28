@@ -105,16 +105,79 @@ void acquire_frames(
             
             CUDA_CTX_LOG("=== FRAME " + std::to_string(camera_state.frame_count) + " PROCESSING ===");
             
-            // Centralized Frame Handling
-
-            // 1. Copy the raw frame to our persistent worker buffer ONCE.
-            CUDA_MEM_LOG("Copying camera frame to worker buffer", current_entry->d_image, 
-                        ecam->frame_recv.bufferSize, camera_state.frame_count);
-            ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
-            VALIDATE_CUDA_OP("Camera frame copy", camera_state.frame_count);
+            // --- GPU DIRECT DETECTION AND OPTIMIZATION ---
+            cudaPointerAttributes attrs;
+            cudaError_t err = cudaPointerGetAttributes(&attrs, ecam->frame_recv.imagePtr);
             
-            // 2. We can now immediately requeue the camera buffer.
-            EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
+            bool gpu_direct_working = false;
+            bool use_direct_pointer = false;
+            
+            if (err == cudaSuccess && attrs.type == cudaMemoryTypeDevice) {
+                // GPU Direct is working!
+                gpu_direct_working = true;
+                std::cout << "✅ [GPU_DIRECT] Frame " << camera_state.frame_count 
+                          << " - Camera buffer is on GPU (device " << attrs.device 
+                          << ") - GPU Direct SUCCESS!" << std::endl;
+                
+                // Check if we can use the pointer directly (safe conditions)
+                if (attrs.device == camera_params->gpu_id) {
+                    use_direct_pointer = true;
+                    std::cout << "🚀 [ZERO_COPY] Frame " << camera_state.frame_count 
+                              << " - Using camera buffer directly, NO COPY NEEDED!" << std::endl;
+                } else {
+                    std::cout << "⚠️ [GPU_MISMATCH] Frame " << camera_state.frame_count 
+                              << " - Camera on GPU " << attrs.device 
+                              << " but worker on GPU " << camera_params->gpu_id 
+                              << " - Copy required" << std::endl;
+                }
+            } else {
+                // GPU Direct not working
+                std::cout << "❌ [GPU_DIRECT_FAILED] Frame " << camera_state.frame_count 
+                          << " - Camera buffer not on GPU: " << cudaGetErrorString(err);
+                if (err == cudaSuccess) {
+                    std::cout << " (memory type: " << attrs.type << ")";
+                }
+                std::cout << " - Copy required" << std::endl;
+            }
+            
+            // --- CENTRALIZED FRAME HANDLING WITH OPTIMIZATION ---
+            
+            if (use_direct_pointer) {
+                // OPTIMIZATION: Use GPU Direct pointer directly - ZERO COPY!
+                current_entry->d_image = static_cast<unsigned char*>(ecam->frame_recv.imagePtr);
+                current_entry->gpu_direct_mode = true;
+                current_entry->owns_memory = false; // Don't free this pointer
+                
+                std::cout << "🎯 [PERFORMANCE] Frame " << camera_state.frame_count 
+                          << " - Zero copy path: " << (ecam->frame_recv.bufferSize / 1024 / 1024) 
+                          << "MB saved!" << std::endl;
+                
+                // IMPORTANT: Don't requeue the camera buffer yet since workers are using it!
+                // We'll need to handle requeuing differently for GPU Direct
+                
+            } else {
+                // FALLBACK: Traditional copy path
+                std::cout << "🐌 [COPY_PATH] Frame " << camera_state.frame_count 
+                          << " - Copying " << (ecam->frame_recv.bufferSize / 1024 / 1024) 
+                          << "MB to worker buffer" << std::endl;
+                
+                CUDA_MEM_LOG("Copying camera frame to worker buffer", current_entry->d_image, 
+                            ecam->frame_recv.bufferSize, camera_state.frame_count);
+                ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, 
+                                   ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
+                VALIDATE_CUDA_OP("Camera frame copy", camera_state.frame_count);
+                
+                // Synchronize to ensure copy is complete before requeuing
+                CUDA_SYNC_LOG("Synchronizing stream after camera copy", stream, camera_state.frame_count);
+                ck(cudaStreamSynchronize(stream));
+                VALIDATE_CUDA_OP("Stream synchronization", camera_state.frame_count);
+                
+                current_entry->gpu_direct_mode = false;
+                current_entry->owns_memory = true; // This buffer can be recycled normally
+                
+                // Safe to requeue immediately after copy
+                EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
+            }
             
             // 3. Populate the metadata for the WORKER_ENTRY.
             current_entry->width = ecam->frame_recv.size_x;
@@ -123,7 +186,7 @@ void acquire_frames(
             current_entry->timestamp = ecam->frame_recv.timestamp;
             current_entry->frame_id = camera_state.frame_count;
             current_entry->has_detections = false;
-
+        
             // 4. Handle asynchronous save request (NON-BLOCKING).
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
                 CUDA_CTX_LOG("Processing frame save request for frame " + std::to_string(camera_state.frame_count));
@@ -131,29 +194,36 @@ void acquire_frames(
                 FrameGPU temp_frame_gpu;
                 temp_frame_gpu.d_orig = current_entry->d_image;
                 temp_frame_gpu.size_pic = current_entry->width * current_entry->height;
-
+        
                 if (camera_params->color){
                     debayer_frame_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
                 } else {
                     duplicate_channel_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
                 }
-                rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, camera_params->width, camera_params->height, stream);
+                rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, 
+                                camera_params->width, camera_params->height, stream);
                 
                 // Asynchronously copy data to the host buffer
-                ck(cudaMemcpy2DAsync(frame_process_save.frame_cpu.frame, camera_params->width*3, frame_process_save.d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost, stream));
-
+                ck(cudaMemcpy2DAsync(frame_process_save.frame_cpu.frame, camera_params->width*3, 
+                                    frame_process_save.d_convert, camera_params->width*3, 
+                                    camera_params->width*3, camera_params->height, 
+                                    cudaMemcpyDeviceToHost, stream));
+        
                 // Create and record a CUDA event to mark when the copy is done
                 cudaEvent_t event;
                 ck(cudaEventCreate(&event));
                 ck(cudaEventRecord(event, stream));
-
+        
                 // Create the save job with the necessary info
                 ImageWriter_Entry* save_job = new ImageWriter_Entry();
                 save_job->event = event;
                 save_job->cpu_buffer = frame_process_save.frame_cpu.frame;
                 save_job->width = camera_params->width;
                 save_job->height = camera_params->height;
-                save_job->file_path = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
+                save_job->file_path = camera_select->picture_save_folder + "/" + 
+                                     camera_params->camera_serial + "_" + 
+                                     camera_select->frame_save_name + "." + 
+                                     camera_select->frame_save_format;
                 
                 // Queue the job; this will no longer block!
                 image_writer->PutObjectToQueueIn(save_job);
@@ -161,34 +231,36 @@ void acquire_frames(
                 camera_select->pictures_counter++;
                 camera_select->frame_save_state = State_Frame_Idle;
             }
-
+        
             // 5. Dispatch the WORKER_ENTRY to real-time workers.
             int dispatch_count = 0;
             if (camera_select->stream_on && openGLDisplay) dispatch_count++;
             if (camera_control->record_video && gpu_encoder) dispatch_count++;
             if (camera_select->yolo && yolo_worker) dispatch_count++;
-
+        
             // Log dispatch analysis with context info
             CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatch analysis");
             dumpCudaState("Before frame dispatch", camera_state.frame_count);
-
+        
             std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " << current_entry->frame_id 
-                    << " dispatch analysis:" << std::endl;
+                      << " dispatch analysis:" << std::endl;
             std::cout << "  - stream_on: " << (camera_select->stream_on ? "true" : "false") 
-                    << ", openGLDisplay: " << (openGLDisplay ? "valid" : "null") << std::endl;
+                      << ", openGLDisplay: " << (openGLDisplay ? "valid" : "null") << std::endl;
             std::cout << "  - record_video: " << (camera_control->record_video ? "true" : "false") 
-                    << ", gpu_encoder: " << (gpu_encoder ? "valid" : "null") << std::endl;
+                      << ", gpu_encoder: " << (gpu_encoder ? "valid" : "null") << std::endl;
             std::cout << "  - yolo: " << (camera_select->yolo ? "true" : "false") 
-                    << ", yolo_worker: " << (yolo_worker ? "valid" : "null") << std::endl;
+                      << ", yolo_worker: " << (yolo_worker ? "valid" : "null") << std::endl;
             std::cout << "  - Total dispatch_count: " << dispatch_count << std::endl;
-
+            std::cout << "  - GPU Direct mode: " << (current_entry->gpu_direct_mode ? "YES" : "NO") << std::endl;
+        
             if (dispatch_count > 0) {
                 current_entry->ref_count.store(dispatch_count);
                 
-                CUDA_CTX_LOG("Setting ref_count to " + std::to_string(dispatch_count) + " for frame " + std::to_string(camera_state.frame_count));
+                CUDA_CTX_LOG("Setting ref_count to " + std::to_string(dispatch_count) + 
+                            " for frame " + std::to_string(camera_state.frame_count));
                 
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Dispatching frame " 
-                        << current_entry->frame_id << " to " << dispatch_count << " consumers:" << std::endl;
+                          << current_entry->frame_id << " to " << dispatch_count << " consumers:" << std::endl;
                 
                 // Dispatch with detailed logging
                 if (camera_select->stream_on && openGLDisplay) {
@@ -212,18 +284,36 @@ void acquire_frames(
                 }
                 
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
-                        << current_entry->frame_id << " dispatched successfully" << std::endl;
+                          << current_entry->frame_id << " dispatched successfully" << std::endl;
                 CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatched successfully");
+                
+                // SPECIAL HANDLING: If using GPU Direct, we need to handle camera buffer requeuing differently
+                if (use_direct_pointer) {
+                    // For GPU Direct, we can't requeue immediately since workers are using the buffer
+                    // The last worker to finish will need to handle requeuing
+                    // This requires modifications to the worker classes (see next step)
+                    current_entry->camera_buffer_ptr = ecam->frame_recv.imagePtr;
+                    current_entry->camera_instance = &ecam->camera;
+                    current_entry->camera_frame_struct = &ecam->frame_recv;
+                    
+                    std::cout << "⚠️ [GPU_DIRECT] Frame " << current_entry->frame_id 
+                              << " - Camera buffer requeue will be handled by last worker" << std::endl;
+                }
                 
             } else {
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
-                        << current_entry->frame_id << " has no consumers - recycling immediately" << std::endl;
+                          << current_entry->frame_id << " has no consumers - recycling immediately" << std::endl;
                 CUDA_CTX_LOG("No consumers, recycling frame " + std::to_string(camera_state.frame_count));
+                
+                // If no consumers and using GPU Direct, requeue the camera buffer now
+                if (use_direct_pointer) {
+                    EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
+                    std::cout << "🔄 [GPU_DIRECT] Frame " << current_entry->frame_id 
+                              << " - Camera buffer requeued (no consumers)" << std::endl;
+                }
+                
                 free_entries_queue->push(current_entry);
             }
-        } else {
-            CUDA_CTX_LOG("Camera frame acquisition failed");
-            free_entries_queue->push(current_entry);
         }
     }
 

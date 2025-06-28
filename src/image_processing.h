@@ -16,10 +16,23 @@ typedef struct {
     unsigned long long timestamp;
     unsigned long long frame_id;
     uint64_t timestamp_sys;
-    // --- Fields for YOLO results ---
-    std::vector<pose::Object> detections; // Store YOLO detection results
-    bool has_detections;                  // Flag to indicate if detections are present
-    std::atomic<int> ref_count;           // Reference count for memory management
+    
+    // YOLO detection fields
+    std::vector<pose::Object> detections;
+    bool has_detections;
+    
+    // Reference counting for memory management
+    std::atomic<int> ref_count;
+    
+    // NEW: GPU Direct optimization fields
+    bool gpu_direct_mode = false;           // True if using GPU Direct pointer
+    bool owns_memory = true;                // False if using camera's GPU Direct buffer
+    
+    // GPU Direct camera buffer management (only used when gpu_direct_mode = true)
+    void* camera_buffer_ptr = nullptr;      // Original camera buffer pointer
+    Emergent::CEmergentCamera* camera_instance = nullptr;  // Camera instance for requeuing
+    Emergent::CEmergentFrame* camera_frame_struct = nullptr; // Frame struct for requeuing
+    
 } WORKER_ENTRY;
 
 

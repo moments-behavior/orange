@@ -62,3 +62,4 @@ profile/
 imgui.ini
 cuda_debug.log
 third_party/flatbuffers
+orange_profile.sqlite

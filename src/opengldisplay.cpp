@@ -80,7 +80,7 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     if (!f) return false;
 
     // For debugging, print with worker function call
-    std::cout << "!!! WORKERFUNCTION CALLED !!!" << std::endl;
+    // std::cout << "!!! WORKERFUNCTION CALLED !!!" << std::endl;
 
     // Always print this regardless of downsample factor
     static int frame_count = 0;

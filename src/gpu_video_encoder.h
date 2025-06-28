@@ -41,6 +41,10 @@ public:
         SafeQueue<WORKER_ENTRY*>& recycle_queue);
     ~GPUVideoEncoder() override;
 
+    double get_fps() const {
+        return current_fps_;
+    }
+
     bool* encoder_ready_signal;
 
 protected:

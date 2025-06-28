@@ -105,17 +105,13 @@ void acquire_frames(
             
             CUDA_CTX_LOG("=== FRAME " + std::to_string(camera_state.frame_count) + " PROCESSING ===");
             
-            // --- FIX: Centralized Frame Handling ---
+            // Centralized Frame Handling
 
             // 1. Copy the raw frame to our persistent worker buffer ONCE.
             CUDA_MEM_LOG("Copying camera frame to worker buffer", current_entry->d_image, 
                         ecam->frame_recv.bufferSize, camera_state.frame_count);
             ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
             VALIDATE_CUDA_OP("Camera frame copy", camera_state.frame_count);
-
-            CUDA_SYNC_LOG("Synchronizing stream after camera copy", stream, camera_state.frame_count);
-            ck(cudaStreamSynchronize(stream));
-            VALIDATE_CUDA_OP("Stream synchronization", camera_state.frame_count);
             
             // 2. We can now immediately requeue the camera buffer.
             EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);

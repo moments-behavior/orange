@@ -68,7 +68,7 @@ public:
 
     std::chrono::steady_clock::time_point last_fps_update_time_;
     int frame_counter_;
-    std::atomic<double> current_fps_; // This is the only line that should be changed here
+    std::atomic<double> current_fps_;
 
     // Shared memory IPC
     shaman::SharedBoxQueue* shaman_ipc_queue_;

@@ -2,9 +2,7 @@
 #define ORANGE_VIDEO_CAPTURE
 #include "camera.h"
 #include "network_base.h"
-#include "thread.h"
-#include <fstream>
-#include <iostream>
+#include <atomic>
 
 enum PictureState {
     State_Frame_Idle = 0,
@@ -34,6 +32,8 @@ struct CameraEachSelect {
     std::string picture_save_folder;
     std::string yolo_model;
     bool detect3d = false;
+    int idx2d;
+    int idx3d;
     std::atomic<PictureState> frame_decode_state;
     CameraEachSelect()
         : frame_save_state(State_Frame_Idle),

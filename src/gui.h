@@ -43,7 +43,7 @@ void upload_texture_from_pbo(GL_Texture &tex, int width, int height) {
     unbind_texture();
 }
 
-void clear_upload_and_cleanup(GL_Texture &tex, int width, int height) {
+inline void clear_upload_and_cleanup(GL_Texture &tex, int width, int height) {
     // Clear the CUDA buffer
     int size_pic = width * height * sizeof(unsigned char) * 4;
     cudaMemset(tex.cuda_buffer, 0, size_pic);
@@ -306,5 +306,67 @@ struct RollingBuffer {
         Data.push_back(ImVec2(xmod, y));
     }
 };
+
+inline void gui_plot_world_coordinates(CameraCalibResults *cvp,
+                                       CameraParams *camera_params) {
+    double axis_x_values[4];
+    double axis_y_values[4];
+    world_coordinates_projection_points(cvp, axis_x_values, axis_y_values, 50,
+                                        camera_params);
+    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0,
+                               ImVec4(1.0, 1.0, 1.0, 1.0));
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 1.0, 1.0), 3.0);
+    std::string name = "World Origin";
+
+    float one_axis_x[2];
+    float one_axis_y[2];
+
+    std::vector<triple_f> node_colors = {{1.0f, 1.0f, 1.0f},
+                                         {1.0f, 0.0f, 0.0f},
+                                         {0.0f, 1.0f, 0.0f},
+                                         {0.0f, 0.0f, 1.0f}};
+
+    for (u32 edge = 0; edge < 3; edge++) {
+        double xs[2]{axis_x_values[0], axis_x_values[edge + 1]};
+        double ys[2]{axis_y_values[0], axis_y_values[edge + 1]};
+
+        ImVec4 my_color;
+        my_color.w = 1.0f;
+        my_color.x = node_colors[edge + 1].x;
+        my_color.y = node_colors[edge + 1].y;
+        my_color.z = node_colors[edge + 1].z;
+
+        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
+        ImPlot::SetNextLineStyle(my_color, 3.0);
+        ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
+    }
+}
+
+inline void draw_aruco_markers(Aruco2d *aruco_marker) {
+    double x[5] = {(double)aruco_marker->proj_corners[0].x,
+                   (double)aruco_marker->proj_corners[1].x,
+                   (double)aruco_marker->proj_corners[2].x,
+                   (double)aruco_marker->proj_corners[3].x,
+                   (double)aruco_marker->proj_corners[0].x};
+
+    double y[5] = {(double)2200 - (double)aruco_marker->proj_corners[0].y,
+                   (double)2200 - (double)aruco_marker->proj_corners[1].y,
+                   (double)2200 - (double)aruco_marker->proj_corners[2].y,
+                   (double)2200 - (double)aruco_marker->proj_corners[3].y,
+                   (double)2200 - (double)aruco_marker->proj_corners[0].y};
+
+    ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
+    ImPlot::PlotLine("Aruco", x, y, 5);
+}
+
+inline void draw_ball_center(Ball2d *ball2d) {
+    ImVec4 node_color = (ImVec4)ImColor::HSV(0.1, 0.9f, 0.9f);
+    float pt_size = 6.0f;
+
+    double ball_center_x = (double)ball2d->proj_center[0].x;
+    double ball_center_y = (double)2200 - (double)ball2d->proj_center[0].y;
+    ImPlot::DragPoint(0, &ball_center_x, &ball_center_y, node_color, pt_size,
+                      ImPlotDragToolFlags_None);
+}
 
 #endif

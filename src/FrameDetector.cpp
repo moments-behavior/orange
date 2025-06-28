@@ -1,4 +1,5 @@
 #include "FrameDetector.h"
+#include "global.h"
 #include "kernel.cuh"
 #include <npp.h>
 
@@ -61,6 +62,7 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr) {
 void FrameDetector::thread_loop() {
     ck(cudaSetDevice(camera_params->gpu_id));
     ck(nppSetStream(stream));
+    std::vector<Bbox> objs;
 
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);
@@ -90,6 +92,15 @@ void FrameDetector::thread_loop() {
         yolov8->preprocess_gpu(frame_process.d_convert);
         yolov8->infer();
         yolov8->postprocess(objs);
+
+        if (objs.size() > 0) {
+            f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
+            f32 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
+
+            detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
+            detection2d[camera_select->idx2d].ball2d.center[0] = {
+                bbox_center_x, bbox_center_y};
+        }
 
         ck(cudaStreamSynchronize(stream));
 

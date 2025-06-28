@@ -1069,27 +1069,24 @@ int main(int argc, char **args) {
                             }
                         }
 
-                        detection_data.detect_per_cam =
-                            new DetectionDataPerCam[num_cameras];
+                        detection2d = new DetectionDataPerCam[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
-                            detection_data.detect_per_cam[i].calibration_file =
+                            int idx3d = 0;
+                            detection2d[i].calibration_file =
                                 calib_yaml_folder + "/Cam" +
                                 cameras_params[i].camera_serial + ".yaml";
-                            std::cout << detection_data.detect_per_cam[i]
-                                             .calibration_file
-                                      << std::endl;
-                            detection_data.detect_per_cam[i]
-                                .has_calibration_results =
+                            detection2d[i].has_calibration_results =
                                 load_camera_calibration_results(
-                                    detection_data.detect_per_cam[i]
-                                        .calibration_file,
-                                    &detection_data.detect_per_cam[i]
-                                         .camera_calib);
-                            if (detection_data.detect_per_cam[i]
-                                    .has_calibration_results) {
-                                print_calibration_results(
-                                    &detection_data.detect_per_cam[i]
-                                         .camera_calib);
+                                    detection2d[i].calibration_file,
+                                    &detection2d[i].camera_calib);
+                            if (detection2d[i].has_calibration_results) {
+                                std::cout << detection2d[i].calibration_file
+                                          << std::endl;
+                            }
+                            cameras_select[i].idx2d = i;
+                            if (cameras_select[i].detect3d) {
+                                cameras_select[i].idx3d = idx3d;
+                                idx3d++;
                             }
                         }
 
@@ -1327,6 +1324,16 @@ int main(int argc, char **args) {
                                               ImVec2(0, 0),
                                               ImVec2(cameras_params[i].width,
                                                      cameras_params[i].height));
+
+                            if (detection2d[i].has_calibration_results) {
+                                gui_plot_world_coordinates(
+                                    &detection2d[i].camera_calib,
+                                    &cameras_params[i]);
+
+                                if (detection2d[i].ball2d.find_ball.load()) {
+                                    draw_ball_center(&detection2d[i].ball2d);
+                                }
+                            }
 
                             ImPlot::EndPlot();
                         }

@@ -30,7 +30,7 @@ class FrameDetector {
     CameraEachSelect *camera_select;
     FrameProcess frame_process;
     YOLOv8 *yolov8;
-    std::vector<Bbox> objs;
+
     std::atomic<bool> running;
     std::mutex mtx;
     std::condition_variable cv;

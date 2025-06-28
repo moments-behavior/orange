@@ -1344,12 +1344,21 @@ int main(int argc, char **args) {
                         ImPlotAxisFlags axisFlags = ImPlotAxisFlags_NoTickLabels | ImPlotAxisFlags_NoTickMarks |
                                                     ImPlotAxisFlags_NoGridLines;
                         if (ImPlot::BeginPlot("##no_plot_name", avail_size, ImPlotFlags_Equal | ImPlotAxisFlags_AutoFit)) {
-                            ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0, cameras_params[i].height);
-                            ImPlot::SetupAxis(ImAxis_X1, nullptr, axisFlags); // X-axis
-                            ImPlot::SetupAxis(ImAxis_Y1, nullptr, axisFlags); // Y-axis
+                            
+                            // Calculate the correct display dimensions based on the downsample factor.
+                            const float display_width = static_cast<float>(cameras_params[i].width / cameras_select[i].downsample);
+                            const float display_height = static_cast<float>(cameras_params[i].height / cameras_select[i].downsample);
+
+                            // Set the plot axes to match the dimensions of the image being displayed.
+                            ImPlot::SetupAxesLimits(0, display_width, 0, display_height);
+                            ImPlot::SetupAxis(ImAxis_X1, nullptr, axisFlags); 
+                            ImPlot::SetupAxis(ImAxis_Y1, nullptr, axisFlags);
+
+                            // Tell ImPlot to draw the image using these correct dimensions.
                             ImPlot::PlotImage("##no_image_name", (void *) (intptr_t) tex[i].texture, ImVec2(0, 0),
-                                              ImVec2(cameras_params[i].width, cameras_params[i].height));
-    
+                                              ImVec2(display_width, display_height));
+                                              
+
                             ImPlot::EndPlot();
                         }
                         ImGui::End();
@@ -1383,8 +1392,8 @@ int main(int argc, char **args) {
                             ImPlot::SetupAxis(ImAxis_X1, nullptr, axisFlags); // X-axis
                             ImPlot::SetupAxis(ImAxis_Y1, nullptr, axisFlags); // Y-axis
                             ImPlot::PlotImage("##no_image_name", (void *) (intptr_t) tex[i].texture, ImVec2(0, 0),
-                                              ImVec2(cameras_params[i].width, cameras_params[i].height));
-    
+                                                ImVec2(cameras_params[i].width, cameras_params[i].height));
+                        
                             ImPlot::EndPlot();
                         }
                         ImGui::End();

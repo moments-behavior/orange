@@ -41,6 +41,6 @@ private:
 
 	cudaStream_t m_stream;
 
-    // --- FIX: Add a reference to the central recycle queue ---
+    // Add a reference to the central recycle queue
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };

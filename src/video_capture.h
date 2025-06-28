@@ -34,10 +34,10 @@ struct CameraEachSelect {
     bool detect3d = false;
     int idx2d;
     int idx3d;
-    std::atomic<PictureState> frame_decode_state;
+    std::atomic<PictureState> frame_detect_state;
     CameraEachSelect()
         : frame_save_state(State_Frame_Idle),
-          frame_decode_state(State_Frame_Idle) {}
+          frame_detect_state(State_Frame_Idle) {}
 };
 
 struct CameraState {

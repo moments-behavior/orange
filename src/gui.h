@@ -342,29 +342,30 @@ inline void gui_plot_world_coordinates(CameraCalibResults *cvp,
     }
 }
 
-inline void draw_aruco_markers(Aruco2d *aruco_marker) {
+inline void draw_aruco_markers(Aruco2d *aruco_marker, int frame_height) {
     double x[5] = {(double)aruco_marker->proj_corners[0].x,
                    (double)aruco_marker->proj_corners[1].x,
                    (double)aruco_marker->proj_corners[2].x,
                    (double)aruco_marker->proj_corners[3].x,
                    (double)aruco_marker->proj_corners[0].x};
 
-    double y[5] = {(double)2200 - (double)aruco_marker->proj_corners[0].y,
-                   (double)2200 - (double)aruco_marker->proj_corners[1].y,
-                   (double)2200 - (double)aruco_marker->proj_corners[2].y,
-                   (double)2200 - (double)aruco_marker->proj_corners[3].y,
-                   (double)2200 - (double)aruco_marker->proj_corners[0].y};
+    double y[5] = {
+        (double)frame_height - (double)aruco_marker->proj_corners[0].y,
+        (double)frame_height - (double)aruco_marker->proj_corners[1].y,
+        (double)frame_height - (double)aruco_marker->proj_corners[2].y,
+        (double)frame_height - (double)aruco_marker->proj_corners[3].y,
+        (double)frame_height - (double)aruco_marker->proj_corners[0].y};
 
     ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
     ImPlot::PlotLine("Aruco", x, y, 5);
 }
 
-inline void draw_ball_center(Ball2d *ball2d) {
+inline void draw_ball_center(cv::Point2f ball_center, int frame_height) {
     ImVec4 node_color = (ImVec4)ImColor::HSV(0.1, 0.9f, 0.9f);
     float pt_size = 6.0f;
 
-    double ball_center_x = (double)ball2d->proj_center[0].x;
-    double ball_center_y = (double)2200 - (double)ball2d->proj_center[0].y;
+    double ball_center_x = (double)ball_center.x;
+    double ball_center_y = (double)frame_height - (double)ball_center.y;
     ImPlot::DragPoint(0, &ball_center_x, &ball_center_y, node_color, pt_size,
                       ImPlotDragToolFlags_None);
 }

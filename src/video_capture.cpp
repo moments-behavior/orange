@@ -198,7 +198,7 @@ inline void get_one_frame(CameraState *camera_state,
         }
         FrameDetector *detector = static_cast<FrameDetector *>(frame_detector);
         if (detector &&
-            camera_select->frame_decode_state.load() == State_Copy_New_Frame) {
+            camera_select->frame_detect_state.load() == State_Copy_New_Frame) {
             detector->notify_frame_ready(ecam->frame_recv.imagePtr);
         }
 #endif
@@ -259,6 +259,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     FrameDetector *frame_detector = nullptr;
     if (camera_select->detect3d) {
         frame_detector = new FrameDetector(camera_params, camera_select);
+        frame_detector->start();
     }
 #endif
 

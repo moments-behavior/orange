@@ -55,7 +55,7 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr) {
                         camera_params->width, camera_params->width,
                         camera_params->height, cudaMemcpyHostToDevice));
     }
-    camera_select->frame_save_state.store(State_Frame_Copy_Done);
+    camera_select->frame_detect_state.store(State_Frame_Copy_Done);
     cv.notify_one();
 }
 
@@ -67,7 +67,7 @@ void FrameDetector::thread_loop() {
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [&] {
-            return camera_select->frame_save_state.load() ==
+            return camera_select->frame_detect_state.load() ==
                        State_Frame_Copy_Done ||
                    !running.load();
         });
@@ -88,7 +88,6 @@ void FrameDetector::thread_loop() {
         rgba2rgb_convert(frame_process.d_convert,
                          frame_process.debayer.d_debayer, camera_params->width,
                          camera_params->height, stream);
-
         yolov8->preprocess_gpu(frame_process.d_convert);
         yolov8->infer();
         yolov8->postprocess(objs);
@@ -97,15 +96,19 @@ void FrameDetector::thread_loop() {
             f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
             f32 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
 
-            detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
             detection2d[camera_select->idx2d].ball2d.center[0] = {
                 bbox_center_x, bbox_center_y};
+            std::cout << detection2d[camera_select->idx2d].ball2d.center[0].x
+                      << std::endl;
+            detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
+        } else {
+            detection2d[camera_select->idx2d].ball2d.find_ball.store(false);
         }
 
         ck(cudaStreamSynchronize(stream));
 
         // running detection
 
-        camera_select->frame_save_state.store(State_Frame_Idle);
+        camera_select->frame_detect_state.store(State_Frame_Idle);
     }
 }

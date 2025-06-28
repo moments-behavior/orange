@@ -1,6 +1,7 @@
 // src/opengldisplay.cpp
 
 #include "opengldisplay.h"
+#include "cuda_context_debug.h"
 #include "kernel.cuh"
 #include "shaman.h"
 #include <cuda_runtime.h>
@@ -22,6 +23,13 @@ COpenGLDisplay::COpenGLDisplay(const char* name, CUcontext cuda_context, CameraP
       m_stream(nullptr),
       m_recycle_queue(recycle_queue)
 {
+    std::cout << "========================================" << std::endl;
+    std::cout << "[OPENGL_DISPLAY] CONSTRUCTOR CALLED" << std::endl;
+    std::cout << "  Camera: " << camera_params->camera_name << std::endl;
+    std::cout << "  Downsample: " << camera_select->downsample << std::endl;
+    std::cout << "  Thread name: " << (name ? name : "null") << std::endl;
+    std::cout << "========================================" << std::endl;
+
     ck(cuCtxPushCurrent(m_cuContext)); // Ensure the CUDA context is active for this thread
     ck(cudaSetDevice(camera_params->gpu_id));
     ck(cudaStreamCreate(&m_stream));
@@ -31,12 +39,26 @@ COpenGLDisplay::COpenGLDisplay(const char* name, CUcontext cuda_context, CameraP
     ck(cudaMalloc(&d_points_for_drawing_, sizeof(float) * 4 * 2 * shaman::MAX_OBJECTS));
     ck(cudaMalloc(&d_skeleton_for_drawing_, sizeof(unsigned int) * 4 * 2));
     ck(cudaMalloc(&d_display_resize_buffer_, camera_params->width * camera_params->height * 4));
+
+    std::cout << "[OPENGL_DISPLAY] Constructor completed:" << std::endl;
+    std::cout << "  - Camera: " << camera_params->camera_name << std::endl;
+    std::cout << "  - Resolution: " << camera_params->width << "x" << camera_params->height << std::endl;
+    std::cout << "  - Downsample: " << camera_select->downsample << std::endl;
+    std::cout << "  - Buffer allocated: " << (d_display_resize_buffer_ != nullptr ? "Yes" : "No") << std::endl;
+    std::cout << "  - Stream created: " << (m_stream != nullptr ? "Yes" : "No") << std::endl;
+    
     CUcontext popped_context;
     ck(cuCtxPopCurrent(&popped_context));
 }
 
 COpenGLDisplay::~COpenGLDisplay()
 {
+    std::cout << "========================================" << std::endl;
+    std::cout << "[OPENGL_DISPLAY] DESTRUCTOR CALLED" << std::endl;
+    if (camera_params) {
+        std::cout << "  Camera: " << camera_params->camera_name << std::endl;
+    }
+    std::cout << "========================================" << std::endl;
     if (camera_params) {
         ck(cudaSetDevice(camera_params->gpu_id));
     }
@@ -57,17 +79,34 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
 {
     if (!f) return false;
 
+    std::cout << "!!! WORKERFUNCTION CALLED !!!" << std::endl;
+
+    // Always print this regardless of downsample factor
+    static int frame_count = 0;
+    frame_count++;
+    std::cout << "[OPENGL_DISPLAY] Frame " << frame_count 
+              << " | Downsample: " << camera_select->downsample 
+              << " | Camera: " << camera_params->camera_name << std::endl;
+
+    CUDA_CONTEXT_SCOPE(m_cuContext);
+
     ck(cudaSetDevice(camera_params->gpu_id));
     nppSetStream(m_stream); // Associate NPP calls with our stream
 
+    std::cout << "[OPENGL_DISPLAY] About to copy frame data..." << std::endl;
+
     size_t buffer_size = static_cast<size_t>(f->width) * static_cast<size_t>(f->height);
     ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, f->d_image, buffer_size, cudaMemcpyDeviceToDevice, m_stream));
+
+    std::cout << "[OPENGL_DISPLAY] About to debayer..." << std::endl;
 
     if (camera_params->color){
         debayer_frame_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
     } else {
         duplicate_channel_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
     }
+
+    std::cout << "[OPENGL_DISPLAY] Debayer complete, checking detections..." << std::endl;
 
     if (f->has_detections) {
         std::vector<float> h_points;
@@ -101,27 +140,97 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         }
     }
 
-    if (camera_select->downsample > 1) {
-        output_display_size_.width = camera_params->width / camera_select->downsample;
-        output_display_size_.height = camera_params->height / camera_select->downsample;
-
-        input_roi_for_display_resize_ = {0, 0, camera_params->width, camera_params->height};
-        output_roi_for_display_resize_ = {0, 0, output_display_size_.width, output_display_size_.height};
-
-        nppiResize_8u_C4R(debayer_gpu_.d_debayer, camera_params->width * 4, debayer_gpu_.size, input_roi_for_display_resize_,
-                          d_display_resize_buffer_, output_display_size_.width * 4, output_display_size_, output_roi_for_display_resize_, NPPI_INTER_SUPER);
-
-        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, d_display_resize_buffer_,
-                           output_display_size_.width * output_display_size_.height * 4,
-                           cudaMemcpyDeviceToDevice, m_stream));
-    } else {
-        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, debayer_gpu_.d_debayer,
-                           camera_params->width * camera_params->height * 4,
-                           cudaMemcpyDeviceToDevice, m_stream));
+    std::cout << "[OPENGL_DISPLAY] About to check downsample: " << camera_select->downsample << std::endl;
+    static bool debug_printed = false;
+    if (!debug_printed && camera_select->downsample > 1) {
+        std::cout << "=== Downsampling Debug Info ===" << std::endl;
+        std::cout << "Camera: " << camera_params->camera_name << std::endl;
+        std::cout << "Original resolution: " << camera_params->width << "x" << camera_params->height << std::endl;
+        std::cout << "Downsample factor: " << camera_select->downsample << std::endl;
+        std::cout << "Target resolution: " << (camera_params->width / camera_select->downsample) 
+                << "x" << (camera_params->height / camera_select->downsample) << std::endl;
+        std::cout << "Input buffer size: " << (camera_params->width * camera_params->height * 4) << " bytes" << std::endl;
+        std::cout << "Output buffer size: " << ((camera_params->width / camera_select->downsample) * 
+                                            (camera_params->height / camera_select->downsample) * 4) << " bytes" << std::endl;
+        std::cout << "Display buffer pointer: " << (void*)display_buffer_pbo_cuda_ptr_ << std::endl;
+        std::cout << "Resize buffer pointer: " << (void*)d_display_resize_buffer_ << std::endl;
+        debug_printed = true;
     }
 
+    if (camera_select->downsample > 1) {
+        std::cout << "[OPENGL_DISPLAY] DOWNSAMPLING PATH - starting resize..." << std::endl;
+        output_display_size_.width = camera_params->width / camera_select->downsample;
+        output_display_size_.height = camera_params->height / camera_select->downsample;
+    
+        // Validate buffer size
+        size_t required_buffer_size = static_cast<size_t>(output_display_size_.width) * 
+                                      static_cast<size_t>(output_display_size_.height) * 4;
+        size_t allocated_buffer_size = static_cast<size_t>(camera_params->width) * 
+                                       static_cast<size_t>(camera_params->height) * 4;
+        
+        if (required_buffer_size > allocated_buffer_size) {
+            std::cerr << "ERROR: Resize buffer too small! Required: " << required_buffer_size 
+                      << ", Allocated: " << allocated_buffer_size << std::endl;
+            return false;
+        }
 
+        // Input parameters (source image)
+        NppiSize input_size = {camera_params->width, camera_params->height};
+        NppiRect input_roi = {0, 0, camera_params->width, camera_params->height};
+        
+        // Output parameters (destination image)
+        NppiRect output_roi = {0, 0, output_display_size_.width, output_display_size_.height};
+    
+        // Perform the resize operation
+        NppStatus npp_status = nppiResize_8u_C4R(
+            debayer_gpu_.d_debayer,                    // source data pointer
+            camera_params->width * 4,                  // source step (bytes per row)
+            input_size,                                // source size
+            input_roi,                                 // source ROI
+            d_display_resize_buffer_,                  // destination data pointer  
+            output_display_size_.width * 4,            // destination step (bytes per row)
+            output_display_size_,                      // destination size
+            output_roi,                                // destination ROI
+            NPPI_INTER_SUPER                          // interpolation method
+        );
+        
+        if (npp_status != NPP_SUCCESS) {
+            std::cerr << "NPP Resize failed with error: " << npp_status << std::endl;
+            std::cerr << "Input size: " << input_size.width << "x" << input_size.height << std::endl;
+            std::cerr << "Output size: " << output_display_size_.width << "x" << output_display_size_.height << std::endl;
+            std::cerr << "Input step: " << (camera_params->width * 4) << std::endl;
+            std::cerr << "Output step: " << (output_display_size_.width * 4) << std::endl;
+            // Continue execution to see if it still works
+        }
+    
+        // Copy resized data to display buffer
+        size_t copy_size = static_cast<size_t>(output_display_size_.width) * 
+                           static_cast<size_t>(output_display_size_.height) * 4;
+        
+        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, 
+                           d_display_resize_buffer_,
+                           copy_size,
+                           cudaMemcpyDeviceToDevice, 
+                           m_stream));
+        std::cout << "[OPENGL_DISPLAY] DOWNSAMPLING PATH - resize complete, copying to display buffer..." << std::endl;
+    } else {
+        // No downsampling case
+        std::cout << "[OPENGL_DISPLAY] NO DOWNSAMPLING PATH - direct copy..." << std::endl;
+        size_t copy_size = static_cast<size_t>(camera_params->width) * 
+                           static_cast<size_t>(camera_params->height) * 4;
+        
+        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, 
+                           debayer_gpu_.d_debayer,
+                           copy_size,
+                           cudaMemcpyDeviceToDevice, 
+                           m_stream));
+        std::cout << "[OPENGL_DISPLAY] NO DOWNSAMPLING PATH - copy complete" << std::endl;
+    }
+
+    std::cout << "[OPENGL_DISPLAY] About to synchronize stream..." << std::endl;
     ck(cudaStreamSynchronize(m_stream));
+
+    std::cout << "[OPENGL_DISPLAY] Frame " << frame_count << " processing complete!" << std::endl;
 
     if (f->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         m_recycle_queue.push(f);

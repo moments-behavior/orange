@@ -1,19 +1,18 @@
 #ifndef ORANGE_VIDEO_CAPTURE
 #define ORANGE_VIDEO_CAPTURE
-#include "thread.h"
 #include "camera.h"
-#include <iostream>
-#include <fstream>
 #include "network_base.h"
+#include "thread.h"
+#include <fstream>
+#include <iostream>
 
-enum PictureSaveState {
+enum PictureState {
     State_Frame_Idle = 0,
-    State_Write_New_Frame = 1,
+    State_Copy_New_Frame = 1,
     State_Frame_Copy_Done = 2
 };
 
-struct CameraControl
-{
+struct CameraControl {
     bool open = false;
     bool subscribe = false;
     bool stop_record = false;
@@ -22,24 +21,26 @@ struct CameraControl
     bool trigger_mode = false;
 };
 
-struct CameraEachSelect
-{
+struct CameraEachSelect {
     bool stream_on = true;
     bool record = true;
     bool yolo = false;
     int downsample = 1;
-    std::atomic<PictureSaveState> frame_save_state;
+    std::atomic<PictureState> frame_save_state;
     std::string frame_save_format;
     std::string frame_save_name;
     int pictures_counter = 0;
     bool selected_to_save = false;
     std::string picture_save_folder;
-    const char* yolo_model;
-    CameraEachSelect() : frame_save_state(State_Frame_Idle) {}
+    std::string yolo_model;
+    bool detect3d = false;
+    std::atomic<PictureState> frame_decode_state;
+    CameraEachSelect()
+        : frame_save_state(State_Frame_Idle),
+          frame_decode_state(State_Frame_Idle) {}
 };
 
-struct CameraState
-{
+struct CameraState {
     int camera_return = 0;
     unsigned short id_prev = 0;
     unsigned short dropped_frames = 0;
@@ -47,11 +48,10 @@ struct CameraState
     unsigned long long frame_count = 0;
 };
 
-struct PTPState 
-{
+struct PTPState {
     int ptp_offset;
-    int ptp_offset_sum=0;
-    int ptp_offset_prev=0;
+    int ptp_offset_sum = 0;
+    int ptp_offset_prev = 0;
     unsigned int ptp_time_low;
     unsigned int ptp_time_high;
     unsigned int ptp_time_plus_delta_to_start_low;
@@ -61,7 +61,7 @@ struct PTPState
     unsigned long long ptp_time;
     unsigned long long ptp_time_prev;
     unsigned long long ptp_time_countdown;
-    unsigned long long frame_ts; 
+    unsigned long long frame_ts;
     unsigned long long frame_ts_prev;
     unsigned long long frame_ts_delta;
     unsigned long long frame_ts_delta_sum = 0;
@@ -71,19 +71,19 @@ struct PTPState
     unsigned int ptp_time_plus_delta_to_start_uint;
 };
 
-void report_statistics(CameraParams *camera_params, CameraState *camera_state, double time_diff);
+void report_statistics(CameraParams *camera_params, CameraState *camera_state,
+                       double time_diff);
 void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam);
-void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params, CameraParams *camera_params, CameraEmergent *ecam, unsigned int delay_in_second);
+void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params,
+                    CameraParams *camera_params, CameraEmergent *ecam,
+                    unsigned int delay_in_second);
 void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam);
 bool try_start_timer();
 bool try_stop_timer();
-void acquire_frames(CameraEmergent *ecam, 
-    CameraParams *camera_params, 
-    CameraEachSelect* camera_select, 
-    CameraControl* camera_control, 
-    unsigned char *display_buffer, 
-    std::string encoder_setup, 
-    std::string folder_name, 
-    PTPParams* ptp_params, 
-    INDIGOSignalBuilder* indigo_signal_builder);
+void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
+                    CameraEachSelect *camera_select,
+                    CameraControl *camera_control,
+                    unsigned char *display_buffer, std::string encoder_setup,
+                    std::string folder_name, PTPParams *ptp_params,
+                    INDIGOSignalBuilder *indigo_signal_builder);
 #endif

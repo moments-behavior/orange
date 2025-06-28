@@ -35,7 +35,7 @@ file(GLOB ORANGE_CLIENT_SOURCES
     ${SRC_DIR}/*.cpp
     ${DIR_NVENCODER}/*.cpp
 )
-list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp)
+list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp ${SRC_DIR}/FrameDetector.cpp)
 
 set(YOLO_OFFLINE_SOURCES
     benchmark/yolo_offline.cpp

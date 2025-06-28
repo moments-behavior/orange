@@ -79,26 +79,28 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
 {
     if (!f) return false;
 
+    // For debugging, print with worker function call
     std::cout << "!!! WORKERFUNCTION CALLED !!!" << std::endl;
 
     // Always print this regardless of downsample factor
     static int frame_count = 0;
     frame_count++;
-    std::cout << "[OPENGL_DISPLAY] Frame " << frame_count 
-              << " | Downsample: " << camera_select->downsample 
-              << " | Camera: " << camera_params->camera_name << std::endl;
+    // For debugging, print frame count and camera parameters
+    // std::cout << "[OPENGL_DISPLAY] Frame " << frame_count 
+    //           << " | Downsample: " << camera_select->downsample 
+    //           << " | Camera: " << camera_params->camera_name << std::endl;
 
     CUDA_CONTEXT_SCOPE(m_cuContext);
 
     ck(cudaSetDevice(camera_params->gpu_id));
     nppSetStream(m_stream); // Associate NPP calls with our stream
 
-    std::cout << "[OPENGL_DISPLAY] About to copy frame data..." << std::endl;
+    // std::cout << "[OPENGL_DISPLAY] About to copy frame data..." << std::endl;
 
     size_t buffer_size = static_cast<size_t>(f->width) * static_cast<size_t>(f->height);
     ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, f->d_image, buffer_size, cudaMemcpyDeviceToDevice, m_stream));
 
-    std::cout << "[OPENGL_DISPLAY] About to debayer..." << std::endl;
+    // std::cout << "[OPENGL_DISPLAY] About to debayer..." << std::endl;
 
     if (camera_params->color){
         debayer_frame_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
@@ -106,7 +108,7 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         duplicate_channel_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
     }
 
-    std::cout << "[OPENGL_DISPLAY] Debayer complete, checking detections..." << std::endl;
+    // std::cout << "[OPENGL_DISPLAY] Debayer complete, checking detections..." << std::endl;
 
     if (f->has_detections) {
         std::vector<float> h_points;
@@ -140,25 +142,26 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         }
     }
 
-    std::cout << "[OPENGL_DISPLAY] About to check downsample: " << camera_select->downsample << std::endl;
-    static bool debug_printed = false;
-    if (!debug_printed && camera_select->downsample > 1) {
-        std::cout << "=== Downsampling Debug Info ===" << std::endl;
-        std::cout << "Camera: " << camera_params->camera_name << std::endl;
-        std::cout << "Original resolution: " << camera_params->width << "x" << camera_params->height << std::endl;
-        std::cout << "Downsample factor: " << camera_select->downsample << std::endl;
-        std::cout << "Target resolution: " << (camera_params->width / camera_select->downsample) 
-                << "x" << (camera_params->height / camera_select->downsample) << std::endl;
-        std::cout << "Input buffer size: " << (camera_params->width * camera_params->height * 4) << " bytes" << std::endl;
-        std::cout << "Output buffer size: " << ((camera_params->width / camera_select->downsample) * 
-                                            (camera_params->height / camera_select->downsample) * 4) << " bytes" << std::endl;
-        std::cout << "Display buffer pointer: " << (void*)display_buffer_pbo_cuda_ptr_ << std::endl;
-        std::cout << "Resize buffer pointer: " << (void*)d_display_resize_buffer_ << std::endl;
-        debug_printed = true;
-    }
+    // Logging for debugging purposes, comment out if not needed
+    // std::cout << "[OPENGL_DISPLAY] About to check downsample: " << camera_select->downsample << std::endl;
+    // static bool debug_printed = false;
+    // if (!debug_printed && camera_select->downsample > 1) {
+    //     std::cout << "=== Downsampling Debug Info ===" << std::endl;
+    //     std::cout << "Camera: " << camera_params->camera_name << std::endl;
+    //     std::cout << "Original resolution: " << camera_params->width << "x" << camera_params->height << std::endl;
+    //     std::cout << "Downsample factor: " << camera_select->downsample << std::endl;
+    //     std::cout << "Target resolution: " << (camera_params->width / camera_select->downsample) 
+    //             << "x" << (camera_params->height / camera_select->downsample) << std::endl;
+    //     std::cout << "Input buffer size: " << (camera_params->width * camera_params->height * 4) << " bytes" << std::endl;
+    //     std::cout << "Output buffer size: " << ((camera_params->width / camera_select->downsample) * 
+    //                                         (camera_params->height / camera_select->downsample) * 4) << " bytes" << std::endl;
+    //     std::cout << "Display buffer pointer: " << (void*)display_buffer_pbo_cuda_ptr_ << std::endl;
+    //     std::cout << "Resize buffer pointer: " << (void*)d_display_resize_buffer_ << std::endl;
+    //     debug_printed = true;
+    // }
 
     if (camera_select->downsample > 1) {
-        std::cout << "[OPENGL_DISPLAY] DOWNSAMPLING PATH - starting resize..." << std::endl;
+        // std::cout << "[OPENGL_DISPLAY] DOWNSAMPLING PATH - starting resize..." << std::endl;
         output_display_size_.width = camera_params->width / camera_select->downsample;
         output_display_size_.height = camera_params->height / camera_select->downsample;
     
@@ -212,10 +215,10 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
                            copy_size,
                            cudaMemcpyDeviceToDevice, 
                            m_stream));
-        std::cout << "[OPENGL_DISPLAY] DOWNSAMPLING PATH - resize complete, copying to display buffer..." << std::endl;
+        // std::cout << "[OPENGL_DISPLAY] DOWNSAMPLING PATH - resize complete, copying to display buffer..." << std::endl;
     } else {
         // No downsampling case
-        std::cout << "[OPENGL_DISPLAY] NO DOWNSAMPLING PATH - direct copy..." << std::endl;
+        // std::cout << "[OPENGL_DISPLAY] NO DOWNSAMPLING PATH - direct copy..." << std::endl;
         size_t copy_size = static_cast<size_t>(camera_params->width) * 
                            static_cast<size_t>(camera_params->height) * 4;
         
@@ -224,13 +227,13 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
                            copy_size,
                            cudaMemcpyDeviceToDevice, 
                            m_stream));
-        std::cout << "[OPENGL_DISPLAY] NO DOWNSAMPLING PATH - copy complete" << std::endl;
+        // std::cout << "[OPENGL_DISPLAY] NO DOWNSAMPLING PATH - copy complete" << std::endl;
     }
 
-    std::cout << "[OPENGL_DISPLAY] About to synchronize stream..." << std::endl;
+    // std::cout << "[OPENGL_DISPLAY] About to synchronize stream..." << std::endl;
     ck(cudaStreamSynchronize(m_stream));
 
-    std::cout << "[OPENGL_DISPLAY] Frame " << frame_count << " processing complete!" << std::endl;
+    // std::cout << "[OPENGL_DISPLAY] Frame " << frame_count << " processing complete!" << std::endl;
 
     if (f->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         m_recycle_queue.push(f);

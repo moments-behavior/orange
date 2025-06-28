@@ -1110,7 +1110,7 @@ int main(int argc, char **args) {
                             }
                         }
                     
-                        // *** ADD THIS SECTION: Create worker threads ***
+                        // Create worker threads
                         for (int i = 0; i < num_cameras; i++) {
                             // Create OpenGL Display workers
                             if (cameras_select[i].stream_on) {
@@ -1130,7 +1130,7 @@ int main(int argc, char **args) {
                                 }
                             }
                     
-                            // *** CREATE GPU VIDEO ENCODERS - THIS IS WHAT'S MISSING ***
+                            // CREATE GPU VIDEO ENCODERS
                             if (cameras_select[i].record) {
                                 std::string encoder_thread_name = "GPUEncoder_Cam_" + cameras_params[i].camera_serial;
                                 bool encoder_ready_signal = false;
@@ -1324,9 +1324,19 @@ int main(int argc, char **args) {
                             ImGui::TextColored(ImVec4{0.0, 1.0f, 0, 1.0f}, "Elapsed Time: %s", g_formatted_elapsed_time.c_str());
                         } else {
                             ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f}, "Recording starting...");
+                        }ImGui::SameLine();
+                        if (gpuVideoEncoders[i])
+                        {
+                            ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Encoding FPS: %.1f", gpuVideoEncoders[i]->get_fps());
+                        }
+                        
+                        if (yolo_workers[i])
+                        {
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.0f, 1.0f), "YOLO FPS: %.1f", yolo_workers[i]->get_fps());
                         }
                         ImGui::SameLine();
-                        ImGui::Text("FPS: %.1f", streaming_fps.load());    
+                        ImGui::Text("Streaming FPS: %.1f", streaming_fps.load());    
                         
                         if (cameras_select[i].yolo && i < yolo_workers.size() && yolo_workers[i]) {
                             ImGui::SameLine();

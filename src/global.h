@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <chrono>
 
 extern std::atomic<double> streaming_fps;
 extern std::atomic<int> streaming_target_fps;

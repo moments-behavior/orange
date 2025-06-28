@@ -337,16 +337,18 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
                                 cudaMemcpyDeviceToDevice));
 
                 // 2. Calculate the starting address of the interleaved UV plane.
-                unsigned char* d_uv_plane_dst = d_y_plane_dst + ((size_t)encoder_pitch_ * height);
+                unsigned char* d_uv_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
 
                 // 3. Create a temporary host buffer filled with the neutral chroma value (128).
                 //    The UV plane is half the height and the same pitch as the Y plane.
+                // size_t uv_plane_size = (size_t)encoder_pitch_ * (height / 2);
+                // std::vector<uint8_t> h_uv_plane(uv_plane_size, 128);
+                // 3. Calculate the size of the UV plane.
                 size_t uv_plane_size = (size_t)encoder_pitch_ * (height / 2);
-                std::vector<uint8_t> h_uv_plane(uv_plane_size, 128);
 
                 // 4. Copy the neutral chroma data to the device.
                 //    This single, simple bulk copy is very robust.
-                ck(cudaMemcpy(d_uv_plane_dst, h_uv_plane.data(), uv_plane_size, cudaMemcpyHostToDevice));
+                ck(cudaMemsetAsync(d_uv_plane_dst, 128, uv_plane_size, m_stream));
             }
 
         // The stream synchronize call here is now redundant but harmless.

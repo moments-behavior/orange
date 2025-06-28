@@ -207,7 +207,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = now - last_fps_update_time_;
         if (elapsed.count() >= 1.0) {
-            // --- FIX: Use store() to update the atomic FPS counter ---
             current_fps_.store(frame_counter_ / elapsed.count());
             std::cout << threadName << " Inference FPS: " << current_fps_.load()
                       << " (Queue: " << this->GetCountQueueInSize() << ")" << std::endl;
@@ -230,7 +229,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
                               << ", w=" << sh_obj.rect.width << ", h=" << sh_obj.rect.height << "]" << std::endl;
                 }
                 
-                // --- FIX: Add the missing frame_id and camera_id arguments ---
                 if (!shaman_ipc_queue_->push(shaman_objects, entry->frame_id, associated_camera_params_->camera_id)) {
                     std::cerr << "[" << threadName << "] Failed to push to IPC queue." << std::endl;
                 }

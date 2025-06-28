@@ -16,6 +16,7 @@ typedef struct {
     unsigned long long timestamp;
     unsigned long long frame_id;
     uint64_t timestamp_sys;
+<<<<<<< HEAD
     
     // YOLO detection fields
     std::vector<pose::Object> detections;
@@ -33,6 +34,12 @@ typedef struct {
     Emergent::CEmergentCamera* camera_instance = nullptr;  // Camera instance for requeuing
     Emergent::CEmergentFrame* camera_frame_struct = nullptr; // Frame struct for requeuing
     
+=======
+    // --- Fields for YOLO results ---
+    std::vector<pose::Object> detections; // Store YOLO detection results
+    bool has_detections;                  // Flag to indicate if detections are present
+    std::atomic<int> ref_count;           // Reference count for memory management
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
 } WORKER_ENTRY;
 
 

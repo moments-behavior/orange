@@ -105,6 +105,7 @@ void acquire_frames(
             
             CUDA_CTX_LOG("=== FRAME " + std::to_string(camera_state.frame_count) + " PROCESSING ===");
             
+<<<<<<< HEAD
             // --- GPU DIRECT DETECTION AND OPTIMIZATION ---
             cudaPointerAttributes attrs;
             cudaError_t err = cudaPointerGetAttributes(&attrs, ecam->frame_recv.imagePtr);
@@ -178,6 +179,18 @@ void acquire_frames(
                 // Safe to requeue immediately after copy
                 EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
             }
+=======
+            // Centralized Frame Handling
+
+            // 1. Copy the raw frame to our persistent worker buffer ONCE.
+            CUDA_MEM_LOG("Copying camera frame to worker buffer", current_entry->d_image, 
+                        ecam->frame_recv.bufferSize, camera_state.frame_count);
+            ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
+            VALIDATE_CUDA_OP("Camera frame copy", camera_state.frame_count);
+            
+            // 2. We can now immediately requeue the camera buffer.
+            EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
             
             // 3. Populate the metadata for the WORKER_ENTRY.
             current_entry->width = ecam->frame_recv.size_x;
@@ -186,7 +199,11 @@ void acquire_frames(
             current_entry->timestamp = ecam->frame_recv.timestamp;
             current_entry->frame_id = camera_state.frame_count;
             current_entry->has_detections = false;
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
             // 4. Handle asynchronous save request (NON-BLOCKING).
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
                 CUDA_CTX_LOG("Processing frame save request for frame " + std::to_string(camera_state.frame_count));
@@ -194,12 +211,17 @@ void acquire_frames(
                 FrameGPU temp_frame_gpu;
                 temp_frame_gpu.d_orig = current_entry->d_image;
                 temp_frame_gpu.size_pic = current_entry->width * current_entry->height;
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
                 if (camera_params->color){
                     debayer_frame_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
                 } else {
                     duplicate_channel_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
                 }
+<<<<<<< HEAD
                 rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, 
                                 camera_params->width, camera_params->height, stream);
                 
@@ -209,21 +231,36 @@ void acquire_frames(
                                     camera_params->width*3, camera_params->height, 
                                     cudaMemcpyDeviceToHost, stream));
         
+=======
+                rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, camera_params->width, camera_params->height, stream);
+                
+                // Asynchronously copy data to the host buffer
+                ck(cudaMemcpy2DAsync(frame_process_save.frame_cpu.frame, camera_params->width*3, frame_process_save.d_convert, camera_params->width*3, camera_params->width*3, camera_params->height, cudaMemcpyDeviceToHost, stream));
+
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
                 // Create and record a CUDA event to mark when the copy is done
                 cudaEvent_t event;
                 ck(cudaEventCreate(&event));
                 ck(cudaEventRecord(event, stream));
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
                 // Create the save job with the necessary info
                 ImageWriter_Entry* save_job = new ImageWriter_Entry();
                 save_job->event = event;
                 save_job->cpu_buffer = frame_process_save.frame_cpu.frame;
                 save_job->width = camera_params->width;
                 save_job->height = camera_params->height;
+<<<<<<< HEAD
                 save_job->file_path = camera_select->picture_save_folder + "/" + 
                                      camera_params->camera_serial + "_" + 
                                      camera_select->frame_save_name + "." + 
                                      camera_select->frame_save_format;
+=======
+                save_job->file_path = camera_select->picture_save_folder + "/" + camera_params->camera_serial + "_" + camera_select->frame_save_name + "." + camera_select->frame_save_format;
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
                 
                 // Queue the job; this will no longer block!
                 image_writer->PutObjectToQueueIn(save_job);
@@ -231,12 +268,17 @@ void acquire_frames(
                 camera_select->pictures_counter++;
                 camera_select->frame_save_state = State_Frame_Idle;
             }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
             // 5. Dispatch the WORKER_ENTRY to real-time workers.
             int dispatch_count = 0;
             if (camera_select->stream_on && openGLDisplay) dispatch_count++;
             if (camera_control->record_video && gpu_encoder) dispatch_count++;
             if (camera_select->yolo && yolo_worker) dispatch_count++;
+<<<<<<< HEAD
         
             // Log dispatch analysis with context info
             CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatch analysis");
@@ -261,6 +303,30 @@ void acquire_frames(
                 
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Dispatching frame " 
                           << current_entry->frame_id << " to " << dispatch_count << " consumers:" << std::endl;
+=======
+
+            // Log dispatch analysis with context info
+            CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatch analysis");
+            dumpCudaState("Before frame dispatch", camera_state.frame_count);
+
+            std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " << current_entry->frame_id 
+                    << " dispatch analysis:" << std::endl;
+            std::cout << "  - stream_on: " << (camera_select->stream_on ? "true" : "false") 
+                    << ", openGLDisplay: " << (openGLDisplay ? "valid" : "null") << std::endl;
+            std::cout << "  - record_video: " << (camera_control->record_video ? "true" : "false") 
+                    << ", gpu_encoder: " << (gpu_encoder ? "valid" : "null") << std::endl;
+            std::cout << "  - yolo: " << (camera_select->yolo ? "true" : "false") 
+                    << ", yolo_worker: " << (yolo_worker ? "valid" : "null") << std::endl;
+            std::cout << "  - Total dispatch_count: " << dispatch_count << std::endl;
+
+            if (dispatch_count > 0) {
+                current_entry->ref_count.store(dispatch_count);
+                
+                CUDA_CTX_LOG("Setting ref_count to " + std::to_string(dispatch_count) + " for frame " + std::to_string(camera_state.frame_count));
+                
+                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Dispatching frame " 
+                        << current_entry->frame_id << " to " << dispatch_count << " consumers:" << std::endl;
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
                 
                 // Dispatch with detailed logging
                 if (camera_select->stream_on && openGLDisplay) {
@@ -284,6 +350,7 @@ void acquire_frames(
                 }
                 
                 std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
+<<<<<<< HEAD
                           << current_entry->frame_id << " dispatched successfully" << std::endl;
                 CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatched successfully");
                 
@@ -314,6 +381,20 @@ void acquire_frames(
                 
                 free_entries_queue->push(current_entry);
             }
+=======
+                        << current_entry->frame_id << " dispatched successfully" << std::endl;
+                CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatched successfully");
+                
+            } else {
+                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
+                        << current_entry->frame_id << " has no consumers - recycling immediately" << std::endl;
+                CUDA_CTX_LOG("No consumers, recycling frame " + std::to_string(camera_state.frame_count));
+                free_entries_queue->push(current_entry);
+            }
+        } else {
+            CUDA_CTX_LOG("Camera frame acquisition failed");
+            free_entries_queue->push(current_entry);
+>>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
         }
     }
 

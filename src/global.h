@@ -30,6 +30,6 @@ inline const char *const *enum_names_calib_state() {
 extern std::atomic<CalibState> calib_state;
 
 // for 3d detection
-extern DetectionData detection_data;
-
+extern Detection3d detection3d;
+extern DetectionDataPerCam *detection2d;
 #endif // GLOBAL_H

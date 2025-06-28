@@ -26,7 +26,7 @@ struct Aruco2d {
 
 struct Ball2d {
     int frame_number;
-    bool find_ball;
+    std::atomic<bool> find_ball = false;
     cv::Point2f center[1];
     cv::Point2f proj_center[1];
 };
@@ -53,10 +53,9 @@ struct Ball3d {
     std::atomic_bool new_detection;
 };
 
-struct DetectionData {
+struct Detection3d {
     Aruco3d marker3d;
     Ball3d ball3d;
-    DetectionDataPerCam *detect_per_cam;
 };
 
 void print_calibration_results(CameraCalibResults *calib_results);

@@ -320,20 +320,34 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             d_rgb_temp_ = nullptr;
             
         } else {
-            // === NEW **ASYNCHRONOUS** MONOCHROME PATH ===
-            unsigned char* d_y_plane_dst = d_iyuv_temp_;
-            unsigned char* d_uv_plane_dst = d_y_plane_dst + ((size_t)encoder_pitch_ * height);
-            
-            // 1. Asynchronously copy the grayscale image data into the Y plane on our stream.
-            ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,
-                                 frame_original.d_orig, width,
-                                 width, height,
-                                 cudaMemcpyDeviceToDevice, m_stream));
-    
-            // 2. Asynchronously set the UV plane to the neutral chroma value (128) on the same stream.
-            ck(cudaMemset2DAsync(d_uv_plane_dst, encoder_pitch_, 128, 
-                                 encoder_pitch_, height / 2, m_stream));
-        }
+                // === NEW NV12 MONOCHROME PATH ===
+                ENCODER_CTX_LOG("Processing MONOCHROME frame for NV12", entry->frame_id);
+
+                // NV12 Layout:
+                // 1. A full-size Y plane.
+                // 2. A half-height plane with interleaved UV pairs (U0, V0, U1, V1, ...)
+
+                // Define the destination for the Y plane (same as before)
+                unsigned char* d_y_plane_dst = d_iyuv_temp_; // We can reuse this buffer
+
+                // 1. Copy the grayscale image data into the Y plane.
+                ck(cudaMemcpy2D(d_y_plane_dst, encoder_pitch_,
+                                frame_original.d_orig, width,
+                                width, height,
+                                cudaMemcpyDeviceToDevice));
+
+                // 2. Calculate the starting address of the interleaved UV plane.
+                unsigned char* d_uv_plane_dst = d_y_plane_dst + ((size_t)encoder_pitch_ * height);
+
+                // 3. Create a temporary host buffer filled with the neutral chroma value (128).
+                //    The UV plane is half the height and the same pitch as the Y plane.
+                size_t uv_plane_size = (size_t)encoder_pitch_ * (height / 2);
+                std::vector<uint8_t> h_uv_plane(uv_plane_size, 128);
+
+                // 4. Copy the neutral chroma data to the device.
+                //    This single, simple bulk copy is very robust.
+                ck(cudaMemcpy(d_uv_plane_dst, h_uv_plane.data(), uv_plane_size, cudaMemcpyHostToDevice));
+            }
 
         // The stream synchronize call here is now redundant but harmless.
         // It ensures all previous work on the stream is done before encoding.

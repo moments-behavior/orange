@@ -1,6 +1,7 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include "realtime_tool.h"
 #include <atomic>
 #include <mutex>
 
@@ -27,5 +28,8 @@ inline const char *const *enum_names_calib_state() {
 
 // Atomic calibration state (now using CalibState instead of int)
 extern std::atomic<CalibState> calib_state;
+
+// for 3d detection
+extern DetectionData detection_data;
 
 #endif // GLOBAL_H

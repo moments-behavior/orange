@@ -33,7 +33,6 @@ struct Ball2d {
 
 struct DetectionDataPerCam {
     bool has_calibration_results;
-    std::string yolo_model;
     std::string calibration_file;
     CameraCalibResults camera_calib;
     Aruco2d marker2d;

@@ -1,4 +1,5 @@
 #include "realtime_tool.h"
+#include <iostream>
 
 std::string cvmat_type2str(int type) {
     std::string r;

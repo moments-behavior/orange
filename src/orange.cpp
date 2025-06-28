@@ -7,6 +7,7 @@
 #include "implot.h"
 #include "network_base.h"
 #include "project.h"
+#include "realtime_tool.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
 #include <iostream>
@@ -1068,6 +1069,30 @@ int main(int argc, char **args) {
                             }
                         }
 
+                        detection_data.detect_per_cam =
+                            new DetectionDataPerCam[num_cameras];
+                        for (int i = 0; i < num_cameras; i++) {
+                            detection_data.detect_per_cam[i].calibration_file =
+                                calib_yaml_folder + "/Cam" +
+                                cameras_params[i].camera_serial + ".yaml";
+                            std::cout << detection_data.detect_per_cam[i]
+                                             .calibration_file
+                                      << std::endl;
+                            detection_data.detect_per_cam[i]
+                                .has_calibration_results =
+                                load_camera_calibration_results(
+                                    detection_data.detect_per_cam[i]
+                                        .calibration_file,
+                                    &detection_data.detect_per_cam[i]
+                                         .camera_calib);
+                            if (detection_data.detect_per_cam[i]
+                                    .has_calibration_results) {
+                                print_calibration_results(
+                                    &detection_data.detect_per_cam[i]
+                                         .camera_calib);
+                            }
+                        }
+
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex, num_cameras,
@@ -1243,11 +1268,6 @@ int main(int argc, char **args) {
 
                         ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-                        static ImVec2 bmin(0, 0);
-                        static ImVec2 uv0(0, 0);
-                        static ImVec2 uv1(1, 1);
-                        static ImVec4 tint(1, 1, 1, 1);
-
                         // ImGui::Image((void*)(intptr_t)texture[i],
                         // avail_size);
                         ImPlotAxisFlags axisFlags =
@@ -1285,11 +1305,6 @@ int main(int argc, char **args) {
                         ImGui::SameLine();
                         ImGui::Text("FPS: %.1f", streaming_fps.load());
                         ImVec2 avail_size = ImGui::GetContentRegionAvail();
-
-                        static ImVec2 bmin(0, 0);
-                        static ImVec2 uv0(0, 0);
-                        static ImVec2 uv1(1, 1);
-                        static ImVec4 tint(1, 1, 1, 1);
 
                         // ImGui::Image((void*)(intptr_t)texture[i],
                         // avail_size);

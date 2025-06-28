@@ -9,11 +9,12 @@
 #include <mutex>
 #include <opencv2/opencv.hpp>
 #include <thread>
+#include <vector>
 
-class FrameSaver {
+class FrameDetector {
   public:
-    FrameSaver(CameraParams *params, CameraEachSelect *select);
-    ~FrameSaver();
+    FrameDetector(CameraParams *params, CameraEachSelect *select);
+    ~FrameDetector();
 
     void start();
     void stop();
@@ -29,7 +30,7 @@ class FrameSaver {
     CameraEachSelect *camera_select;
     FrameProcess frame_process;
     YOLOv8 *yolov8;
-
+    std::vector<Bbox> objs;
     std::atomic<bool> running;
     std::mutex mtx;
     std::condition_variable cv;

@@ -19,14 +19,9 @@ enum CalibState {
     CalibSavePictures
 };
 
-inline const char * const *enum_names_calib_state() {
-    static const char * const names[5] = {
-        "Idle",
-        "NextPose",
-        "PoseReached",
-        "SavePictures",
-        nullptr
-      };
+inline const char *const *enum_names_calib_state() {
+    static const char *const names[5] = {"Idle", "NextPose", "PoseReached",
+                                         "SavePictures", nullptr};
     return names;
 }
 

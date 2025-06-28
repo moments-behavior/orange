@@ -5,27 +5,24 @@
 #include "fstream"
 #include <nppi.h>
 
-using namespace pose;
-
-class YOLOv8
-{
-public:
+class YOLOv8 {
+  public:
     explicit YOLOv8(const std::string &engine_file_path, int width, int height);
     ~YOLOv8();
 
     void make_pipe(bool warmup = true);
     void preprocess_gpu(unsigned char *d_rgb);
     void infer();
-    void postprocess(std::vector<Object> &objs);
-    static void draw_objects(const cv::Mat&                                image,
-                           cv::Mat&                                      res,
-                           const std::vector<Object>&                    objs,
-                           const std::vector<std::string>&               CLASS_NAMES,
-                           const std::vector<std::vector<unsigned int>>& COLORS);
+    void postprocess(std::vector<Bbox> &objs);
+    static void
+    draw_objects(const cv::Mat &image, cv::Mat &res,
+                 const std::vector<Bbox> &objs,
+                 const std::vector<std::string> &CLASS_NAMES,
+                 const std::vector<std::vector<unsigned int>> &COLORS);
 
-    void copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs);
-    void copy_keypoints_gpu(float* d_points, const Object& obj);
-    
+    void copy_keypoints_gpu(float *d_points, const std::vector<Bbox> &objs);
+    void copy_keypoints_gpu(float *d_points, const Bbox &obj);
+
     int num_bindings;
     int num_inputs = 0;
     int num_outputs = 0;
@@ -37,7 +34,7 @@ public:
     PreParam pparam;
     cudaStream_t stream = nullptr;
 
-private:
+  private:
     // device pointer for gpu preprocessing
     unsigned char *d_temp;
     unsigned char *d_boarder;

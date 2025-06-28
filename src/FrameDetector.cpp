@@ -1,9 +1,10 @@
-#include "FrameSaver.h"
+#include "FrameDetector.h"
 #include "kernel.cuh"
 #include <npp.h>
 
-FrameSaver::FrameSaver(CameraParams *params, CameraEachSelect *select)
+FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
     : camera_params(params), camera_select(select), running(false) {
+
     ck(cudaStreamCreate(&stream));
     initalize_gpu_frame(&frame_process.frame_original, camera_params);
     initialize_gpu_debayer(&frame_process.debayer, camera_params);
@@ -11,9 +12,14 @@ FrameSaver::FrameSaver(CameraParams *params, CameraEachSelect *select)
 
     ck(cudaMalloc((void **)&frame_process.d_convert,
                   camera_params->width * camera_params->height * 3));
+    // initialize yolo
+    const std::string engine_file_path = camera_select->yolo_model;
+    yolov8 = new YOLOv8(engine_file_path, camera_params->width,
+                        camera_params->height);
+    yolov8->make_pipe(true);
 }
 
-FrameSaver::~FrameSaver() {
+FrameDetector::~FrameDetector() {
     stop();
     cudaFree(frame_process.frame_original.d_orig);
     cudaFree(frame_process.debayer.d_debayer);
@@ -21,12 +27,12 @@ FrameSaver::~FrameSaver() {
     ck(cudaStreamDestroy(stream));
 }
 
-void FrameSaver::start() {
+void FrameDetector::start() {
     running.store(true);
-    worker_thread = std::thread(&FrameSaver::thread_loop, this);
+    worker_thread = std::thread(&FrameDetector::thread_loop, this);
 }
 
-void FrameSaver::stop() {
+void FrameDetector::stop() {
     if (running.load()) {
         running.store(false);
         cv.notify_all();
@@ -36,7 +42,7 @@ void FrameSaver::stop() {
     }
 }
 
-void FrameSaver::notify_frame_ready(void *device_image_ptr) {
+void FrameDetector::notify_frame_ready(void *device_image_ptr) {
     if (camera_params->gpu_direct) {
         ck(cudaMemcpy2D(frame_process.frame_original.d_orig,
                         camera_params->width, device_image_ptr,
@@ -52,7 +58,7 @@ void FrameSaver::notify_frame_ready(void *device_image_ptr) {
     cv.notify_one();
 }
 
-void FrameSaver::thread_loop() {
+void FrameDetector::thread_loop() {
     ck(cudaSetDevice(camera_params->gpu_id));
     ck(nppSetStream(stream));
 
@@ -77,32 +83,18 @@ void FrameSaver::thread_loop() {
                                   &frame_process.debayer);
         }
 
-        rgba2bgr_convert(frame_process.d_convert,
+        rgba2rgb_convert(frame_process.d_convert,
                          frame_process.debayer.d_debayer, camera_params->width,
                          camera_params->height, stream);
 
-        ck(cudaMemcpy2DAsync(frame_process.frame_cpu.frame,
-                             camera_params->width * 3, frame_process.d_convert,
-                             camera_params->width * 3, camera_params->width * 3,
-                             camera_params->height, cudaMemcpyDeviceToHost,
-                             stream));
+        yolov8->preprocess_gpu(frame_process.d_convert);
+        yolov8->infer();
+        yolov8->postprocess(objs);
 
         ck(cudaStreamSynchronize(stream));
 
-        // Save to disk
-        cv::Mat view(camera_params->width * camera_params->height * 3, 1, CV_8U,
-                     frame_process.frame_cpu.frame);
-        view = view.reshape(3, camera_params->height);
+        // running detection
 
-        std::string image_name = camera_select->picture_save_folder + "/" +
-                                 camera_params->camera_serial + "_" +
-                                 camera_select->frame_save_name + "." +
-                                 camera_select->frame_save_format;
-
-        std::cout << "Saving " << image_name << std::endl;
-        cv::imwrite(image_name, view);
-
-        camera_select->pictures_counter++;
         camera_select->frame_save_state.store(State_Frame_Idle);
     }
 }

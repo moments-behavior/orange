@@ -1,13 +1,11 @@
-#include "yolov8_det.h"
-#include "opencv2/opencv.hpp"
 #include "kernel.cuh"
-
+#include "opencv2/opencv.hpp"
+#include "yolov8_det.h"
 
 const std::vector<std::string> CLASS_NAMES = {"rat"};
-const std::vector<std::vector<unsigned int>> COLORS = {{255,0,255}};
+const std::vector<std::vector<unsigned int>> COLORS = {{255, 0, 255}};
 
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s [engine_path] [video_path]\n", argv[0]);
         return -1;
@@ -19,13 +17,11 @@ int main(int argc, char** argv)
     const std::string engine_file_path{argv[1]};
     const std::string input_video{argv[2]};
 
-
     cv::VideoCapture cap(input_video);
     if (!cap.isOpened()) {
         printf("Cannot open %s\n", input_video);
         return -1;
     }
-
 
     // Get video frame width and height
     int camera_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
@@ -38,37 +34,38 @@ int main(int argc, char** argv)
 
     float *d_points;
     unsigned int *d_skeleton;
-    unsigned char* d_frame;
+    unsigned char *d_frame;
     // get input size from the video
-    cv:: Mat image;
-    
+    cv::Mat image;
+
     printf("YOLO initialization...\n");
 
-    YOLOv8* yolov8 = new YOLOv8(engine_file_path, camera_width, camera_height);
+    YOLOv8 *yolov8 = new YOLOv8(engine_file_path, camera_width, camera_height);
     yolov8->make_pipe(true);
 
     cudaMalloc((void **)&d_points, sizeof(float) * 8);
     cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
-    CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8,
+                     cudaMemcpyHostToDevice));
 
     int frame_size = camera_width * camera_height * 3;
-    CHECK(cudaMalloc((void **)&d_frame, frame_size)); 
-    std::vector<Object> objs;
-    unsigned char *frame_draw = (unsigned char*)malloc(frame_size * sizeof(unsigned char));
+    CHECK(cudaMalloc((void **)&d_frame, frame_size));
+    std::vector<Bbox> objs;
+    unsigned char *frame_draw =
+        (unsigned char *)malloc(frame_size * sizeof(unsigned char));
 
     cv::Mat view;
     cv::Mat final_view;
     while (cap.read(image)) {
 
         auto start = std::chrono::high_resolution_clock::now();
-        CHECK(cudaMemcpy(d_frame,
-                         (uint8_t *)image.data,
-                         frame_size,
+        CHECK(cudaMemcpy(d_frame, (uint8_t *)image.data, frame_size,
                          cudaMemcpyHostToDevice));
         cudaDeviceSynchronize();
         auto stop = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> elapsed = stop - start;
-        std::cout << "copy frame from cpu to gpu:  " << elapsed.count() << " ms" << std::endl;
+        std::cout << "copy frame from cpu to gpu:  " << elapsed.count() << " ms"
+                  << std::endl;
 
         start = std::chrono::high_resolution_clock::now();
         yolov8->preprocess_gpu(d_frame);
@@ -78,23 +75,25 @@ int main(int argc, char** argv)
         cudaDeviceSynchronize();
         stop = std::chrono::high_resolution_clock::now();
         elapsed = stop - start;
-        std::cout << "yolo pre/infer/post time:  " << elapsed.count() << " ms" << std::endl;
+        std::cout << "yolo pre/infer/post time:  " << elapsed.count() << " ms"
+                  << std::endl;
 
-        gpu_draw_rat_pose(d_frame, camera_width, camera_height, d_points, d_skeleton, yolov8->stream, 3);
+        gpu_draw_rat_pose(d_frame, camera_width, camera_height, d_points,
+                          d_skeleton, yolov8->stream, 3);
         // copy frame back for opencv visualization
-        cudaMemcpy2D(frame_draw, camera_width*3, d_frame, camera_width*3, camera_width*3, camera_height, cudaMemcpyDeviceToHost);
-        view = cv::Mat(camera_width * camera_height * 3, 1, CV_8U, frame_draw).reshape(3, camera_height);
-        //yolov8->draw_objects(image, view, objs, CLASS_NAMES, COLORS);
+        cudaMemcpy2D(frame_draw, camera_width * 3, d_frame, camera_width * 3,
+                     camera_width * 3, camera_height, cudaMemcpyDeviceToHost);
+        view = cv::Mat(camera_width * camera_height * 3, 1, CV_8U, frame_draw)
+                   .reshape(3, camera_height);
+        // yolov8->draw_objects(image, view, objs, CLASS_NAMES, COLORS);
         float r = 0.5;
-        int   output_w = std::round(camera_width* r);
-        int   output_h = std::round(camera_height * r);
+        int output_w = std::round(camera_width * r);
+        int output_h = std::round(camera_height * r);
         cv::resize(view, final_view, cv::Size(output_w, output_h));
 
         cv::imshow(engine_file_path.c_str(), final_view);
         if (cv::waitKey(10) == 'q') {
             break;
         }
-
-    } 
-    
+    }
 }

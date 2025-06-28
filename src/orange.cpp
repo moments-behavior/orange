@@ -45,7 +45,7 @@ int main(int argc, char **args) {
     prepare_application_folders(orange_root_dir_str);
     std::string input_folder = orange_root_dir_str + "/exp/unsorted";
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
-    std::string yolo_model = yolo_model_folder + "/rat_bbox.engine";
+    std::string yolo_model = yolo_model_folder + "/ball.engine";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
 
     std::vector<bool> check;
@@ -821,8 +821,8 @@ int main(int argc, char **args) {
                                 cameras_select[i].picture_save_folder =
                                     picture_save_folder;
                                 if (cameras_select[i].selected_to_save) {
-                                    cameras_select[i].frame_save_state =
-                                        State_Copy_New_Frame;
+                                    cameras_select[i].frame_save_state.store(
+                                        State_Copy_New_Frame);
                                 }
                             }
                         }
@@ -861,8 +861,8 @@ int main(int argc, char **args) {
                                         cameras_select[i].pictures_counter);
                                 cameras_select[i].picture_save_folder =
                                     calib_save_folder;
-                                cameras_select[i].frame_save_state =
-                                    State_Copy_New_Frame;
+                                cameras_select[i].frame_save_state.store(
+                                    State_Copy_New_Frame);
                             }
                             calib_state = CalibSavePictures;
                         }
@@ -875,8 +875,8 @@ int main(int argc, char **args) {
                                         cameras_select[i].pictures_counter);
                                 cameras_select[i].picture_save_folder =
                                     calib_save_folder;
-                                cameras_select[i].frame_save_state =
-                                    State_Copy_New_Frame;
+                                cameras_select[i].frame_save_state.store(
+                                    State_Copy_New_Frame);
                             }
                         }
 
@@ -1088,6 +1088,8 @@ int main(int argc, char **args) {
                                 cameras_select[i].idx3d = idx3d;
                                 idx3d++;
                             }
+                            cameras_select[i].frame_detect_state.store(
+                                State_Copy_New_Frame);
                         }
 
                         start_camera_streaming(
@@ -1331,7 +1333,11 @@ int main(int argc, char **args) {
                                     &cameras_params[i]);
 
                                 if (detection2d[i].ball2d.find_ball.load()) {
-                                    draw_ball_center(&detection2d[i].ball2d);
+                                    draw_ball_center(
+                                        detection2d[i].ball2d.center[0],
+                                        cameras_params[i].height);
+                                    cameras_select[i].frame_detect_state.store(
+                                        State_Copy_New_Frame);
                                 }
                             }
 

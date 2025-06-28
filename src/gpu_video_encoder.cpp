@@ -223,18 +223,11 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
     ENCODER_CTX_LOG("=== ENTERING WorkerFunction ===", entry->frame_id);
     dumpCudaState("WorkerFunction Entry", entry->frame_id);
 
-    // Context management with debug logging
-    ENCODER_CTX_LOG("About to push CUDA context", entry->frame_id);
-    CUresult push_result = cuCtxPushCurrent(m_cuContext);
-    if (push_result != CUDA_SUCCESS) {
-        ENCODER_CTX_LOG("FAILED to push CUDA context!", entry->frame_id);
-        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) { 
-            m_recycle_queue.push(entry); 
-        }
-        return false;
-    }
 
     try {
+
+        // Ensure we're using the correct CUDA device
+        ck(cudaSetDevice(camera_params->gpu_id));
         ENCODER_CTX_LOG("Setting NPP stream", entry->frame_id);
         nppSetStream(m_stream);
 
@@ -362,18 +355,7 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             m_recycle_queue.push(entry);
         }
         
-        ENCODER_CTX_LOG("Exception occurred, popping context", entry->frame_id);
-        CUcontext popped_context;
-        ck(cuCtxPopCurrent(&popped_context));
         return false;
-    }
-
-    // Normal exit - pop context
-    ENCODER_CTX_LOG("Popping CUDA context", entry->frame_id);
-    CUcontext popped_context;
-    CUresult pop_result = cuCtxPopCurrent(&popped_context);
-    if (pop_result != CUDA_SUCCESS) {
-        ENCODER_CTX_LOG("WARNING: Failed to pop CUDA context on normal exit", entry->frame_id);
     }
     
     ENCODER_CTX_LOG("=== EXITING WorkerFunction ===", entry->frame_id);

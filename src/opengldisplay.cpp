@@ -30,6 +30,7 @@ COpenGLDisplay::COpenGLDisplay(const char* name, CUcontext cuda_context, CameraP
     initialize_gpu_debayer(&debayer_gpu_, camera_params);
     ck(cudaMalloc(&d_points_for_drawing_, sizeof(float) * 4 * 2 * shaman::MAX_OBJECTS));
     ck(cudaMalloc(&d_skeleton_for_drawing_, sizeof(unsigned int) * 4 * 2));
+    ck(cudaMalloc(&d_display_resize_buffer_, camera_params->width * camera_params->height * 4));
     CUcontext popped_context;
     ck(cuCtxPopCurrent(&popped_context));
 }
@@ -56,7 +57,6 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
 {
     if (!f) return false;
 
-    ck(cuCtxPushCurrent(m_cuContext));
     ck(cudaSetDevice(camera_params->gpu_id));
     nppSetStream(m_stream); // Associate NPP calls with our stream
 
@@ -101,7 +101,25 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         }
     }
 
-    ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, debayer_gpu_.d_debayer, camera_params->width * camera_params->height * 4, cudaMemcpyDeviceToDevice, m_stream));
+    if (camera_select->downsample > 1) {
+        output_display_size_.width = camera_params->width / camera_select->downsample;
+        output_display_size_.height = camera_params->height / camera_select->downsample;
+
+        input_roi_for_display_resize_ = {0, 0, camera_params->width, camera_params->height};
+        output_roi_for_display_resize_ = {0, 0, output_display_size_.width, output_display_size_.height};
+
+        nppiResize_8u_C4R(debayer_gpu_.d_debayer, camera_params->width * 4, debayer_gpu_.size, input_roi_for_display_resize_,
+                          d_display_resize_buffer_, output_display_size_.width * 4, output_display_size_, output_roi_for_display_resize_, NPPI_INTER_SUPER);
+
+        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, d_display_resize_buffer_,
+                           output_display_size_.width * output_display_size_.height * 4,
+                           cudaMemcpyDeviceToDevice, m_stream));
+    } else {
+        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, debayer_gpu_.d_debayer,
+                           camera_params->width * camera_params->height * 4,
+                           cudaMemcpyDeviceToDevice, m_stream));
+    }
+
 
     ck(cudaStreamSynchronize(m_stream));
 
@@ -109,7 +127,5 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         m_recycle_queue.push(f);
     }
 
-    CUcontext popped_context;
-    ck(cuCtxPopCurrent(&popped_context));
     return false;
 }

@@ -164,10 +164,6 @@ encoder_pitch_(0)
         std::cout << "  Frame Rate: " << initializeParams.frameRateNum << "/" << initializeParams.frameRateDen << std::endl;
         std::cout << "  Rate Control: " << encodeConfig.rcParams.rateControlMode << std::endl;
         std::cout << "  Avg Bitrate: " << encodeConfig.rcParams.averageBitRate << std::endl;
-<<<<<<< HEAD
-=======
-        // This is the most likely culprit:
->>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
         std::cout << "  Input Format: " << encoder.eFormat << std::endl;
         std::cout << "========================================" << std::endl;
 
@@ -266,7 +262,6 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         }
 
         ENCODER_CTX_LOG("Processing frame dimensions", entry->frame_id);
-<<<<<<< HEAD
         
         // GPU DIRECT OPTIMIZATION: Check if we can skip the copy
         if (entry->gpu_direct_mode) {
@@ -287,17 +282,6 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             ck(cudaMemcpyAsync(frame_original.d_orig, entry->d_image, 
                                (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
         }
-=======
-        std::cout << "[GPUEncoder] NATIVE RESOLUTION - Processing frame " << entry->frame_id 
-                  << " - Dimensions: " << width << "x" << height 
-                  << " (no resizing, pitch: " << encoder_pitch_ << ")" << std::endl;
-
-        // Copy frame data from entry to local buffer
-        CUDA_MEM_LOG("Copying frame data from entry", entry->d_image, width * height, entry->frame_id);
-        ENCODER_CTX_LOG("About to copy frame data", entry->frame_id);
-        ck(cudaMemcpyAsync(frame_original.d_orig, entry->d_image, 
-                           (size_t)width * height, cudaMemcpyDeviceToDevice, m_stream));
->>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
 
         if (camera_params->color) {
             // === COLOR PATH ===
@@ -346,7 +330,6 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             d_rgb_temp_ = nullptr;
             
         } else {
-<<<<<<< HEAD
             // === MONOCHROME PATH ===
             ENCODER_CTX_LOG("Processing MONOCHROME frame", entry->frame_id);
             std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
@@ -373,53 +356,11 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
         ENCODER_CTX_LOG("Synchronizing stream before encode", entry->frame_id);
         ck(cudaStreamSynchronize(m_stream));
-=======
-                // === NEW NV12 MONOCHROME PATH ===
-                ENCODER_CTX_LOG("Processing MONOCHROME frame for NV12", entry->frame_id);
-
-                // NV12 Layout:
-                // 1. A full-size Y plane.
-                // 2. A half-height plane with interleaved UV pairs (U0, V0, U1, V1, ...)
-
-                // Define the destination for the Y plane (same as before)
-                unsigned char* d_y_plane_dst = d_iyuv_temp_; // We can reuse this buffer
-
-                // 1. Copy the grayscale image data into the Y plane.
-                ck(cudaMemcpy2D(d_y_plane_dst, encoder_pitch_,
-                                frame_original.d_orig, width,
-                                width, height,
-                                cudaMemcpyDeviceToDevice));
-
-                // 2. Calculate the starting address of the interleaved UV plane.
-                unsigned char* d_uv_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
-
-                // 3. Create a temporary host buffer filled with the neutral chroma value (128).
-                //    The UV plane is half the height and the same pitch as the Y plane.
-                // size_t uv_plane_size = (size_t)encoder_pitch_ * (height / 2);
-                // std::vector<uint8_t> h_uv_plane(uv_plane_size, 128);
-                // 3. Calculate the size of the UV plane.
-                size_t uv_plane_size = (size_t)encoder_pitch_ * (height / 2);
-
-                // 4. Copy the neutral chroma data to the device.
-                //    This single, simple bulk copy is very robust.
-                ck(cudaMemsetAsync(d_uv_plane_dst, 128, uv_plane_size, m_stream));
-            }
-
-        // The stream synchronize call here is now redundant but harmless.
-        // It ensures all previous work on the stream is done before encoding.
-        // CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
-        // ck(cudaStreamSynchronize(m_stream));
->>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
 
         // NVIDIA encoder call
         ENCODER_CTX_LOG("About to call NVIDIA EncodeFrame - CRITICAL POINT", entry->frame_id);
         dumpCudaState("Pre-EncodeFrame", entry->frame_id);
         
-<<<<<<< HEAD
-=======
-        std::cout << "[GPUEncoder] Calling EncodeFrame for NATIVE RESOLUTION frame " << entry->frame_id << "..." << std::endl;
-        
->>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
         // Get encoder input frame and copy our IYUV data to it
         const NvEncInputFrame *encoderInputFrame = encoder.pEnc->GetNextInputFrame();
         NvEncoderCuda::CopyToDeviceFrame(encoder.cuContext,
@@ -450,7 +391,6 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         
         std::cout << "[GPUEncoder] Frame " << entry->frame_id << " encoded successfully" << std::endl;
 
-<<<<<<< HEAD
         // Handle reference counting and GPU Direct camera buffer management
         ENCODER_CTX_LOG("Handling reference count", entry->frame_id);
         int remaining_refs = entry->ref_count.fetch_sub(1, std::memory_order_acq_rel);
@@ -480,17 +420,10 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         } else {
             std::cout << "[GPUEncoder] Frame " << entry->frame_id 
                       << " - Worker finished, " << (remaining_refs - 1) << " workers remaining" << std::endl;
-=======
-        // Handle reference counting
-        ENCODER_CTX_LOG("Handling reference count", entry->frame_id);
-        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            m_recycle_queue.push(entry);
->>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
         }
 
     } catch (const std::exception& e) {
         std::cerr << "[GPUEncoder] Exception in WorkerFunction: " << e.what() << std::endl;
-<<<<<<< HEAD
         
         // Handle reference counting even on error
         int remaining_refs = entry->ref_count.fetch_sub(1, std::memory_order_acq_rel);
@@ -503,9 +436,6 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             entry->camera_buffer_ptr = nullptr;
             entry->camera_instance = nullptr;
             entry->camera_frame_struct = nullptr;
-=======
-        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
->>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
             m_recycle_queue.push(entry);
         }
         

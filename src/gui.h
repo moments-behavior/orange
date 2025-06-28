@@ -1,6 +1,7 @@
 #ifndef ORANGE_GUI
 #define ORANGE_GUI
 #include "camera.h"
+#include "global.h"
 #include "gx_helper.h"
 #include "video_capture.h"
 #include <math.h>

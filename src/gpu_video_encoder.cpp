@@ -153,6 +153,11 @@ encoder_pitch_(0)
         encodeConfig.rcParams.maxBitRate = 25000000;
         encodeConfig.rcParams.vbvBufferSize = encodeConfig.rcParams.averageBitRate;
 
+        if (!camera_params->color) {
+            std::cout << "[GPUVideoEncoder] Mono camera detected, setting monoChromeEncoding to 1" << std::endl;
+            encodeConfig.monoChromeEncoding = 1;
+        }
+
         encoder.pEnc->CreateEncoder(&initializeParams);
         encoder.pEnc->SetIOCudaStreams((NV_ENC_CUSTREAM_PTR)&m_stream, (NV_ENC_CUSTREAM_PTR)&m_stream);
 
@@ -219,6 +224,9 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 {
     if (!entry) return false;
 
+    // Set CUDA context for this thread
+    CUDA_CONTEXT_SCOPE(m_cuContext);
+
     // Log entry into function
     ENCODER_CTX_LOG("=== ENTERING WorkerFunction ===", entry->frame_id);
     dumpCudaState("WorkerFunction Entry", entry->frame_id);
@@ -283,13 +291,13 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         
             CUDA_MEM_LOG("Converting to IYUV", d_iyuv_temp_, encoder_pitch_ * height * 3 / 2, entry->frame_id);
             
-            // CRITICAL FIX: Use cudaMemcpy2DAsync for proper pitch conversion
+            // Use cudaMemcpy2DAsync for proper pitch conversion
             ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,              // dst, dst_pitch
                                 frame_original.d_orig, width,                // src, src_pitch  
                                 width, height,                               // width, height
                                 cudaMemcpyDeviceToDevice, m_stream));
         
-            // CRITICAL FIX: Use encoder_pitch for U/V plane calculations
+            // Use encoder_pitch for U/V plane calculations
             ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
             ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
             

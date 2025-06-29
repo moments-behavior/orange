@@ -188,19 +188,6 @@ cv::Mat triangulate_points(std::vector<cv::Point2f> image_points,
         cv::Mat point =
             (cv::Mat_<float>(2, 1) << image_points[i].x, image_points[i].y);
         cv::Mat pointUndistort;
-
-        std::cout << "k = " << std::endl
-                  << cv::format(calib_results[i]->k, cv::Formatter::FMT_PYTHON)
-                  << std::endl
-                  << cvmat_type2str(calib_results[i]->k.type()) << std::endl
-                  << std::endl;
-        std::cout << "dist_coeffs  = " << std::endl
-                  << cv::format(calib_results[i]->dist_coeffs,
-                                cv::Formatter::FMT_PYTHON)
-                  << std::endl
-                  << cvmat_type2str(calib_results[i]->dist_coeffs.type())
-                  << std::endl
-                  << std::endl;
     }
 
     for (int i = 0; i < calib_results.size(); i++) {
@@ -277,29 +264,22 @@ bool find_marker3d(TriangulatePoints *aruco_marker_2d,
     return true;
 }
 
-bool find_ball3d(TriangulatePoints *ball_2d,
-                 std::vector<CameraCalibResults *> &calib_results,
-                 Ball3d *ball3d) {
+bool find_ball3d(TriangulatePoints *ball_2d, Ball3d *ball3d) {
     int num_detected_cams = ball_2d->detected_cameras.size();
     if (num_detected_cams >= 2) {
         // triangulate
-        std::vector<CameraCalibResults *> calib_results_all;
-        for (size_t i = 0; i < num_detected_cams; i++) {
-            calib_results_all.push_back(
-                calib_results[ball_2d->detected_cameras[i]]);
-        }
-
         std::vector<cv::Point2f> image_points_all;
         for (size_t j = 0; j < num_detected_cams; j++) {
             image_points_all.push_back(ball_2d->detected_points[j][0]);
+            // print_calibration_results(ball_2d->calib_results[j]);
         }
         cv::Mat output3d =
-            triangulate_points(image_points_all, calib_results_all);
+            triangulate_points(image_points_all, ball_2d->calib_results);
         cv::Point3f pts3d = cv::Point3d(output3d);
         // cv::Point3f(output3d.at<float>(0), output3d.at<float>(1),
         // output3d.at<float>(2));
         ball3d->center = pts3d;
-        std::cout << "Ball: " << ball3d->center << std::endl;
+        // std::cout << "Ball: " << ball3d->center << std::endl;
 
     } else {
         return false;

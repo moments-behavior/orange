@@ -1343,11 +1343,26 @@ int main(int argc, char **args) {
                                     &cameras_params[i]);
 
                                 if (detection2d[i].ball2d.find_ball.load()) {
+                                    std::string ball2d_name =
+                                        "ball##" + std::to_string(i);
+
                                     draw_ball_center(
                                         detection2d[i].ball2d.center[0],
-                                        cameras_params[i].height);
-                                    cameras_select[i].frame_detect_state.store(
-                                        State_Copy_New_Frame);
+                                        cameras_params[i].height,
+                                        (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
+                                        ball2d_name, ImPlotMarker_Circle, 6.0);
+                                }
+
+                                if (detection3d.ball3d.new_detection.load()) {
+                                    std::string ball_proj_name =
+                                        "ball_proj##" + std::to_string(i);
+
+                                    draw_ball_center(
+                                        detection2d[i].ball2d.proj_center[0],
+                                        cameras_params[i].height,
+                                        (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
+                                        ball_proj_name, ImPlotMarker_Cross,
+                                        8.0);
                                 }
                             }
 

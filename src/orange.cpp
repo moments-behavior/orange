@@ -75,9 +75,12 @@ int main(int argc, char **args) {
     int evt_buffer_size{100};
     PTPParams *ptp_params = new PTPParams{0, 0, 0, 0, false, false, false, false};
     const int ACQUIRE_WORK_ENTRIES_MAX = 120;
+    const int EVENT_POOL_SIZE = 256;
     WORKER_ENTRY* worker_entry_pool = nullptr;
     SafeQueue<WORKER_ENTRY*>* free_entries_queue = nullptr;
     SafeQueue<WORKER_ENTRY*>* recycle_queue = nullptr;
+    std::vector<cudaEvent_t> event_pool;
+    SafeQueue<cudaEvent_t*>* free_events_queue = nullptr;
     COpenGLDisplay** openGLDisplayWorkers = nullptr;
     GPUVideoEncoder** gpuVideoEncoders = nullptr; // Define pointer, but allocate later
     ImageWriterWorker* image_writer = new ImageWriterWorker("ImageSaverThread", cuContext);
@@ -414,6 +417,7 @@ int main(int argc, char **args) {
                             yolo_workers[i],
                             image_writer,
                             free_entries_queue,
+                            free_events_queue,
                             recycle_queue
                         );
                     }
@@ -1075,6 +1079,14 @@ int main(int argc, char **args) {
                         worker_entry_pool = new WORKER_ENTRY[ACQUIRE_WORK_ENTRIES_MAX];
                         free_entries_queue = new SafeQueue<WORKER_ENTRY*>();
                         recycle_queue = new SafeQueue<WORKER_ENTRY*>();
+
+                        event_pool.resize(EVENT_POOL_SIZE);
+                        free_events_queue = new SafeQueue<cudaEvent_t*>();
+                        for (int i = 0; i < EVENT_POOL_SIZE; ++i) {
+                            ck(cudaEventCreateWithFlags(&event_pool[i], cudaEventDisableTiming));
+                            free_events_queue->push(&event_pool[i]);
+                        }
+                        std::cout << "Initialized CUDA event pool with " << EVENT_POOL_SIZE << " events." << std::endl;
                         openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
                         gpuVideoEncoders = new GPUVideoEncoder*[num_cameras]();  // This should already exist
                         tex = new GL_Texture[num_cameras];
@@ -1196,6 +1208,7 @@ int main(int argc, char **args) {
                                 yolo_workers[i],                   // YOLOv8Worker* yolo_worker
                                 image_writer,                      // ImageWriterWorker* image_writer
                                 free_entries_queue,                // SafeQueue<WORKER_ENTRY*>* free_entries_queue
+                                free_events_queue,                // SafeQueue<cudaEvent_t*>* free_events_queue
                                 recycle_queue                      // SafeQueue<WORKER_ENTRY*>* recycle_queue
                             );
                         }
@@ -1256,6 +1269,18 @@ int main(int argc, char **args) {
                         }
                         if (free_entries_queue) { delete free_entries_queue; free_entries_queue = nullptr; }
                         if (recycle_queue) { delete recycle_queue; recycle_queue = nullptr; }
+                        if (free_events_queue) {
+                            // Drain the queue to ensure no dangling pointers before destroying events
+                            cudaEvent_t* ev = nullptr;
+                            while(free_events_queue->pop(ev)) {}
+                            delete free_events_queue;
+                            free_events_queue = nullptr;
+                        }
+                        for (size_t i = 0; i < event_pool.size(); ++i) {
+                            cudaEventDestroy(event_pool[i]);
+                        }
+                        event_pool.clear();
+                        std::cout << "Cleaned up CUDA event pool." << std::endl;
                     }
                 }
             }

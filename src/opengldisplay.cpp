@@ -83,12 +83,13 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     ck(cudaSetDevice(camera_params->gpu_id));
     nppSetStream(m_stream); 
 
-    if (f->data_ready) {
-        ck(cudaStreamWaitEvent(m_stream, f->data_ready, 0));
-        ck(cudaEventDestroy(f->data_ready));
-        f->data_ready = nullptr; // Prevent double-destruction
+    if (f->event_ptr) { // Check if the pointer is not null
+        ck(cudaStreamWaitEvent(m_stream, *f->event_ptr, 0)); // Dereference the pointer to get the event
+        // The event is now owned by this worker. We can choose to destroy it or recycle it.
+        // For simplicity and to match the logic in acquire_frames, let's assume events are single-use for now.
+        // The acquire_frames thread will push new events to the pool.
+        // NOTE: A more robust system might have this worker push the event back to the free_events_queue.
     }
-
     frame_original_gpu_.d_orig = f->d_image;
     
     if (camera_params->color){
@@ -165,8 +166,8 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         }
 
         // Input parameters (source image)
-        NppiSize input_size = {camera_params->width, camera_params->height};
-        NppiRect input_roi = {0, 0, camera_params->width, camera_params->height};
+        NppiSize input_size = {static_cast<int>(camera_params->width), static_cast<int>(camera_params->height)};
+        NppiRect input_roi = {0, 0, static_cast<int>(camera_params->width), static_cast<int>(camera_params->height)};
         
         // Output parameters (destination image)
         NppiRect output_roi = {0, 0, output_display_size_.width, output_display_size_.height};

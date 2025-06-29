@@ -6,13 +6,12 @@
 #include "threadworker.h"
 #include <string>
 #include <opencv2/opencv.hpp>
-#include <cuda_runtime.h> // For cudaEvent_t
-#include <cuda.h>         // For CUcontext
+#include <cuda_runtime.h>
+#include <cuda.h>
 
-// This is now the single, authoritative definition for ImageWriter_Entry
 struct ImageWriter_Entry {
     std::string file_path;
-    cudaEvent_t event;
+    cudaEvent_t* event_ptr;
     unsigned char* cpu_buffer;
     int width;
     int height;

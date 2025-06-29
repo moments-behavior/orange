@@ -31,6 +31,7 @@ void acquire_frames(
     YOLOv8Worker* yolo_worker,
     ImageWriterWorker* image_writer,
     SafeQueue<WORKER_ENTRY*>* free_entries_queue,
+    SafeQueue<cudaEvent_t*>* free_events_queue,
     SafeQueue<WORKER_ENTRY*>* recycle_queue
 );
 #endif

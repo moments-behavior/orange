@@ -159,8 +159,8 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         nppSetStream(yolov8_instance_->stream);
 
         //  Wait for the data to be ready before processing
-        if (entry->data_ready) {
-            ck(cudaStreamWaitEvent(yolov8_instance_->stream, entry->data_ready, 0));
+        if (entry->event_ptr) {
+            ck(cudaStreamWaitEvent(yolov8_instance_->stream, *entry->event_ptr, 0));
         }
 
         frame_original_gpu_.d_orig = entry->d_image;
@@ -238,10 +238,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
     if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         if (entry->gpu_direct_mode && entry->camera_instance && entry->camera_frame_struct) {
             EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);
-        }
-        if(entry->data_ready) {
-            cudaEventDestroy(entry->data_ready);
-            entry->data_ready = nullptr;
         }
         m_recycle_queue.push(entry);
     }

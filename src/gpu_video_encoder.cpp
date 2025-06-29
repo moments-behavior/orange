@@ -303,10 +303,9 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         
         {
             NVTX_SYNC("Stream_Wait_For_Data_Ready_Event");
-            if (entry->data_ready) {
-                ck(cudaStreamWaitEvent(m_stream, entry->data_ready, 0));
-                ck(cudaEventDestroy(entry->data_ready));
-                entry->data_ready = nullptr; 
+            if (entry->event_ptr) {
+                ck(cudaStreamWaitEvent(m_stream, *entry->event_ptr, 0));
+                // Event is consumed, no need to destroy here as the pool manages it.
             }
         }
 

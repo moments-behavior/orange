@@ -8,6 +8,7 @@ echo "========================================"
 DEBUG=0
 CLEAN=0
 CUDA_DEBUG=0
+NVTX_PROFILE=0
 for arg in "$@"; do
   case $arg in
     --debug)
@@ -22,13 +23,28 @@ for arg in "$@"; do
     CUDA_DEBUG=1
     shift
     ;;
+    --nvtx)
+    NVTX_PROFILE=1
+    shift
+    ;;
     --help)
     echo "Usage: $0 [options]"
     echo "Options:"
     echo "  --debug       Build in debug mode"
     echo "  --clean       Remove all generated files and rebuild"
     echo "  --cuda-debug  Enable CUDA context debugging (can be combined with --debug)"
+    echo "  --nvtx        Enable NVTX profiling markers (recommended for Nsight)"
     echo "  --help        Show this help message"
+    echo ""
+    echo "Profiling Examples:"
+    echo "  # Build with profiling support:"
+    echo "  $0 --nvtx"
+    echo ""
+    echo "  # Build debug version with profiling:"
+    echo "  $0 --debug --nvtx"
+    echo ""
+    echo "  # Profile the application:"
+    echo "  nsys profile --duration=30 --output=orange_profile targets/orange"
     exit 0
     ;;
   esac
@@ -48,11 +64,27 @@ fi
 # Add CUDA debug flag if requested
 if [ $CUDA_DEBUG -eq 1 ]; then
   echo "==> Enabling CUDA context debugging"
-  CFLAGS="$CFLAGS -DDEBUG_CUDA_CONTEXT"
+  CFLAGS="$CFLAGS -DDEBUG_CUDA_CONTEXT -DENABLE_CUDA_DEBUG_LOGGING"
   if [ $DEBUG -eq 1 ]; then
     BUILD_DIR="targets/debug_cuda"
   else
     BUILD_DIR="targets/release_cuda"
+  fi
+fi
+
+# Add NVTX profiling support
+if [ $NVTX_PROFILE -eq 1 ]; then
+  echo "==> Enabling NVTX profiling markers"
+  CFLAGS="$CFLAGS -DENABLE_NVTX_PROFILING"
+  # Append nvtx to build directory name
+  if [ $CUDA_DEBUG -eq 1 ] && [ $DEBUG -eq 1 ]; then
+    BUILD_DIR="targets/debug_cuda_nvtx"
+  elif [ $CUDA_DEBUG -eq 1 ]; then
+    BUILD_DIR="targets/release_cuda_nvtx"
+  elif [ $DEBUG -eq 1 ]; then
+    BUILD_DIR="targets/debug_nvtx"
+  else
+    BUILD_DIR="targets/release_nvtx"
   fi
 fi
 
@@ -66,7 +98,7 @@ if [ $CLEAN -eq 1 ]; then
   echo "========================================"
   echo "==> Removing all build artifacts from $BUILD_DIR"
   rm -rf $BUILD_DIR
-  rm -f targets/orange targets/orange_debug targets/orange_cuda_debug
+  rm -f targets/orange targets/orange_debug targets/orange_cuda_debug targets/orange_nvtx
   echo "==> Clean completed"
 fi
 
@@ -87,6 +119,22 @@ DIR_IMGUI_BACKEND="third_party/imgui/backends"
 DIR_IMPLOT="third_party/implot"
 DIR_FILEBROWSER="third_party/ImGuiFileDialog"
 DIR_ICONFONT="third_party/IconFontCppHeaders"
+
+# Check for NVTX availability
+if [ $NVTX_PROFILE -eq 1 ]; then
+  echo "========================================"
+  echo "Checking NVTX availability"
+  echo "========================================"
+  
+  # Check if NVTX headers are available
+  if [ -f "/usr/local/cuda/include/nvtx3/nvToolsExt.h" ] || [ -f "/usr/include/nvtx3/nvToolsExt.h" ]; then
+    echo "==> NVTX headers found"
+  else
+    echo "WARNING: NVTX headers not found!"
+    echo "Install with: sudo apt install nvidia-nsight-systems-cli"
+    echo "Or use CUDA toolkit installation"
+  fi
+fi
 
 # Helper function to check if a file is outdated (source is newer than object)
 is_outdated() {
@@ -142,22 +190,25 @@ echo "========================================"
 echo "Compiling CUDA kernel"
 echo "========================================"
 # Compile CUDA kernel with appropriate flags
+NVCC_FLAGS="-arch=sm_86"
+
 if [ $DEBUG -eq 1 ]; then
-  if is_outdated "src/kernel.cu" "$BUILD_DIR/kernel.o"; then
-    echo "==> Compiling CUDA kernel (debug mode)"
-    nvcc -c src/kernel.cu -G -g -O0 -arch=sm_86 $CFLAGS -o $BUILD_DIR/kernel.o
-    echo "==> CUDA kernel compilation complete"
-  else
-    echo "==> CUDA kernel is up to date, skipping compilation"
-  fi
+  NVCC_FLAGS="$NVCC_FLAGS -G -g -O0"
 else
-  if is_outdated "src/kernel.cu" "$BUILD_DIR/kernel.o"; then
-    echo "==> Compiling CUDA kernel (release mode)"
-    nvcc -c src/kernel.cu -arch=sm_86 $CFLAGS -o $BUILD_DIR/kernel.o
-    echo "==> CUDA kernel compilation complete"
-  else
-    echo "==> CUDA kernel is up to date, skipping compilation"
-  fi
+  NVCC_FLAGS="$NVCC_FLAGS -O3"
+fi
+
+# Add NVTX support to CUDA compilation
+if [ $NVTX_PROFILE -eq 1 ]; then
+  NVCC_FLAGS="$NVCC_FLAGS -DENABLE_NVTX_PROFILING"
+fi
+
+if is_outdated "src/kernel.cu" "$BUILD_DIR/kernel.o"; then
+  echo "==> Compiling CUDA kernel with flags: $NVCC_FLAGS"
+  nvcc -c src/kernel.cu $NVCC_FLAGS $CFLAGS -o $BUILD_DIR/kernel.o
+  echo "==> CUDA kernel compilation complete"
+else
+  echo "==> CUDA kernel is up to date, skipping compilation"
 fi
 
 echo "========================================"
@@ -249,6 +300,17 @@ else
   fi
 fi
 
+# Build library flags
+LIBS=""
+INCLUDES=""
+
+# Add NVTX libraries if profiling is enabled
+if [ $NVTX_PROFILE -eq 1 ]; then
+  echo "==> Adding NVTX libraries"
+  LIBS="$LIBS -lnvToolsExt"
+  INCLUDES="$INCLUDES -I/usr/local/cuda/include"
+fi
+
 # Main compilation command with all the libraries
 if [ $need_link -eq 1 ]; then
   echo "========================================"
@@ -262,6 +324,13 @@ if [ $need_link -eq 1 ]; then
     echo "    - Enhanced logging for CUDA operations"
     echo "    - RAII context management"
     echo "    - Resource tracking"
+  fi
+  
+  if [ $NVTX_PROFILE -eq 1 ]; then
+    echo "==> NVTX profiling ENABLED"
+    echo "    - Timeline markers for Nsight Systems"
+    echo "    - Detailed GPU operation tracking"
+    echo "    - Ready for nsys profiling"
   fi
   
   g++ $CFLAGS -std=c++17 $BUILD_DIR/*.o \
@@ -295,6 +364,7 @@ if [ $need_link -eq 1 ]; then
       -I$FFMPEG_ROOT/include \
       -I./third_party/flatbuffers/include \
       -I$TENSORRT_ROOT/include \
+      $INCLUDES \
       -L${EVT_ROOT}/lib \
       -lEmergentCamera -lEmergentGenICam -lEmergentGigEVision \
       -lm \
@@ -308,6 +378,7 @@ if [ $need_link -eq 1 ]; then
       -L$OPENCV_ROOT/lib -lopencv_sfm -lopencv_core -lopencv_imgcodecs -lopencv_imgproc \
       -I$TENSORRT_ROOT/include \
       -L$TENSORRT_ROOT/lib -lnvinfer -lnvinfer_plugin \
+      $LIBS \
       `pkg-config --static --libs glfw3`
   
   if [ $? -eq 0 ]; then
@@ -323,7 +394,19 @@ fi
 echo "========================================"
 echo "Creating symbolic links"
 echo "========================================"
-if [ $DEBUG -eq 1 ] && [ $CUDA_DEBUG -eq 1 ]; then
+if [ $NVTX_PROFILE -eq 1 ] && [ $DEBUG -eq 1 ] && [ $CUDA_DEBUG -eq 1 ]; then
+  echo "==> Creating symbolic link for debug+CUDA debug+NVTX binary"
+  ln -sf debug_cuda_nvtx/orange targets/orange_nvtx
+elif [ $NVTX_PROFILE -eq 1 ] && [ $DEBUG -eq 1 ]; then
+  echo "==> Creating symbolic link for debug+NVTX binary"
+  ln -sf debug_nvtx/orange targets/orange_nvtx
+elif [ $NVTX_PROFILE -eq 1 ] && [ $CUDA_DEBUG -eq 1 ]; then
+  echo "==> Creating symbolic link for CUDA debug+NVTX binary"
+  ln -sf release_cuda_nvtx/orange targets/orange_nvtx
+elif [ $NVTX_PROFILE -eq 1 ]; then
+  echo "==> Creating symbolic link for NVTX binary"
+  ln -sf release_nvtx/orange targets/orange_nvtx
+elif [ $DEBUG -eq 1 ] && [ $CUDA_DEBUG -eq 1 ]; then
   echo "==> Creating symbolic link for debug+CUDA debug binary"
   ln -sf debug_cuda/orange targets/orange_cuda_debug
 elif [ $DEBUG -eq 1 ]; then
@@ -352,6 +435,23 @@ if [ $CUDA_DEBUG -eq 1 ]; then
   echo "- Resource allocation/deallocation tracking"
   echo "- TensorRT operation monitoring"
   echo "- Run with 2>&1 | tee debug.log to capture all output"
+fi
+
+if [ $NVTX_PROFILE -eq 1 ]; then
+  echo ""
+  echo "NVTX PROFILING ENABLED:"
+  echo "- Timeline markers added to critical sections"
+  echo "- Ready for Nsight Systems profiling"
+  echo ""
+  echo "Quick profiling commands:"
+  echo "  # Basic 30-second capture:"
+  echo "  nsys profile --duration=30 --output=orange_profile targets/orange_nvtx"
+  echo ""
+  echo "  # Focused CUDA profiling:"
+  echo "  nsys profile --trace=cuda,nvtx --duration=30 --output=orange_cuda targets/orange_nvtx"
+  echo ""
+  echo "  # View results:"
+  echo "  nsight-sys orange_profile.nsys-rep"
 fi
 
 echo "========================================"

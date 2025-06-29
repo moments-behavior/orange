@@ -1,6 +1,7 @@
 #include "FrameDetector.h"
 #include "global.h"
 #include "kernel.cuh"
+#include "video_capture.h"
 #include <npp.h>
 
 FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
@@ -63,7 +64,11 @@ void FrameDetector::thread_loop() {
     ck(cudaSetDevice(camera_params->gpu_id));
     ck(nppSetStream(stream));
     std::vector<Bbox> objs;
+    std::cout << "camera detector: " << camera_params->camera_serial
+              << std::endl;
 
+    auto start = std::chrono::high_resolution_clock::now();
+    int count = 0;
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [&] {
@@ -98,8 +103,8 @@ void FrameDetector::thread_loop() {
 
             detection2d[camera_select->idx2d].ball2d.center[0] = {
                 bbox_center_x, bbox_center_y};
-            std::cout << detection2d[camera_select->idx2d].ball2d.center[0].x
-                      << std::endl;
+            // std::cout << detection2d[camera_select->idx2d].ball2d.center[0].x
+            //           << std::endl;
             detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
         } else {
             detection2d[camera_select->idx2d].ball2d.find_ball.store(false);
@@ -108,7 +113,14 @@ void FrameDetector::thread_loop() {
         ck(cudaStreamSynchronize(stream));
 
         // running detection
-
-        camera_select->frame_detect_state.store(State_Frame_Idle);
+        camera_select->frame_detect_state.store(State_Copy_New_Frame);
+        count++;
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    float calc_frame_rate = count / elapsed.count();
+    std::cout << camera_params->camera_serial
+              << ", Detect frame Rate : " + std::to_string(calc_frame_rate)
+              << std::endl;
 }

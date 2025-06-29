@@ -439,6 +439,7 @@ int main(int argc, char **args) {
                 }
             }
             delete[] tex;
+            tex = nullptr;
 
             for (auto &t : camera_threads)
                 t.join();
@@ -861,8 +862,6 @@ int main(int argc, char **args) {
                                         cameras_select[i].pictures_counter);
                                 cameras_select[i].picture_save_folder =
                                     calib_save_folder;
-                                cameras_select[i].frame_save_state.store(
-                                    State_Copy_New_Frame);
                             }
                             calib_state = CalibSavePictures;
                         }
@@ -1112,6 +1111,7 @@ int main(int argc, char **args) {
                             }
                         }
                         delete[] tex;
+                        tex = nullptr;
 
                         stop_camera_streaming(camera_threads, camera_control,
                                               ecams, cameras_params,
@@ -1150,6 +1150,7 @@ int main(int argc, char **args) {
                                 }
                             }
                             delete[] tex;
+                            tex = nullptr;
                             stop_camera_streaming(
                                 camera_threads, camera_control, ecams,
                                 cameras_params, cameras_select, num_cameras,
@@ -1209,6 +1210,7 @@ int main(int argc, char **args) {
                             }
                         }
                         delete[] tex;
+                        tex = nullptr;
 
                         stop_camera_streaming(camera_threads, camera_control,
                                               ecams, cameras_params,

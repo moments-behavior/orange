@@ -318,9 +318,6 @@ inline void gui_plot_world_coordinates(CameraCalibResults *cvp,
     ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 1.0, 1.0), 3.0);
     std::string name = "World Origin";
 
-    float one_axis_x[2];
-    float one_axis_y[2];
-
     std::vector<triple_f> node_colors = {{1.0f, 1.0f, 1.0f},
                                          {1.0f, 0.0f, 0.0f},
                                          {0.0f, 1.0f, 0.0f},
@@ -360,14 +357,13 @@ inline void draw_aruco_markers(Aruco2d *aruco_marker, int frame_height) {
     ImPlot::PlotLine("Aruco", x, y, 5);
 }
 
-inline void draw_ball_center(cv::Point2f ball_center, int frame_height) {
-    ImVec4 node_color = (ImVec4)ImColor::HSV(0.1, 0.9f, 0.9f);
-    float pt_size = 6.0f;
-
+inline void draw_ball_center(cv::Point2f ball_center, int frame_height,
+                             ImVec4 color, std::string name,
+                             ImPlotMarker marker, float pt_size) {
     double ball_center_x = (double)ball_center.x;
     double ball_center_y = (double)frame_height - (double)ball_center.y;
-    ImPlot::DragPoint(0, &ball_center_x, &ball_center_y, node_color, pt_size,
-                      ImPlotDragToolFlags_None);
+    ImPlot::SetNextMarkerStyle(marker, pt_size, color, 2.5);
+    ImPlot::PlotScatter(name.c_str(), &ball_center_x, &ball_center_y, 1);
 }
 
 #endif

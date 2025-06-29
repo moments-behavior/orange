@@ -5,16 +5,11 @@
 #include "opencv2/core/core.hpp"
 #include "types.h"
 #include <atomic>
+#include <csignal>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/sfm.hpp>
 
 #define PI 3.14159265
-
-struct TriangulatePoints {
-    int id;
-    std::vector<int> detected_cameras;
-    std::vector<std::vector<cv::Point2f>> detected_points;
-};
 
 struct CameraCalibResults {
     cv::Mat k;
@@ -25,6 +20,13 @@ struct CameraCalibResults {
     cv::Mat projection_mat;
 };
 
+struct TriangulatePoints {
+    int id;
+    std::vector<int> detected_cameras;
+    std::vector<std::vector<cv::Point2f>> detected_points;
+    std::vector<CameraCalibResults *> calib_results;
+};
+
 struct Aruco2d {
     int frame_number;
     bool find_marker;
@@ -33,7 +35,6 @@ struct Aruco2d {
 };
 
 struct Ball2d {
-    int frame_number;
     std::atomic<bool> find_ball = false;
     cv::Point2f center[1];
     cv::Point2f proj_center[1];
@@ -85,7 +86,5 @@ void marker3d_to_pose(Aruco3d *aruco_maker_3d);
 bool find_marker3d(TriangulatePoints *aruco_marker_2d,
                    std::vector<CameraCalibResults *> &calib_results,
                    Aruco3d *marker3d);
-bool find_ball3d(TriangulatePoints *ball_2d,
-                 std::vector<CameraCalibResults *> &calib_results,
-                 Ball3d *ball3d);
+bool find_ball3d(TriangulatePoints *ball_2d, Ball3d *ball3d);
 #endif

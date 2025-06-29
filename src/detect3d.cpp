@@ -16,16 +16,16 @@ void detection3d_proc(CameraControl *camera_control,
                       CameraEachSelect *cameras_select, int num_cameras) {
 
     // threads for 3d triangulations
-    std::vector<CameraCalibResults *> calib_results;
     std::vector<int> cam3d_idx;
     for (int i = 0; i < num_cameras; i++) {
         if (cameras_select[i].detect3d) {
-            calib_results.push_back(&detection2d[i].camera_calib);
             cam3d_idx.push_back(i);
         }
     }
 
     TriangulatePoints ball2d_all_cams;
+    auto start = std::chrono::high_resolution_clock::now();
+    int count = 0;
     while (camera_control->subscribe) {
         // 1. wait for all the detection ready; otherwise sleep
         std::unique_lock<std::mutex> lock(mtx3d);
@@ -41,6 +41,7 @@ void detection3d_proc(CameraControl *camera_control,
         if (!ball2d_all_cams.detected_cameras.empty()) {
             ball2d_all_cams.detected_cameras.clear();
             ball2d_all_cams.detected_points.clear();
+            ball2d_all_cams.calib_results.clear();
         }
 
         // triangulation calculation
@@ -51,6 +52,8 @@ void detection3d_proc(CameraControl *camera_control,
                 corners.push_back(detection2d[idx].ball2d.center[0]);
                 ball2d_all_cams.detected_points.push_back(corners);
                 ball2d_all_cams.detected_cameras.push_back(idx);
+                ball2d_all_cams.calib_results.push_back(
+                    &detection2d[idx].camera_calib);
             }
         }
 
@@ -59,11 +62,11 @@ void detection3d_proc(CameraControl *camera_control,
             cameras_select[idx].frame_detect_state.store(State_Copy_New_Frame);
         }
 
-        detection3d.ball3d.new_detection =
-            find_ball3d(&ball2d_all_cams, calib_results, &detection3d.ball3d);
+        detection3d.ball3d.new_detection.store(
+            find_ball3d(&ball2d_all_cams, &detection3d.ball3d));
 
         // project to all the streaming cameras
-        if (detection3d.ball3d.new_detection) {
+        if (detection3d.ball3d.new_detection.load()) {
             for (int i = 0; i < num_cameras; i++) {
 
                 if (cameras_select[i].stream_on &&
@@ -80,8 +83,8 @@ void detection3d_proc(CameraControl *camera_control,
                                       cam_calib->tvec, cam_calib->k,
                                       cam_calib->dist_coeffs, image_pts);
 
-                    std::cout << image_pts.at<float>(0, 0) << ", "
-                              << image_pts.at<float>(0, 1) << std::endl;
+                    // std::cout << image_pts.at<float>(0, 0) << ", "
+                    //           << image_pts.at<float>(0, 1) << std::endl;
                     detection2d[i].ball2d.proj_center[0].x =
                         image_pts.at<float>(0, 0);
                     detection2d[i].ball2d.proj_center[0].y =
@@ -89,5 +92,11 @@ void detection3d_proc(CameraControl *camera_control,
                 }
             }
         }
+        count++;
     }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    float calc_frame_rate = count / elapsed.count();
+    std::cout << "Triangule frame Rate : " + std::to_string(calc_frame_rate)
+              << std::endl;
 }

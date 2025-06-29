@@ -348,7 +348,14 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
         openGLDisplay->StopThread();
         delete openGLDisplay;
     }
+
+    if (camera_select->detect3d) {
+        frame_detector->stop();
+        delete frame_detector;
+    }
 #endif
+
+    frame_saver.stop();
 
     if (camera_control->record_video && camera_select->record) {
         gpu_encoder->StopThread();

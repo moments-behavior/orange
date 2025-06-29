@@ -126,13 +126,24 @@ if [ $NVTX_PROFILE -eq 1 ]; then
   echo "Checking NVTX availability"
   echo "========================================"
   
-  # Check if NVTX headers are available
-  if [ -f "/usr/local/cuda/include/nvtx3/nvToolsExt.h" ] || [ -f "/usr/include/nvtx3/nvToolsExt.h" ]; then
-    echo "==> NVTX headers found"
-  else
+  # Check if NVTX headers are available (updated paths for newer CUDA)
+  NVTX_FOUND=0
+  for nvtx_path in "/usr/local/cuda/include/nvtx3/nvToolsExt.h" \
+                   "/usr/include/nvtx3/nvToolsExt.h" \
+                   "/usr/local/cuda/include/nvToolsExt.h" \
+                   "/opt/nvidia/nsight-systems/*/target-linux-x64/nvtx/include/nvtx3/nvToolsExt.h"; do
+    if [ -f "$nvtx_path" ]; then
+      echo "==> NVTX headers found at: $nvtx_path"
+      NVTX_FOUND=1
+      break
+    fi
+  done
+  
+  if [ $NVTX_FOUND -eq 0 ]; then
     echo "WARNING: NVTX headers not found!"
     echo "Install with: sudo apt install nvidia-nsight-systems-cli"
     echo "Or use CUDA toolkit installation"
+    echo "Continuing build anyway..."
   fi
 fi
 
@@ -167,9 +178,15 @@ headers_changed() {
     fi
   done
   
-  # Check for the new cuda_context_manager.h header specifically
-  if [ -f "src/cuda_context_manager.h" ] && [ "src/cuda_context_manager.h" -nt "$executable" ]; then
-    echo "    - CUDA context manager header is newer than executable"
+  # Check for the new cuda_context_debug.h header specifically
+  if [ -f "src/cuda_context_debug.h" ] && [ "src/cuda_context_debug.h" -nt "$executable" ]; then
+    echo "    - CUDA context debug header is newer than executable"
+    return 0
+  fi
+  
+  # Check for NVTX profiling header
+  if [ -f "src/nvtx_profiling.h" ] && [ "src/nvtx_profiling.h" -nt "$executable" ]; then
+    echo "    - NVTX profiling header is newer than executable"
     return 0
   fi
   
@@ -177,13 +194,26 @@ headers_changed() {
 }
 
 echo "========================================"
-echo "Checking for cuda_context_manager.h"
+echo "Checking for required headers"
 echo "========================================"
-# Check if the new CUDA context manager header exists
-if [ ! -f "src/cuda_context_manager.h" ]; then
-  echo "WARNING: cuda_context_manager.h not found in src/"
+# Check if required headers exist
+MISSING_HEADERS=0
+
+if [ ! -f "src/cuda_context_debug.h" ]; then
+  echo "WARNING: cuda_context_debug.h not found in src/"
   echo "         This file is required for enhanced CUDA debugging"
-  echo "         Please create it as shown in the provided artifacts"
+  MISSING_HEADERS=1
+fi
+
+if [ ! -f "src/nvtx_profiling.h" ]; then
+  echo "WARNING: nvtx_profiling.h not found in src/"
+  echo "         This file is required for NVTX profiling support"
+  MISSING_HEADERS=1
+fi
+
+if [ $MISSING_HEADERS -eq 1 ]; then
+  echo "         Please ensure all required header files are present"
+  echo "         Build will continue but may fail..."
 fi
 
 echo "========================================"
@@ -203,10 +233,20 @@ if [ $NVTX_PROFILE -eq 1 ]; then
   NVCC_FLAGS="$NVCC_FLAGS -DENABLE_NVTX_PROFILING"
 fi
 
+# Add CUDA debug support to CUDA compilation
+if [ $CUDA_DEBUG -eq 1 ]; then
+  NVCC_FLAGS="$NVCC_FLAGS -DDEBUG_CUDA_CONTEXT -DENABLE_CUDA_DEBUG_LOGGING"
+fi
+
 if is_outdated "src/kernel.cu" "$BUILD_DIR/kernel.o"; then
   echo "==> Compiling CUDA kernel with flags: $NVCC_FLAGS"
   nvcc -c src/kernel.cu $NVCC_FLAGS $CFLAGS -o $BUILD_DIR/kernel.o
-  echo "==> CUDA kernel compilation complete"
+  if [ $? -eq 0 ]; then
+    echo "==> CUDA kernel compilation complete"
+  else
+    echo "==> ERROR: CUDA kernel compilation failed!"
+    exit 1
+  fi
 else
   echo "==> CUDA kernel is up to date, skipping compilation"
 fi
@@ -223,13 +263,18 @@ check_and_compile_imgui() {
   if is_outdated "$src" "$obj"; then
     echo "    - File needs compilation"
     g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends $CFLAGS -Wall -Wformat `pkg-config --cflags glfw3` -c -o "$obj" "$src"
-    echo "    - Compilation complete"
+    if [ $? -eq 0 ]; then
+      echo "    - Compilation complete"
+    else
+      echo "    - ERROR: Compilation failed for $src"
+      exit 1
+    fi
   else
     echo "    - File is up to date, skipping"
   fi
 }
 
-# Compile ImGui files if needed
+# Compile ImGui files if needed - FIXED THE SYNTAX ERROR HERE
 check_and_compile_imgui "$DIR_IMGUI/imgui.cpp" "$BUILD_DIR/imgui.o"
 check_and_compile_imgui "$DIR_IMGUI/imgui_demo.cpp" "$BUILD_DIR/imgui_demo.o"
 check_and_compile_imgui "$DIR_IMGUI/imgui_draw.cpp" "$BUILD_DIR/imgui_draw.o"
@@ -250,7 +295,12 @@ check_and_compile_implot() {
   if is_outdated "$src" "$obj"; then
     echo "    - File needs compilation"
     g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI $CFLAGS -Wall -c -o "$obj" "$src"
-    echo "    - Compilation complete"
+    if [ $? -eq 0 ]; then
+      echo "    - Compilation complete"
+    else
+      echo "    - ERROR: Compilation failed for $src"
+      exit 1
+    fi
   else
     echo "    - File is up to date, skipping"
   fi
@@ -283,7 +333,7 @@ else
   if [ $need_link -eq 0 ]; then
     echo "==> Checking if source files changed"
     for src in src/*.cpp src/NvEncoder/*.cpp src/*.cu; do # Added src/*.cu to check kernel.cu
-      if [ "$src" -nt "$BUILD_DIR/orange" ]; then
+      if [ -f "$src" ] && [ "$src" -nt "$BUILD_DIR/orange" ]; then
         echo "    - Source file $src is newer than executable"
         need_link=1
         break
@@ -307,7 +357,14 @@ INCLUDES=""
 # Add NVTX libraries if profiling is enabled
 if [ $NVTX_PROFILE -eq 1 ]; then
   echo "==> Adding NVTX libraries"
-  LIBS="$LIBS -lnvToolsExt"
+  # Try different locations for libnvToolsExt
+  if [ -f "/usr/local/cuda/lib64/libnvToolsExt.so" ]; then
+    LIBS="$LIBS -L/usr/local/cuda/lib64 -lnvToolsExt"
+  elif [ -f "/usr/lib/x86_64-linux-gnu/libnvToolsExt.so" ]; then
+    LIBS="$LIBS -L/usr/lib/x86_64-linux-gnu -lnvToolsExt"
+  else
+    LIBS="$LIBS -lnvToolsExt"  # Try system paths
+  fi
   INCLUDES="$INCLUDES -I/usr/local/cuda/include"
 fi
 
@@ -385,6 +442,12 @@ if [ $need_link -eq 1 ]; then
     echo "==> Linking complete"
   else
     echo "==> ERROR: Linking failed!"
+    echo "    Check library paths and dependencies"
+    if [ $NVTX_PROFILE -eq 1 ]; then
+      echo "    NVTX-related linking errors? Try:"
+      echo "    - sudo apt install nvidia-nsight-systems-cli"
+      echo "    - Check CUDA installation includes NVTX libraries"
+    fi
     exit 1
   fi
 else
@@ -444,11 +507,19 @@ if [ $NVTX_PROFILE -eq 1 ]; then
   echo "- Ready for Nsight Systems profiling"
   echo ""
   echo "Quick profiling commands:"
-  echo "  # Basic 30-second capture:"
-  echo "  nsys profile --duration=30 --output=orange_profile targets/orange_nvtx"
-  echo ""
-  echo "  # Focused CUDA profiling:"
-  echo "  nsys profile --trace=cuda,nvtx --duration=30 --output=orange_cuda targets/orange_nvtx"
+  if [ -f "targets/orange_nvtx" ]; then
+    echo "  # Basic 30-second capture:"
+    echo "  nsys profile --duration=30 --output=orange_profile targets/orange_nvtx"
+    echo ""
+    echo "  # Focused CUDA profiling:"
+    echo "  nsys profile --trace=cuda,nvtx --duration=30 --output=orange_cuda targets/orange_nvtx"
+    echo ""
+    echo "  # Memory transfer analysis:"
+    echo "  nsys profile --trace=cuda,nvtx,cublas,cudnn --duration=30 --output=orange_full targets/orange_nvtx"
+  else
+    echo "  # Basic 30-second capture:"
+    echo "  nsys profile --duration=30 --output=orange_profile $BUILD_DIR/orange"
+  fi
   echo ""
   echo "  # View results:"
   echo "  nsight-sys orange_profile.nsys-rep"

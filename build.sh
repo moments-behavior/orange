@@ -262,7 +262,7 @@ check_and_compile_imgui() {
   echo "==> Checking $src"
   if is_outdated "$src" "$obj"; then
     echo "    - File needs compilation"
-    g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends $CFLAGS -Wall -Wformat `pkg-config --cflags glfw3` -c -o "$obj" "$src"
+    g++ -std=c++11 -I./third_party/imgui -I./third_party/imgui/backends -I/usr/local/cuda/include $CFLAGS -Wall -Wformat `pkg-config --cflags glfw3` -c -o "$obj" "$src"
     if [ $? -eq 0 ]; then
       echo "    - Compilation complete"
     else
@@ -274,7 +274,7 @@ check_and_compile_imgui() {
   fi
 }
 
-# Compile ImGui files if needed - FIXED THE SYNTAX ERROR HERE
+# Compile ImGui files if needed
 check_and_compile_imgui "$DIR_IMGUI/imgui.cpp" "$BUILD_DIR/imgui.o"
 check_and_compile_imgui "$DIR_IMGUI/imgui_demo.cpp" "$BUILD_DIR/imgui_demo.o"
 check_and_compile_imgui "$DIR_IMGUI/imgui_draw.cpp" "$BUILD_DIR/imgui_draw.o"
@@ -294,7 +294,7 @@ check_and_compile_implot() {
   echo "==> Checking $src"
   if is_outdated "$src" "$obj"; then
     echo "    - File needs compilation"
-    g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI $CFLAGS -Wall -c -o "$obj" "$src"
+    g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -I/usr/local/cuda/include $CFLAGS -Wall -c -o "$obj" "$src"
     if [ $? -eq 0 ]; then
       echo "    - Compilation complete"
     else
@@ -357,15 +357,7 @@ INCLUDES=""
 # Add NVTX libraries if profiling is enabled
 if [ $NVTX_PROFILE -eq 1 ]; then
   echo "==> Adding NVTX libraries"
-  # Try different locations for libnvToolsExt
-  if [ -f "/usr/local/cuda/lib64/libnvToolsExt.so" ]; then
-    LIBS="$LIBS -L/usr/local/cuda/lib64 -lnvToolsExt"
-  elif [ -f "/usr/lib/x86_64-linux-gnu/libnvToolsExt.so" ]; then
-    LIBS="$LIBS -L/usr/lib/x86_64-linux-gnu -lnvToolsExt"
-  else
-    LIBS="$LIBS -lnvToolsExt"  # Try system paths
-  fi
-  INCLUDES="$INCLUDES -I/usr/local/cuda/include"
+  LIBS="$LIBS -L/usr/local/cuda/lib64 -lnvToolsExt -Wl,-rpath,/usr/local/cuda/lib64"
 fi
 
 # Main compilation command with all the libraries
@@ -378,19 +370,13 @@ if [ $need_link -eq 1 ]; then
   # Show what debugging options are enabled
   if [ $CUDA_DEBUG -eq 1 ]; then
     echo "==> CUDA context debugging ENABLED"
-    echo "    - Enhanced logging for CUDA operations"
-    echo "    - RAII context management"
-    echo "    - Resource tracking"
   fi
   
   if [ $NVTX_PROFILE -eq 1 ]; then
     echo "==> NVTX profiling ENABLED"
-    echo "    - Timeline markers for Nsight Systems"
-    echo "    - Detailed GPU operation tracking"
-    echo "    - Ready for nsys profiling"
   fi
   
-  g++ $CFLAGS -std=c++17 $BUILD_DIR/*.o \
+  g++ $CFLAGS -std=c++17 -Wno-deprecated-declarations $BUILD_DIR/*.o \
       -o $BUILD_DIR/orange \
       -I./src/ \
       src/orange.cpp \

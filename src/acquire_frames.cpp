@@ -1,4 +1,4 @@
-// src/acquire_frames.cpp - Final Corrected Version with NVTX Profiling
+// src/acquire_frames.cpp
 
 #include "acquire_frames.h"
 #include "nvtx_profiling.h"
@@ -61,12 +61,13 @@ void acquire_frames(
     }
 
     cudaStream_t stream;
+    FrameProcess frame_process_save;
+
     {
         NVTX_RANGE("Stream_and_Buffer_Init");
         ck(cudaStreamCreate(&stream));
         CUDA_STREAM_LOG("Created acquisition stream", stream);
 
-        FrameProcess frame_process_save;
         initalize_gpu_frame(&frame_process_save.frame_original, camera_params);
         initialize_gpu_debayer(&frame_process_save.debayer, camera_params);
         initialize_cpu_frame(&frame_process_save.frame_cpu, camera_params);
@@ -140,7 +141,6 @@ void acquire_frames(
             // --- GPU DIRECT DETECTION AND OPTIMIZATION ---
             cudaPointerAttributes attrs;
             cudaError_t err;
-            bool gpu_direct_working = false;
             bool use_direct_pointer = false;
             
             {
@@ -148,31 +148,9 @@ void acquire_frames(
                 err = cudaPointerGetAttributes(&attrs, ecam->frame_recv.imagePtr);
                 
                 if (err == cudaSuccess && attrs.type == cudaMemoryTypeDevice) {
-                    // GPU Direct is working!
-                    gpu_direct_working = true;
-                    std::cout << "✅ [GPU_DIRECT] Frame " << camera_state.frame_count 
-                              << " - Camera buffer is on GPU (device " << attrs.device 
-                              << ") - GPU Direct SUCCESS!" << std::endl;
-                    
-                    // Check if we can use the pointer directly (safe conditions)
                     if (attrs.device == camera_params->gpu_id) {
                         use_direct_pointer = true;
-                        std::cout << "🚀 [ZERO_COPY] Frame " << camera_state.frame_count 
-                                  << " - Using camera buffer directly, NO COPY NEEDED!" << std::endl;
-                    } else {
-                        std::cout << "⚠️ [GPU_MISMATCH] Frame " << camera_state.frame_count 
-                                  << " - Camera on GPU " << attrs.device 
-                                  << " but worker on GPU " << camera_params->gpu_id 
-                                  << " - Copy required" << std::endl;
                     }
-                } else {
-                    // GPU Direct not working
-                    std::cout << "❌ [GPU_DIRECT_FAILED] Frame " << camera_state.frame_count 
-                              << " - Camera buffer not on GPU: " << cudaGetErrorString(err);
-                    if (err == cudaSuccess) {
-                        std::cout << " (memory type: " << attrs.type << ")";
-                    }
-                    std::cout << " - Copy required" << std::endl;
                 }
             }
             
@@ -180,46 +158,28 @@ void acquire_frames(
             
             if (use_direct_pointer) {
                 NVTX_GPU_COPY("GPU_Direct_ZeroCopy_Setup");
-                // OPTIMIZATION: Use GPU Direct pointer directly - ZERO COPY!
                 current_entry->d_image = static_cast<unsigned char*>(ecam->frame_recv.imagePtr);
                 current_entry->gpu_direct_mode = true;
-                current_entry->owns_memory = false; // Don't free this pointer
-                
-                std::cout << "🎯 [PERFORMANCE] Frame " << camera_state.frame_count 
-                          << " - Zero copy path: " << (ecam->frame_recv.bufferSize / 1024 / 1024) 
-                          << "MB saved!" << std::endl;
-                
-                // IMPORTANT: Don't requeue the camera buffer yet since workers are using it!
-                // We'll need to handle requeuing differently for GPU Direct
-                
+                current_entry->owns_memory = false; 
             } else {
                 NVTX_GPU_COPY("Traditional_Copy_Path");
-                // FALLBACK: Traditional copy path
-                std::cout << "🐌 [COPY_PATH] Frame " << camera_state.frame_count 
-                          << " - Copying " << (ecam->frame_recv.bufferSize / 1024 / 1024) 
-                          << "MB to worker buffer" << std::endl;
-                
-                CUDA_MEM_LOG("Copying camera frame to worker buffer", current_entry->d_image, 
-                            ecam->frame_recv.bufferSize, camera_state.frame_count);
-                ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, 
-                                   ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
+                CUDA_MEM_LOG("Copying camera frame to worker buffer", current_entry->d_image, ecam->frame_recv.bufferSize, camera_state.frame_count);
+                ck(cudaMemcpyAsync(current_entry->d_image, ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize, cudaMemcpyDeviceToDevice, stream));
                 VALIDATE_CUDA_OP("Camera frame copy", camera_state.frame_count);
-                
-                // Synchronize to ensure copy is complete before requeuing
-                NVTX_SYNC("Copy_Stream_Synchronization");
-                CUDA_SYNC_LOG("Synchronizing stream after camera copy", stream, camera_state.frame_count);
-                ck(cudaStreamSynchronize(stream));
-                VALIDATE_CUDA_OP("Stream synchronization", camera_state.frame_count);
-                
-                current_entry->gpu_direct_mode = false;
-                current_entry->owns_memory = true; // This buffer can be recycled normally
-                
-                // Safe to requeue immediately after copy
+
                 NVTX_CAMERA("Camera_Buffer_Requeue");
                 EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
             }
             
-            // 3. Populate the metadata for the WORKER_ENTRY.
+            // Record a CUDA event to signal that the data is ready on the GPU
+            {
+                NVTX_SYNC("Record_Data_Ready_Event");
+                ck(cudaEventCreateWithFlags(&current_entry->data_ready, cudaEventDisableTiming));
+                ck(cudaEventRecord(current_entry->data_ready, stream));
+                CUDA_SYNC_LOG("Recorded data_ready event", stream, camera_state.frame_count);
+            }
+            
+            // Populate the metadata for the WORKER_ENTRY.
             {
                 NVTX_RANGE("Populate_Entry_Metadata");
                 current_entry->width = ecam->frame_recv.size_x;
@@ -230,50 +190,42 @@ void acquire_frames(
                 current_entry->has_detections = false;
             }
         
-            // 4. Handle asynchronous save request (NON-BLOCKING).
+            // Handle asynchronous save request (NON-BLOCKING).
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
                 NVTX_RANGE_PUSH("Image_Save_Processing");
-                CUDA_CTX_LOG("Processing frame save request for frame " + std::to_string(camera_state.frame_count));
                 
-                FrameGPU temp_frame_gpu;
-                temp_frame_gpu.d_orig = current_entry->d_image;
-                temp_frame_gpu.size_pic = current_entry->width * current_entry->height;
+                // The data in current_entry->d_image is the raw camera data.
+                // We need to debayer and convert it before saving.
+                frame_process_save.frame_original.d_orig = current_entry->d_image;
         
-                {
-                    NVTX_RANGE("Image_Save_Debayer");
-                    if (camera_params->color){
-                        debayer_frame_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
-                    } else {
-                        duplicate_channel_gpu(camera_params, &temp_frame_gpu, &frame_process_save.debayer);
-                    }
+                if (camera_params->color){
+                    debayer_frame_gpu(camera_params, &frame_process_save.frame_original, &frame_process_save.debayer);
+                } else {
+                    duplicate_channel_gpu(camera_params, &frame_process_save.frame_original, &frame_process_save.debayer);
                 }
                 
-                {
-                    NVTX_RANGE("Image_Save_ColorConvert");
-                    rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, 
-                                    camera_params->width, camera_params->height, stream);
-                }
+                rgba2bgr_convert(frame_process_save.d_convert, frame_process_save.debayer.d_debayer, 
+                                 camera_params->width, camera_params->height, stream);
                 
-                // Asynchronously copy data to the host buffer
-                {
-                    NVTX_GPU_COPY("Image_Save_D2H_Copy");
-                    ck(cudaMemcpy2DAsync(frame_process_save.frame_cpu.frame, camera_params->width*3, 
-                                        frame_process_save.d_convert, camera_params->width*3, 
-                                        camera_params->width*3, camera_params->height, 
-                                        cudaMemcpyDeviceToHost, stream));
-                }
+                // Asynchronously copy the converted BGR data to the host buffer for saving.
+                ck(cudaMemcpy2DAsync(frame_process_save.frame_cpu.frame, (size_t)camera_params->width*3, 
+                                    frame_process_save.d_convert, (size_t)camera_params->width*3, 
+                                    (size_t)camera_params->width*3, (size_t)camera_params->height, 
+                                    cudaMemcpyDeviceToHost, stream));
         
-                // Create and record a CUDA event to mark when the copy is done
-                cudaEvent_t event;
-                ck(cudaEventCreate(&event));
-                ck(cudaEventRecord(event, stream));
+                // Create and record a CUDA event to mark when the DtoH copy is done.
+                cudaEvent_t save_event;
+                ck(cudaEventCreateWithFlags(&save_event, cudaEventDisableTiming));
+                ck(cudaEventRecord(save_event, stream));
         
-                // Create the save job with the necessary info
+                // Create the save job with the CPU buffer and the synchronization event.
                 {
                     NVTX_QUEUE("Image_Save_Queue_Job");
                     ImageWriter_Entry* save_job = new ImageWriter_Entry();
-                    save_job->event = event;
+                    save_job->event = save_event;
+                    
                     save_job->cpu_buffer = frame_process_save.frame_cpu.frame;
+
                     save_job->width = camera_params->width;
                     save_job->height = camera_params->height;
                     save_job->file_path = camera_select->picture_save_folder + "/" + 
@@ -281,115 +233,51 @@ void acquire_frames(
                                          camera_select->frame_save_name + "." + 
                                          camera_select->frame_save_format;
                     
-                    // Queue the job; this will no longer block!
                     image_writer->PutObjectToQueueIn(save_job);
                 }
                 
                 camera_select->pictures_counter++;
                 camera_select->frame_save_state = State_Frame_Idle;
-                NVTX_RANGE_POP(); // Image_Save_Processing
+                NVTX_RANGE_POP();
             }
         
-            // 5. Dispatch the WORKER_ENTRY to real-time workers.
+            // Dispatch to workers
             int dispatch_count = 0;
             if (camera_select->stream_on && openGLDisplay) dispatch_count++;
             if (camera_control->record_video && gpu_encoder) dispatch_count++;
             if (camera_select->yolo && yolo_worker) dispatch_count++;
-        
-            // Log dispatch analysis with context info
-            {
-                NVTX_RANGE("Dispatch_Analysis");
-                CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatch analysis");
-                dumpCudaState("Before frame dispatch", camera_state.frame_count);
             
-                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " << current_entry->frame_id 
-                          << " dispatch analysis:" << std::endl;
-                std::cout << "  - stream_on: " << (camera_select->stream_on ? "true" : "false") 
-                          << ", openGLDisplay: " << (openGLDisplay ? "valid" : "null") << std::endl;
-                std::cout << "  - record_video: " << (camera_control->record_video ? "true" : "false") 
-                          << ", gpu_encoder: " << (gpu_encoder ? "valid" : "null") << std::endl;
-                std::cout << "  - yolo: " << (camera_select->yolo ? "true" : "false") 
-                          << ", yolo_worker: " << (yolo_worker ? "valid" : "null") << std::endl;
-                std::cout << "  - Total dispatch_count: " << dispatch_count << std::endl;
-                std::cout << "  - GPU Direct mode: " << (current_entry->gpu_direct_mode ? "YES" : "NO") << std::endl;
-            }
-        
             if (dispatch_count > 0) {
                 NVTX_RANGE_PUSH("Worker_Dispatch");
                 current_entry->ref_count.store(dispatch_count);
                 
-                CUDA_CTX_LOG("Setting ref_count to " + std::to_string(dispatch_count) + 
-                            " for frame " + std::to_string(camera_state.frame_count));
-                
-                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Dispatching frame " 
-                          << current_entry->frame_id << " to " << dispatch_count << " consumers:" << std::endl;
-                
-                // Dispatch with detailed logging
                 if (camera_select->stream_on && openGLDisplay) {
-                    NVTX_DISPLAY("Dispatch_to_OpenGL");
-                    CUDA_CTX_LOG("Dispatching to OpenGL Display");
-                    std::cout << "  -> Sending to OpenGL Display" << std::endl;
                     openGLDisplay->PutObjectToQueueIn(current_entry);
                 }
-                
                 if (camera_control->record_video && gpu_encoder) {
-                    NVTX_ENCODE("Dispatch_to_GPU_Encoder");
-                    CUDA_CTX_LOG("Dispatching to GPU Encoder - CRITICAL DISPATCH");
-                    dumpCudaState("Pre-GPU-Encoder-Dispatch", camera_state.frame_count);
-                    std::cout << "  -> Sending to GPU Encoder" << std::endl;
                     gpu_encoder->PutObjectToQueueIn(current_entry);
-                    CUDA_CTX_LOG("GPU Encoder dispatch completed");
                 }
-                
                 if (camera_select->yolo && yolo_worker) {
-                    NVTX_YOLO("Dispatch_to_YOLO");
-                    CUDA_CTX_LOG("Dispatching to YOLO Worker");
-                    std::cout << "  -> Sending to YOLO Worker" << std::endl;
                     yolo_worker->PutObjectToQueueIn(current_entry);
                 }
                 
-                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
-                          << current_entry->frame_id << " dispatched successfully" << std::endl;
-                CUDA_CTX_LOG("Frame " + std::to_string(camera_state.frame_count) + " dispatched successfully");
-                
-                // SPECIAL HANDLING: If using GPU Direct, we need to handle camera buffer requeuing differently
                 if (use_direct_pointer) {
-                    NVTX_RANGE_PUSH("GPU_Direct_Buffer_Setup");
-                    // For GPU Direct, we can't requeue immediately since workers are using the buffer
-                    // The last worker to finish will need to handle requeuing
-                    // This requires modifications to the worker classes (see next step)
                     current_entry->camera_buffer_ptr = ecam->frame_recv.imagePtr;
                     current_entry->camera_instance = &ecam->camera;
                     current_entry->camera_frame_struct = &ecam->frame_recv;
-                    
-                    std::cout << "⚠️ [GPU_DIRECT] Frame " << current_entry->frame_id 
-                              << " - Camera buffer requeue will be handled by last worker" << std::endl;
-                    NVTX_RANGE_POP(); // GPU_Direct_Buffer_Setup
                 }
                 
-                NVTX_RANGE_POP(); // Worker_Dispatch
+                NVTX_RANGE_POP();
                 
             } else {
-                NVTX_RANGE_PUSH("No_Consumers_Cleanup");
-                std::cout << "[ACQUIRE " << camera_params->camera_serial << "] Frame " 
-                          << current_entry->frame_id << " has no consumers - recycling immediately" << std::endl;
-                CUDA_CTX_LOG("No consumers, recycling frame " + std::to_string(camera_state.frame_count));
-                
-                // If no consumers and using GPU Direct, requeue the camera buffer now
                 if (use_direct_pointer) {
-                    NVTX_CAMERA("Camera_Buffer_Requeue_No_Consumers");
                     EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
-                    std::cout << "🔄 [GPU_DIRECT] Frame " << current_entry->frame_id 
-                              << " - Camera buffer requeued (no consumers)" << std::endl;
                 }
-                
-                NVTX_QUEUE("Recycle_Entry_Immediately");
                 free_entries_queue->push(current_entry);
-                NVTX_RANGE_POP(); // No_Consumers_Cleanup
             }
         }
         
-        NVTX_RANGE_POP(); // Frame_Processing_Loop
+        NVTX_RANGE_POP();
     }
 
     // Cleanup

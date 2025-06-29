@@ -1,4 +1,4 @@
-// src/nvtx_profiling.h
+// src/nvtx_profiling.h - FIXED VERSION
 #ifndef NVTX_PROFILING_H
 #define NVTX_PROFILING_H
 
@@ -28,27 +28,27 @@ public:
 // Convenient macro for RAII ranges
 #define NVTX_RANGE(name) NvtxRange nvtx_range_##__LINE__(name)
 
-// Colored ranges for better visualization
-#define NVTX_RANGE_COLORED(name, color) \
+// FIX: Updated colored ranges macro to properly handle the color parameter
+#define NVTX_RANGE_COLORED(name, color_val) \
     do { \
         nvtxEventAttributes_t attrib = {0}; \
         attrib.version = NVTX_VERSION; \
         attrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
         attrib.colorType = NVTX_COLOR_ARGB; \
-        attrib.color = color; \
+        attrib.color = (color_val); \
         attrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
         attrib.message.ascii = name; \
         nvtxRangePushEx(&attrib); \
     } while(0)
 
 // Predefined colors for different categories
-#define NVTX_COLOR_CAMERA     0xFF00FF00  // Green - Camera operations
-#define NVTX_COLOR_GPU_COPY   0xFF0000FF  // Blue - Memory operations
-#define NVTX_COLOR_ENCODE     0xFFFF0000  // Red - Encoding operations
-#define NVTX_COLOR_YOLO       0xFFFFFF00  // Yellow - YOLO inference
-#define NVTX_COLOR_DISPLAY    0xFFFF00FF  // Magenta - Display operations
-#define NVTX_COLOR_SYNC       0xFF800080  // Purple - Synchronization
-#define NVTX_COLOR_QUEUE      0xFF808080  // Gray - Queue operations
+#define NVTX_COLOR_CAMERA     0xFF00FF00U  // Green - Camera operations
+#define NVTX_COLOR_GPU_COPY   0xFF0000FFU  // Blue - Memory operations
+#define NVTX_COLOR_ENCODE     0xFFFF0000U  // Red - Encoding operations
+#define NVTX_COLOR_YOLO       0xFFFFFF00U  // Yellow - YOLO inference
+#define NVTX_COLOR_DISPLAY    0xFFFF00FFU  // Magenta - Display operations
+#define NVTX_COLOR_SYNC       0xFF800080U  // Purple - Synchronization
+#define NVTX_COLOR_QUEUE      0xFF808080U  // Gray - Queue operations
 
 // Specific category macros
 #define NVTX_CAMERA(name)     NVTX_RANGE_COLORED(name, NVTX_COLOR_CAMERA)
@@ -64,7 +64,7 @@ public:
 #define NVTX_RANGE_PUSH(name) do {} while(0)
 #define NVTX_RANGE_POP() do {} while(0)
 #define NVTX_RANGE(name) do {} while(0)
-#define NVTX_RANGE_COLORED(name, color) do {} while(0)
+#define NVTX_RANGE_COLORED(name, color_val) do {} while(0)
 #define NVTX_CAMERA(name) do {} while(0)
 #define NVTX_GPU_COPY(name) do {} while(0)
 #define NVTX_ENCODE(name) do {} while(0)

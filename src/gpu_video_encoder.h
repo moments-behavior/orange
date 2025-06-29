@@ -68,6 +68,7 @@ private:
     // Intermediate GPU buffers for conversion
     unsigned char* d_rgb_temp_;
     unsigned char* d_iyuv_temp_; // Single buffer for the 3-plane IYUV data
+    unsigned char* d_uv_default_plane_; // Pre-filled buffer for monochrome U/V planes
 
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 

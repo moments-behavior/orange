@@ -47,6 +47,8 @@ public:
         return current_fps_.load(std::memory_order_relaxed);
     }
 
+    cudaEvent_t m_inference_completed;
+
     private:
     bool WorkerFunction(WORKER_ENTRY* f) override;
     void WorkerReset() override;

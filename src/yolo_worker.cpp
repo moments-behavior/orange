@@ -66,6 +66,9 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
                                      associated_camera_params_->width,
                                      associated_camera_params_->height);
         yolov8_instance_->make_pipe(true);
+        
+        // *** CHANGE 1: Create the CUDA event ***
+        ck(cudaEventCreate(&m_inference_completed));
 
         std::cout << "[YOLOv8 MODEL INFO] " << name << " expects input size: " 
                   << yolov8_instance_->inp_w_int << "x" << yolov8_instance_->inp_h_int << std::endl;
@@ -101,6 +104,9 @@ YOLOv8Worker::~YOLOv8Worker() {
     
     if (ctx_manager.is_valid() && associated_camera_params_) {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
+
+        // *** CHANGE 2: Destroy the CUDA event ***
+        if (m_inference_completed) { cudaEventDestroy(m_inference_completed); }
         
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); }
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); }
@@ -152,10 +158,12 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
         nppSetStream(yolov8_instance_->stream);
 
-        size_t buffer_size = static_cast<size_t>(entry->width) * static_cast<size_t>(entry->height);
-        ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, entry->d_image, buffer_size, 
-                          cudaMemcpyDeviceToDevice, yolov8_instance_->stream));
+        //  Wait for the data to be ready before processing
+        if (entry->data_ready) {
+            ck(cudaStreamWaitEvent(yolov8_instance_->stream, entry->data_ready, 0));
+        }
 
+        frame_original_gpu_.d_orig = entry->d_image;
         debayer_gpu_.size.width = camera_width;
         debayer_gpu_.size.height = camera_height;
 
@@ -165,11 +173,8 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         }
 
-        // --- NEW CONVERSION STEP ---
-        // Convert the 4-channel RGBA debayer output to 3-channel BGR for the network.
         NppiSize image_size = {camera_width, camera_height};
-        // The order of channels to extract from RGBA to get BGR
-        const int channel_order[4] = {2, 1, 0, 3}; // B<-R, G<-G, R<-B
+        const int channel_order[4] = {2, 1, 0, 3}; 
         nppiSwapChannels_8u_C4C3R(debayer_gpu_.d_debayer, camera_width * 4,
                                  d_rgb_yolo_input_gpu_, camera_width * 3,
                                  image_size, channel_order);
@@ -177,12 +182,9 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         bool dump_this_frame = m_dump_next_frame.exchange(false);
         if (dump_this_frame)
         {
-            std::cout << "[" << threadName << "] Dumping pre-YOLO input for frame " << entry->frame_id << std::endl;
             size_t image_size_bytes = (size_t)camera_width * camera_height * 4;
             unsigned char* h_rgba_buffer = new unsigned char[image_size_bytes];
-
             ck(cudaMemcpy(h_rgba_buffer, debayer_gpu_.d_debayer, image_size_bytes, cudaMemcpyDeviceToHost));
-
             try {
                 cv::Mat rgba_image(camera_height, camera_width, CV_8UC4, h_rgba_buffer);
                 cv::Mat bgr_image;
@@ -193,13 +195,16 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             } catch (const cv::Exception& ex) {
                 std::cerr << "OpenCV exception while saving debug image: " << ex.what() << std::endl;
             }
-
             delete[] h_rgba_buffer;
         }
 
         yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, camera_width, camera_height);
-        
         yolov8_instance_->infer();
+        
+        // *** CHANGE 3: Replace stream synchronization with event synchronization ***
+        ck(cudaEventRecord(m_inference_completed, yolov8_instance_->stream));
+        ck(cudaEventSynchronize(m_inference_completed));
+        
         yolov8_instance_->postprocess(entry->detections);
         entry->has_detections = !entry->detections.empty();
 
@@ -214,32 +219,13 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             last_fps_update_time_ = now;
         }
 
-        ck(cudaStreamSynchronize(yolov8_instance_->stream));
-
         if (entry->has_detections) {
-            std::cout << "[" << threadName << "] SUCCESS: Detected " << entry->detections.size() << " object(s) in frame " << entry->frame_id << "." << std::endl;
             if (associated_camera_select_->send_yolo_via_ipc && shaman_ipc_queue_) {
                 std::vector<shaman::Object> shaman_objects = conv_shaman(entry->detections);
-
-                std::cout << "  > Writing " << shaman_objects.size() << " object(s) to shared memory:" << std::endl;
-                for (const auto& sh_obj : shaman_objects) {
-                    std::cout << "    - Label: " << sh_obj.label
-                              << ", Prob: " << sh_obj.prob
-                              << ", Rect: [x=" << sh_obj.rect.x << ", y=" << sh_obj.rect.y
-                              << ", w=" << sh_obj.rect.width << ", h=" << sh_obj.rect.height << "]" << std::endl;
-                }
-                
                 if (!shaman_ipc_queue_->push(shaman_objects, entry->frame_id, associated_camera_params_->camera_id)) {
                     std::cerr << "[" << threadName << "] Failed to push to IPC queue." << std::endl;
                 }
             }
-            if (associated_camera_select_->send_yolo_via_enet && enet_host_context_ && enet_target_peer_ &&
-                enet_target_peer_->state == ENET_PEER_STATE_CONNECTED) {
-                // ENet transmission logic
-            }
-        }
-        else {
-            std::cout << "[" << threadName << "] No objects detected in frame " << entry->frame_id << "." << std::endl;
         }
 
     } catch (const std::exception& e) {
@@ -250,6 +236,13 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
     }
 
     if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        if (entry->gpu_direct_mode && entry->camera_instance && entry->camera_frame_struct) {
+            EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);
+        }
+        if(entry->data_ready) {
+            cudaEventDestroy(entry->data_ready);
+            entry->data_ready = nullptr;
+        }
         m_recycle_queue.push(entry);
     }
     

@@ -1,4 +1,4 @@
-// src/gpu_video_encoder.cpp - Enhanced with NVTX Profiling
+// src/gpu_video_encoder.cpp
 
 #include "gpu_video_encoder.h"
 #include "kernel.cuh"
@@ -9,7 +9,7 @@
 #include "global.h"
 #include "NvEncoder/NvEncoder.h"
 #include "cuda_context_debug.h"
-#include "nvtx_profiling.h"  // Add NVTX profiling support
+#include "nvtx_profiling.h"
 
 static std::string NvEncFormatToString(NV_ENC_BUFFER_FORMAT format) {
     switch (format) {
@@ -96,7 +96,6 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
     }
 }
 
-// SIMPLIFIED CONSTRUCTOR - No resizing, use native camera resolution
 GPUVideoEncoder::GPUVideoEncoder(const char* name, CUcontext cuda_context, CameraParams *camera_params,
     const std::string& codec, const std::string& preset, const std::string& tuning,
     std::string folder_name, bool* encoder_ready_signal,
@@ -110,11 +109,12 @@ m_recycle_queue(recycle_queue),
 m_stream(nullptr),
 d_rgb_temp_(nullptr),
 d_iyuv_temp_(nullptr),
+d_uv_default_plane_(nullptr), // Initialize new member
 last_fps_update_time_(std::chrono::steady_clock::now()),
 frame_counter_(0),
 current_fps_(0.0),
-scaled_width_(camera_params->width),   // USE NATIVE CAMERA WIDTH
-scaled_height_(camera_params->height), // USE NATIVE CAMERA HEIGHT
+scaled_width_(camera_params->width),
+scaled_height_(camera_params->height),
 d_scaled_mono_buffer_(nullptr),
 encoder_pitch_(0)
 {
@@ -137,10 +137,7 @@ encoder_pitch_(0)
         NVTX_RANGE_POP();
 
         NVTX_RANGE_PUSH("Allocate_GPU_Memory");
-        // No need for d_scaled_mono_buffer since we're not resizing
-        // ck(cudaMalloc(&d_scaled_mono_buffer_, scaled_width_ * scaled_height_));
         ck(cudaMalloc(&d_rgb_temp_, scaled_width_ * scaled_height_ * 3));
-        // DON'T allocate d_iyuv_temp_ yet - we need encoder pitch first
         NVTX_RANGE_POP();
 
         NVTX_RANGE_PUSH("Setup_Encoder_Context");
@@ -203,14 +200,21 @@ encoder_pitch_(0)
         encoder.pEnc->SetIOCudaStreams((NV_ENC_CUSTREAM_PTR)&m_stream, (NV_ENC_CUSTREAM_PTR)&m_stream);
         NVTX_RANGE_POP();
 
-        NVTX_RANGE_PUSH("Allocate_IYUV_Buffer");
-        // NOW get the encoder's expected pitch and allocate IYUV buffer
+        NVTX_RANGE_PUSH("Allocate_YUV_And_Mono_Buffers");
         const NvEncInputFrame *tempFrame = encoder.pEnc->GetNextInputFrame();
         encoder_pitch_ = tempFrame->pitch;
 
-        // Allocate IYUV buffer using encoder's pitch
         size_t encoder_buffer_size = (size_t)encoder_pitch_ * scaled_height_ * 3 / 2;
         ck(cudaMalloc(&d_iyuv_temp_, encoder_buffer_size));
+        
+        // --- NEW CODE: Allocate and pre-fill the monochrome UV plane ---
+        if (!camera_params->color) {
+            size_t uv_plane_size = (size_t)encoder_pitch_ * scaled_height_ / 4;
+            ck(cudaMalloc(&d_uv_default_plane_, uv_plane_size));
+            ck(cudaMemset(d_uv_default_plane_, 128, uv_plane_size));
+            std::cout << "[GPUVideoEncoder] Pre-allocated monochrome UV plane (" << uv_plane_size << " bytes)." << std::endl;
+        }
+        // --- END NEW CODE ---
         NVTX_RANGE_POP();
 
         std::cout << "[GPUVideoEncoder] Native resolution " << scaled_width_ << "x" << scaled_height_ 
@@ -270,6 +274,8 @@ GPUVideoEncoder::~GPUVideoEncoder()
     if (d_rgb_temp_) cudaFree(d_rgb_temp_);
     if (d_iyuv_temp_) cudaFree(d_iyuv_temp_);
     if (d_scaled_mono_buffer_) cudaFree(d_scaled_mono_buffer_);
+    // Free the pre-filled monochrome plane
+    if (d_uv_default_plane_) cudaFree(d_uv_default_plane_);
     NVTX_RANGE_POP();
 
     CUcontext popped_context;
@@ -291,11 +297,18 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 
     try {
         NVTX_RANGE_PUSH("Setup_Device_And_Stream");
-        // Ensure we're using the correct CUDA device
         ck(cudaSetDevice(camera_params->gpu_id));
-        ENCODER_CTX_LOG("Setting NPP stream", entry->frame_id);
         nppSetStream(m_stream);
         NVTX_RANGE_POP();
+        
+        {
+            NVTX_SYNC("Stream_Wait_For_Data_Ready_Event");
+            if (entry->data_ready) {
+                ck(cudaStreamWaitEvent(m_stream, entry->data_ready, 0));
+                ck(cudaEventDestroy(entry->data_ready));
+                entry->data_ready = nullptr; 
+            }
+        }
 
         const int width = camera_params->width;
         const int height = camera_params->height;
@@ -402,10 +415,8 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             NVTX_RANGE_PUSH("Monochrome_Frame_Processing");
             // === MONOCHROME PATH ===
             ENCODER_CTX_LOG("Processing MONOCHROME frame", entry->frame_id);
-            std::cout << "[GPUEncoder] Processing MONOCHROME frame at native resolution..." << std::endl;
             
             NVTX_RANGE_PUSH("Calculate_YUV_Planes");
-            // Calculate plane pointers with ENCODER PITCH
             unsigned char* d_y_plane_dst = d_iyuv_temp_;
             unsigned char* d_u_plane_dst = d_iyuv_temp_ + ((size_t)encoder_pitch_ * height);
             unsigned char* d_v_plane_dst = d_u_plane_dst + ((size_t)encoder_pitch_ * height / 4);
@@ -414,27 +425,18 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             CUDA_MEM_LOG("Converting to IYUV", d_iyuv_temp_, encoder_pitch_ * height * 3 / 2, entry->frame_id);
             
             NVTX_RANGE_PUSH("Copy_Y_Plane");
-            // Use cudaMemcpy2DAsync for proper pitch conversion
-            ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_,              // dst, dst_pitch
-                                frame_original.d_orig, width,                // src, src_pitch  
-                                width, height,                               // width, height
-                                cudaMemcpyDeviceToDevice, m_stream));
+            ck(cudaMemcpy2DAsync(d_y_plane_dst, encoder_pitch_, frame_original.d_orig, width, width, height, cudaMemcpyDeviceToDevice, m_stream));
             NVTX_RANGE_POP();
         
-            NVTX_RANGE_PUSH("Set_UV_Planes");
-            // Use encoder_pitch for U/V plane calculations
-            ck(cudaMemsetAsync(d_u_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
-            ck(cudaMemsetAsync(d_v_plane_dst, 128, (size_t)encoder_pitch_ * height / 4, m_stream));
+            // For monochrome, we can use a pre-filled UV plane
+            NVTX_RANGE_PUSH("Set_UV_Planes_Optimized");
+            size_t uv_plane_size = (size_t)encoder_pitch_ * height / 4;
+            ck(cudaMemcpyAsync(d_u_plane_dst, d_uv_default_plane_, uv_plane_size, cudaMemcpyDeviceToDevice, m_stream));
+            ck(cudaMemcpyAsync(d_v_plane_dst, d_uv_default_plane_, uv_plane_size, cudaMemcpyDeviceToDevice, m_stream));
             NVTX_RANGE_POP();
             
             NVTX_RANGE_POP(); // Monochrome_Frame_Processing
-        }
-
-        NVTX_SYNC("Stream_Sync_Before_Encode");
-        // Stream synchronization
-        CUDA_SYNC_LOG("Synchronizing stream before encode", m_stream, entry->frame_id);
-        ENCODER_CTX_LOG("Synchronizing stream before encode", entry->frame_id);
-        ck(cudaStreamSynchronize(m_stream));
+        };
 
         NVTX_ENCODE("NVIDIA_Hardware_Encode");
         NVTX_RANGE_PUSH("Setup_Encoder_Input");

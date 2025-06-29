@@ -1,3 +1,4 @@
+// src/image_processing.h
 #ifndef ORANGE_IMGAE_PROCESSING
 #define ORANGE_IMGAE_PROCESSING
 
@@ -7,6 +8,7 @@
 #include "common.hpp"      // For pose::Object
 #include <vector>         // For std::vector
 #include <atomic>         // For std::atomic
+#include <cuda_runtime.h> // For cudaEvent_t
 
 typedef struct {
     unsigned char* d_image;
@@ -24,15 +26,18 @@ typedef struct {
     // Reference counting for memory management
     std::atomic<int> ref_count;
     
-    // NEW: GPU Direct optimization fields
-    bool gpu_direct_mode = false;           // True if using GPU Direct pointer
-    bool owns_memory = true;                // False if using camera's GPU Direct buffer
+    // GPU Direct optimization fields
+    bool gpu_direct_mode = false;
+    bool owns_memory = true;
     
-    // GPU Direct camera buffer management (only used when gpu_direct_mode = true)
-    void* camera_buffer_ptr = nullptr;      // Original camera buffer pointer
-    Emergent::CEmergentCamera* camera_instance = nullptr;  // Camera instance for requeuing
-    Emergent::CEmergentFrame* camera_frame_struct = nullptr; // Frame struct for requeuing
+    // Camera buffer management (only used when gpu_direct_mode = true)
+    void* camera_buffer_ptr = nullptr;
+    Emergent::CEmergentCamera* camera_instance = nullptr;
+    Emergent::CEmergentFrame* camera_frame_struct = nullptr;
     
+    // Event for synchronization between workers
+    cudaEvent_t data_ready; // Event to signal data is ready for processing
+
 } WORKER_ENTRY;
 
 

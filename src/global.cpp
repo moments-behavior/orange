@@ -1,5 +1,7 @@
 #include "global.h"
 
+std::mutex mtx3d;
+std::condition_variable cv3d;
 std::atomic<double> streaming_fps = 0.0;
 std::atomic<int> streaming_target_fps = 60;
 std::atomic<int64_t> record_start_time_ns{0};

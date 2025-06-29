@@ -3,11 +3,14 @@
 
 #include "realtime_tool.h"
 #include <atomic>
+#include <condition_variable>
 #include <mutex>
 
 extern std::atomic<double> streaming_fps;
 extern std::atomic<int> streaming_target_fps;
 extern std::atomic<int64_t> record_start_time_ns;
+extern std::mutex mtx3d;
+extern std::condition_variable cv3d;
 
 bool try_start_timer();
 bool try_stop_timer();

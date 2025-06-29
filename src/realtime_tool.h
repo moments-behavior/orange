@@ -8,6 +8,14 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/sfm.hpp>
 
+#define PI 3.14159265
+
+struct TriangulatePoints {
+    int id;
+    std::vector<int> detected_cameras;
+    std::vector<std::vector<cv::Point2f>> detected_points;
+};
+
 struct CameraCalibResults {
     cv::Mat k;
     cv::Mat dist_coeffs;
@@ -71,4 +79,13 @@ void world_coordinates_projection_points(CameraCalibResults *cvp,
                                          double *axis_x_values,
                                          double *axis_y_values, float scale,
                                          CameraParams *camera_params);
+cv::Mat triangulate_points(std::vector<cv::Point2f> image_points,
+                           std::vector<CameraCalibResults *> calib_results);
+void marker3d_to_pose(Aruco3d *aruco_maker_3d);
+bool find_marker3d(TriangulatePoints *aruco_marker_2d,
+                   std::vector<CameraCalibResults *> &calib_results,
+                   Aruco3d *marker3d);
+bool find_ball3d(TriangulatePoints *ball_2d,
+                 std::vector<CameraCalibResults *> &calib_results,
+                 Ball3d *ball3d);
 #endif

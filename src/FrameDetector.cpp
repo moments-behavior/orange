@@ -2,6 +2,7 @@
 #include "global.h"
 #include "kernel.cuh"
 #include "video_capture.h"
+#include <mutex>
 #include <npp.h>
 
 FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
@@ -113,7 +114,14 @@ void FrameDetector::thread_loop() {
         ck(cudaStreamSynchronize(stream));
 
         // running detection
-        camera_select->frame_detect_state.store(State_Copy_New_Frame);
+        if (camera_select->detect3d) {
+            camera_select->frame_detect_state.store(
+                State_Frame_Detection_Ready);
+            std::lock_guard<std::mutex> lock(mtx3d);
+            cv3d.notify_one();
+        } else {
+            camera_select->frame_detect_state.store(State_Copy_New_Frame);
+        }
         count++;
     }
 

@@ -1,5 +1,6 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "camera.h"
+#include "detect3d.h"
 #include "enet_thread.h"
 #include "global.h"
 #include "gui.h"
@@ -120,6 +121,7 @@ int main(int argc, char **args) {
                                             "CT_4000K", "CT_5000K", "CT_6500K",
                                             "CT_Custom"};
 
+    std::thread detection3d_thread;
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
         if (ImGui::Begin("Network")) {
@@ -1069,8 +1071,8 @@ int main(int argc, char **args) {
                         }
 
                         detection2d = new DetectionDataPerCam[num_cameras];
+                        int idx3d = 0;
                         for (int i = 0; i < num_cameras; i++) {
-                            int idx3d = 0;
                             detection2d[i].calibration_file =
                                 calib_yaml_folder + "/Cam" +
                                 cameras_params[i].camera_serial + ".yaml";
@@ -1090,6 +1092,9 @@ int main(int argc, char **args) {
                             cameras_select[i].frame_detect_state.store(
                                 State_Copy_New_Frame);
                         }
+                        detection3d_thread =
+                            std::thread(&detection3d_proc, camera_control,
+                                        cameras_select, num_cameras);
 
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
@@ -1112,11 +1117,14 @@ int main(int argc, char **args) {
                         }
                         delete[] tex;
                         tex = nullptr;
-
+                        delete[] detection2d;
+                        detection2d = nullptr;
                         stop_camera_streaming(camera_threads, camera_control,
                                               ecams, cameras_params,
                                               cameras_select, num_cameras,
                                               evt_buffer_size, ptp_params);
+                        cv3d.notify_all();
+                        detection3d_thread.join();
                     }
                 }
             }

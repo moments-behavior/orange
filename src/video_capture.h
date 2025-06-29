@@ -5,9 +5,10 @@
 #include <atomic>
 
 enum PictureState {
-    State_Frame_Idle = 0,
-    State_Copy_New_Frame = 1,
-    State_Frame_Copy_Done = 2
+    State_Frame_Idle,
+    State_Copy_New_Frame,
+    State_Frame_Copy_Done,
+    State_Frame_Detection_Ready
 };
 
 struct CameraControl {

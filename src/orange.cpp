@@ -52,7 +52,7 @@ int main(int argc, char **args) {
     std::string input_folder = orange_root_dir_str + "/exp/unsorted";
 
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
-    std::string yolo_model = yolo_model_folder + "/bee7.engine"; // default yolo engine here!
+    std::string yolo_model = yolo_model_folder + "/bee9.engine"; // default yolo engine here!
     
     bool check[cam_count]{0};
     CameraParams *cameras_params;

@@ -113,9 +113,7 @@ void COpenGLDisplay::ThreadRunning()
                         yolov8->copy_keypoints_gpu(d_points, objs[obj]);
                         gpu_draw_box(debayer.d_debayer, camera_params->width, camera_params->height, d_points, yolov8->stream, objs[obj].label);
 
-                        // write to shared memory with shaman 
-                        std::vector<shaman::Object> conv_objs = conv_shaman(objs);
-                        writer.push(conv_objs);
+                        
                         
                     }
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y << std::endl;
@@ -134,6 +132,10 @@ void COpenGLDisplay::ThreadRunning()
                 } else {
                     objs_last_frame.clear();
                 }
+
+                // write to shared memory with shaman 
+                std::vector<shaman::Object> conv_objs = conv_shaman(objs);
+                writer.push(conv_objs);
                     
                 // gpu_draw_rat_pose(debayer.d_debayer, camera_params->width, camera_params->height, d_points, d_skeleton, yolov8->stream, 4);
             }

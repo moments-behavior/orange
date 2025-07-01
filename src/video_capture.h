@@ -20,10 +20,18 @@ struct CameraControl {
     bool trigger_mode = false;
 };
 
+enum DetectMode {
+    Detect_OFF,
+    Detect2D_GLThread,
+    Detect2D_Standoff,
+    Detect3d_Standoff
+};
+constexpr const char *DetectModeNames[] = {"Detect_OFF", "Detect2D_GLThread",
+                                           "Detect2D_Standoff",
+                                           "Detect3d_Standoff"};
 struct CameraEachSelect {
     bool stream_on = true;
     bool record = true;
-    bool yolo = false;
     int downsample = 1;
     std::atomic<PictureState> frame_save_state;
     std::string frame_save_format;
@@ -32,7 +40,7 @@ struct CameraEachSelect {
     bool selected_to_save = false;
     std::string picture_save_folder;
     std::string yolo_model;
-    bool detect3d = false;
+    DetectMode detect_mode = Detect_OFF;
     int idx2d;
     int idx3d;
     std::atomic<PictureState> frame_detect_state;

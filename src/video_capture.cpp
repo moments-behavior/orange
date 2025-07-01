@@ -257,7 +257,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     }
 
     FrameDetector *frame_detector = nullptr;
-    if (camera_select->detect3d) {
+    if (camera_select->detect_mode == Detect3d_Standoff ||
+        camera_select->detect_mode == Detect2D_Standoff) {
         frame_detector = new FrameDetector(camera_params, camera_select);
         frame_detector->start();
     }
@@ -349,7 +350,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
         delete openGLDisplay;
     }
 
-    if (camera_select->detect3d) {
+    if (camera_select->detect_mode == Detect3d_Standoff ||
+        camera_select->detect_mode == Detect2D_Standoff) {
         frame_detector->stop();
         delete frame_detector;
     }

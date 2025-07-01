@@ -144,7 +144,6 @@ void load_camera_json_config_files(std::string file_name,
     camera_params->iris = camera_config["iris"];
     if (camera_config.contains("yolo")) {
         camera_select->yolo_model = camera_config["yolo"];
-        camera_select->yolo = true;
     }
 }
 

@@ -1,6 +1,7 @@
 #include "detect3d.h"
 #include "global.h"
 #include "realtime_tool.h"
+#include "video_capture.h"
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
@@ -18,7 +19,7 @@ void detection3d_proc(CameraControl *camera_control,
     // threads for 3d triangulations
     std::vector<int> cam3d_idx;
     for (int i = 0; i < num_cameras; i++) {
-        if (cameras_select[i].detect3d) {
+        if (cameras_select[i].detect_mode == Detect3d_Standoff) {
             cam3d_idx.push_back(i);
         }
     }

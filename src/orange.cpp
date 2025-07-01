@@ -120,6 +120,8 @@ int main(int argc, char **args) {
                                             "CT_Custom"};
 
     std::thread detection3d_thread;
+    bool show_error = false;
+    std::string error_message;
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
         if (ImGui::Begin("Network")) {
@@ -654,7 +656,7 @@ int main(int argc, char **args) {
                     }
                 }
 
-                if (ImGui::BeginTable("Camera Control Setting", 6,
+                if (ImGui::BeginTable("Camera Control Setting", 5,
                                       ImGuiTableFlags_Resizable |
                                           ImGuiTableFlags_NoSavedSettings |
                                           ImGuiTableFlags_Borders)) {
@@ -694,8 +696,6 @@ int main(int argc, char **args) {
                     }
                     ImGui::TableNextColumn();
                     ImGui::Text("yolo");
-                    ImGui::TableNextColumn();
-                    ImGui::Text("3D");
 
                     for (int i = 0; i < num_cameras; i++) {
                         ImGui::TableNextRow();
@@ -713,12 +713,23 @@ int main(int argc, char **args) {
                         sprintf(temp_string, "##checkbox_record%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].record);
                         ImGui::TableNextColumn();
-                        sprintf(temp_string, "##checkbox_yolo%d", i);
-                        ImGui::Checkbox(temp_string, &cameras_select[i].yolo);
-                        ImGui::TableNextColumn();
-                        sprintf(temp_string, "##checkbox_detect3d%d", i);
-                        ImGui::Checkbox(temp_string,
-                                        &cameras_select[i].detect3d);
+
+                        int current_index =
+                            static_cast<int>(cameras_select[i].detect_mode);
+                        sprintf(temp_string, "##detection_mode%d", i);
+                        if (ImGui::Combo(temp_string, &current_index,
+                                         DetectModeNames,
+                                         IM_ARRAYSIZE(DetectModeNames))) {
+                            if (current_index != 0 &&
+                                cameras_select[i].yolo_model.empty()) {
+                                current_index = 0;
+                                error_message = "Speciy YOLO model first in "
+                                                "Camera Property.";
+                                show_error = true;
+                            }
+                            cameras_select[i].detect_mode =
+                                static_cast<DetectMode>(current_index);
+                        }
                     }
                     ImGui::EndTable();
                 }
@@ -1059,7 +1070,8 @@ int main(int argc, char **args) {
                                           << std::endl;
                             }
                             cameras_select[i].idx2d = i;
-                            if (cameras_select[i].detect3d) {
+                            if (cameras_select[i].detect_mode ==
+                                Detect3d_Standoff) {
                                 cameras_select[i].idx3d = idx3d;
                                 idx3d++;
                             }
@@ -1386,6 +1398,23 @@ int main(int argc, char **args) {
                 }
                 ImGui::End();
             }
+        }
+        if (show_error) {
+            ImGui::OpenPopup("Error");
+            show_error = false; // Reset the flag so it only opens once
+        }
+
+        if (ImGui::BeginPopupModal("Error", NULL,
+                                   ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("%s", error_message.c_str());
+            ImGui::Separator();
+
+            if (ImGui::Button("OK")) {
+                ImGui::CloseCurrentPopup();
+                show_error = false;
+            }
+
+            ImGui::EndPopup();
         }
 
         render_a_frame(window);

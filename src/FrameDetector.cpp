@@ -114,7 +114,7 @@ void FrameDetector::thread_loop() {
         ck(cudaStreamSynchronize(stream));
 
         // running detection
-        if (camera_select->detect3d) {
+        if (camera_select->detect_mode == Detect3d_Standoff) {
             camera_select->frame_detect_state.store(
                 State_Frame_Detection_Ready);
             std::lock_guard<std::mutex> lock(mtx3d);

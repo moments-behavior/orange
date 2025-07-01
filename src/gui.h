@@ -1,9 +1,9 @@
 #ifndef ORANGE_GUI
 #define ORANGE_GUI
 #include "camera.h"
-#include "global.h"
 #include "gx_helper.h"
 #include "imgui.h"
+#include "realtime_tool.h"
 #include "video_capture.h"
 #include <math.h>
 #include <thread>
@@ -171,9 +171,7 @@ inline void set_camera_properties(CameraEmergent *ecams,
             OffsetY = cameras_params[selected_camera].offsety;
         }
 
-        if (input_text("YOLO", cameras_select->yolo_model)) {
-            cameras_select->yolo = true;
-        }
+        input_text("YOLO", cameras_select->yolo_model);
         ImGui::Checkbox("GPU Direct",
                         &cameras_params[selected_camera].gpu_direct);
         ImGui::Checkbox("Color", &cameras_params[selected_camera].color);

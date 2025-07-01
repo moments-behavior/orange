@@ -1,3 +1,4 @@
+#include "video_capture.h"
 #if defined(__GNUC__)
 #include <unistd.h>
 #endif
@@ -47,7 +48,7 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
 COpenGLDisplay::~COpenGLDisplay() {
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
-    if (camera_select->yolo) {
+    if (camera_select->detect_mode == Detect2D_GLThread) {
         delete yolov8;
     }
 }
@@ -63,7 +64,7 @@ void COpenGLDisplay::ThreadRunning() {
                   camera_params->width * camera_params->height * 3));
 
     unsigned int skeleton[8] = {0, 1, 1, 2, 2, 3, 3, 0}; // box
-    if (camera_select->yolo) {
+    if (camera_select->detect_mode == Detect2D_GLThread) {
         printf("YOLO initialization...\n");
 
         const std::string engine_file_path = camera_select->yolo_model;
@@ -106,7 +107,7 @@ void COpenGLDisplay::ThreadRunning() {
                 duplicate_channel_gpu(camera_params, &frame_original, &debayer);
             }
 
-            if (camera_select->yolo) {
+            if (camera_select->detect_mode == Detect2D_GLThread) {
                 rgba2rgb_convert(d_convert, debayer.d_debayer,
                                  camera_params->width, camera_params->height,
                                  0);

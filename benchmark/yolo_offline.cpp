@@ -1,18 +1,21 @@
 #include "kernel.cuh"
 #include "opencv2/opencv.hpp"
 #include "yolov8_det.h"
+#include <string> // for std::stoi
 
 const std::vector<std::string> CLASS_NAMES = {"rat"};
 const std::vector<std::vector<unsigned int>> COLORS = {{255, 0, 255}};
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s [engine_path] [video_path]\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s [engine_path] [video_path] [gpu_id]\n",
+                argv[0]);
         return -1;
     }
 
+    int device_id = std::stoi(argv[3]);
     // cuda:0
-    cudaSetDevice(0);
+    cudaSetDevice(device_id);
 
     const std::string engine_file_path{argv[1]};
     const std::string input_video{argv[2]};

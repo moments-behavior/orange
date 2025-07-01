@@ -45,8 +45,6 @@ int main(int argc, char **args) {
         "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
     std::string input_folder = orange_root_dir_str + "/exp/unsorted";
-    std::string yolo_model_folder = orange_root_dir_str + "/detect";
-    std::string yolo_model = yolo_model_folder + "/ball.engine";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
 
     std::vector<bool> check;
@@ -257,6 +255,7 @@ int main(int argc, char **args) {
                         }
                         for (int i = 0; i < num_cameras; i++) {
                             set_camera_params(&cameras_params[i],
+                                              &cameras_select[i],
                                               &device_info[selected_cameras[i]],
                                               camera_config_files,
                                               selected_cameras[i], num_cameras);
@@ -266,11 +265,9 @@ int main(int argc, char **args) {
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name == "Cam16") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
                             }
                             if (cameras_params[i].camera_name == "shelter") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = false;
                             }
                         }
 
@@ -343,7 +340,7 @@ int main(int argc, char **args) {
                         camera_threads, camera_control, ecams, cameras_params,
                         cameras_select, tex, num_cameras, evt_buffer_size, true,
                         encoder_setup, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder, yolo_model);
+                        &indigo_signal_builder);
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -535,17 +532,6 @@ int main(int argc, char **args) {
             ImGui::Separator();
             ImGui::Spacing();
 
-            // selection for yolo model
-            if (ImGui::Button("Select YOLO")) {
-                IGFD::FileDialogConfig config;
-                config.countSelectionMax = 1;
-                config.path = yolo_model_folder;
-                ImGuiFileDialog::Instance()->OpenDialog(
-                    "ChooseYOLOFile", "Choose File", ".engine", config);
-            }
-            ImGui::SameLine();
-            ImGui::Text("%s", yolo_model.c_str());
-
             if (camera_control->subscribe) {
                 ImGui::EndDisabled();
             }
@@ -641,9 +627,8 @@ int main(int argc, char **args) {
                 }
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
-
-                set_camera_properties(ecams, cameras_params, num_cameras,
-                                      color_temps);
+                set_camera_properties(ecams, cameras_params, cameras_select,
+                                      num_cameras, color_temps);
 
                 if (camera_control->record_video) {
                     ImGui::EndDisabled();
@@ -893,16 +878,6 @@ int main(int argc, char **args) {
         ImGui::End();
 
         // file explorer display
-        if (ImGuiFileDialog::Instance()->Display("ChooseYOLOFile")) {
-            // => will show a dialog
-            if (ImGuiFileDialog::Instance()->IsOk()) {
-                // action if OK
-                yolo_model = ImGuiFileDialog::Instance()->GetFilePathName();
-            }
-            // close
-            ImGuiFileDialog::Instance()->Close();
-        }
-
         if (ImGuiFileDialog::Instance()->Display("ChooseRecordingDir")) {
             // => will show a dialog
             if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -984,7 +959,7 @@ int main(int argc, char **args) {
                         skip_setting_params.resize(num_cameras);
                         for (int i = 0; i < num_cameras; i++) {
                             if (!set_camera_params(
-                                    &cameras_params[i],
+                                    &cameras_params[i], &cameras_select[i],
                                     &device_info[selected_cameras[i]],
                                     camera_config_files, selected_cameras[i],
                                     num_cameras)) {
@@ -1002,7 +977,6 @@ int main(int argc, char **args) {
                             if (cameras_params[i].camera_name ==
                                 "ceiling_center") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].yolo = true;
                             }
 
                             if (cameras_params[i].camera_name == "shelter") {
@@ -1101,7 +1075,7 @@ int main(int argc, char **args) {
                             cameras_params, cameras_select, tex, num_cameras,
                             evt_buffer_size, ptp_stream_sync, "",
                             encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder, yolo_model);
+                            &indigo_signal_builder);
                     } else {
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
@@ -1199,7 +1173,7 @@ int main(int argc, char **args) {
                             cameras_params, cameras_select, tex, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
                             encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder, yolo_model);
+                            &indigo_signal_builder);
                         camera_control->subscribe = true;
                     } else {
                         camera_control->subscribe = false;

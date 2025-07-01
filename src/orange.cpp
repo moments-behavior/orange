@@ -860,6 +860,8 @@ int main(int argc, char **args) {
                                         cameras_select[i].pictures_counter);
                                 cameras_select[i].picture_save_folder =
                                     calib_save_folder;
+                                cameras_select[i].frame_save_state.store(
+                                    State_Copy_New_Frame);
                             }
                             calib_state = CalibSavePictures;
                         }

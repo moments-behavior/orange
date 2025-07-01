@@ -61,7 +61,7 @@ pip install tensorrt==10.11.0.33
 Now we convert the `.pt` to `.onnx`:
 ```
 python3 export-det.py \
---weights yolov8s.pt \
+--weights best.pt \
 --iou-thres 0.65 \
 --conf-thres 0.25 \
 --topk 100 \
@@ -74,14 +74,14 @@ Change the arguments to fit your use case. IOU treshold and confidence threshold
 
 Finally, use `trtexec` to compile `.onnx` to `.engine`:
 ```
-~/nvidia/TensorRT/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --device=0 --fp16
+~/nvidia/TensorRT/bin/trtexec --onnx=best.onnx --saveEngine=best.engine --device=0 --fp16
 ```
 
 When running `trtexec`, the device used to compile the engine will be shown, as well as a list of devices available. Take note of which device your video output is connected to. You can change which device is used for compilation by changing the flag. 
 
 We can move this `.engine` file into the default directory that orange looks at:
 ```
-cp ./yolov8s.engine ~/orange_data/detect/yolov8s.engine
+cp ./best.engine ~/orange_data/detect/best.engine
 ```
 
 Finally, in the configuration file for the cameras, located in `~/orange_data/config/local/<CONFIG_NAME>`, update all cameras' `gpu_id` in the json files for the cameras you want to use the model with to match the id of the GPU that you used for compilation. 

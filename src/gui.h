@@ -3,6 +3,7 @@
 #include "camera.h"
 #include "global.h"
 #include "gx_helper.h"
+#include "imgui.h"
 #include "video_capture.h"
 #include <math.h>
 #include <thread>
@@ -23,7 +24,7 @@ struct GL_Texture {
     int num_channels;
 };
 
-void setup_texture(GL_Texture &tex, int width, int height) {
+inline void setup_texture(GL_Texture &tex, int width, int height) {
     cudaStreamCreate(&tex.streams);
     create_pbo(&tex.pbo, width, height);
     register_pbo_to_cuda(&tex.pbo, &tex.cuda_resource);
@@ -34,7 +35,7 @@ void setup_texture(GL_Texture &tex, int width, int height) {
     create_texture(&tex.texture, width, height);
 }
 
-void upload_texture_from_pbo(GL_Texture &tex, int width, int height) {
+inline void upload_texture_from_pbo(GL_Texture &tex, int width, int height) {
     bind_pbo(&tex.pbo);
     bind_texture(&tex.texture);
     upload_image_pbo_to_texture(width,
@@ -64,7 +65,7 @@ inline void start_camera_streaming(
     CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras,
     int evt_buffer_size, bool ptp_stream_sync, const std::string &encoder_setup,
     const std::string &folder_name, PTPParams *ptp_params,
-    INDIGOSignalBuilder *indigo_signal_builder, const std::string &yolo_model) {
+    INDIGOSignalBuilder *indigo_signal_builder) {
     for (int i = 0; i < num_cameras; i++) {
         camera_open_stream(&ecams[i].camera, &cameras_params[i]);
         ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
@@ -88,10 +89,6 @@ inline void start_camera_streaming(
         for (int i = 0; i < num_cameras; i++) {
             camera_trigger_mode(&ecams[i].camera, &cameras_params[i]);
         }
-    }
-
-    for (int i = 0; i < num_cameras; i++) {
-        cameras_select[i].yolo_model = yolo_model.c_str();
     }
 
     for (int i = 0; i < num_cameras; i++) {
@@ -133,8 +130,23 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
     }
 }
 
-static void set_camera_properties(CameraEmergent *ecams,
+inline bool input_text(const char *label, std::string &str,
+                       ImGuiInputTextFlags flags = 0) {
+    // Create a buffer big enough for current string + margin
+    static const size_t buf_size = 256;
+    char buf[buf_size];
+    std::snprintf(buf, buf_size, "%s", str.c_str());
+
+    if (ImGui::InputText(label, buf, buf_size, flags)) {
+        str = std::string(buf);
+        return true; // value changed
+    }
+    return false;
+}
+
+inline void set_camera_properties(CameraEmergent *ecams,
                                   CameraParams *cameras_params,
+                                  CameraEachSelect *cameras_select,
                                   const int num_cameras,
                                   std::vector<std::string> &color_temps) {
     if (ImGui::TreeNode("Camera Property")) {
@@ -159,6 +171,9 @@ static void set_camera_properties(CameraEmergent *ecams,
             OffsetY = cameras_params[selected_camera].offsety;
         }
 
+        if (input_text("YOLO", cameras_select->yolo_model)) {
+            cameras_select->yolo = true;
+        }
         ImGui::Checkbox("GPU Direct",
                         &cameras_params[selected_camera].gpu_direct);
         ImGui::Checkbox("Color", &cameras_params[selected_camera].color);

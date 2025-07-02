@@ -3,6 +3,7 @@
 
 ```
 sudo apt install gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly
+sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ```
 1. Download and upzip `opencv-4.8.0.zip` and `opencv_contrib-4.8.0.zip`. Unzip the folders to `~/build/`, for instance. 
 

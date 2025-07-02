@@ -1103,16 +1103,16 @@ int main(int argc, char **args) {
                                                          camera_height);
                             }
                         }
-                        delete[] tex;
-                        tex = nullptr;
-                        delete[] detection2d;
-                        detection2d = nullptr;
                         stop_camera_streaming(camera_threads, camera_control,
                                               ecams, cameras_params,
                                               cameras_select, num_cameras,
                                               evt_buffer_size, ptp_params);
                         cv3d.notify_all();
                         detection3d_thread.join();
+                        delete[] detection2d;
+                        detection2d = nullptr;
+                        delete[] tex;
+                        tex = nullptr;
                     }
                 }
             }

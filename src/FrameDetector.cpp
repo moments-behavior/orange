@@ -129,6 +129,6 @@ void FrameDetector::thread_loop() {
     std::chrono::duration<double> elapsed = end - start;
     float calc_frame_rate = count / elapsed.count();
     std::cout << camera_params->camera_serial
-              << ", Detect frame Rate : " + std::to_string(calc_frame_rate)
+              << ", Detect Frame Rate : " + std::to_string(calc_frame_rate)
               << std::endl;
 }

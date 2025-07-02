@@ -98,6 +98,6 @@ void detection3d_proc(CameraControl *camera_control,
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     float calc_frame_rate = count / elapsed.count();
-    std::cout << "Triangule frame Rate : " + std::to_string(calc_frame_rate)
+    std::cout << "Triangule Frame Rate : " + std::to_string(calc_frame_rate)
               << std::endl;
 }

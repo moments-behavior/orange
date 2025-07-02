@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
 
     cv::VideoCapture cap(input_video);
     if (!cap.isOpened()) {
-        printf("Cannot open %s\n", input_video);
+        printf("Cannot open %s\n", input_video.c_str());
         return -1;
     }
 

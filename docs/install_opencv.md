@@ -1,5 +1,5 @@
 ## Build OpenCV
-0. Install Gstreamer
+0. Install GStreamer
 
 ```
 sudo apt install gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly

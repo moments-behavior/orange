@@ -20,6 +20,5 @@ class FFmpegWriter {
     AVFormatContext *oc = NULL;
     AVStream *vs = NULL;
     int nFps = 0;
-    int nPts = 0;
     std::ofstream *metadata;
 };

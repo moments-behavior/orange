@@ -1,4 +1,5 @@
 #include "FFmpegWriter.h"
+#include "libavutil/rational.h"
 #include <cstdio>  // for FILE*
 #include <cstring> // for memcpy
 #include <iostream>
@@ -36,6 +37,12 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight,
     vpar->codec_type = AVMEDIA_TYPE_VIDEO;
     vpar->width = nWidth;
     vpar->height = nHeight;
+    // Set correct codec_tag for Apple compatibility
+    if (vpar->codec_id == AV_CODEC_ID_H264) {
+        vpar->codec_tag = MKTAG('a', 'v', 'c', '1');
+    } else if (vpar->codec_id == AV_CODEC_ID_HEVC) {
+        vpar->codec_tag = MKTAG('h', 'v', 'c', '1');
+    }
 
     vs->time_base = AVRational{1, nFps};
 
@@ -61,7 +68,11 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight,
 }
 
 FFmpegWriter::~FFmpegWriter() {
-    metadata->close();
+    if (metadata) {
+        metadata->close();
+        delete metadata;
+    }
+
     if (oc) {
         av_write_trailer(oc);
         avio_close(oc->pb);
@@ -76,14 +87,8 @@ bool FFmpegWriter::write_packet(uint8_t *pData, int nBytes, int nPts) {
         return false;
     }
 
-    if (av_new_packet(pkt, nBytes) < 0) {
-        std::cerr << "Failed to allocate packet buffer\n";
-        av_packet_free(&pkt);
-        return false;
-    }
-
-    memcpy(pkt->data, pData, nBytes);
-
+    pkt->data = pData;
+    pkt->size = nBytes;
     pkt->pts = av_rescale_q(nPts, AVRational{1, nFps}, vs->time_base);
     pkt->dts = pkt->pts;
     pkt->stream_index = vs->index;

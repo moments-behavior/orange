@@ -3,7 +3,6 @@
 #include "camera.h"
 #include "image_processing.h"
 #include "video_capture.h"
-#include "yolov8_det.h"
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -28,7 +27,6 @@ class FrameSaver {
     CameraParams *camera_params;
     CameraEachSelect *camera_select;
     FrameProcess frame_process;
-    YOLOv8 *yolov8;
 
     std::atomic<bool> running;
     std::mutex mtx;

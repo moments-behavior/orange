@@ -1,10 +1,10 @@
 #include "video_capture.h"
-#include "FrameDetector.h"
 #include "FrameSaver.h"
 #include "NvEncoder/NvCodecUtils.h"
 #include "global.h"
 #include "gpu_video_encoder.h"
 #ifndef HEADLESS
+#include "FrameDetector.h"
 #include "opengldisplay.h"
 #endif
 
@@ -139,8 +139,7 @@ inline void get_one_frame(CameraState *camera_state,
                           CameraControl *camera_control, CameraEmergent *ecam,
                           CameraParams *camera_params, PTPState *ptp_state,
                           void *openGLDisplay, GPUVideoEncoder *gpu_encoder,
-                          FrameSaver *frame_saver,
-                          FrameDetector *frame_detector) {
+                          FrameSaver *frame_saver, void *frame_detector) {
     if (camera_control->trigger_mode) {
         std::cout << "trigger" << std::endl;
         check_camera_errors(

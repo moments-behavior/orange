@@ -169,8 +169,6 @@ inline void get_one_frame(CameraState *camera_state,
             camera_state->frames_recd++;
         }
 
-        camera_state->frame_count++;
-
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max
         // then the next id is 1 so set prev id to 0 for math above.
         if (ecam->frame_recv.frame_id == 65535)
@@ -206,6 +204,8 @@ inline void get_one_frame(CameraState *camera_state,
         if (camera_select->frame_save_state.load() == State_Copy_New_Frame) {
             frame_saver->notify_frame_ready(ecam->frame_recv.imagePtr);
         }
+
+        camera_state->frame_count++;
 
         camera_state->camera_return =
             EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.

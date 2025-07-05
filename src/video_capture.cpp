@@ -3,6 +3,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "global.h"
 #include "gpu_video_encoder.h"
+#include "thread.h"
 #ifndef HEADLESS
 #include "FrameDetector.h"
 #include "opengldisplay.h"

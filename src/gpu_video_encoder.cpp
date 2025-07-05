@@ -2,7 +2,6 @@
 #include <unistd.h>
 #endif
 #include "gpu_video_encoder.h"
-#include "kernel.cuh"
 #include <cuda_runtime_api.h>
 #include <stdio.h>
 #include <string.h>
@@ -51,10 +50,10 @@ static inline void open_metadata_file(std::ofstream *frame_metadata,
     *frame_metadata << "frame_id,timestamp,timestamp_sys\n";
 }
 
-static inline void write_meatadata(std::ofstream *metadata,
-                                   unsigned long long frame_id,
-                                   unsigned long long timestamp,
-                                   uint64_t timestamp_sys) {
+static inline void write_metadata(std::ofstream *metadata,
+                                  unsigned long long frame_id,
+                                  unsigned long long timestamp,
+                                  uint64_t timestamp_sys) {
     *metadata << frame_id << "," << timestamp << "," << timestamp_sys
               << std::endl;
 }
@@ -108,20 +107,16 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer,
     encoder->pEnc->EncodeFrame(encoder->vPacket);
     for (std::vector<uint8_t> &packet : encoder->vPacket) {
         // For each encoded packet
-        // writer->write_packet(packet.data(), (int)packet.size(),
-        // encoder->num_frame_encode++);
-        writer->push_packet(packet.data(), (int)packet.size(),
-                            encoder->num_frame_encode++);
+        writer->write_packet(packet.data(), (int)packet.size(),
+                             encoder->num_frame_encode++);
     }
 }
 
 static inline void close_writer(EncoderContext *encoder, Writer *writer) {
     encoder->pEnc->EndEncode(encoder->vPacket);
     for (std::vector<uint8_t> &packet : encoder->vPacket) {
-        // writer->video->write_packet(packet.data(), (int)packet.size(),
-        // encoder->num_frame_encode++);
-        writer->video->push_packet(packet.data(), (int)packet.size(),
-                                   encoder->num_frame_encode++);
+        writer->video->write_packet(packet.data(), (int)packet.size(),
+                                    encoder->num_frame_encode++);
     }
     encoder->pEnc->DestroyEncoder();
     (*writer->metadata).close();
@@ -132,8 +127,8 @@ GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params,
                                  std::string folder_name,
                                  bool *encoder_ready_signal)
     : CThreadWorker(name), camera_params(camera_params),
-      display_buffer(display_buffer), encoder_setup(encoder_setup),
-      folder_name(folder_name), encoder_ready_signal(encoder_ready_signal) {
+      encoder_setup(encoder_setup), folder_name(folder_name),
+      encoder_ready_signal(encoder_ready_signal) {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = ENCODER_ENTRIES_MAX;
     for (int i = 0; i < workerEntriesFreeQueueCount; i++) {
@@ -159,8 +154,8 @@ void GPUVideoEncoder::ProcessOneFrame(void *f) {
     }
 
     encode_frame(&encoder, writer.video, &debayer);
-    write_meatadata(writer.metadata, entry.frame_id, entry.timestamp,
-                    entry.timestamp_sys);
+    write_metadata(writer.metadata, entry.frame_id, entry.timestamp,
+                   entry.timestamp_sys);
 }
 
 void GPUVideoEncoder::ThreadRunning() {
@@ -171,9 +166,6 @@ void GPUVideoEncoder::ThreadRunning() {
 
     initialize_encoder(&encoder, encoder_setup, camera_params);
     initialize_writer(&writer, camera_params, folder_name, encoder_setup);
-
-    // start writing thread
-    writer.video->create_thread();
 
     *encoder_ready_signal = true;
     while (IsMachineOn()) {
@@ -197,11 +189,10 @@ void GPUVideoEncoder::ThreadRunning() {
     print_out += ", Frame encoded: " + std::to_string(encoder.num_frame_encode);
     std::cout << print_out << std::endl;
 
-    writer.video->quit_thread();
-    writer.video->join_thread();
-
     delete writer.video;
+    writer.video = nullptr;
     delete writer.metadata;
+    writer.metadata = nullptr;
     delete encoder.pEnc;
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);

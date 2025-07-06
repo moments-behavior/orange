@@ -44,7 +44,8 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight,
         vpar->codec_tag = MKTAG('h', 'v', 'c', '1');
     }
 
-    vs->time_base = AVRational{1, nFps};
+    vs->time_base = AVRational{1, 90000};
+    vs->r_frame_rate = (AVRational){nFps, 1};
 
     // Everything is ready. Now open the output stream.
     if (avio_open(&oc->pb, szOutFilePath, AVIO_FLAG_WRITE) < 0) {
@@ -64,7 +65,6 @@ FFmpegWriter::FFmpegWriter(AVCodecID eCodecId, int nWidth, int nHeight,
         std::cout << "File did not open!";
         return;
     }
-    *metadata << "frame_id, keyframe\n";
 }
 
 FFmpegWriter::~FFmpegWriter() {
@@ -92,6 +92,7 @@ bool FFmpegWriter::write_packet(uint8_t *pData, int nBytes, int nPts) {
     pkt->pts = av_rescale_q(nPts, AVRational{1, nFps}, vs->time_base);
     pkt->dts = pkt->pts;
     pkt->stream_index = vs->index;
+    pkt->duration = av_rescale_q(1, AVRational{1, nFps}, vs->time_base);
 
     bool is_keyframe = false;
 
@@ -110,7 +111,12 @@ bool FFmpegWriter::write_packet(uint8_t *pData, int nBytes, int nPts) {
         pkt->flags |= AV_PKT_FLAG_KEY;
 
     if (metadata && metadata->is_open()) {
-        *metadata << nPts << "," << (is_keyframe ? 1 : 0) << "\n";
+        *metadata << "frame_id: " << nPts
+                  << ", keyframe: " << (is_keyframe ? 1 : 0)
+                  << ", pts: " << pkt->pts << ", dts: " << pkt->dts
+                  << ", duration: " << pkt->duration
+                  << ", time_base: " << vs->time_base.num << "/"
+                  << vs->time_base.den << "\n";
     }
 
     int ret = av_write_frame(oc, pkt);

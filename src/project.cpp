@@ -142,6 +142,11 @@ void load_camera_json_config_files(std::string file_name,
     camera_params->color = camera_config["color"];
     camera_params->focus = camera_config["focus"];
     camera_params->iris = camera_config["iris"];
+    if (camera_config.contains("gop")) {
+        camera_params->gop = camera_config["gop"];
+    } else {
+        camera_params->gop = 1;
+    }
     if (camera_config.contains("yolo")) {
         camera_select->yolo_model = camera_config["yolo"];
     }

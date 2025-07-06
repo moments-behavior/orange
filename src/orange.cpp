@@ -1,6 +1,5 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "camera.h"
-#include "detect3d.h"
 #include "enet_thread.h"
 #include "global.h"
 #include "gui.h"
@@ -64,7 +63,7 @@ int main(int argc, char **args) {
     PTPParams *ptp_params =
         new PTPParams{0, 0, 0, 0, false, false, false, false};
 
-    EncoderConfig *encoder_config = new EncoderConfig{"h264", "p1"};
+    EncoderConfig *encoder_config = new EncoderConfig{"h264", 1, "p1"};
     std::vector<std::string> camera_config_files;
 
     ScrollingBuffer *realtime_plot_data;
@@ -314,7 +313,7 @@ int main(int argc, char **args) {
                 if (ImGui::Button("Clients start camera threads")) {
                     std::string encoder_setup =
                         "-codec " + encoder_config->encoder_codec +
-                        " -preset " + encoder_config->encoder_preset + " -fps ";
+                        " -preset " + encoder_config->encoder_preset;
                     encoder_config->folder_name =
                         input_folder + "/" + get_current_date_time();
                     make_folder(encoder_config->folder_name);
@@ -342,7 +341,8 @@ int main(int argc, char **args) {
                         camera_threads, camera_control, ecams, cameras_params,
                         cameras_select, tex, num_cameras, evt_buffer_size, true,
                         encoder_setup, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder);
+                        &indigo_signal_builder, calib_yaml_folder,
+                        detection3d_thread);
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -630,7 +630,7 @@ int main(int argc, char **args) {
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
                 set_camera_properties(ecams, cameras_params, cameras_select,
-                                      num_cameras, color_temps);
+                                      num_cameras, color_temps, encoder_config);
 
                 if (camera_control->record_video) {
                     ImGui::EndDisabled();
@@ -1056,40 +1056,13 @@ int main(int argc, char **args) {
                                               camera_height);
                             }
                         }
-
-                        detection2d = new DetectionDataPerCam[num_cameras];
-                        int idx3d = 0;
-                        for (int i = 0; i < num_cameras; i++) {
-                            detection2d[i].calibration_file =
-                                calib_yaml_folder + "/Cam" +
-                                cameras_params[i].camera_serial + ".yaml";
-                            detection2d[i].has_calibration_results =
-                                load_camera_calibration_results(
-                                    detection2d[i].calibration_file,
-                                    &detection2d[i].camera_calib);
-                            if (detection2d[i].has_calibration_results) {
-                                std::cout << detection2d[i].calibration_file
-                                          << std::endl;
-                            }
-                            cameras_select[i].idx2d = i;
-                            if (cameras_select[i].detect_mode ==
-                                Detect3d_Standoff) {
-                                cameras_select[i].idx3d = idx3d;
-                                idx3d++;
-                            }
-                            cameras_select[i].frame_detect_state.store(
-                                State_Copy_New_Frame);
-                        }
-                        detection3d_thread =
-                            std::thread(&detection3d_proc, camera_control,
-                                        cameras_select, num_cameras);
-
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex, num_cameras,
                             evt_buffer_size, ptp_stream_sync, "",
                             encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder);
+                            &indigo_signal_builder, calib_yaml_folder,
+                            detection3d_thread);
                     } else {
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
@@ -1103,16 +1076,12 @@ int main(int argc, char **args) {
                                                          camera_height);
                             }
                         }
-                        stop_camera_streaming(camera_threads, camera_control,
-                                              ecams, cameras_params,
-                                              cameras_select, num_cameras,
-                                              evt_buffer_size, ptp_params);
-                        cv3d.notify_all();
-                        detection3d_thread.join();
-                        delete[] detection2d;
-                        detection2d = nullptr;
                         delete[] tex;
                         tex = nullptr;
+                        stop_camera_streaming(
+                            camera_threads, camera_control, ecams,
+                            cameras_params, cameras_select, num_cameras,
+                            evt_buffer_size, ptp_params, detection3d_thread);
                     }
                 }
             }
@@ -1145,18 +1114,18 @@ int main(int argc, char **args) {
                                         tex[i], camera_width, camera_height);
                                 }
                             }
-                            delete[] tex;
-                            tex = nullptr;
                             stop_camera_streaming(
                                 camera_threads, camera_control, ecams,
                                 cameras_params, cameras_select, num_cameras,
-                                evt_buffer_size, ptp_params);
+                                evt_buffer_size, ptp_params,
+                                detection3d_thread);
+                            delete[] tex;
+                            tex = nullptr;
                         }
 
                         std::string encoder_setup =
                             "-codec " + encoder_config->encoder_codec +
-                            " -preset " + encoder_config->encoder_preset +
-                            " -fps ";
+                            " -preset " + encoder_config->encoder_preset;
                         camera_control->record_video = true;
                         encoder_config->folder_name =
                             input_folder + "/" + get_current_date_time();
@@ -1187,7 +1156,8 @@ int main(int argc, char **args) {
                             cameras_params, cameras_select, tex, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
                             encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder);
+                            &indigo_signal_builder, calib_yaml_folder,
+                            detection3d_thread);
                         camera_control->subscribe = true;
                     } else {
                         camera_control->subscribe = false;
@@ -1208,10 +1178,10 @@ int main(int argc, char **args) {
                         delete[] tex;
                         tex = nullptr;
 
-                        stop_camera_streaming(camera_threads, camera_control,
-                                              ecams, cameras_params,
-                                              cameras_select, num_cameras,
-                                              evt_buffer_size, ptp_params);
+                        stop_camera_streaming(
+                            camera_threads, camera_control, ecams,
+                            cameras_params, cameras_select, num_cameras,
+                            evt_buffer_size, ptp_params, detection3d_thread);
                         camera_control->record_video = false;
                     }
                 }

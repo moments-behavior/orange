@@ -266,6 +266,8 @@ int main(int argc, char **args) {
                             cameras_select[i].stream_on = false;
                             if (cameras_params[i].camera_name == "Cam16") {
                                 cameras_select[i].stream_on = true;
+                                cameras_select[i].detect_mode =
+                                    Detect2D_GLThread;
                             }
                             if (cameras_params[i].camera_name == "shelter") {
                                 cameras_select[i].stream_on = true;
@@ -990,6 +992,8 @@ int main(int argc, char **args) {
                             if (cameras_params[i].camera_name ==
                                 "ceiling_center") {
                                 cameras_select[i].stream_on = true;
+                                cameras_select[i].detect_mode =
+                                    Detect2D_GLThread;
                             }
 
                             if (cameras_params[i].camera_name == "shelter") {
@@ -1123,6 +1127,7 @@ int main(int argc, char **args) {
                             tex = nullptr;
                         }
 
+                        camera_control->subscribe = true;
                         std::string encoder_setup =
                             "-codec " + encoder_config->encoder_codec +
                             " -preset " + encoder_config->encoder_preset;
@@ -1158,7 +1163,6 @@ int main(int argc, char **args) {
                             encoder_config->folder_name, ptp_params,
                             &indigo_signal_builder, calib_yaml_folder,
                             detection3d_thread);
-                        camera_control->subscribe = true;
                     } else {
                         camera_control->subscribe = false;
                         ptp_stream_sync = false;
@@ -1256,6 +1260,31 @@ int main(int argc, char **args) {
                                               ImVec2(0, 0),
                                               ImVec2(cameras_params[i].width,
                                                      cameras_params[i].height));
+
+                            if (detection2d[i].has_calibration_results) {
+                                if (detection2d[i].ball2d.find_ball.load()) {
+                                    std::string ball2d_name =
+                                        "ball##" + std::to_string(i);
+
+                                    draw_ball_center(
+                                        detection2d[i].ball2d.center[0],
+                                        cameras_params[i].height,
+                                        (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
+                                        ball2d_name, ImPlotMarker_Circle, 6.0);
+                                }
+
+                                if (detection3d.ball3d.new_detection.load()) {
+                                    std::string ball_proj_name =
+                                        "ball_proj##" + std::to_string(i);
+
+                                    draw_ball_center(
+                                        detection2d[i].ball2d.proj_center[0],
+                                        cameras_params[i].height,
+                                        (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
+                                        ball_proj_name, ImPlotMarker_Cross,
+                                        8.0);
+                                }
+                            }
 
                             ImPlot::EndPlot();
                         }

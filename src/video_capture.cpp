@@ -1,10 +1,11 @@
 #include "video_capture.h"
-#include "FrameDetector.h"
 #include "FrameSaver.h"
 #include "NvEncoder/NvCodecUtils.h"
 #include "global.h"
 #include "gpu_video_encoder.h"
+#include "thread.h"
 #ifndef HEADLESS
+#include "FrameDetector.h"
 #include "opengldisplay.h"
 #endif
 
@@ -139,8 +140,7 @@ inline void get_one_frame(CameraState *camera_state,
                           CameraControl *camera_control, CameraEmergent *ecam,
                           CameraParams *camera_params, PTPState *ptp_state,
                           void *openGLDisplay, GPUVideoEncoder *gpu_encoder,
-                          FrameSaver *frame_saver,
-                          FrameDetector *frame_detector) {
+                          FrameSaver *frame_saver, void *frame_detector) {
     if (camera_control->trigger_mode) {
         std::cout << "trigger" << std::endl;
         check_camera_errors(
@@ -168,8 +168,6 @@ inline void get_one_frame(CameraState *camera_state,
         else {
             camera_state->frames_recd++;
         }
-
-        camera_state->frame_count++;
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max
         // then the next id is 1 so set prev id to 0 for math above.
@@ -206,6 +204,8 @@ inline void get_one_frame(CameraState *camera_state,
         if (camera_select->frame_save_state.load() == State_Copy_New_Frame) {
             frame_saver->notify_frame_ready(ecam->frame_recv.imagePtr);
         }
+
+        camera_state->frame_count++;
 
         camera_state->camera_return =
             EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv); // Re-queue.

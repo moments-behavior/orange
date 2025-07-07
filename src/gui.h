@@ -1,6 +1,9 @@
 #ifndef ORANGE_GUI
 #define ORANGE_GUI
+#include "IconsForkAwesome.h"
 #include "camera.h"
+#include "detect3d.h"
+#include "global.h"
 #include "gx_helper.h"
 #include "imgui.h"
 #include "realtime_tool.h"
@@ -10,6 +13,7 @@
 
 struct EncoderConfig {
     std::string encoder_codec;
+    int gop;
     std::string encoder_preset;
     std::string folder_name;
 };
@@ -65,7 +69,33 @@ inline void start_camera_streaming(
     CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras,
     int evt_buffer_size, bool ptp_stream_sync, const std::string &encoder_setup,
     const std::string &folder_name, PTPParams *ptp_params,
-    INDIGOSignalBuilder *indigo_signal_builder) {
+    INDIGOSignalBuilder *indigo_signal_builder, std::string calib_yaml_folder,
+    std::thread &detection3d_thread) {
+
+    detection2d = new DetectionDataPerCam[num_cameras];
+    int idx3d = 0;
+    for (int i = 0; i < num_cameras; i++) {
+        detection2d[i].calibration_file = calib_yaml_folder + "/Cam" +
+                                          cameras_params[i].camera_serial +
+                                          ".yaml";
+        detection2d[i].has_calibration_results =
+            load_camera_calibration_results(detection2d[i].calibration_file,
+                                            &detection2d[i].camera_calib);
+        if (detection2d[i].has_calibration_results) {
+            std::cout << detection2d[i].calibration_file << std::endl;
+        }
+        cameras_select[i].idx2d = i;
+        if (cameras_select[i].detect_mode == Detect3d_Standoff) {
+            cameras_select[i].idx3d = idx3d;
+            idx3d++;
+        }
+        cameras_select[i].frame_detect_state.store(State_Copy_New_Frame);
+    }
+    if (idx3d >= 2) {
+        detection3d_thread = std::thread(&detection3d_proc, camera_control,
+                                         cameras_select, num_cameras);
+    }
+
     for (int i = 0; i < num_cameras; i++) {
         camera_open_stream(&ecams[i].camera, &cameras_params[i]);
         ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
@@ -104,7 +134,8 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
                       CameraControl *camera_control, CameraEmergent *ecams,
                       CameraParams *cameras_params,
                       CameraEachSelect *cameras_select, const int num_cameras,
-                      const int evt_buffer_size, PTPParams *ptp_params) {
+                      const int evt_buffer_size, PTPParams *ptp_params,
+                      std::thread &detection3d_thread) {
     for (auto &t : camera_threads)
         t.join();
 
@@ -128,6 +159,14 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
         ptp_params->ptp_global_time = 0;
         camera_control->sync_camera = false;
     }
+
+    cv3d.notify_all();
+
+    if (detection3d_thread.joinable()) {
+        detection3d_thread.join();
+    }
+    delete[] detection2d;
+    detection2d = nullptr;
 }
 
 inline bool input_text(const char *label, std::string &str,
@@ -144,11 +183,24 @@ inline bool input_text(const char *label, std::string &str,
     return false;
 }
 
+inline void HelpMarker(const char *desc) {
+    ImGui::TextDisabled(ICON_FK_INFO_CIRCLE);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) &&
+        ImGui::BeginTooltip()) {
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(desc);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
 inline void set_camera_properties(CameraEmergent *ecams,
                                   CameraParams *cameras_params,
                                   CameraEachSelect *cameras_select,
                                   const int num_cameras,
-                                  std::vector<std::string> &color_temps) {
+                                  std::vector<std::string> &color_temps,
+                                  EncoderConfig *encoder_config) {
+
     if (ImGui::TreeNode("Camera Property")) {
         static int selected_camera = 0;
         static int slider_gain, slider_exposure, slider_frame_rate,
@@ -170,6 +222,11 @@ inline void set_camera_properties(CameraEmergent *ecams,
             OffsetX = cameras_params[selected_camera].offsetx;
             OffsetY = cameras_params[selected_camera].offsety;
         }
+
+        ImGui::SliderInt("GOP", &encoder_config->gop, 1, 10, "%d second");
+        ImGui::SameLine();
+        HelpMarker("Set keyframe interval as a multiple of the framerate. "
+                   "Default is set to 1 second.");
 
         input_text("YOLO", cameras_select->yolo_model);
         ImGui::Checkbox("GPU Direct",

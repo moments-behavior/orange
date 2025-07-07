@@ -1,26 +1,22 @@
 #ifndef ORANGE_GPU_VIDEO_ENCODER
 #define ORANGE_GPU_VIDEO_ENCODER
-
-#include "threadworker.h"
-#include "video_capture.h"
 #include "FFmpegWriter.h"
-#include "NvEncoder/NvEncoderCuda.h"
 #include "NvEncoder/NvEncoderCLIOptions.h"
+#include "NvEncoder/NvEncoderCuda.h"
 #include "image_processing.h"
+#include "threadworker.h"
 
 #define ENCODER_ENTRIES_MAX 20
 
-struct Writer
-{
+struct Writer {
     std::string video_file;
     std::string keyframe_file;
-	std::string metadata_file;
+    std::string metadata_file;
     FFmpegWriter *video;
-    std::ofstream* metadata;
+    std::ofstream *metadata;
 };
 
-struct EncoderContext
-{
+struct EncoderContext {
     NV_ENC_BUFFER_FORMAT eFormat;
     NvEncoderInitParam encodeCLIOptions;
     CUcontext cuContext;
@@ -29,34 +25,38 @@ struct EncoderContext
     NvEncoderCuda *pEnc;
 };
 
-class GPUVideoEncoder : public CThreadWorker
-{
-public:
-    GPUVideoEncoder(const char* name, CameraParams *camera_params, std::string encoder_setup, std::string folder_name, bool* encoder_ready_signal); // name is the thread name
-    ~GPUVideoEncoder ();
+class GPUVideoEncoder : public CThreadWorker {
+  public:
+    GPUVideoEncoder(const char *name, CameraParams *camera_params,
+                    std::string encoder_setup, std::string folder_name,
+                    bool *encoder_ready_signal); // name is the thread name
+    ~GPUVideoEncoder();
 
-	bool PushToDisplay(void* imagePtr, size_t bufferSize, int width, int height, int pixelFormat, unsigned long long timestamp, unsigned long long frame_id, uint64_t timestamp_sys);
-	void ProcessOneFrame(void *f);
+    bool PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height,
+                       int pixelFormat, unsigned long long timestamp,
+                       unsigned long long frame_id, uint64_t timestamp_sys);
+    void ProcessOneFrame(void *f);
 
-	//open gl dimensions:
-	bool* encoder_ready_signal;
-	CameraParams* camera_params;	
-	unsigned char* display_buffer;
-	FrameGPU frame_original; // frame on gpu device 
-	Debayer debayer;
+    // open gl dimensions:
+    bool *encoder_ready_signal;
+    CameraParams *camera_params;
+    unsigned char *display_buffer;
+    FrameGPU frame_original; // frame on gpu device
+    Debayer debayer;
 
-	// encoding
-	EncoderContext encoder;
+    // encoding
+    EncoderContext encoder;
     Writer writer;
-	std::string encoder_setup;
-	std::string folder_name;
+    std::string encoder_setup;
+    std::string folder_name;
 
-private: 
-	virtual void ThreadRunning(); // overides of COffThreadMachine for worker thread
-private:	
-	WORKER_ENTRY workerEntries[ENCODER_ENTRIES_MAX];
-	WORKER_ENTRY* workerEntriesFreeQueue[ENCODER_ENTRIES_MAX];
-	int workerEntriesFreeQueueCount;
+  private:
+    virtual void
+    ThreadRunning(); // overides of COffThreadMachine for worker thread
+  private:
+    WORKER_ENTRY workerEntries[ENCODER_ENTRIES_MAX];
+    WORKER_ENTRY *workerEntriesFreeQueue[ENCODER_ENTRIES_MAX];
+    int workerEntriesFreeQueueCount;
 };
 
 #endif

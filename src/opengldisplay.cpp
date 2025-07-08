@@ -33,11 +33,6 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
     output_image_roi.width = output_image_size.width;
     output_image_roi.height = output_image_size.height;
 
-    if (camera_select->downsample != 1) {
-        cudaMalloc((void **)&d_resize,
-                   output_image_size.width * output_image_size.height * 4);
-    }
-
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = WORK_ENTRIES_MAX;
     for (int i = 0; i < workerEntriesFreeQueueCount; i++) {
@@ -55,6 +50,12 @@ COpenGLDisplay::~COpenGLDisplay() {
 
 void COpenGLDisplay::ThreadRunning() {
     ck(cudaSetDevice(camera_params->gpu_id));
+
+    if (camera_select->downsample != 1) {
+        ck(cudaMalloc((void **)&d_resize,
+                      output_image_size.width * output_image_size.height * 4));
+    }
+
     // innitialization
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params);
@@ -69,7 +70,7 @@ void COpenGLDisplay::ThreadRunning() {
 
         const std::string engine_file_path = camera_select->yolo_model;
         yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                            camera_params->height);
+                            camera_params->height, true, 0);
         yolov8->make_pipe(true);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 8);

@@ -6,21 +6,7 @@
 #include <npp.h>
 
 FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
-    : camera_params(params), camera_select(select), running(false) {
-
-    ck(cudaStreamCreate(&stream));
-    initalize_gpu_frame(&frame_process.frame_original, camera_params);
-    initialize_gpu_debayer(&frame_process.debayer, camera_params);
-    initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params);
-
-    ck(cudaMalloc((void **)&frame_process.d_convert,
-                  camera_params->width * camera_params->height * 3));
-    // initialize yolo
-    const std::string engine_file_path = camera_select->yolo_model;
-    yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                        camera_params->height);
-    yolov8->make_pipe(true);
-}
+    : camera_params(params), camera_select(select), running(false) {}
 
 FrameDetector::~FrameDetector() {
     stop();
@@ -47,15 +33,15 @@ void FrameDetector::stop() {
 
 void FrameDetector::notify_frame_ready(void *device_image_ptr) {
     if (camera_params->gpu_direct) {
-        ck(cudaMemcpy2D(frame_process.frame_original.d_orig,
-                        camera_params->width, device_image_ptr,
-                        camera_params->width, camera_params->width,
-                        camera_params->height, cudaMemcpyDeviceToDevice));
+        ck(cudaMemcpy2DAsync(
+            frame_process.frame_original.d_orig, camera_params->width,
+            device_image_ptr, camera_params->width, camera_params->width,
+            camera_params->height, cudaMemcpyDeviceToDevice, stream));
     } else {
-        ck(cudaMemcpy2D(frame_process.frame_original.d_orig,
-                        camera_params->width, device_image_ptr,
-                        camera_params->width, camera_params->width,
-                        camera_params->height, cudaMemcpyHostToDevice));
+        ck(cudaMemcpy2DAsync(
+            frame_process.frame_original.d_orig, camera_params->width,
+            device_image_ptr, camera_params->width, camera_params->width,
+            camera_params->height, cudaMemcpyHostToDevice, stream));
     }
     camera_select->frame_detect_state.store(State_Frame_Copy_Done);
     cv.notify_one();
@@ -63,7 +49,20 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr) {
 
 void FrameDetector::thread_loop() {
     ck(cudaSetDevice(camera_params->gpu_id));
+    ck(cudaStreamCreate(&stream));
     ck(nppSetStream(stream));
+    initalize_gpu_frame(&frame_process.frame_original, camera_params);
+    initialize_gpu_debayer(&frame_process.debayer, camera_params);
+    initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params);
+
+    ck(cudaMalloc((void **)&frame_process.d_convert,
+                  camera_params->width * camera_params->height * 3));
+    // initialize yolo
+    const std::string engine_file_path = camera_select->yolo_model;
+    yolov8 = new YOLOv8(engine_file_path, camera_params->width,
+                        camera_params->height, true, stream);
+    yolov8->make_pipe(true);
+
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
@@ -95,7 +94,7 @@ void FrameDetector::thread_loop() {
                          frame_process.debayer.d_debayer, camera_params->width,
                          camera_params->height, stream);
         yolov8->preprocess_gpu(frame_process.d_convert);
-        yolov8->infer();
+        yolov8->infer(); // it sync gpu with cpu here
         yolov8->postprocess(objs);
 
         if (objs.size() > 0) {
@@ -110,8 +109,6 @@ void FrameDetector::thread_loop() {
         } else {
             detection2d[camera_select->idx2d].ball2d.find_ball.store(false);
         }
-
-        ck(cudaStreamSynchronize(stream));
 
         // running detection
         if (camera_select->detect_mode == Detect3d_Standoff) {

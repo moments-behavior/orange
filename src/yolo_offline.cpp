@@ -43,7 +43,8 @@ int main(int argc, char **argv) {
 
     printf("YOLO initialization...\n");
 
-    YOLOv8 *yolov8 = new YOLOv8(engine_file_path, camera_width, camera_height);
+    YOLOv8 *yolov8 =
+        new YOLOv8(engine_file_path, camera_width, camera_height, true, 0);
     yolov8->make_pipe(true);
 
     cudaMalloc((void **)&d_points, sizeof(float) * 8);

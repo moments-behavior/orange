@@ -1,7 +1,9 @@
 #include "yolov8_det.h"
 #include "common.hpp"
+#include <npp.h>
 
-YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height) {
+YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
+               bool use_external_stream, cudaStream_t stream) {
     img_width = width;
     img_height = height;
 
@@ -24,7 +26,17 @@ YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height) {
     this->context = this->engine->createExecutionContext();
 
     assert(this->context != nullptr);
-    cudaStreamCreate(&this->stream);
+
+    if (use_external_stream) {
+        this->stream = stream;
+        nppSetStream(this->stream);
+        use_external_stream = true;
+    } else {
+        CHECK(cudaStreamCreate(&this->stream));
+        nppSetStream(this->stream);
+        use_external_stream = false;
+    }
+
     this->num_bindings = this->engine->getNbIOTensors();
 
     for (int i = 0; i < this->num_bindings; ++i) {
@@ -86,8 +98,9 @@ YOLOv8::~YOLOv8() {
             ->runtime; // Use delete to call the destructor for `runtime`.
     }
 
-    cudaStreamDestroy(
-        this->stream); // CUDA streams still need to be destroyed explicitly.
+    if (!use_external_stream && stream != nullptr) {
+        CHECK(cudaStreamDestroy(this->stream));
+    }
 
     for (auto &ptr : this->device_ptrs) {
         CHECK(cudaFree(ptr));
@@ -97,19 +110,28 @@ YOLOv8::~YOLOv8() {
         CHECK(cudaFreeHost(ptr));
     }
 
-    CHECK(cudaFree(d_temp));
-    CHECK(cudaFree(d_boarder));
-    CHECK(cudaFree(d_float));
-    CHECK(cudaFree(d_planar));
+    if (d_temp)
+        CHECK(cudaFree(d_temp));
+    if (d_boarder)
+        CHECK(cudaFree(d_boarder));
+    if (d_float)
+        CHECK(cudaFree(d_float));
+    if (d_planar)
+        CHECK(cudaFree(d_planar));
 }
 
 void YOLOv8::make_pipe(bool warmup) {
     // allocate device resources for initialization
-    cudaMalloc((void **)&d_temp,
-               padw * padh * 3); // assuming width bigger than height
-    cudaMalloc((void **)&d_boarder, inp_w_int * inp_w_int * 3);
-    cudaMalloc((void **)&d_float, sizeof(float) * inp_w_int * inp_w_int * 3);
-    cudaMalloc((void **)&d_planar, sizeof(float) * inp_w_int * inp_w_int * 3);
+    CHECK(cudaMallocAsync((void **)&d_temp, padw * padh * 3,
+                          this->stream)); // assuming width bigger than height
+    CHECK(cudaMallocAsync((void **)&d_boarder, inp_w_int * inp_w_int * 3,
+                          this->stream));
+    CHECK(cudaMallocAsync((void **)&d_float,
+                          sizeof(float) * inp_w_int * inp_w_int * 3,
+                          this->stream));
+    CHECK(cudaMallocAsync((void **)&d_planar,
+                          sizeof(float) * inp_w_int * inp_w_int * 3,
+                          this->stream));
 
     for (auto &bindings : this->input_bindings) {
         void *d_ptr;
@@ -139,6 +161,7 @@ void YOLOv8::make_pipe(bool warmup) {
             }
             this->infer();
         }
+        CHECK(cudaStreamSynchronize(this->stream));
         printf("model warmup 10 times\n");
     }
 }

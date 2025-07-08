@@ -2,6 +2,7 @@
 #include "global.h"
 #include "realtime_tool.h"
 #include "video_capture.h"
+#include "shaman.h"
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
@@ -23,6 +24,7 @@ void detection3d_proc(CameraControl *camera_control,
             cam3d_idx.push_back(i);
         }
     }
+    shaman::SharedBoxQueue writer(true);
 
     TriangulatePoints ball2d_all_cams;
     auto start = std::chrono::high_resolution_clock::now();
@@ -72,13 +74,21 @@ void detection3d_proc(CameraControl *camera_control,
 
                 if (cameras_select[i].stream_on &&
                     detection2d[i].has_calibration_results) {
+                    
+                    shaman::Object obj;
 
                     cv::Mat image_pts;
                     CameraCalibResults *cam_calib =
                         &detection2d[i].camera_calib;
 
                     std::vector<cv::Point3f> points3d;
+                    std::vector<shaman::Object> center_vec;
                     points3d.push_back(detection3d.ball3d.center);
+                    std::cout << detection3d.ball3d.center << '\n';
+                    obj.data = {detection3d.ball3d.center.x, detection3d.ball3d.center.y, detection3d.ball3d.center.z, 0, 0};
+                    center_vec.reserve(1);
+                    center_vec.push_back(obj);
+                    writer.push(center_vec);
 
                     cv::projectPoints(points3d, cam_calib->rvec,
                                       cam_calib->tvec, cam_calib->k,

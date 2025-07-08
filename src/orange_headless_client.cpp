@@ -148,6 +148,8 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
             }
             break;
         case FetchGame::ManagerState_STARTCAMTHREAD:
+
+            std::cout << recording_setup->encoder_basic_setup << std::endl;
             if (start_camera_thread(camera_threads, cameras_params, ecams,
                                     camera_control, cameras_select, device_info,
                                     *cam_count, ptp_params,

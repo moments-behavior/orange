@@ -62,7 +62,5 @@ profile/
 imgui.ini
 cuda_debug.log
 third_party/flatbuffers
-<<<<<<< HEAD
-orange_profile.sqlite
-=======
->>>>>>> b2a3c47172f10b60b34f381ba1ff4d3a1b5ccc34
+*.sqlite
+*.nsys-rep

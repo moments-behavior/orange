@@ -294,6 +294,7 @@ int main(int argc, char **args) {
                     IGFD::FileDialogConfig config;
                     config.countSelectionMax = 1;
                     config.path = input_folder;
+                    config.flags = ImGuiFileDialogFlags_Modal;
                     ImGuiFileDialog::Instance()->OpenDialog(
                         "ChooseRecordingDir", "Choose a Directory", nullptr,
                         config);
@@ -550,6 +551,7 @@ int main(int argc, char **args) {
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
                 config.path = input_folder;
+                config.flags = ImGuiFileDialogFlags_Modal;
                 ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir",
                                                         "Choose a Directory",
                                                         nullptr, config);
@@ -751,6 +753,7 @@ int main(int argc, char **args) {
                         IGFD::FileDialogConfig config;
                         config.countSelectionMax = 1;
                         config.path = picture_save_folder;
+                        config.flags = ImGuiFileDialogFlags_Modal;
                         ImGuiFileDialog::Instance()->OpenDialog(
                             "ChoosePictureDir", "Choose a Directory", nullptr,
                             config);

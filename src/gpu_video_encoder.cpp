@@ -96,7 +96,7 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer)
     }
 }
 
-GPUVideoEncoder::GPUVideoEncoder(const char* name, CUcontext cuda_context, CameraParams *camera_params,
+GPUVideoEncoder::GPUVideoEncoder(const char* name, CameraParams *camera_params,
     const std::string& codec, const std::string& preset, const std::string& tuning,
     std::string folder_name, bool* encoder_ready_signal,
     SafeQueue<WORKER_ENTRY*>& recycle_queue)
@@ -104,7 +104,6 @@ GPUVideoEncoder::GPUVideoEncoder(const char* name, CUcontext cuda_context, Camer
 camera_params(camera_params),
 folder_name(folder_name),
 encoder_ready_signal(encoder_ready_signal),
-m_cuContext(cuda_context),
 m_recycle_queue(recycle_queue),
 m_stream(nullptr),
 d_rgb_temp_(nullptr),
@@ -125,11 +124,8 @@ encoder_pitch_(0)
     std::cout << "[GPUVideoEncoder] NATIVE RESOLUTION MODE: " << camera_params->width << "x" << camera_params->height << std::endl;
 
     try {
-        NVTX_RANGE_PUSH("Setup_CUDA_Context");
-        CUDA_CTX_LOG("Pushing CUDA context in constructor");
-        ck(cuCtxPushCurrent(m_cuContext));
-        dumpCudaState("Constructor - After context push");
-        NVTX_RANGE_POP();
+        ck(cudaSetDevice(camera_params->gpu_id));
+        ck(cuCtxGetCurrent(&encoder.cuContext));
 
         NVTX_RANGE_PUSH("Initialize_GPU_Frames");
         initalize_gpu_frame(&frame_original, camera_params);
@@ -140,14 +136,13 @@ encoder_pitch_(0)
         ck(cudaMalloc(&d_rgb_temp_, scaled_width_ * scaled_height_ * 3));
         NVTX_RANGE_POP();
 
-        NVTX_RANGE_PUSH("Setup_Encoder_Context");
-        encoder.cuContext = m_cuContext;
+        NVTX_RANGE_PUSH("Setup_Encoder_Format");
         encoder.eFormat = NV_ENC_BUFFER_FORMAT_NV12;
         NVTX_RANGE_POP();
         
         NVTX_RANGE_PUSH("Create_NVIDIA_Encoder");
         CUDA_CTX_LOG("Creating NVIDIA encoder");
-        encoder.pEnc = new NvEncoderCuda(m_cuContext, camera_params->width, camera_params->height, encoder.eFormat);
+        encoder.pEnc = new NvEncoderCuda(encoder.cuContext, camera_params->width, camera_params->height, encoder.eFormat);
         CUDA_CTX_LOG("NVIDIA encoder created successfully");
         NVTX_RANGE_POP();
         
@@ -233,9 +228,6 @@ encoder_pitch_(0)
         *encoder_ready_signal = true;
         
         NVTX_RANGE_PUSH("Cleanup_Context");
-        CUDA_CTX_LOG("Popping CUDA context in constructor");
-        CUcontext popped_context;
-        ck(cuCtxPopCurrent(&popped_context));
         NVTX_RANGE_POP();
     }
     catch (const std::exception& e)
@@ -243,16 +235,12 @@ encoder_pitch_(0)
         std::cerr << "[GPUVideoEncoder] Exception initializing encoder for " << name
                   << ": " << e.what() << std::endl;
         CUDA_CTX_LOG("Exception in constructor");
-        CUcontext popped_context;
-        cuCtxPopCurrent(&popped_context);
         throw;
     }
     catch (...)
     {
         std::cerr << "[GPUVideoEncoder] Unknown exception initializing encoder for " << name << std::endl;
         CUDA_CTX_LOG("Unknown exception in constructor");
-        CUcontext popped_context;
-        cuCtxPopCurrent(&popped_context);
         throw;
     }
     
@@ -264,7 +252,7 @@ GPUVideoEncoder::~GPUVideoEncoder()
     NVTX_ENCODE("GPUVideoEncoder_Destructor");
     
     std::cout << "[GPUVideoEncoder] Destructor for " << this->threadName << std::endl;
-    ck(cuCtxPushCurrent(m_cuContext));
+
 
     NVTX_RANGE_PUSH("Close_Writer_And_Encoder");
     close_writer(&encoder, &writer);
@@ -280,16 +268,13 @@ GPUVideoEncoder::~GPUVideoEncoder()
     if (d_uv_default_plane_) cudaFree(d_uv_default_plane_);
     NVTX_RANGE_POP();
 
-    CUcontext popped_context;
-    ck(cuCtxPopCurrent(&popped_context));
 }
 
 bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
 {
     if (!entry) return false;
 
-    // Set CUDA context for this thread
-    CUDA_CONTEXT_SCOPE(m_cuContext);
+    ck(cudaSetDevice(camera_params->gpu_id));
 
     // Log entry into function
     ENCODER_CTX_LOG("=== ENTERING WorkerFunction ===", entry->frame_id);

@@ -12,7 +12,6 @@ class COpenGLDisplay : public CThreadWorker<WORKER_ENTRY>
 public:
 COpenGLDisplay(
 	const char* name,
-	CUcontext cuda_context,
 	CameraParams *camera_params,
 	CameraEachSelect *camera_select,
 	unsigned char *display_buffer_cuda_pbo,
@@ -31,7 +30,6 @@ protected:
     bool WorkerFunction(WORKER_ENTRY* f) override;
 
 private:
-	CUcontext m_cuContext; // Store the CUDA context
     float *d_points_for_drawing_;
     unsigned int *d_skeleton_for_drawing_;
     unsigned char *d_display_resize_buffer_;

@@ -10,9 +10,8 @@
 #include "global.h"
 #include <npp.h> // For nppSetStream
 
-COpenGLDisplay::COpenGLDisplay(const char* name, CUcontext cuda_context, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer_cuda_pbo, INDIGOSignalBuilder* indigo_signal_builder, SafeQueue<WORKER_ENTRY*>& recycle_queue)
+COpenGLDisplay::COpenGLDisplay(const char* name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer_cuda_pbo, INDIGOSignalBuilder* indigo_signal_builder, SafeQueue<WORKER_ENTRY*>& recycle_queue)
     : CThreadWorker(name),
-      m_cuContext(cuda_context),
       camera_params(camera_params),
       camera_select(camera_select),
       display_buffer_pbo_cuda_ptr_(display_buffer_cuda_pbo),
@@ -30,7 +29,6 @@ COpenGLDisplay::COpenGLDisplay(const char* name, CUcontext cuda_context, CameraP
     std::cout << "  Thread name: " << (name ? name : "null") << std::endl;
     std::cout << "========================================" << std::endl;
 
-    ck(cuCtxPushCurrent(m_cuContext)); // Ensure the CUDA context is active for this thread
     ck(cudaSetDevice(camera_params->gpu_id));
     ck(cudaStreamCreate(&m_stream));
 
@@ -46,9 +44,6 @@ COpenGLDisplay::COpenGLDisplay(const char* name, CUcontext cuda_context, CameraP
     std::cout << "  - Downsample: " << camera_select->downsample << std::endl;
     std::cout << "  - Buffer allocated: " << (d_display_resize_buffer_ != nullptr ? "Yes" : "No") << std::endl;
     std::cout << "  - Stream created: " << (m_stream != nullptr ? "Yes" : "No") << std::endl;
-    
-    CUcontext popped_context;
-    ck(cuCtxPopCurrent(&popped_context));
 }
 
 COpenGLDisplay::~COpenGLDisplay()
@@ -79,7 +74,6 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
 {
     if (!f) return false;
 
-    CUDA_CONTEXT_SCOPE(m_cuContext);
     ck(cudaSetDevice(camera_params->gpu_id));
     nppSetStream(m_stream); 
 

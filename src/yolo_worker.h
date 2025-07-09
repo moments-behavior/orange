@@ -22,9 +22,7 @@
 class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
 {
 public:
-    // Constructor no longer takes display_texture_buffer
     YOLOv8Worker(const char* name,
-                    CUcontext cuda_context,
                     CameraParams* cam_params,
                     CameraEachSelect* cam_select,
                     SafeQueue<WORKER_ENTRY*>& recycle_queue);
@@ -75,7 +73,6 @@ public:
     // Shared memory IPC
     shaman::SharedBoxQueue* shaman_ipc_queue_;
     COpenGLDisplay* m_display_worker = nullptr;
-    CUcontext m_cuContext;
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };
 

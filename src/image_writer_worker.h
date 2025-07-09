@@ -20,14 +20,13 @@ struct ImageWriter_Entry {
 class ImageWriterWorker : public CThreadWorker<ImageWriter_Entry>
 {
 public:
-    ImageWriterWorker(const char* name, CUcontext cuda_context);
+    ImageWriterWorker(const char* name);
     ~ImageWriterWorker() override;
 
 protected:
     bool WorkerFunction(ImageWriter_Entry* f) override;
 
 private:
-    CUcontext m_cuContext;
 };
 
 #endif // IMAGE_WRITER_WORKER_H

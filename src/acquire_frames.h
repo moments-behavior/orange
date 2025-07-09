@@ -17,9 +17,7 @@ class GPUVideoEncoder;
 class YOLOv8Worker;
 class ImageWriterWorker;
 
-// --- FIX: Update the function signature to match the call in orange.cpp ---
 void acquire_frames(
-    CUcontext cuda_context,
     CameraEmergent *ecam,
     CameraParams *camera_params,
     CameraEachSelect* camera_select,

@@ -35,7 +35,7 @@ struct EncoderContext
 class GPUVideoEncoder : public CThreadWorker<WORKER_ENTRY>
 {
 public:
-    GPUVideoEncoder(const char* name, CUcontext cuda_context, CameraParams *camera_params,
+    GPUVideoEncoder(const char* name, CameraParams *camera_params,
         const std::string& codec, const std::string& preset, const std::string& tuning,
         std::string folder_name, bool* encoder_ready_signal,
         SafeQueue<WORKER_ENTRY*>& recycle_queue);
@@ -58,7 +58,6 @@ private:
     Debayer debayer;
     EncoderContext encoder;
     Writer writer;
-	CUcontext m_cuContext; // Store the CUDA context
     cudaStream_t m_stream; // Dedicated stream for this worker
 	int encoder_pitch_;
     int scaled_width_;

@@ -25,14 +25,6 @@ simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger(
 #define display_gpu_id 0
 
 int main(int argc, char **args) {
-    // --- REFACTOR 1: ESTABLISH THE PRIMARY CUDA CONTEXT ---
-    // This context will be created once and shared by all threads.
-    ck(cuInit(0));
-    CUdevice cuDevice;
-    CUcontext cuContext;
-    ck(cuDeviceGet(&cuDevice, display_gpu_id));
-    ck(cuCtxCreate(&cuContext, 0, cuDevice));
-    ck(cuCtxPushCurrent(cuContext)); // Set for the main thread
 
     gx_context *window = (gx_context *) malloc(sizeof(gx_context));
     *window = (gx_context){
@@ -83,7 +75,7 @@ int main(int argc, char **args) {
     SafeQueue<cudaEvent_t*>* free_events_queue = nullptr;
     COpenGLDisplay** openGLDisplayWorkers = nullptr;
     GPUVideoEncoder** gpuVideoEncoders = nullptr; // Define pointer, but allocate later
-    ImageWriterWorker* image_writer = new ImageWriterWorker("ImageSaverThread", cuContext);
+    ImageWriterWorker* image_writer = new ImageWriterWorker("ImageSaverThread");
     image_writer->StartThread();
 
     EncoderConfig *encoder_config = new EncoderConfig{
@@ -360,7 +352,7 @@ int main(int argc, char **args) {
                     for (int i = 0; i < num_cameras; i++) {
                         if (cameras_select[i].stream_on) {
                             std::string display_name = "OpenGLDisplay_Cam_" + cameras_params[i].camera_serial;
-                            openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
+                            openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
                         }
                         if (cameras_select[i].yolo) {
                             std::string yolo_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
@@ -368,7 +360,7 @@ int main(int argc, char **args) {
                             if (yolo_model.empty()) {
                                 std::cerr << "YOLO model not selected. Please select a YOLO model." << std::endl;
                             } else {
-                                yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], *recycle_queue);
+                                yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), &cameras_params[i], &cameras_select[i], *recycle_queue);
                                 if (openGLDisplayWorkers[i]) {
                                     yolo_workers[i]->SetDisplayWorker(openGLDisplayWorkers[i]);
                                 }
@@ -377,7 +369,7 @@ int main(int argc, char **args) {
                         if (cameras_select[i].record) {
                             std::string encoder_thread_name = "GPUEncoder_Cam_" + cameras_params[i].camera_serial;
                             bool encoder_ready_signal = false;
-                            gpuVideoEncoders[i] = new GPUVideoEncoder(encoder_thread_name.c_str(), cuContext, &cameras_params[i], encoder_config->encoder_codec, encoder_config->encoder_preset, encoder_config->tuning_info, encoder_config->folder_name, &encoder_ready_signal, *recycle_queue);
+                            gpuVideoEncoders[i] = new GPUVideoEncoder(encoder_thread_name.c_str(), &cameras_params[i], encoder_config->encoder_codec, encoder_config->encoder_preset, encoder_config->tuning_info, encoder_config->folder_name, &encoder_ready_signal, *recycle_queue);
                         }
                     }
             
@@ -405,7 +397,6 @@ int main(int argc, char **args) {
                     for (int i = 0; i < num_cameras; i++) {
                         camera_threads.emplace_back(
                             &acquire_frames,
-                            cuContext,
                             &ecams[i],
                             &cameras_params[i],
                             &cameras_select[i],
@@ -1127,7 +1118,7 @@ int main(int argc, char **args) {
                             // Create OpenGL Display workers
                             if (cameras_select[i].stream_on) {
                                 std::string display_name = "OpenGLDisplay_Cam_" + cameras_params[i].camera_serial;
-                                openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
+                                openGLDisplayWorkers[i] = new COpenGLDisplay(display_name.c_str(), &cameras_params[i], &cameras_select[i], tex[i].cuda_buffer, &indigo_signal_builder, *recycle_queue);
                             }
                     
                             // Create YOLO workers
@@ -1135,7 +1126,7 @@ int main(int argc, char **args) {
                                 std::string yolo_name = "YOLO_Worker_Cam_" + cameras_params[i].camera_serial;
                                 cameras_select[i].yolo_model = yolo_model.c_str();
                                 if (!yolo_model.empty()) {
-                                    yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), cuContext, &cameras_params[i], &cameras_select[i], *recycle_queue);
+                                    yolo_workers[i] = new YOLOv8Worker(yolo_name.c_str(), &cameras_params[i], &cameras_select[i], *recycle_queue);
                                     if (openGLDisplayWorkers[i]) {
                                         yolo_workers[i]->SetDisplayWorker(openGLDisplayWorkers[i]);
                                     }
@@ -1154,7 +1145,6 @@ int main(int argc, char **args) {
                                 
                                 gpuVideoEncoders[i] = new GPUVideoEncoder(
                                     encoder_thread_name.c_str(), 
-                                    cuContext, 
                                     &cameras_params[i], 
                                     encoder_config->encoder_codec, 
                                     encoder_config->encoder_preset, 
@@ -1196,7 +1186,6 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             camera_threads.emplace_back(
                                 &acquire_frames,
-                                cuContext,                          // CUcontext cuda_context
                                 &ecams[i],                         // CameraEmergent *ecam
                                 &cameras_params[i],                // CameraParams *camera_params
                                 &cameras_select[i],                // CameraEachSelect* camera_select
@@ -1485,10 +1474,6 @@ int main(int argc, char **args) {
 
     quite_enet = true;
     enet_thread.join();
-
-    // Pop and destroy the primary context
-    ck(cuCtxPopCurrent(&cuContext));
-    ck(cuCtxDestroy(cuContext));
 
     image_writer->StopThread();
     delete image_writer;

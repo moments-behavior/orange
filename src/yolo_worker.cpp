@@ -1,4 +1,4 @@
-// src/yolo_worker.cpp - Fixed
+// src/yolo_worker.cpp - FINAL CORRECTED VERSION
 #include "yolo_worker.h"
 #include "kernel.cuh"
 #include <cuda_runtime_api.h>
@@ -16,12 +16,10 @@
 #include "cuda_context_debug.h"
 
 YOLOv8Worker::YOLOv8Worker(const char* name,
-                           CUcontext cuda_context,
                            CameraParams* cam_params,
                            CameraEachSelect* cam_select,
                            SafeQueue<WORKER_ENTRY*>& recycle_queue)
     : CThreadWorker(name),
-      m_cuContext(cuda_context),
       yolov8_instance_(nullptr),
       associated_camera_params_(cam_params),
       associated_camera_select_(cam_select),
@@ -36,25 +34,13 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
       m_recycle_queue(recycle_queue),
       m_dump_next_frame(false)
 {
-    std::cout << "YOLOv8Worker constructor for: " << name << std::endl;
-    
-    if (!cuda_context) {
-        throw std::runtime_error("YOLOv8Worker: Null CUDA context provided");
-    }
-    
-    CUDA_CONTEXT_SCOPE_AT(m_cuContext, "YOLOv8Worker constructor");
-    
-    if (!ctx_manager.is_valid()) {
-        throw std::runtime_error("YOLOv8Worker: Failed to set CUDA context");
-    }
+    ck(cudaSetDevice(associated_camera_params_->gpu_id));
+    std::cout << "YOLOv8Worker constructor set to CUDA device: " << associated_camera_params_->gpu_id << std::endl;
 
     try {
         if (!associated_camera_params_ || !associated_camera_select_) {
             throw std::runtime_error("CameraParams or CameraEachSelect is null.");
         }
-
-        ck(cudaSetDevice(associated_camera_params_->gpu_id));
-        std::cout << "YOLOv8Worker set to CUDA device: " << associated_camera_params_->gpu_id << std::endl;
 
         fb_builder_ = new flatbuffers::FlatBufferBuilder(1024 * 4);
 
@@ -67,10 +53,9 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
                                      associated_camera_params_->height);
         yolov8_instance_->make_pipe(true);
         
-        // *** CHANGE 1: Create the CUDA event ***
         ck(cudaEventCreate(&m_inference_completed));
 
-        std::cout << "[YOLOv8 MODEL INFO] " << name << " expects input size: " 
+        std::cout << "[YOLOv8 MODEL INFO] " << name << " expects input size: "
                   << yolov8_instance_->inp_w_int << "x" << yolov8_instance_->inp_h_int << std::endl;
 
         initalize_gpu_frame(&frame_original_gpu_, associated_camera_params_);
@@ -93,28 +78,21 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); frame_original_gpu_.d_orig = nullptr; }
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); debayer_gpu_.d_debayer = nullptr; }
         
-        throw; 
+        throw;
     }
 }
 
 YOLOv8Worker::~YOLOv8Worker() {
     std::cout << "YOLOv8Worker destructor for " << threadName << std::endl;
     
-    CUDA_CONTEXT_SCOPE_AT(m_cuContext, "YOLOv8Worker destructor");
-    
-    if (ctx_manager.is_valid() && associated_camera_params_) {
+    if (associated_camera_params_) {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
 
-        // *** CHANGE 2: Destroy the CUDA event ***
         if (m_inference_completed) { cudaEventDestroy(m_inference_completed); }
-        
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); }
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); }
         if (d_rgb_yolo_input_gpu_) { cudaFree(d_rgb_yolo_input_gpu_); }
-        
         if (yolov8_instance_) { delete yolov8_instance_; }
-    } else {
-        std::cerr << "Warning: Could not set CUDA context in YOLOv8Worker destructor for " << threadName << std::endl;
     }
     
     if (shaman_ipc_queue_) delete shaman_ipc_queue_;
@@ -142,23 +120,14 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         return false;
     }
 
-    CUDA_CONTEXT_SCOPE_AT(m_cuContext, "YOLOv8Worker::WorkerFunction");
-    
-    if (!ctx_manager.is_valid()) {
-        if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            m_recycle_queue.push(entry);
-        }
-        return false;
-    }
+    ck(cudaSetDevice(associated_camera_params_->gpu_id));
 
     try {
         const int camera_width = associated_camera_params_->width;
         const int camera_height = associated_camera_params_->height;
 
-        ck(cudaSetDevice(associated_camera_params_->gpu_id));
         nppSetStream(yolov8_instance_->stream);
 
-        //  Wait for the data to be ready before processing
         if (entry->event_ptr) {
             ck(cudaStreamWaitEvent(yolov8_instance_->stream, *entry->event_ptr, 0));
         }
@@ -201,7 +170,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, camera_width, camera_height);
         yolov8_instance_->infer();
         
-        // *** CHANGE 3: Replace stream synchronization with event synchronization ***
         ck(cudaEventRecord(m_inference_completed, yolov8_instance_->stream));
         ck(cudaEventSynchronize(m_inference_completed));
         

@@ -34,7 +34,6 @@ static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *e
 }
 
 void acquire_frames(
-    CUcontext cuda_context,
     CameraEmergent *ecam,
     CameraParams *camera_params,
     CameraEachSelect* camera_select,
@@ -49,7 +48,7 @@ void acquire_frames(
     SafeQueue<cudaEvent_t*>* free_events_queue,
     SafeQueue<WORKER_ENTRY*>* recycle_queue
 ){
-    CUDA_CONTEXT_SCOPE(cuda_context);
+    ck(cudaSetDevice(camera_params->gpu_id));
     NVTX_CAMERA("AcquireFrames_Main");
     std::cout << "Starting acquisition loop for camera " << camera_params->camera_serial << std::endl;
 

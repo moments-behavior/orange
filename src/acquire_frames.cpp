@@ -49,12 +49,12 @@ void acquire_frames(
     SafeQueue<cudaEvent_t*>* free_events_queue,
     SafeQueue<WORKER_ENTRY*>* recycle_queue
 ){
+    CUDA_CONTEXT_SCOPE(cuda_context);
     NVTX_CAMERA("AcquireFrames_Main");
     std::cout << "Starting acquisition loop for camera " << camera_params->camera_serial << std::endl;
 
     {
         NVTX_RANGE("CUDA_Context_Setup");
-        ck(cuCtxPushCurrent(cuda_context));
         CUDA_CTX_LOG("=== ACQUIRE FRAMES START ===");
         dumpCudaState("Acquire frames startup");
         ck(cudaSetDevice(camera_params->gpu_id));
@@ -225,6 +225,5 @@ void acquire_frames(
 
         // 2. Now, pop the context as the final step
         CUcontext popped_context;
-        ck(cuCtxPopCurrent(&popped_context));
     }
 }

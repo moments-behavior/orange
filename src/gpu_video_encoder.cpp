@@ -109,7 +109,7 @@ m_recycle_queue(recycle_queue),
 m_stream(nullptr),
 d_rgb_temp_(nullptr),
 d_iyuv_temp_(nullptr),
-d_uv_default_plane_(nullptr), // Initialize new member
+d_uv_default_plane_(nullptr),
 last_fps_update_time_(std::chrono::steady_clock::now()),
 frame_counter_(0),
 current_fps_(0.0),
@@ -207,14 +207,17 @@ encoder_pitch_(0)
         size_t encoder_buffer_size = (size_t)encoder_pitch_ * scaled_height_ * 3 / 2;
         ck(cudaMalloc(&d_iyuv_temp_, encoder_buffer_size));
         
-        // --- NEW CODE: Allocate and pre-fill the monochrome UV plane ---
         if (!camera_params->color) {
+            // Determine the size of one chroma plane based on the final encoded resolution
+            // The pitch is determined by the encoder's requirements.
+            const NvEncInputFrame *tempFrame = encoder.pEnc->GetNextInputFrame();
+            encoder_pitch_ = tempFrame->pitch;
             size_t uv_plane_size = (size_t)encoder_pitch_ * scaled_height_ / 4;
+            
             ck(cudaMalloc(&d_uv_default_plane_, uv_plane_size));
             ck(cudaMemset(d_uv_default_plane_, 128, uv_plane_size));
             std::cout << "[GPUVideoEncoder] Pre-allocated monochrome UV plane (" << uv_plane_size << " bytes)." << std::endl;
         }
-        // --- END NEW CODE ---
         NVTX_RANGE_POP();
 
         std::cout << "[GPUVideoEncoder] Native resolution " << scaled_width_ << "x" << scaled_height_ 
@@ -274,7 +277,6 @@ GPUVideoEncoder::~GPUVideoEncoder()
     if (d_rgb_temp_) cudaFree(d_rgb_temp_);
     if (d_iyuv_temp_) cudaFree(d_iyuv_temp_);
     if (d_scaled_mono_buffer_) cudaFree(d_scaled_mono_buffer_);
-    // Free the pre-filled monochrome plane
     if (d_uv_default_plane_) cudaFree(d_uv_default_plane_);
     NVTX_RANGE_POP();
 
@@ -332,7 +334,7 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         // GPU DIRECT OPTIMIZATION: Check if we can skip the copy
         if (entry->gpu_direct_mode) {
             NVTX_RANGE_PUSH("GPU_Direct_Zero_Copy");
-            std::cout << "[GPUEncoder] 🚀 GPU DIRECT Frame " << entry->frame_id 
+            std::cout << "[GPUEncoder] GPU DIRECT Frame " << entry->frame_id 
                       << " - Using camera buffer directly (ZERO COPY!)" << std::endl;
             
             // Use the GPU Direct pointer directly - NO COPY!
@@ -342,7 +344,7 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
             NVTX_RANGE_POP();
         } else {
             NVTX_GPU_COPY("Traditional_Frame_Copy");
-            std::cout << "[GPUEncoder] 🐌 COPY PATH Frame " << entry->frame_id 
+            std::cout << "[GPUEncoder] COPY PATH Frame " << entry->frame_id 
                       << " - Copying frame data (" << (width * height / 1024 / 1024) << "MB)" << std::endl;
             
             // Traditional copy path
@@ -495,7 +497,7 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
                 NVTX_CAMERA("GPU_Direct_Camera_Requeue");
                 // GPU Direct: Requeue the camera buffer now that all workers are done
                 EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);
-                std::cout << "[GPUEncoder] 🔄 GPU DIRECT Frame " << entry->frame_id 
+                std::cout << "[GPUEncoder] GPU DIRECT Frame " << entry->frame_id 
                           << " - Last worker requeued camera buffer" << std::endl;
                 ENCODER_CTX_LOG("GPU Direct camera buffer requeued by last worker", entry->frame_id);
             }

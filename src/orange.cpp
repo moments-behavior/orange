@@ -68,7 +68,7 @@ int main(int argc, char **args) {
 
     ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
-    bool ptp_stream_sync = false;
+    bool ptp_stream_sync = true;
 
     flatbuffers::FlatBufferBuilder *fb_builder =
         new flatbuffers::FlatBufferBuilder(1024);
@@ -988,7 +988,7 @@ int main(int argc, char **args) {
                         }
 
                         for (int i = 0; i < num_cameras; i++) {
-                            cameras_select[i].stream_on = false;
+                            cameras_select[i].stream_on = true;
                             if (cameras_params[i].camera_name ==
                                 "ceiling_center") {
                                 cameras_select[i].stream_on = true;

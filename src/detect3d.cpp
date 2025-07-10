@@ -70,25 +70,26 @@ void detection3d_proc(CameraControl *camera_control,
 
         // project to all the streaming cameras
         if (detection3d.ball3d.new_detection.load()) {
+            shaman::Object obj;
+            std::vector<shaman::Object> center_vec;
+            obj.data = {detection3d.ball3d.center.x, detection3d.ball3d.center.y, detection3d.ball3d.center.z, 0, 0};
+            center_vec.reserve(1);
+            center_vec.push_back(obj);
+            writer.push(center_vec);
             for (int i = 0; i < num_cameras; i++) {
 
                 if (cameras_select[i].stream_on &&
                     detection2d[i].has_calibration_results) {
                     
-                    shaman::Object obj;
+
 
                     cv::Mat image_pts;
                     CameraCalibResults *cam_calib =
                         &detection2d[i].camera_calib;
 
                     std::vector<cv::Point3f> points3d;
-                    std::vector<shaman::Object> center_vec;
+
                     points3d.push_back(detection3d.ball3d.center);
-                    std::cout << detection3d.ball3d.center << '\n';
-                    obj.data = {detection3d.ball3d.center.x, detection3d.ball3d.center.y, detection3d.ball3d.center.z, 0, 0};
-                    center_vec.reserve(1);
-                    center_vec.push_back(obj);
-                    writer.push(center_vec);
 
                     cv::projectPoints(points3d, cam_calib->rvec,
                                       cam_calib->tvec, cam_calib->k,

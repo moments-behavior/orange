@@ -40,7 +40,7 @@ struct CameraEachSelect {
     bool selected_to_save = false;
     std::string picture_save_folder;
     std::string yolo_model;
-    DetectMode detect_mode = Detect_OFF;
+    DetectMode detect_mode = Detect3d_Standoff;
     int idx2d;
     int idx3d;
     std::atomic<PictureState> frame_detect_state;

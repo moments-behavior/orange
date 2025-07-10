@@ -162,7 +162,10 @@ void acquire_frames(
             current_entry->pixelFormat = ecam->frame_recv.pixel_type;
             current_entry->timestamp = ecam->frame_recv.timestamp;
             current_entry->frame_id = camera_state.frame_count;
-            current_entry->has_detections = false;
+            // Explicitly set has_detections based on whether the YOLO worker is active for this camera.
+            // This tells the display worker that it MUST wait for the YOLO worker's event.
+            current_entry->has_detections = (camera_select->yolo && yolo_worker);
+            current_entry->detections_ready.store(false);
 
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
                 ImageWriter_Entry* save_job = new ImageWriter_Entry();

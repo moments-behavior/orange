@@ -148,26 +148,35 @@ void gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points,
 }
 
 
-__global__ void gpu_draw_box(unsigned char* src, const int width, const int height, float* d_points, double current_time)
+__global__ void gpu_draw_box_kernel(unsigned char* src, const int width, const int height, float* d_points, int num_objects, double current_time)
 {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if( (x < width) && (y < height) ) {
-        for (int i= 0; i < 4; i++) {
+        // Loop through all line segments for all objects
+        for (int i = 0; i < num_objects * 4; i++) {
+            float x1 = d_points[i * 4];
+            float y1 = d_points[i * 4 + 1];
+            float x2 = d_points[i * 4 + 2];
+            float y2 = d_points[i * 4 + 3];
 
-            float lengh_squared = (d_points[i*2+2]-d_points[i*2]) * (d_points[i*2+2]-d_points[i*2]) + (d_points[i*2+3]-d_points[i*2+1]) * (d_points[i*2+3]-d_points[i*2+1]);
-            float dot_product = (x - d_points[i*2]) * (d_points[i*2+2] - d_points[i*2]) + (y-d_points[i*2+1]) * (d_points[i*2+3]-d_points[i*2+1]);
+            float lengh_squared = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+            
+            if (lengh_squared == 0.0f) continue;
+            
+            float dot_product = (x - x1) * (x2 - x1) + (y-y1) * (y2 - y1);
             float t = fmaxf(0.0f, fminf(1.0f, dot_product/lengh_squared));
-            float proj_x = d_points[i*2] + t * (d_points[i*2+2] - d_points[i*2]);
-            float proj_y = d_points[i*2+1] + t * (d_points[i*2+3]-d_points[i*2+1]);
+            float proj_x = x1 + t * (x2 - x1);
+            float proj_y = y1 + t * (y2 - y1);
+
             float distance_squared = (x - proj_x) * (x - proj_x) + (y - proj_y) * (y - proj_y);
-            double multiplier = 0.5 * (sin(current_time * 0.00000001) + 1.0);
-            if (distance_squared < 8.0f) {
-                *(src + ((y * width * 4) + (x * 4)))  = 200 + (unsigned char) 55 * multiplier;
-                *(src + ((y * width * 4) + (x * 4)) + 1)  = (unsigned char) 250 * multiplier;
-                *(src + ((y * width * 4) + (x * 4)) + 2)  = (unsigned char) 255 * multiplier;
-                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255;                   
+            if (distance_squared < 12.0f) {
+                // Set a static bright yellow color (RGBA)
+                *(src + ((y * width * 4) + (x * 4)))      = 255; // R
+                *(src + ((y * width * 4) + (x * 4)) + 1)  = 0; // G
+                *(src + ((y * width * 4) + (x * 4)) + 2)  = 0;   // B
+                *(src + ((y * width * 4) + (x * 4)) + 3)  = 255; // A                 
             }
 
         }
@@ -175,12 +184,13 @@ __global__ void gpu_draw_box(unsigned char* src, const int width, const int heig
 }
 
 
-void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, cudaStream_t stream)
+
+void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, int num_objects, cudaStream_t stream)
 {
     dim3 threads_per_block(32, 32);
     dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
     double current_time = (double) (std::chrono::system_clock::now().time_since_epoch()).count();
-    gpu_draw_box <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, current_time);
+    gpu_draw_box_kernel <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, num_objects, current_time);
 }
 
 

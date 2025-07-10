@@ -77,22 +77,25 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     if (!f) return false;
 
     ck(cudaSetDevice(camera_params->gpu_id));
-    nppSetStream(m_stream); 
+    nppSetStream(m_stream);
 
     if (f->event_ptr) { // Wait for acquire_frames to be ready
         ck(cudaStreamWaitEvent(m_stream, *f->event_ptr, 0));
     }
-    
+
     // If this frame is supposed to have detections, we MUST wait for the YOLO worker.
-    if (f->has_detections && camera_select->yolo && f->yolo_completion_event) {
-        std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": Waiting for YOLO inference to complete." << std::endl;
-        // Wait for the specific event that signals YOLO inference is done for this frame.
-        ck(cudaStreamWaitEvent(m_stream, *f->yolo_completion_event, 0));
-        std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": YOLO inference complete. Proceeding to draw." << std::endl;
+    if (f->has_detections && camera_select->yolo) {
+        // MODIFICATION: Add a spin-wait loop
+        // This ensures we don't check the detections vector until the YOLO thread is truly done.
+        while (!f->detections_ready.load()) {
+            // You can add a small sleep here to prevent busy-waiting, e.g., usleep(100);
+            // but for low-latency, a spin-wait is often acceptable.
+        }
+        std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": YOLO CPU post-processing complete. Proceeding to draw." << std::endl;
     }
-    
+
     frame_original_gpu_.d_orig = f->d_image;
-    
+
     if (camera_params->color){
         debayer_frame_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
     } else {
@@ -100,6 +103,7 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     }
 
     if (f->has_detections) {
+        std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": Found " << f->detections.size() << " detections. Preparing to draw boxes." << std::endl;
         std::vector<float> h_points;
         h_points.reserve(f->detections.size() * 4 * 2);
 
@@ -121,7 +125,7 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
             h_points.push_back(obj.rect.y + obj.rect.height);
             h_points.push_back(obj.rect.x);
             h_points.push_back(obj.rect.y + obj.rect.height);
-            
+
             // Left line
             h_points.push_back(obj.rect.x);
             h_points.push_back(obj.rect.y + obj.rect.height);
@@ -130,20 +134,27 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         }
 
         if (!h_points.empty()) {
+            std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": Drawing " << f->detections.size() << " boxes." << std::endl;
             ck(cudaMemcpyAsync(d_points_for_drawing_, h_points.data(), h_points.size() * sizeof(float), cudaMemcpyHostToDevice, m_stream));
-            gpu_draw_box(debayer_gpu_.d_debayer, camera_params->width, camera_params->height, d_points_for_drawing_, m_stream);
+            gpu_draw_box(
+                debayer_gpu_.d_debayer,
+                camera_params->width,
+                camera_params->height,
+                d_points_for_drawing_,
+                f->detections.size(),
+                m_stream);
         }
     }
 
     if (camera_select->downsample > 1) {
         output_display_size_.width = camera_params->width / camera_select->downsample;
         output_display_size_.height = camera_params->height / camera_select->downsample;
-    
+
         NppiSize input_size = {static_cast<int>(camera_params->width), static_cast<int>(camera_params->height)};
         NppiRect input_roi = {0, 0, static_cast<int>(camera_params->width), static_cast<int>(camera_params->height)};
-        
+
         NppiRect output_roi = {0, 0, output_display_size_.width, output_display_size_.height};
-    
+
         nppiResize_8u_C4R(
             debayer_gpu_.d_debayer,
             camera_params->width * 4,
@@ -155,21 +166,21 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
             output_roi,
             NPPI_INTER_SUPER
         );
-        
+
         size_t copy_size = static_cast<size_t>(output_display_size_.width) * static_cast<size_t>(output_display_size_.height) * 4;
-        
-        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, 
+
+        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_,
                             d_display_resize_buffer_,
                             copy_size,
-                            cudaMemcpyDeviceToDevice, 
+                            cudaMemcpyDeviceToDevice,
                             m_stream));
     } else {
         size_t copy_size = static_cast<size_t>(camera_params->width) * static_cast<size_t>(camera_params->height) * 4;
-        
-        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_, 
+
+        ck(cudaMemcpyAsync(display_buffer_pbo_cuda_ptr_,
                            debayer_gpu_.d_debayer,
                            copy_size,
-                           cudaMemcpyDeviceToDevice, 
+                           cudaMemcpyDeviceToDevice,
                            m_stream));
     }
 

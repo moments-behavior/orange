@@ -183,7 +183,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             }
         }
 
-        entry->has_detections = !entry->detections.empty();
+        entry->detections_ready.store(true);
 
         // FPS calculation and IPC/ENet logic remains the same.
         frame_counter_++;

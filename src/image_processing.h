@@ -22,6 +22,7 @@ typedef struct {
     // YOLO detection fields
     std::vector<pose::Object> detections;
     bool has_detections;
+    std::atomic<bool> detections_ready;
     
     // Reference counting for memory management
     std::atomic<int> ref_count;

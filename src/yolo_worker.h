@@ -12,11 +12,11 @@
 #include <chrono>
 #include <vector>             // For std::vector (if passing detections)
 #include "common.hpp"         // For pose::Object (if passing detections)
-#include "opengldisplay.h"
 #include <chrono>
-#include "opengldisplay.h"
 #include <cuda.h>
 #include <atomic>
+
+class COpenGLDisplay; // Forward declaration to avoid include cycle
 
 
 class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
@@ -31,6 +31,8 @@ public:
     void SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer);
     void SetDisplayWorker(COpenGLDisplay* display_worker) { m_display_worker = display_worker; }
     void DumpNextFrame() { m_dump_next_frame.store(true);}
+
+    CameraParams* GetCameraParams() const { return associated_camera_params_; }
 
     // New: Define a structure for passing detection results (or use pose::Object directly)
     // This could also be part of WORKER_ENTRY if you modify it globally

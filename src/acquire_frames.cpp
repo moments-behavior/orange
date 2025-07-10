@@ -77,6 +77,8 @@ void acquire_frames(
     CameraState camera_state{};
     PTPState ptp_state{};
     StopWatch w;
+    auto last_fps_update_time = std::chrono::steady_clock::now();
+    int frame_counter_for_fps = 0;
 
     {
         NVTX_RANGE("Camera_Initialization");
@@ -155,10 +157,8 @@ void acquire_frames(
             current_entry->has_detections = false;
         
             if (camera_select->frame_save_state == State_Write_New_Frame && image_writer) {
-                // ... (Image save logic remains the same, but use event_ptr)
                 ImageWriter_Entry* save_job = new ImageWriter_Entry();
-                save_job->event_ptr = current_event; // Pass the pointer
-                // ... (rest of the save job setup)
+                save_job->event_ptr = current_event;
                 image_writer->PutObjectToQueueIn(save_job);
             }
         
@@ -186,6 +186,15 @@ void acquire_frames(
                 }
                 free_events_queue->push(current_event);
                 free_entries_queue->push(current_entry);
+            }
+            
+            frame_counter_for_fps++;
+            auto now = std::chrono::steady_clock::now();
+            std::chrono::duration<double> elapsed = now - last_fps_update_time;
+            if (elapsed.count() >= 1.0) {
+                streaming_fps.store(frame_counter_for_fps / elapsed.count());
+                frame_counter_for_fps = 0;
+                last_fps_update_time = now;
             }
         }
         NVTX_RANGE_POP();

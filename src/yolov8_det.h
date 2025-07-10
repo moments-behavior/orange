@@ -11,6 +11,7 @@ using namespace pose;
 class YOLOv8
 {
 public:
+    static void initialize_plugins();
     explicit YOLOv8(const std::string &engine_file_path, int width, int height);
     ~YOLOv8();
 

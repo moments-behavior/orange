@@ -1,7 +1,16 @@
 // src/yolov8_det.cpp - Fixed
 #include "yolov8_det.h"
 
-// ... (Constructor and Destructor remain the same) ...
+void YOLOv8::initialize_plugins() {
+    static bool plugins_initialized = false;
+    if (!plugins_initialized) {
+        Logger logger; // A temporary logger for this one-time initialization.
+        initLibNvInferPlugins(&logger, "");
+        plugins_initialized = true;
+        std::cout << "[YOLOv8] TensorRT plugins initialized." << std::endl;
+    }
+}
+
 YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 {
     img_width = width;
@@ -30,8 +39,6 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
     assert(trtModelStream);
     file.read(trtModelStream, size);
     file.close();
-    
-    initLibNvInferPlugins(&this->gLogger, "");
     
     this->runtime = nvinfer1::createInferRuntime(this->gLogger);
     if (!this->runtime) {
@@ -235,7 +242,6 @@ void YOLOv8::infer()
     }
 }
 
-// ... (Rest of the file is unchanged) ...
 
 void YOLOv8::postprocess(std::vector<Object>& objs)
 {

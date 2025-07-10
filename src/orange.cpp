@@ -16,6 +16,7 @@
 #include "gpu_video_encoder.h"
 #include "opengldisplay.h"
 #include "image_writer_worker.h"
+#include "yolov8_det.h"
 
 std::vector<YOLOv8Worker*> yolo_workers; // For managing YOLO workers
 ENetPeer* external_data_consumer_peer = nullptr; // Store the peer for YOLO data
@@ -25,6 +26,9 @@ simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger(
 #define display_gpu_id 0
 
 int main(int argc, char **args) {
+
+    // Initialize the YOLOv8 plugins
+    YOLOv8::initialize_plugins();
 
     gx_context *window = (gx_context *) malloc(sizeof(gx_context));
     *window = (gx_context){

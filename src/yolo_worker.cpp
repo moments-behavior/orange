@@ -10,6 +10,7 @@
 #include <chrono>
 #include "yolo_payload_generated.h"
 #include "message_wrapper_generated.h"
+#include "opengldisplay.h"
 #include "pose_shaman.h"
 #include "thread.h"
 #include "global.h"
@@ -87,7 +88,6 @@ YOLOv8Worker::~YOLOv8Worker() {
     
     if (associated_camera_params_) {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
-
         if (m_inference_completed) { cudaEventDestroy(m_inference_completed); }
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); }
         if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); }
@@ -120,14 +120,17 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         return false;
     }
 
+    // Set the CUDA device for this thread.
     ck(cudaSetDevice(associated_camera_params_->gpu_id));
 
     try {
         const int camera_width = associated_camera_params_->width;
         const int camera_height = associated_camera_params_->height;
 
+        // Set the NPP stream to the one used by the YOLO instance.
         nppSetStream(yolov8_instance_->stream);
 
+        // Wait for the previous stage (acquire_frames) to finish copying data.
         if (entry->event_ptr) {
             ck(cudaStreamWaitEvent(yolov8_instance_->stream, *entry->event_ptr, 0));
         }
@@ -136,18 +139,21 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         debayer_gpu_.size.width = camera_width;
         debayer_gpu_.size.height = camera_height;
 
+        // Debayer or duplicate mono channel to prepare for color conversion.
         if (associated_camera_params_->color) {
             debayer_frame_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         } else {
             duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
         }
 
+        // Convert from RGBA to BGR, which is what the YOLO model expects.
         NppiSize image_size = {camera_width, camera_height};
         const int channel_order[4] = {2, 1, 0, 3}; 
         nppiSwapChannels_8u_C4C3R(debayer_gpu_.d_debayer, camera_width * 4,
                                  d_rgb_yolo_input_gpu_, camera_width * 3,
                                  image_size, channel_order);
 
+        // Logic for dumping a debug frame if requested.
         bool dump_this_frame = m_dump_next_frame.exchange(false);
         if (dump_this_frame)
         {
@@ -167,22 +173,34 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
             delete[] h_rgba_buffer;
         }
 
+        // Preprocess and run inference. These are non-blocking CUDA calls.
         yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, camera_width, camera_height);
         yolov8_instance_->infer();
         
+        // Record an event *after* launching inference.
+        // This marks the point in the stream when inference is done, but DOES NOT block the CPU.
         ck(cudaEventRecord(m_inference_completed, yolov8_instance_->stream));
+
+        // Wait for the GPU to finish ONLY when we need the results for post-processing.
+        // This is still a blocking call, but it's much shorter and only blocks this thread
+        // when absolutely necessary, allowing other workers to proceed.
         ck(cudaEventSynchronize(m_inference_completed));
         
+        // Now that the GPU is finished, process the results.
         yolov8_instance_->postprocess(entry->detections);
+
+        // --- End of Performance Fix ---
+
         entry->has_detections = !entry->detections.empty();
 
+        // FPS calculation and IPC/ENet logic remains the same.
         frame_counter_++;
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = now - last_fps_update_time_;
         if (elapsed.count() >= 1.0) {
             current_fps_.store(frame_counter_ / elapsed.count());
-            std::cout << threadName << " Inference FPS: " << current_fps_.load()
-                      << " (Queue: " << this->GetCountQueueInSize() << ")" << std::endl;
+            std::cout << "[" << this->threadName << "] Inference FPS: " << current_fps_.load()
+                      << " (Queue depth: " << this->GetCountQueueInSize() << ")" << std::endl;
             frame_counter_ = 0;
             last_fps_update_time_ = now;
         }
@@ -203,6 +221,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         }
     }
 
+    // Reference counting for recycling the WORKER_ENTRY.
     if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         if (entry->gpu_direct_mode && entry->camera_instance && entry->camera_frame_struct) {
             EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);

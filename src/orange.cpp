@@ -8,6 +8,7 @@
 #include "gui.h"
 #include <sys/stat.h>
 #include <cuda.h>
+#include <cuda_runtime.h>
 #include "NvEncoder/NvCodecUtils.h"
 #include "network_base.h"
 #include "enet_thread.h"

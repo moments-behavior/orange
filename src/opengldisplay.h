@@ -1,4 +1,5 @@
 // src/opengldisplay.h
+
 #pragma once
 #include "threadworker.h"
 #include "image_processing.h"
@@ -30,6 +31,7 @@ protected:
     bool WorkerFunction(WORKER_ENTRY* f) override;
 
 private:
+    unsigned char* h_p2p_copy_buffer_;
     float *d_points_for_drawing_;
     unsigned int *d_skeleton_for_drawing_;
     unsigned char *d_display_resize_buffer_;

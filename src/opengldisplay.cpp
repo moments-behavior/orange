@@ -12,58 +12,53 @@
 #include <npp.h> // For nppSetStream
 #include "yolo_worker.h"
 
+#define display_gpu_id 0 // Centralize the display GPU ID for clarity
+
 COpenGLDisplay::COpenGLDisplay(const char* name, CameraParams *camera_params, CameraEachSelect *camera_select, unsigned char *display_buffer_cuda_pbo, INDIGOSignalBuilder* indigo_signal_builder, SafeQueue<WORKER_ENTRY*>& recycle_queue)
     : CThreadWorker(name),
       camera_params(camera_params),
       camera_select(camera_select),
       display_buffer_pbo_cuda_ptr_(display_buffer_cuda_pbo),
       indigo_signal_builder_(indigo_signal_builder),
+      h_p2p_copy_buffer_(nullptr), // Initialize the new host buffer
       d_points_for_drawing_(nullptr),
       d_skeleton_for_drawing_(nullptr),
       d_display_resize_buffer_(nullptr),
       m_stream(nullptr),
       m_recycle_queue(recycle_queue)
 {
-    std::cout << "========================================" << std::endl;
-    std::cout << "[OPENGL_DISPLAY] CONSTRUCTOR CALLED" << std::endl;
-    std::cout << "  Camera: " << camera_params->camera_name << std::endl;
-    std::cout << "  Downsample: " << camera_select->downsample << std::endl;
-    std::cout << "  Thread name: " << (name ? name : "null") << std::endl;
-    std::cout << "========================================" << std::endl;
+    std::cout << "[OPENGL_DISPLAY] CONSTRUCTOR for " << camera_params->camera_name << " on display GPU " << display_gpu_id << std::endl;
 
-    ck(cudaSetDevice(camera_params->gpu_id));
+    // *** Set context to the display GPU for all its resources ***
+    ck(cudaSetDevice(display_gpu_id));
     ck(cudaStreamCreate(&m_stream));
 
-    initalize_gpu_frame(&frame_original_gpu_, camera_params);
+    // Allocate buffers that will live on the display GPU
+    initalize_gpu_frame(&frame_original_gpu_, camera_params); // This will now be on the display GPU
     initialize_gpu_debayer(&debayer_gpu_, camera_params);
     ck(cudaMalloc(&d_points_for_drawing_, sizeof(float) * 4 * 2 * shaman::MAX_OBJECTS));
     ck(cudaMalloc(&d_skeleton_for_drawing_, sizeof(unsigned int) * 4 * 2));
-    ck(cudaMalloc(&d_display_resize_buffer_, camera_params->width * camera_params->height * 4));
+    ck(cudaMalloc(&d_display_resize_buffer_, (size_t)camera_params->width * camera_params->height * 4));
 
-    std::cout << "[OPENGL_DISPLAY] Constructor completed:" << std::endl;
-    std::cout << "  - Camera: " << camera_params->camera_name << std::endl;
-    std::cout << "  - Resolution: " << camera_params->width << "x" << camera_params->height << std::endl;
-    std::cout << "  - Downsample: " << camera_select->downsample << std::endl;
-    std::cout << "  - Buffer allocated: " << (d_display_resize_buffer_ != nullptr ? "Yes" : "No") << std::endl;
-    std::cout << "  - Stream created: " << (m_stream != nullptr ? "Yes" : "No") << std::endl;
+    // *** Allocate PINNED HOST MEMORY for efficient transfers ***
+    // This memory is accessible by the CPU and all GPUs
+    size_t staging_buffer_size = (size_t)camera_params->width * camera_params->height * 4;
+    ck(cudaHostAlloc(&h_p2p_copy_buffer_, staging_buffer_size, cudaHostAllocDefault));
+
+    std::cout << "[OPENGL_DISPLAY] Constructor completed for " << camera_params->camera_name << std::endl;
 }
 
 COpenGLDisplay::~COpenGLDisplay()
 {
-    std::cout << "========================================" << std::endl;
-    std::cout << "[OPENGL_DISPLAY] DESTRUCTOR CALLED" << std::endl;
-    if (camera_params) {
-        std::cout << "  Camera: " << camera_params->camera_name << std::endl;
-    }
-    std::cout << "========================================" << std::endl;
-    if (camera_params) {
-        ck(cudaSetDevice(camera_params->gpu_id));
-    }
+    std::cout << "[OPENGL_DISPLAY] DESTRUCTOR for " << (camera_params ? camera_params->camera_name : "unknown") << std::endl;
+    
+    // Set context to the display GPU to safely free its resources
+    ck(cudaSetDevice(display_gpu_id));
 
-    if (m_stream) {
-        cudaStreamDestroy(m_stream);
-    }
+    if (m_stream) cudaStreamDestroy(m_stream);
+    if (h_p2p_copy_buffer_) cudaFreeHost(h_p2p_copy_buffer_); // Use cudaFreeHost for pinned memory
 
+    // Free all device memory
     if (frame_original_gpu_.d_orig) cudaFree(frame_original_gpu_.d_orig);
     if (debayer_gpu_.d_debayer) cudaFree(debayer_gpu_.d_debayer);
     if (d_points_for_drawing_) cudaFree(d_points_for_drawing_);
@@ -76,26 +71,56 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
 {
     if (!f) return false;
 
-    ck(cudaSetDevice(camera_params->gpu_id));
+    // --- "LAST FRAME" OPTIMIZATION ---
+    // 1. We've been given one frame, 'f'. See if more recent ones are in the queue.
+    WORKER_ENTRY* latest_frame = f;
+    WORKER_ENTRY* discarded_frame = nullptr;
+
+    // 2. Quickly drain the queue, keeping only the very last item.
+    while ((discarded_frame = GetObjectFromQueueIn()) != nullptr) {
+    // A newer frame is available. The one we were holding is now outdated.
+    // We MUST release the one we are replacing.
+    if (latest_frame->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        if (latest_frame->gpu_direct_mode && latest_frame->camera_instance && latest_frame->camera_frame_struct) {
+            EVT_CameraQueueFrame(latest_frame->camera_instance, latest_frame->camera_frame_struct);
+        }
+        m_recycle_queue.push(latest_frame);
+    }
+    // The newly popped frame is now the latest one.
+    latest_frame = discarded_frame;
+}
+
+    // Now, 'latest_frame' holds the most recent frame. We process only this one.
+    // --- END OF "LAST FRAME" OPTIMIZATION ---
+
+    // *** Set context to the display GPU for all subsequent operations ***
+    ck(cudaSetDevice(display_gpu_id));
     nppSetStream(m_stream);
 
-    if (f->event_ptr) { // Wait for acquire_frames to be ready
-        ck(cudaStreamWaitEvent(m_stream, *f->event_ptr, 0));
+    // Wait for the data in the latest_frame to be ready on its source GPU
+    if (latest_frame->event_ptr) {
+        ck(cudaStreamWaitEvent(m_stream, *latest_frame->event_ptr, 0));
     }
 
-    // If this frame is supposed to have detections, we MUST wait for the YOLO worker.
-    if (f->has_detections && camera_select->yolo) {
-        // MODIFICATION: Add a spin-wait loop
-        // This ensures we don't check the detections vector until the YOLO thread is truly done.
-        while (!f->detections_ready.load()) {
-            // You can add a small sleep here to prevent busy-waiting, e.g., usleep(100);
-            // but for low-latency, a spin-wait is often acceptable.
-        }
-        std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": YOLO CPU post-processing complete. Proceeding to draw." << std::endl;
+    // --- STAGED COPY (DEVICE -> HOST -> DEVICE) ---
+    // This section safely moves the image data to the display GPU.
+    unsigned char* source_image_ptr_on_display_gpu = nullptr;
+    size_t frame_size = (size_t)camera_params->width * camera_params->height;
+
+    if (camera_params->gpu_id != display_gpu_id) {
+        // STAGE 1: Copy from Camera GPU's device memory to pinned Host memory.
+        ck(cudaMemcpyAsync(h_p2p_copy_buffer_, latest_frame->d_image, frame_size, cudaMemcpyDeviceToHost, m_stream));
+        
+        // STAGE 2: Copy from pinned Host memory to our local Device memory on the display GPU.
+        ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, h_p2p_copy_buffer_, frame_size, cudaMemcpyHostToDevice, m_stream));
+    } else {
+        // The frame is already on the display GPU, do a simple device-to-device copy.
+        ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, latest_frame->d_image, frame_size, cudaMemcpyDeviceToDevice, m_stream));
     }
+    source_image_ptr_on_display_gpu = frame_original_gpu_.d_orig;
+    // --- END OF STAGED COPY ---
 
-    frame_original_gpu_.d_orig = f->d_image;
-
+    // Now, all subsequent operations use buffers that are guaranteed to be on the display GPU.
     if (camera_params->color){
         debayer_frame_gpu(camera_params, &frame_original_gpu_, &debayer_gpu_);
     } else {
@@ -185,13 +210,14 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     }
 
     ck(cudaStreamSynchronize(m_stream));
-
-    if (f->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-        if (f->gpu_direct_mode && f->camera_instance && f->camera_frame_struct) {
-            EVT_CameraQueueFrame(f->camera_instance, f->camera_frame_struct);
+    
+    // Final release of the one frame we actually used.
+    if (latest_frame->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        if (latest_frame->gpu_direct_mode && latest_frame->camera_instance && latest_frame->camera_frame_struct) {
+            EVT_CameraQueueFrame(latest_frame->camera_instance, latest_frame->camera_frame_struct);
         }
-        m_recycle_queue.push(f);
+        m_recycle_queue.push(latest_frame);
     }
 
-    return false;
+    return false; // We handled the object, do not put it on the output queue.
 }

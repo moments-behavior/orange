@@ -71,7 +71,7 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
 {
     if (!f) return false;
 
-    // --- "LAST FRAME" OPTIMIZATION ---
+    // Use just the last frame in a queue
     // 1. We've been given one frame, 'f'. See if more recent ones are in the queue.
     WORKER_ENTRY* latest_frame = f;
     WORKER_ENTRY* discarded_frame = nullptr;
@@ -90,11 +90,12 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     latest_frame = discarded_frame;
 }
 
-    // Now, 'latest_frame' holds the most recent frame. We process only this one.
-    // --- END OF "LAST FRAME" OPTIMIZATION ---
+    // Now, 'latest_frame' holds the most recent frame. We process only this one.-
 
-    // *** Set context to the display GPU for all subsequent operations ***
+    // Set context to the display GPU for all subsequent operations
     ck(cudaSetDevice(display_gpu_id));
+
+    // Use this worker's stream
     nppSetStream(m_stream);
 
     // Wait for the data in the latest_frame to be ready on its source GPU
@@ -102,7 +103,21 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         ck(cudaStreamWaitEvent(m_stream, *latest_frame->event_ptr, 0));
     }
 
-    // --- STAGED COPY (DEVICE -> HOST -> DEVICE) ---
+    // If this frame should have detections, we tell our GPU stream to wait for the
+    // YOLO worker's yolo_completion_event before proceeding.
+    if (latest_frame->has_detections && latest_frame->yolo_completion_event) {
+        ck(cudaStreamWaitEvent(m_stream, *latest_frame->yolo_completion_event, 0));
+    }
+
+    // Now that GPU work is synchronized, also wait for the CPU-side post-processing to finish.
+    // This ensures the detections vector is populated.
+    while (latest_frame->has_detections && camera_select->yolo && !latest_frame->detections_ready.load(std::memory_order_acquire)) {
+        // This spin-wait will now be very short, as it only waits for the CPU part.
+    }
+
+    // We need to use staged copying to ensure the image data is safely moved to the display GPU
+    // This is necessary when the camera GPU is different from the display GPU because we don't have P2P on this motherboard and no NVLink
+    // TODO: If the camera GPU is the same as the display GPU, we can skip this staged copy.
     // This section safely moves the image data to the display GPU.
     unsigned char* source_image_ptr_on_display_gpu = nullptr;
     size_t frame_size = (size_t)camera_params->width * camera_params->height;
@@ -118,7 +133,6 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         ck(cudaMemcpyAsync(frame_original_gpu_.d_orig, latest_frame->d_image, frame_size, cudaMemcpyDeviceToDevice, m_stream));
     }
     source_image_ptr_on_display_gpu = frame_original_gpu_.d_orig;
-    // --- END OF STAGED COPY ---
 
     // Now, all subsequent operations use buffers that are guaranteed to be on the display GPU.
     if (camera_params->color){

@@ -82,20 +82,30 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     if (f->event_ptr) { // Wait for acquire_frames to be ready
         ck(cudaStreamWaitEvent(m_stream, *f->event_ptr, 0));
     }
-
+    
+    // --- START: MODIFIED LOGIC ---
+    // If this frame is supposed to have detections, we MUST wait for the YOLO worker.
     if (f->has_detections && camera_select->yolo) {
         YOLOv8Worker* yolo_worker = nullptr;
+        // Find the YOLO worker that corresponds to this display instance
         for (auto* worker : yolo_workers) {
-             // A simple way to associate workers is by the camera they are assigned to
-            if (worker && worker->GetCameraParams()->camera_id == this->camera_params->camera_id) {
+             if (worker && worker->GetCameraParams()->camera_id == this->camera_params->camera_id) {
                 yolo_worker = worker;
                 break;
             }
         }
+
         if (yolo_worker) {
+            std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": Waiting for YOLO inference to complete." << std::endl;
+            // *** THIS IS THE FIX ***
+            // Wait for the specific event that signals YOLO inference is done for this frame.
             ck(cudaStreamWaitEvent(m_stream, yolo_worker->m_inference_completed, 0));
+            std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": YOLO inference complete. Proceeding to draw." << std::endl;
+        } else {
+             std::cerr << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": has_detections is true, but no corresponding YOLO worker was found!" << std::endl;
         }
     }
+    // --- END: MODIFIED LOGIC ---
     
     frame_original_gpu_.d_orig = f->d_image;
     
@@ -106,25 +116,30 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
     }
 
     if (f->has_detections) {
+        std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": Detected " << f->detections.size() << " objects. Preparing to draw boxes." << std::endl;
         std::vector<float> h_points;
         h_points.reserve(f->detections.size() * 4 * 2);
 
         for(const auto& obj : f->detections) {
+            // Top line
             h_points.push_back(obj.rect.x);
             h_points.push_back(obj.rect.y);
             h_points.push_back(obj.rect.x + obj.rect.width);
             h_points.push_back(obj.rect.y);
 
+            // Right line
             h_points.push_back(obj.rect.x + obj.rect.width);
             h_points.push_back(obj.rect.y);
             h_points.push_back(obj.rect.x + obj.rect.width);
             h_points.push_back(obj.rect.y + obj.rect.height);
 
+            // Bottom line
             h_points.push_back(obj.rect.x + obj.rect.width);
             h_points.push_back(obj.rect.y + obj.rect.height);
             h_points.push_back(obj.rect.x);
             h_points.push_back(obj.rect.y + obj.rect.height);
-
+            
+            // Left line
             h_points.push_back(obj.rect.x);
             h_points.push_back(obj.rect.y + obj.rect.height);
             h_points.push_back(obj.rect.x);
@@ -132,6 +147,7 @@ bool COpenGLDisplay::WorkerFunction(WORKER_ENTRY* f)
         }
 
         if (!h_points.empty()) {
+            std::cout << "[OPENGL_DISPLAY] Frame " << f->frame_id << ": Copying " << h_points.size() / 2 << " points to GPU and launching draw kernel." << std::endl;
             ck(cudaMemcpyAsync(d_points_for_drawing_, h_points.data(), h_points.size() * sizeof(float), cudaMemcpyHostToDevice, m_stream));
             gpu_draw_box(debayer_gpu_.d_debayer, camera_params->width, camera_params->height, d_points_for_drawing_, m_stream);
         }

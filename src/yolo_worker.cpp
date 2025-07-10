@@ -1,4 +1,4 @@
-// src/yolo_worker.cpp - FINAL CORRECTED VERSION
+// src/yolo_worker.cpp
 #include "yolo_worker.h"
 #include "kernel.cuh"
 #include <cuda_runtime_api.h>
@@ -27,7 +27,6 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
       enet_host_context_(nullptr),
       enet_target_peer_(nullptr),
       fb_builder_(nullptr),
-      d_rgb_yolo_input_gpu_(nullptr),
       last_fps_update_time_(std::chrono::steady_clock::now()),
       frame_counter_(0),
       current_fps_(0.0),
@@ -62,9 +61,6 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
         initalize_gpu_frame(&frame_original_gpu_, associated_camera_params_);
         initialize_gpu_debayer(&debayer_gpu_, associated_camera_params_);
         
-        size_t bgr_buffer_size = (size_t)associated_camera_params_->width * associated_camera_params_->height * 3;
-        ck(cudaMalloc(&d_rgb_yolo_input_gpu_, bgr_buffer_size));
-
         if (associated_camera_select_->yolo && associated_camera_select_->send_yolo_via_ipc) {
             shaman_ipc_queue_ = new shaman::SharedBoxQueue(true /* is_writer */);
         }
@@ -90,8 +86,6 @@ YOLOv8Worker::~YOLOv8Worker() {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
         if (m_inference_completed) { cudaEventDestroy(m_inference_completed); }
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); }
-        if (frame_original_gpu_.d_orig) { cudaFree(frame_original_gpu_.d_orig); }
-        if (d_rgb_yolo_input_gpu_) { cudaFree(d_rgb_yolo_input_gpu_); }
         if (yolov8_instance_) { delete yolov8_instance_; }
     }
     
@@ -141,17 +135,13 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
 
         // Debayer or duplicate mono channel to prepare for color conversion.
         if (associated_camera_params_->color) {
+            // If color, debayer to RGBA first, then our kernel will handle the rest.
             debayer_frame_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
+            yolov8_instance_->preprocess_gpu(debayer_gpu_.d_debayer, camera_width, camera_height, true);
         } else {
-            duplicate_channel_gpu(associated_camera_params_, &frame_original_gpu_, &debayer_gpu_);
+            // If mono, pass the raw mono buffer directly to the kernel.
+            yolov8_instance_->preprocess_gpu(frame_original_gpu_.d_orig, camera_width, camera_height, false);
         }
-
-        // Convert from RGBA to BGR, which is what the YOLO model expects.
-        NppiSize image_size = {camera_width, camera_height};
-        const int channel_order[4] = {2, 1, 0, 3}; 
-        nppiSwapChannels_8u_C4C3R(debayer_gpu_.d_debayer, camera_width * 4,
-                                 d_rgb_yolo_input_gpu_, camera_width * 3,
-                                 image_size, channel_order);
 
         // Logic for dumping a debug frame if requested.
         bool dump_this_frame = m_dump_next_frame.exchange(false);
@@ -174,7 +164,6 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         }
 
         // Preprocess and run inference. These are non-blocking CUDA calls.
-        yolov8_instance_->preprocess_gpu(d_rgb_yolo_input_gpu_, camera_width, camera_height);
         yolov8_instance_->infer();
         
         // Record an event *after* launching inference.

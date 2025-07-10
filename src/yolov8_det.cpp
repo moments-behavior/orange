@@ -13,14 +13,7 @@ void YOLOv8::initialize_plugins() {
 
 YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
 {
-    img_width = width;
-    img_height = height;
-
     this->stream = nullptr;
-    // this->d_bgr_temp = nullptr; 
-    this->d_temp = nullptr;
-    this->d_boarder = nullptr;
-    this->d_float = nullptr;
     this->d_planar = nullptr;
     this->engine = nullptr;
     this->runtime = nullptr;
@@ -93,15 +86,6 @@ YOLOv8::YOLOv8(const std::string& engine_file_path, int width, int height)
     auto& in_binding = this->input_bindings[0];
     inp_h_int = in_binding.dims.d[2];
     inp_w_int = in_binding.dims.d[3];
-    
-    const float inp_h = (float)inp_h_int;
-    const float inp_w = (float)inp_w_int;
-    float img_width_float = img_width;
-    float img_height_float = img_height;
-
-    float r = std::min(inp_h / img_height_float, inp_w / img_width_float);
-    padw = std::round(img_width_float * r);
-    padh = std::round(img_height_float * r);
 }
 
 YOLOv8::~YOLOv8()
@@ -114,25 +98,14 @@ YOLOv8::~YOLOv8()
     if (this->runtime) { delete this->runtime; }
     for (size_t i = 0; i < this->device_ptrs.size(); ++i) { if (this->device_ptrs[i]) cudaFree(this->device_ptrs[i]); }
     for (size_t i = 0; i < this->host_ptrs.size(); ++i) { if (this->host_ptrs[i]) cudaFreeHost(this->host_ptrs[i]); }
-    if (this->d_planar) { cudaFree(this->d_planar); }
-    if (this->d_float) { cudaFree(this->d_float); }
-    if (this->d_boarder) { cudaFree(this->d_boarder); }
-    if (this->d_temp) { cudaFree(this->d_temp); }
-    // if (this->d_bgr_temp) { cudaFree(this->d_bgr_temp); }
     if (this->stream) { cudaStreamDestroy(this->stream); }
 }
 
-void YOLOv8::make_pipe(bool warmup)
+void YOLOv8::make_pipe(bool warmup, int max_width, int max_height)
 {
     if (this->stream == nullptr) {
         CHECK(cudaStreamCreate(&this->stream));
     }
-    
-    // CHECK(cudaMalloc((void **)&this->d_bgr_temp, img_width * img_height * 3 * sizeof(unsigned char)));
-    CHECK(cudaMalloc((void **)&this->d_temp, padw * padh * 3 * sizeof(unsigned char)));
-    CHECK(cudaMalloc((void **)&this->d_boarder, inp_w_int * inp_h_int * 3 * sizeof(unsigned char)));
-    CHECK(cudaMalloc((void **)&this->d_float, sizeof(float) * inp_w_int * inp_h_int * 3));
-    CHECK(cudaMalloc((void **)&this->d_planar, sizeof(float) * inp_w_int * inp_h_int * 3));
 
     for (size_t i = 0; i < this->input_bindings.size(); ++i) {
         auto& bindings = this->input_bindings[i];
@@ -165,48 +138,26 @@ void YOLOv8::make_pipe(bool warmup)
     }
 }
 
-void YOLOv8::preprocess_gpu(unsigned char *d_bgr, int source_width, int source_height)
+void YOLOv8::preprocess_gpu(unsigned char *d_src, int source_width, int source_height, bool is_color)
 {
     const float inp_h  = (float)inp_h_int;
     const float inp_w  = (float)inp_w_int;
-    float       current_img_width  = (float)source_width;
-    float       current_img_height = (float)source_height;
-    float r    = std::min(inp_h / current_img_height, inp_w / current_img_width);
-    int   current_padw = std::round(current_img_width * r);
-    int   current_padh = std::round(current_img_height * r);
-
-    NppiSize src_img_size = {source_width, source_height};
-    NppiRect src_roi = {0, 0, source_width, source_height};
-    NppiSize resized_output_size = {current_padw, current_padh};
-    NppiRect resized_output_roi = {0, 0, current_padw, current_padh};
-
-    // The first conversion from RGBA to BGR is removed. We now start with resizing the provided BGR image.
-    nppiResize_8u_C3R(d_bgr, source_width * 3, src_img_size, src_roi, this->d_temp, current_padw * 3, resized_output_size, resized_output_roi, NPPI_INTER_SUPER);
-
-    NppiSize final_input_tensor_size = {inp_w_int, inp_h_int};
-    float dw_border = (inp_w - current_padw) / 2.0f;
-    float dh_border = (inp_h - current_padh) / 2.0f;
-    int top_border    = static_cast<int>(std::round(dh_border - 0.1f));
-    int left_border   = static_cast<int>(std::round(dw_border - 0.1f));
-
-    Npp8u border_val[3] = {114, 114, 114};
-    nppiCopyConstBorder_8u_C3R(this->d_temp, current_padw * 3, resized_output_size, this->d_boarder, inp_w_int * 3, final_input_tensor_size, top_border, left_border, border_val);
-
-    nppiConvert_8u32f_C3R(this->d_boarder, inp_w_int * 3, this->d_float, inp_w_int * 3 * sizeof(float), final_input_tensor_size);
-
-    Npp32f norm_scale_factor[3] = {255.0f, 255.0f, 255.0f};
-    nppiDivC_32f_C3IR(norm_scale_factor, this->d_float, inp_w_int * 3 * sizeof(float), final_input_tensor_size);
-
-    float * const planar_output_channels[3] {this->d_planar, this->d_planar + inp_w_int * inp_h_int, this->d_planar + (inp_w_int * inp_h_int * 2)};
-    nppiCopy_32f_C3P3R(this->d_float, inp_w_int * 3 * sizeof(float), planar_output_channels, inp_w_int * sizeof(float), final_input_tensor_size);
+    float r = std::min(inp_h / (float)source_height, inp_w / (float)source_width);
+    
+    launch_optimized_yolo_preprocess(
+        d_src,
+        (float*)this->device_ptrs[0], //directly write to device pointer
+        source_width, source_height,
+        inp_w_int, inp_h_int,
+        is_color,
+        this->stream
+    );
 
     this->pparam.ratio  = 1.0f / r;
-    this->pparam.dw     = (inp_w - current_padw) / 2.0f;
-    this->pparam.dh     = (inp_h - current_padh) / 2.0f;
-    this->pparam.height = current_img_height;
-    this->pparam.width  = current_img_width;
-
-    CHECK(cudaMemcpyAsync(this->device_ptrs[0], this->d_planar, inp_h_int * inp_w_int * 3 * sizeof(float), cudaMemcpyDeviceToDevice, this->stream));
+    this->pparam.dw     = (inp_w - source_width * r) / 2.0f;
+    this->pparam.dh     = (inp_h - source_height * r) / 2.0f;
+    this->pparam.width  = (float)source_width;
+    this->pparam.height = (float)source_height;
 }
 
 

@@ -2,6 +2,7 @@
 #ifndef DETECT_END2END_YOLOV8_HPP
 #define DETECT_END2END_YOLOV8_HPP
 #include "NvInferPlugin.h"
+#include "optimized_yolo_preprocess.h"
 #include "common.hpp"
 #include "fstream"
 #include <nppi.h>
@@ -14,9 +15,9 @@ public:
     static void initialize_plugins();
     explicit YOLOv8(const std::string &engine_file_path, int width, int height);
     ~YOLOv8();
-
-    void make_pipe(bool warmup = true);
-    void preprocess_gpu(unsigned char *d_bgr, int source_width, int source_height);
+    // We don't yet have cameras with larger resolutions than 4512x4512
+    void make_pipe(bool warmup = true, int max_width=4512, int max_height=4512);
+    void preprocess_gpu(unsigned char *d_src, int source_width, int source_height, bool is_color);
     void infer();
     void postprocess(std::vector<Object> &objs);
     static void draw_objects(const cv::Mat&                                image,
@@ -42,16 +43,7 @@ public:
     cudaStream_t stream = nullptr;
 
 private:
-    // FIX: Added a 3-channel buffer for intermediate conversion
-    // unsigned char *d_bgr_temp = nullptr;
-    unsigned char *d_temp = nullptr;
-    unsigned char *d_boarder = nullptr;
-    float *d_float = nullptr;
     float *d_planar = nullptr;
-    int img_width;
-    int img_height;
-    int padw;
-    int padh;
 
     nvinfer1::ICudaEngine *engine = nullptr;
     nvinfer1::IRuntime *runtime = nullptr;

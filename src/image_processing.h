@@ -38,6 +38,9 @@ typedef struct {
     // Event for synchronization between workers. Now a pointer.
     cudaEvent_t* event_ptr; 
 
+    // New event specifically for YOLO completion
+    cudaEvent_t* yolo_completion_event; 
+
 } WORKER_ENTRY;
 
 

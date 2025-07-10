@@ -52,8 +52,6 @@ YOLOv8Worker::YOLOv8Worker(const char* name,
                                      associated_camera_params_->width,
                                      associated_camera_params_->height);
         yolov8_instance_->make_pipe(true);
-        
-        ck(cudaEventCreate(&m_inference_completed));
 
         std::cout << "[YOLOv8 MODEL INFO] " << name << " expects input size: "
                   << yolov8_instance_->inp_w_int << "x" << yolov8_instance_->inp_h_int << std::endl;
@@ -84,7 +82,6 @@ YOLOv8Worker::~YOLOv8Worker() {
     
     if (associated_camera_params_) {
         ck(cudaSetDevice(associated_camera_params_->gpu_id));
-        if (m_inference_completed) { cudaEventDestroy(m_inference_completed); }
         if (debayer_gpu_.d_debayer) { cudaFree(debayer_gpu_.d_debayer); }
         if (yolov8_instance_) { delete yolov8_instance_; }
     }
@@ -165,20 +162,26 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
 
         // Preprocess and run inference. These are non-blocking CUDA calls.
         yolov8_instance_->infer();
-        
-        // Record an event *after* launching inference.
-        // This marks the point in the stream when inference is done, but DOES NOT block the CPU.
-        ck(cudaEventRecord(m_inference_completed, yolov8_instance_->stream));
 
-        // Wait for the GPU to finish ONLY when we need the results for post-processing.
-        // This is still a blocking call, but it's much shorter and only blocks this thread
-        // when absolutely necessary, allowing other workers to proceed.
-        ck(cudaEventSynchronize(m_inference_completed));
+        if (entry->yolo_completion_event) {
+            ck(cudaEventRecord(*entry->yolo_completion_event, yolov8_instance_->stream));
+        }
+
+        // record per-frame event for synchronization
+        ck(cudaStreamSynchronize(yolov8_instance_->stream));
         
         // Now that the GPU is finished, process the results.
         yolov8_instance_->postprocess(entry->detections);
 
-        // --- End of Performance Fix ---
+        if (!entry->detections.empty()) {
+            std::cout << "[YOLO_WORKER] Frame " << entry->frame_id << ": Post-processed " << entry->detections.size() << " detections." << std::endl;
+            for(size_t i = 0; i < entry->detections.size(); ++i) {
+                const auto& obj = entry->detections[i];
+                std::cout << "  - Det " << i << ": Label=" << obj.label << ", Prob=" << obj.prob 
+                          << ", Rect=[x:" << obj.rect.x << ", y:" << obj.rect.y 
+                          << ", w:" << obj.rect.width << ", h:" << obj.rect.height << "]" << std::endl;
+            }
+        }
 
         entry->has_detections = !entry->detections.empty();
 

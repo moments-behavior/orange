@@ -76,7 +76,9 @@ int main(int argc, char **args) {
     SafeQueue<WORKER_ENTRY*>* free_entries_queue = nullptr;
     SafeQueue<WORKER_ENTRY*>* recycle_queue = nullptr;
     std::vector<cudaEvent_t> event_pool;
+    std::vector<cudaEvent_t> yolo_event_pool;
     SafeQueue<cudaEvent_t*>* free_events_queue = nullptr;
+    SafeQueue<cudaEvent_t*>* yolo_events_queue = nullptr;
     COpenGLDisplay** openGLDisplayWorkers = nullptr;
     GPUVideoEncoder** gpuVideoEncoders = nullptr; // Define pointer, but allocate later
     ImageWriterWorker* image_writer = new ImageWriterWorker("ImageSaverThread");
@@ -413,7 +415,8 @@ int main(int argc, char **args) {
                             image_writer,
                             free_entries_queue,
                             free_events_queue,
-                            recycle_queue
+                            recycle_queue,
+                            yolo_events_queue
                         );
                     }
                 }
@@ -1082,6 +1085,15 @@ int main(int argc, char **args) {
                             free_events_queue->push(&event_pool[i]);
                         }
                         std::cout << "Initialized CUDA event pool with " << EVENT_POOL_SIZE << " events." << std::endl;
+
+                        yolo_event_pool.resize(EVENT_POOL_SIZE);
+                        yolo_events_queue = new SafeQueue<cudaEvent_t*>();
+                        for (int i = 0; i < EVENT_POOL_SIZE; ++i) {
+                            ck(cudaEventCreateWithFlags(&yolo_event_pool[i], cudaEventDisableTiming));
+                            yolo_events_queue->push(&yolo_event_pool[i]);
+                        }
+                        std::cout << "Initialized YOLO CUDA event pool with " << EVENT_POOL_SIZE << " events." << std::endl;
+
                         openGLDisplayWorkers = new COpenGLDisplay*[num_cameras]();
                         gpuVideoEncoders = new GPUVideoEncoder*[num_cameras]();  // This should already exist
                         tex = new GL_Texture[num_cameras];
@@ -1166,7 +1178,7 @@ int main(int argc, char **args) {
                         for (int i = 0; i < num_cameras; i++) {
                             if (openGLDisplayWorkers[i]) openGLDisplayWorkers[i]->StartThread();
                             if (yolo_workers[i]) yolo_workers[i]->StartThread();
-                            if (gpuVideoEncoders[i]) gpuVideoEncoders[i]->StartThread();  // THIS IS CRITICAL
+                            if (gpuVideoEncoders[i]) gpuVideoEncoders[i]->StartThread();
                         }
                     
                         // Setup camera streaming
@@ -1202,7 +1214,8 @@ int main(int argc, char **args) {
                                 image_writer,                      // ImageWriterWorker* image_writer
                                 free_entries_queue,                // SafeQueue<WORKER_ENTRY*>* free_entries_queue
                                 free_events_queue,                // SafeQueue<cudaEvent_t*>* free_events_queue
-                                recycle_queue                      // SafeQueue<WORKER_ENTRY*>* recycle_queue
+                                recycle_queue,                      // SafeQueue<WORKER_ENTRY*>* recycle_queue,
+                                yolo_events_queue               // SafeQueue<cudaEvent_t*>* yolo_events_queue
                             );
                         }
                     } else {
@@ -1269,10 +1282,20 @@ int main(int argc, char **args) {
                             delete free_events_queue;
                             free_events_queue = nullptr;
                         }
+                        if (yolo_events_queue) {
+                            cudaEvent_t* ev = nullptr;
+                            while(yolo_events_queue->pop(ev)) {}
+                            delete yolo_events_queue;
+                            yolo_events_queue = nullptr;
+                        }
                         for (size_t i = 0; i < event_pool.size(); ++i) {
                             cudaEventDestroy(event_pool[i]);
                         }
                         event_pool.clear();
+                        for (size_t i = 0; i <yolo_event_pool.size(); ++i) {
+                            cudaEventDestroy(yolo_event_pool[i]);
+                        }
+                        yolo_event_pool.clear();
                         std::cout << "Cleaned up CUDA event pool." << std::endl;
                     }
                 }

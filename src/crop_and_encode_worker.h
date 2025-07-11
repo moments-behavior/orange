@@ -3,12 +3,12 @@
 
 #include "threadworker.h"
 #include "video_capture.h"
+#include "gpu_video_encoder.h" // For Writer struct
 #include "FFmpegWriter.h"
 #include "NvEncoder/NvEncoderCuda.h"
 #include "image_processing.h"
 #include <chrono>
 #include <fstream>
-#include "gpu_video_encoder.h"
 
 class CropAndEncodeWorker : public CThreadWorker<WORKER_ENTRY> {
 public:
@@ -26,6 +26,8 @@ private:
     unsigned char* d_cropped_bgr_ = nullptr;
     unsigned char* d_yuv_buffer_ = nullptr;
     int encoder_pitch_ = 0;
+    cudaStream_t m_stream = nullptr;
+    int frame_counter_ = 0;
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };
 

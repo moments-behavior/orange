@@ -17,13 +17,13 @@ void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_point
 
 void gpu_crop_and_resize(
     const unsigned char* d_src,
-    unsigned char* d_dst,
-    int src_width,
-    int src_height,
-    pose::Rect crop_rect,
-    int dst_width,
-    int dst_height,
+    unsigned char* d_dst_bgr,
+    int src_width, int src_height,
+    pose::Rect detection_rect,
+    int dst_width, int dst_height,
     cudaStream_t stream
 );
+
+__global__ void mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* src_mono, int width, int height);
 
 #endif // KERNEL_H

@@ -61,60 +61,76 @@ void GSPRINT4521_Convert(unsigned char* dest, const unsigned char* src, int widt
 }
 
 __global__ void crop_and_resize_kernel(
-    const unsigned char* src,
-    unsigned char* dst,
-    int src_width,
-    int src_height,
-    float crop_x,
-    float crop_y,
-    float crop_w,
-    float crop_h,
-    int dst_width,
-    int dst_height
+    const unsigned char* d_src,
+    unsigned char* d_dst_bgr,
+    int src_width, int src_height,
+    int crop_x, int crop_y, int crop_w, int crop_h,
+    int dst_width, int dst_height
 ) {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (x < dst_width && y < dst_height) {
-        // Map destination pixel to source coordinates
-        float src_x = crop_x + (x / (float)dst_width) * crop_w;
-        float src_y = crop_y + (y / (float)dst_height) * crop_h;
-
-        // Simple nearest-neighbor sampling for now
-        int sx = static_cast<int>(src_x);
-        int sy = static_cast<int>(src_y);
-
-        if (sx >= 0 && sx < src_width && sy >= 0 && sy < src_height) {
-            // Assuming BGR for simplicity. A real implementation would handle different formats.
-            int src_idx = (sy * src_width + sx) * 3;
-            int dst_idx = (y * dst_width + x) * 3;
-            dst[dst_idx + 0] = src[src_idx + 0]; // B
-            dst[dst_idx + 1] = src[src_idx + 1]; // G
-            dst[dst_idx + 2] = src[src_idx + 2]; // R
-        }
-    }
+    int dst_x = blockIdx.x * blockDim.x + threadIdx.x;
+    int dst_y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (dst_x >= dst_width || dst_y >= dst_height) return;
+    
+    // Calculate source coordinates with bilinear interpolation
+    float scale_x = (float)crop_w / dst_width;
+    float scale_y = (float)crop_h / dst_height;
+    
+    float src_x_f = crop_x + dst_x * scale_x;
+    float src_y_f = crop_y + dst_y * scale_y;
+    
+    // Clamp to source boundaries
+    src_x_f = fmaxf(0.0f, fminf(src_width - 1.0f, src_x_f));
+    src_y_f = fmaxf(0.0f, fminf(src_height - 1.0f, src_y_f));
+    
+    int src_x = (int)src_x_f;
+    int src_y = (int)src_y_f;
+    
+    // Simple nearest neighbor sampling (can be enhanced to bilinear)
+    unsigned char pixel_value = d_src[src_y * src_width + src_x];
+    
+    // Convert mono to BGR (duplicate to all 3 channels)
+    int dst_idx = (dst_y * dst_width + dst_x) * 3;
+    d_dst_bgr[dst_idx + 0] = pixel_value; // B
+    d_dst_bgr[dst_idx + 1] = pixel_value; // G  
+    d_dst_bgr[dst_idx + 2] = pixel_value; // R
 }
 
 void gpu_crop_and_resize(
     const unsigned char* d_src,
-    unsigned char* d_dst,
-    int src_width,
-    int src_height,
-    pose::Rect crop_rect,
-    int dst_width,
-    int dst_height,
+    unsigned char* d_dst_bgr,
+    int src_width, int src_height,
+    pose::Rect detection_rect,
+    int dst_width, int dst_height,
     cudaStream_t stream
 ) {
-    dim3 threads_per_block(16, 16);
-    dim3 num_blocks((dst_width + threads_per_block.x - 1) / threads_per_block.x,
-                    (dst_height + threads_per_block.y - 1) / threads_per_block.y);
-
-    crop_and_resize_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
-        d_src, d_dst, src_width, src_height,
-        crop_rect.x, crop_rect.y, crop_rect.width, crop_rect.height,
+    // Extract crop region from detection
+    int crop_x = (int)detection_rect.x;
+    int crop_y = (int)detection_rect.y;
+    int crop_w = (int)detection_rect.width;
+    int crop_h = (int)detection_rect.height;
+    
+    // Clamp crop region to source image bounds
+    crop_x = max(0, min(src_width - 1, crop_x));
+    crop_y = max(0, min(src_height - 1, crop_y));
+    crop_w = min(crop_w, src_width - crop_x);
+    crop_h = min(crop_h, src_height - crop_y);
+    
+    dim3 block(16, 16);
+    dim3 grid((dst_width + block.x - 1) / block.x, 
+              (dst_height + block.y - 1) / block.y);
+    
+    crop_and_resize_kernel<<<grid, block, 0, stream>>>(
+        d_src, d_dst_bgr,
+        src_width, src_height,
+        crop_x, crop_y, crop_w, crop_h,
         dst_width, dst_height
     );
+    
+    cudaError_t err = cudaGetLastError();
+    if(err != cudaSuccess) printf("crop_and_resize_kernel failed: %s\n", cudaGetErrorString(err));
 }
+
 
 __global__ void Mono8ToRGBMonoKernel(unsigned char* dest, const unsigned char* src, int width, int height)
 {
@@ -280,3 +296,20 @@ void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_point
 }
 
 
+__global__ void mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* src_mono, int width, int height)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (x < width && y < height) {
+        int mono_idx = y * width + x;
+        int rgb_idx = (y * width + x) * 3;
+        
+        unsigned char pixel_value = src_mono[mono_idx];
+        
+        // Duplicate grayscale value to all 3 RGB channels
+        dst_rgb[rgb_idx + 0] = pixel_value; // R
+        dst_rgb[rgb_idx + 1] = pixel_value; // G
+        dst_rgb[rgb_idx + 2] = pixel_value; // B
+    }
+}

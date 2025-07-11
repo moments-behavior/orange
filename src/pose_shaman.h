@@ -1,7 +1,9 @@
 #include "shaman.h"
 #include "common.hpp"
+#include <vector>
+#include <algorithm> // For std::copy
 
-inline std::vector<shaman::Object> conv_shaman(std::vector<pose::Object>& objs) {
+inline std::vector<shaman::Object> conv_shaman(const std::vector<pose::Object>& objs) {
 
     std::vector<shaman::Object> shaman_objs;
     shaman_objs.reserve(objs.size());
@@ -14,11 +16,14 @@ inline std::vector<shaman::Object> conv_shaman(std::vector<pose::Object>& objs) 
         o.rect.height = p.rect.height;
         o.label = p.label;
         o.prob = p.prob;
-        std::copy(p.kps.begin(), p.kps.end(), o.kps);
+
+        // Copy from the C-style array using the num_kps member
+        if (p.num_kps > 0) {
+            std::copy(p.kps, p.kps + p.num_kps, o.kps);
+        }
+        o.num_kps = p.num_kps;
         
         shaman_objs.push_back(std::move(o));
     }
     return shaman_objs;
-
 }
-

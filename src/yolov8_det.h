@@ -6,6 +6,7 @@
 #include "common.hpp"
 #include "fstream"
 #include <nppi.h>
+#include <opencv2/opencv.hpp>
 
 using namespace pose;
 

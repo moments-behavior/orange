@@ -234,6 +234,8 @@ echo "========================================"
 # Compile CUDA kernels with appropriate flags
 NVCC_FLAGS="-arch=sm_86"
 
+NVCC_FLAGS="$NVCC_FLAGS -I$TENSORRT_ROOT/include"
+
 if [ $DEBUG -eq 1 ]; then
   NVCC_FLAGS="$NVCC_FLAGS -G -g -O0"
 else

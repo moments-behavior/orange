@@ -1,4 +1,5 @@
 #include "kernel.cuh"
+#include "common.hpp"
 
 /* Sensor process data:
     *Every group of 16 lines, change order to (0, 4, 8, 12), (1, 5, 9, 13), (2, 6, 10, 14), (3, 7, 11, 15).
@@ -148,49 +149,42 @@ void gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points,
 }
 
 
-__global__ void gpu_draw_box_kernel(unsigned char* src, const int width, const int height, float* d_points, int num_objects, double current_time)
+__global__ void gpu_draw_box_kernel(unsigned char* src, const int width, const int height, const pose::Object* d_detections, int num_objects)
 {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if( (x < width) && (y < height) ) {
-        // Loop through all line segments for all objects
-        for (int i = 0; i < num_objects * 4; i++) {
-            float x1 = d_points[i * 4];
-            float y1 = d_points[i * 4 + 1];
-            float x2 = d_points[i * 4 + 2];
-            float y2 = d_points[i * 4 + 3];
+        // Loop through all detected objects
+        for (int i = 0; i < num_objects; i++) {
+            // Read detection data for the current object
+            const pose::Object det = d_detections[i];
+            const float x1 = det.rect.x;
+            const float y1 = det.rect.y;
+            const float x2 = det.rect.x + det.rect.width;
+            const float y2 = det.rect.y + det.rect.height;
 
-            float lengh_squared = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+            // Check if the current pixel (x,y) is on one of the four lines of the bounding box
+            // Add a thickness of 2 pixels for better visibility
+            bool on_top_bottom = ( (y > y1-2 && y < y1+2) || (y > y2-2 && y < y2+2) ) && (x > x1 && x < x2);
+            bool on_left_right = ( (x > x1-2 && x < x1+2) || (x > x2-2 && x < x2+2) ) && (y > y1 && y < y2);
             
-            if (lengh_squared == 0.0f) continue;
-            
-            float dot_product = (x - x1) * (x2 - x1) + (y-y1) * (y2 - y1);
-            float t = fmaxf(0.0f, fminf(1.0f, dot_product/lengh_squared));
-            float proj_x = x1 + t * (x2 - x1);
-            float proj_y = y1 + t * (y2 - y1);
-
-            float distance_squared = (x - proj_x) * (x - proj_x) + (y - proj_y) * (y - proj_y);
-            if (distance_squared < 12.0f) {
-                // Set a static bright yellow color (RGBA)
+            if (on_top_bottom || on_left_right) {
+                 // Set a static bright red color (RGBA)
                 *(src + ((y * width * 4) + (x * 4)))      = 255; // R
-                *(src + ((y * width * 4) + (x * 4)) + 1)  = 0; // G
+                *(src + ((y * width * 4) + (x * 4)) + 1)  = 0;   // G
                 *(src + ((y * width * 4) + (x * 4)) + 2)  = 0;   // B
                 *(src + ((y * width * 4) + (x * 4)) + 3)  = 255; // A                 
             }
-
         }
     } 
 }
 
-
-
-void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, int num_objects, cudaStream_t stream)
+void gpu_draw_box(unsigned char* src, int width, int height, const pose::Object* d_detections, int num_objects, cudaStream_t stream)
 {
     dim3 threads_per_block(32, 32);
     dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
-    double current_time = (double) (std::chrono::system_clock::now().time_since_epoch()).count();
-    gpu_draw_box_kernel <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_points, num_objects, current_time);
+    gpu_draw_box_kernel <<<num_blocks, threads_per_block, 0, stream>>> (src, width, height, d_detections, num_objects);
 }
 
 

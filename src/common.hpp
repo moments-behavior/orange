@@ -1,13 +1,13 @@
-//
-// Created by ubuntu on 4/7/23.
-//
+// src/common.hpp
 
 #ifndef POSE_NORMAL_COMMON_HPP
 #define POSE_NORMAL_COMMON_HPP
 #include "NvInfer.h"
-#include "opencv2/opencv.hpp"
 #include <sys/stat.h>
 #include <unistd.h>
+#include <vector>
+#include <string>
+#include <iostream>
 
 #define CHECK(call)                                                                                                    \
     do {                                                                                                               \
@@ -117,6 +117,9 @@ inline bool IsFolder(const std::string& path)
 }
 
 namespace pose {
+// Define a maximum number of keypoints for the fixed-size array
+constexpr int MAX_KEYPOINTS = 32;
+
 struct Binding {
     size_t         size  = 1;
     size_t         dsize = 1;
@@ -124,11 +127,16 @@ struct Binding {
     std::string    name;
 };
 
+struct Rect {
+    float x, y, width, height;
+};
+
 struct Object {
-    cv::Rect_<float>   rect;
-    int                label = 0;
-    float              prob  = 0.0;
-    std::vector<float> kps;
+    Rect rect;
+    int   label = 0;
+    float prob  = 0.0;
+    float kps[MAX_KEYPOINTS];
+    size_t num_kps = 0;
 };
 
 struct PreParam {

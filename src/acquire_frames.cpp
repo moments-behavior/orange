@@ -43,10 +43,7 @@ void acquire_frames(
     GPUVideoEncoder* gpu_encoder,
     YOLOv8Worker* yolo_worker,
     ImageWriterWorker* image_writer,
-    SafeQueue<WORKER_ENTRY*>* free_entries_queue,
-    SafeQueue<cudaEvent_t*>* free_events_queue,
-    SafeQueue<WORKER_ENTRY*>* recycle_queue,
-    SafeQueue<cudaEvent_t*>* yolo_events_queue
+    CameraResources* resources
 ){
     ck(cudaSetDevice(camera_params->gpu_id));
     NVTX_CAMERA("AcquireFrames_Main");
@@ -107,15 +104,15 @@ void acquire_frames(
         NVTX_RANGE_PUSH("Frame_Processing_Loop");
 
         WORKER_ENTRY* recycled_entry = nullptr;
-        while(recycle_queue->pop(recycled_entry)) {
+        while(resources->recycle_queue->pop(recycled_entry)) {
             if (recycled_entry) {
                 if (recycled_entry->event_ptr) {
-                    free_events_queue->push(recycled_entry->event_ptr);
+                    resources->free_events_queue->push(recycled_entry->event_ptr);
                 }
                 if (recycled_entry->yolo_completion_event) {
-                    yolo_events_queue->push(recycled_entry->yolo_completion_event);
+                    resources->yolo_events_queue->push(recycled_entry->yolo_completion_event);
                 }
-                free_entries_queue->push(recycled_entry);
+                resources->free_entries_queue->push(recycled_entry);
             }
         }
 
@@ -123,11 +120,10 @@ void acquire_frames(
         cudaEvent_t* current_event = nullptr;
         cudaEvent_t* yolo_event = nullptr;
 
-        if (!free_entries_queue->pop(current_entry) || !free_events_queue->pop(current_event) || !yolo_events_queue->pop(yolo_event)) {
-            // If we failed to get all three resources, put back what we got and try again
-            if (current_entry) free_entries_queue->push(current_entry);
-            if (current_event) free_events_queue->push(current_event);
-            if (yolo_event) yolo_events_queue->push(yolo_event);
+        if (!resources->free_entries_queue->pop(current_entry) || !resources->free_events_queue->pop(current_event) || !resources->yolo_events_queue->pop(yolo_event)) {
+            if (current_entry) resources->free_entries_queue->push(current_entry);
+            if (current_event) resources->free_events_queue->push(current_event);
+            if (yolo_event) resources->yolo_events_queue->push(yolo_event);
             NVTX_RANGE_POP();
             usleep(100);
             continue;
@@ -162,8 +158,6 @@ void acquire_frames(
             current_entry->pixelFormat = ecam->frame_recv.pixel_type;
             current_entry->timestamp = ecam->frame_recv.timestamp;
             current_entry->frame_id = camera_state.frame_count;
-            // Explicitly set has_detections based on whether the YOLO worker is active for this camera.
-            // This tells the display worker that it MUST wait for the YOLO worker's event.
             current_entry->has_detections = (camera_select->yolo && yolo_worker);
             current_entry->detections_ready.store(false);
 
@@ -192,13 +186,12 @@ void acquire_frames(
                 }
 
             } else {
-                // If not dispatching, requeue resources immediately
                 if (use_direct_pointer) {
                     EVT_CameraQueueFrame(&ecam->camera, &ecam->frame_recv);
                 }
-                free_events_queue->push(current_event);
-                yolo_events_queue->push(yolo_event); // FIX: also requeue the yolo event
-                free_entries_queue->push(current_entry);
+                resources->free_events_queue->push(current_event);
+                resources->yolo_events_queue->push(yolo_event);
+                resources->free_entries_queue->push(current_entry);
             }
 
             frame_counter_for_fps++;
@@ -240,11 +233,9 @@ void acquire_frames(
         CUDA_STREAM_LOG("Destroying acquisition stream", stream);
         cudaStreamDestroy(stream);
 
-        // 1. Log that the thread is ending (while context is still active)
         CUDA_CTX_LOG("=== ACQUIRE FRAMES END ===");
         std::cout << "Acquire frames thread finished for camera: " << camera_params->camera_serial << std::endl;
 
-        // 2. Now, pop the context as the final step
         CUcontext popped_context;
     }
 }

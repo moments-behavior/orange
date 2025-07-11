@@ -11,13 +11,13 @@
 class COpenGLDisplay : public CThreadWorker<WORKER_ENTRY>
 {
 public:
-COpenGLDisplay(
-	const char* name,
-	CameraParams *camera_params,
-	CameraEachSelect *camera_select,
-	unsigned char *display_buffer_cuda_pbo,
-	INDIGOSignalBuilder* indigo_signal_builder,
-	SafeQueue<WORKER_ENTRY*>& recycle_queue);
+    COpenGLDisplay(
+        const char* name,
+        CameraParams *camera_params,
+        CameraEachSelect *camera_select,
+        unsigned char *display_buffer_cuda_pbo,
+        INDIGOSignalBuilder* indigo_signal_builder,
+        SafeQueue<WORKER_ENTRY*>& recycle_queue);
     ~COpenGLDisplay() override;
 
     CameraParams* camera_params;
@@ -32,15 +32,13 @@ protected:
 
 private:
     unsigned char* h_p2p_copy_buffer_;
-    float *d_points_for_drawing_;
+    pose::Object *d_detections_for_drawing_; 
     unsigned int *d_skeleton_for_drawing_;
     unsigned char *d_display_resize_buffer_;
     NppiSize output_display_size_;
     NppiRect input_roi_for_display_resize_;
     NppiRect output_roi_for_display_resize_;
 
-	cudaStream_t m_stream;
-
-    // Add a reference to the central recycle queue
+    cudaStream_t m_stream;
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };

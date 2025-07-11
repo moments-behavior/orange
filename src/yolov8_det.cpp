@@ -1,5 +1,6 @@
-// src/yolov8_det.cpp - Fixed
+// src/yolov8_det.cpp
 #include "yolov8_det.h"
+#include <opencv2/opencv.hpp>
 
 void YOLOv8::initialize_plugins() {
     static bool plugins_initialized = false;
@@ -264,7 +265,13 @@ void YOLOv8::draw_objects(const cv::Mat&                                image,
     res = image.clone();
     for (auto& obj : objs) {
         cv::Scalar color = cv::Scalar(COLORS[obj.label][0], COLORS[obj.label][1], COLORS[obj.label][2]);
-        cv::rectangle(res, obj.rect, color, 2);
+        
+        // Create the cv::Rect on-the-fly from our custom pose::Rect
+        cv::Rect cv_rect(static_cast<int>(obj.rect.x), 
+                         static_cast<int>(obj.rect.y), 
+                         static_cast<int>(obj.rect.width), 
+                         static_cast<int>(obj.rect.height));
+        cv::rectangle(res, cv_rect, color, 2);
 
         char text[256];
         sprintf(text, "%s %.1f%%", CLASS_NAMES[obj.label].c_str(), obj.prob * 100);
@@ -279,7 +286,6 @@ void YOLOv8::draw_objects(const cv::Mat&                                image,
             y = res.rows;
 
         cv::rectangle(res, cv::Rect(x, y, label_size.width, label_size.height + baseLine), {0, 0, 255}, -1);
-
         cv::putText(res, text, cv::Point(x, y + label_size.height), cv::FONT_HERSHEY_SIMPLEX, 0.4, {255, 255, 255}, 1);
     }
 }

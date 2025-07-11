@@ -10,40 +10,6 @@
 #include <atomic>         // For std::atomic
 #include <cuda_runtime.h> // For cudaEvent_t
 
-typedef struct {
-    unsigned char* d_image;
-    int width;
-    int height;
-    int pixelFormat;
-    unsigned long long timestamp;
-    unsigned long long frame_id;
-    uint64_t timestamp_sys;
-    
-    // YOLO detection fields
-    std::vector<pose::Object> detections;
-    bool has_detections;
-    std::atomic<bool> detections_ready;
-    
-    // Reference counting for memory management
-    std::atomic<int> ref_count;
-    
-    // GPU Direct optimization fields
-    bool gpu_direct_mode = false;
-    bool owns_memory = true;
-    
-    // Camera buffer management (only used when gpu_direct_mode = true)
-    void* camera_buffer_ptr = nullptr;
-    Emergent::CEmergentCamera* camera_instance = nullptr;
-    Emergent::CEmergentFrame* camera_frame_struct = nullptr;
-    
-    // Event for synchronization between workers. Now a pointer.
-    cudaEvent_t* event_ptr; 
-
-    // New event specifically for YOLO completion
-    cudaEvent_t* yolo_completion_event; 
-
-} WORKER_ENTRY;
-
 
 struct FrameGPU
 {

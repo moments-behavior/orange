@@ -15,6 +15,7 @@
 #include "thread.h"
 #include "global.h"
 #include "cuda_context_debug.h"
+#include "opencv2/opencv.hpp"
 
 YOLOv8Worker::YOLOv8Worker(const char* name,
                            CameraParams* cam_params,

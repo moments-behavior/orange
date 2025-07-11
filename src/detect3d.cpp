@@ -41,6 +41,7 @@ void detection3d_proc(CameraControl *camera_control,
             break; // exit cleanly if subscription is turned off
         }
 
+        auto start = std::chrono::high_resolution_clock::now();
         if (!ball2d_all_cams.detected_cameras.empty()) {
             ball2d_all_cams.detected_cameras.clear();
             ball2d_all_cams.detected_points.clear();
@@ -105,10 +106,11 @@ void detection3d_proc(CameraControl *camera_control,
             }
         }
         count++;
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        std::cout << "Triangulation Delay: " << std::to_string(elapsed.count() * 1000000) << " microseconds" << std::endl;
+        // float calc_frame_rate = count / elapsed.count();
+        // std::cout << "Triangule Frame Rate : " + std::to_string(calc_frame_rate)
+        //       << std::endl;
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    float calc_frame_rate = count / elapsed.count();
-    std::cout << "Triangule Frame Rate : " + std::to_string(calc_frame_rate)
-              << std::endl;
 }

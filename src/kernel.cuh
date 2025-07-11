@@ -24,6 +24,6 @@ void gpu_crop_and_resize(
     cudaStream_t stream
 );
 
-__global__ void mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* src_mono, int width, int height);
+void launch_mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* src_mono, int width, int height, cudaStream_t stream);
 
 #endif // KERNEL_H

@@ -300,16 +300,24 @@ __global__ void mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* 
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    
+
     if (x < width && y < height) {
         int mono_idx = y * width + x;
         int rgb_idx = (y * width + x) * 3;
-        
+
         unsigned char pixel_value = src_mono[mono_idx];
-        
+
         // Duplicate grayscale value to all 3 RGB channels
         dst_rgb[rgb_idx + 0] = pixel_value; // R
         dst_rgb[rgb_idx + 1] = pixel_value; // G
         dst_rgb[rgb_idx + 2] = pixel_value; // B
     }
+}
+
+void launch_mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* src_mono, int width, int height, cudaStream_t stream)
+{
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x - 1) / threads_per_block.x,
+                   (height + threads_per_block.y - 1) / threads_per_block.y);
+    mono_to_rgb_kernel<<<num_blocks, threads_per_block, 0, stream>>>(dst_rgb, src_mono, width, height);
 }

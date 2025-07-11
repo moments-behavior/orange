@@ -43,7 +43,9 @@ int main(int argc, char **args) {
     std::string orange_root_dir_str =
         "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
-    std::string input_folder = orange_root_dir_str + "/exp/unsorted";
+    std::string recording_root_dir_str = "/mnt";
+    // std::string input_folder = orange_root_dir_str + "/exp/unsorted";
+    std::string input_folder = recording_root_dir_str + "/exp/unsorted";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
 
     std::vector<bool> check;

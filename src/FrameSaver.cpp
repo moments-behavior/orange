@@ -6,8 +6,8 @@ FrameSaver::FrameSaver(CameraParams *params, CameraEachSelect *select)
     : camera_params(params), camera_select(select), running(false) {
     ck(cudaStreamCreate(&stream));
     initalize_gpu_frame(&frame_process.frame_original, camera_params);
-    initialize_gpu_debayer(&frame_process.debayer, camera_params);
-    initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params);
+    initialize_gpu_debayer(&frame_process.debayer, camera_params, 4);
+    initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params, 3);
 
     ck(cudaMalloc((void **)&frame_process.d_convert,
                   camera_params->width * camera_params->height * 3));

@@ -83,8 +83,9 @@ void FrameDetector::thread_loop() {
             debayer_frame_gpu_rgb(camera_params, &frame_process.frame_original,
                                   &frame_process.debayer);
         } else {
-            duplicate_channel_gpu(camera_params, &frame_process.frame_original,
-                                  &frame_process.debayer);
+            duplicate_channel_gpu_3(camera_params,
+                                    &frame_process.frame_original,
+                                    &frame_process.debayer);
         }
         yolov8->preprocess_gpu(frame_process.debayer.d_debayer);
         yolov8->infer(); // it sync gpu with cpu here

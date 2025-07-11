@@ -124,4 +124,17 @@ inline void duplicate_channel_gpu(CameraParams *camera_params,
     }
 }
 
+inline void duplicate_channel_gpu_3(CameraParams *camera_params,
+                                    FrameGPU *frame_original,
+                                    Debayer *debayer) {
+    const NppStatus npp_result = nppiDup_8u_C1C3R(
+        frame_original->d_orig, camera_params->width * sizeof(unsigned char),
+        debayer->d_debayer, camera_params->width * sizeof(uchar4),
+        debayer->size);
+
+    if (npp_result != 0) {
+        std::cout << "\nNPP error %d \n" << npp_result << std::endl;
+    }
+}
+
 #endif

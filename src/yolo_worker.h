@@ -6,18 +6,18 @@
 #include "yolov8_det.h"
 #include "image_processing.h" // For FrameGPU, Debayer
 #include "camera.h"           // For CameraParams
-#include "video_capture.h"    // For CameraEachSelect, WORKER_ENTRY (if detections are added here)
+#include "video_capture.h"    // For CameraEachSelect, WORKER_ENTRY
 #include "network_base.h"     // For EnetContext, ENetPeer
 #include "shaman.h"           // For shaman::SharedBoxQueue
 #include <chrono>
-#include <vector>             // For std::vector (if passing detections)
-#include "common.hpp"         // For pose::Object (if passing detections)
+#include <vector>
 #include <chrono>
 #include <cuda.h>
 #include <atomic>
+#include "common.hpp"         // For pose::Object
 
-class COpenGLDisplay; // Forward declaration to avoid include cycle
-
+class COpenGLDisplay;
+class CropAndEncodeWorker;
 
 class YOLOv8Worker : public CThreadWorker<WORKER_ENTRY>
 {
@@ -29,13 +29,12 @@ public:
     ~YOLOv8Worker() override;
 
     void SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer);
-    void SetDisplayWorker(COpenGLDisplay* display_worker) { m_display_worker = display_worker; }
+    void SetDisplayWorker(COpenGLDisplay* display_worker);
+    void SetCropAndEncodeWorker(CropAndEncodeWorker* crop_worker);
     void DumpNextFrame() { m_dump_next_frame.store(true);}
 
     CameraParams* GetCameraParams() const { return associated_camera_params_; }
 
-    // New: Define a structure for passing detection results (or use pose::Object directly)
-    // This could also be part of WORKER_ENTRY if you modify it globally
     struct YoloDetectionOutput {
         unsigned long long frame_id;
         unsigned long long timestamp;
@@ -47,7 +46,7 @@ public:
         return current_fps_.load(std::memory_order_relaxed);
     }
 
-    private:
+private:
     bool WorkerFunction(WORKER_ENTRY* f) override;
     void WorkerReset() override;
 
@@ -61,7 +60,6 @@ public:
     ENetPeer* enet_target_peer_;
     flatbuffers::FlatBufferBuilder* fb_builder_;
 
-    // Buffers needed for YOLO preprocessing
     FrameGPU frame_original_gpu_;
     Debayer debayer_gpu_;
     unsigned char* d_rgb_yolo_input_gpu_;
@@ -70,9 +68,9 @@ public:
     int frame_counter_;
     std::atomic<double> current_fps_;
 
-    // Shared memory IPC
     shaman::SharedBoxQueue* shaman_ipc_queue_;
     COpenGLDisplay* m_display_worker = nullptr;
+    CropAndEncodeWorker* m_crop_worker = nullptr; // New pointer to the crop worker
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
 };
 

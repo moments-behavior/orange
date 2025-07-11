@@ -14,4 +14,16 @@ void rgba2bgr_convert(unsigned char* dest, unsigned char* src, int width, int he
 void gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points, int num_points, cudaStream_t stream);
 void gpu_draw_box(unsigned char* src, int width, int height, const pose::Object* d_detections, int num_objects, cudaStream_t stream);
 void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_points, unsigned int* d_skeleton, cudaStream_t stream, int num_channels);
+
+void gpu_crop_and_resize(
+    const unsigned char* d_src,
+    unsigned char* d_dst,
+    int src_width,
+    int src_height,
+    pose::Rect crop_rect,
+    int dst_width,
+    int dst_height,
+    cudaStream_t stream
+);
+
 #endif // KERNEL_H

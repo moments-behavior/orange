@@ -16,6 +16,7 @@
 #include "global.h"
 #include "cuda_context_debug.h"
 #include "opencv2/opencv.hpp"
+#include "crop_and_encode_worker.h"
 
 YOLOv8Worker::YOLOv8Worker(const char* name,
                            CameraParams* cam_params,
@@ -93,6 +94,13 @@ YOLOv8Worker::~YOLOv8Worker() {
     std::cout << "YOLOv8Worker destructor complete for " << threadName << std::endl;
 }
 
+void YOLOv8Worker::SetCropAndEncodeWorker(CropAndEncodeWorker* crop_worker) {
+    m_crop_worker = crop_worker;
+}
+
+void YOLOv8Worker::SetDisplayWorker(COpenGLDisplay* display_worker) {
+    m_display_worker = display_worker;
+}
 
 void YOLOv8Worker::SetENetTarget(EnetContext* host_ctx, ENetPeer* target_peer)
 {
@@ -174,6 +182,12 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         // Now that the GPU is finished, process the results.
         yolov8_instance_->postprocess(entry->detections);
 
+        // After detections are found, dispatch to the crop worker if it exists
+        if (m_crop_worker && !entry->detections.empty()) {
+            entry->ref_count.fetch_add(1, std::memory_order_acq_rel); // Increment ref count for the new worker
+            m_crop_worker->PutObjectToQueueIn(entry);
+        }
+
         if (!entry->detections.empty()) {
             std::cout << "[YOLO_WORKER] Frame " << entry->frame_id << ": Post-processed " << entry->detections.size() << " detections." << std::endl;
             for(size_t i = 0; i < entry->detections.size(); ++i) {
@@ -222,6 +236,7 @@ bool YOLOv8Worker::WorkerFunction(WORKER_ENTRY* entry) {
         m_recycle_queue.push(entry);
     }
     
+    // This worker doesn't pass an item to its own output queue so we return false
     return false;
 }
 

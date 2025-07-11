@@ -11,6 +11,12 @@
 #include <cuda_runtime.h>
 #include "NvEncoder/NvCodecUtils.h"
 
+class COpenGLDisplay;
+class GPUVideoEncoder;
+class YOLOv8Worker;
+class ImageWriterWorker;
+class CropAndEncodeWorker;
+
 typedef struct {
     unsigned char* d_image;
     int width;
@@ -37,7 +43,7 @@ typedef struct {
     Emergent::CEmergentCamera* camera_instance = nullptr;
     Emergent::CEmergentFrame* camera_frame_struct = nullptr;
     
-    // Event for synchronization between workers. Now a pointer.
+    // Event for synchronization between workers
     cudaEvent_t* event_ptr; 
 
     // New event specifically for YOLO completion
@@ -172,6 +178,7 @@ struct CameraEachSelect
     bool stream_on = true;
     bool record = false;
     bool yolo = false;
+    bool crop_and_encode = false;
     int downsample = 1;
     PictureSaveState frame_save_state = State_Frame_Idle;
     std::string frame_save_format;
@@ -180,9 +187,8 @@ struct CameraEachSelect
     bool selected_to_save = false;
     std::string picture_save_folder;
     const char* yolo_model;
-    // New flags for configurable YOLO output:
-    bool send_yolo_via_ipc = false; // Default to false
-    bool send_yolo_via_enet = false;  // Default to true (current behavior)
+    bool send_yolo_via_ipc = false;
+    bool send_yolo_via_enet = false;
 };
 
 struct CameraState

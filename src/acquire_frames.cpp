@@ -13,6 +13,7 @@
 #include "gpu_video_encoder.h"
 #include "yolo_worker.h"
 #include "image_writer_worker.h"
+#include "crop_and_encode_worker.h"
 #include "cuda_context_debug.h"
 
 static inline void PTP_timestamp_checking(PTPState *ptp_state, CameraEmergent *ecam, CameraState *camera_state){
@@ -43,7 +44,8 @@ void acquire_frames(
     GPUVideoEncoder* gpu_encoder,
     YOLOv8Worker* yolo_worker,
     ImageWriterWorker* image_writer,
-    CameraResources* resources
+    CameraResources* resources,
+    CropAndEncodeWorker* crop_and_encode_worker
 ){
     ck(cudaSetDevice(camera_params->gpu_id));
     NVTX_CAMERA("AcquireFrames_Main");
@@ -166,7 +168,12 @@ void acquire_frames(
                 save_job->event_ptr = current_event;
                 image_writer->PutObjectToQueueIn(save_job);
             }
-
+            
+            // Create a dispatch counter to track how many workers will process this frame
+            // If the camera is set to stream, record video, or run YOLO detection,
+            // we increment the dispatch count for each active worker.
+            // If no workers are active, we return the frame to the free queue.
+            // This allows us to efficiently manage resources and avoid unnecessary processing.
             int dispatch_count = 0;
             if (camera_select->stream_on && openGLDisplay) dispatch_count++;
             if (camera_control->record_video && gpu_encoder) dispatch_count++;

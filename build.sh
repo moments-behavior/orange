@@ -434,6 +434,7 @@ if [ $need_link -eq 1 ]; then
       src/project.cpp \
       src/global.cpp \
       src/image_writer_worker.cpp \
+      src/crop_and_encode_worker.cpp \
       $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
       -I$DIR_IMGUI \
       -I$DIR_IMGUI_BACKEND \

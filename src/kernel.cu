@@ -60,6 +60,61 @@ void GSPRINT4521_Convert(unsigned char* dest, const unsigned char* src, int widt
     if(err != cudaSuccess) printf("GSPRINT4521_ConvertKernel failed: %s\n", cudaGetErrorString(err));
 }
 
+__global__ void crop_and_resize_kernel(
+    const unsigned char* src,
+    unsigned char* dst,
+    int src_width,
+    int src_height,
+    float crop_x,
+    float crop_y,
+    float crop_w,
+    float crop_h,
+    int dst_width,
+    int dst_height
+) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x < dst_width && y < dst_height) {
+        // Map destination pixel to source coordinates
+        float src_x = crop_x + (x / (float)dst_width) * crop_w;
+        float src_y = crop_y + (y / (float)dst_height) * crop_h;
+
+        // Simple nearest-neighbor sampling for now
+        int sx = static_cast<int>(src_x);
+        int sy = static_cast<int>(src_y);
+
+        if (sx >= 0 && sx < src_width && sy >= 0 && sy < src_height) {
+            // Assuming BGR for simplicity. A real implementation would handle different formats.
+            int src_idx = (sy * src_width + sx) * 3;
+            int dst_idx = (y * dst_width + x) * 3;
+            dst[dst_idx + 0] = src[src_idx + 0]; // B
+            dst[dst_idx + 1] = src[src_idx + 1]; // G
+            dst[dst_idx + 2] = src[src_idx + 2]; // R
+        }
+    }
+}
+
+void gpu_crop_and_resize(
+    const unsigned char* d_src,
+    unsigned char* d_dst,
+    int src_width,
+    int src_height,
+    pose::Rect crop_rect,
+    int dst_width,
+    int dst_height,
+    cudaStream_t stream
+) {
+    dim3 threads_per_block(16, 16);
+    dim3 num_blocks((dst_width + threads_per_block.x - 1) / threads_per_block.x,
+                    (dst_height + threads_per_block.y - 1) / threads_per_block.y);
+
+    crop_and_resize_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
+        d_src, d_dst, src_width, src_height,
+        crop_rect.x, crop_rect.y, crop_rect.width, crop_rect.height,
+        dst_width, dst_height
+    );
+}
 
 __global__ void Mono8ToRGBMonoKernel(unsigned char* dest, const unsigned char* src, int width, int height)
 {

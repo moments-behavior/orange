@@ -1,6 +1,5 @@
 #include "FrameDetector.h"
 #include "global.h"
-#include "kernel.cuh"
 #include "video_capture.h"
 #include <mutex>
 #include <npp.h>
@@ -12,7 +11,6 @@ FrameDetector::~FrameDetector() {
     stop();
     cudaFree(frame_process.frame_original.d_orig);
     cudaFree(frame_process.debayer.d_debayer);
-    cudaFreeHost(frame_process.frame_cpu.frame);
     ck(cudaStreamDestroy(stream));
 }
 
@@ -52,8 +50,7 @@ void FrameDetector::thread_loop() {
     ck(cudaStreamCreate(&stream));
     ck(nppSetStream(stream));
     initalize_gpu_frame(&frame_process.frame_original, camera_params);
-    initialize_gpu_debayer(&frame_process.debayer, camera_params);
-    initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params);
+    initialize_gpu_debayer(&frame_process.debayer, camera_params, 3);
 
     ck(cudaMalloc((void **)&frame_process.d_convert,
                   camera_params->width * camera_params->height * 3));
@@ -83,17 +80,13 @@ void FrameDetector::thread_loop() {
 
         // GPU processing
         if (camera_params->color) {
-            debayer_frame_gpu(camera_params, &frame_process.frame_original,
-                              &frame_process.debayer);
+            debayer_frame_gpu_rgb(camera_params, &frame_process.frame_original,
+                                  &frame_process.debayer);
         } else {
             duplicate_channel_gpu(camera_params, &frame_process.frame_original,
                                   &frame_process.debayer);
         }
-
-        rgba2rgb_convert(frame_process.d_convert,
-                         frame_process.debayer.d_debayer, camera_params->width,
-                         camera_params->height, stream);
-        yolov8->preprocess_gpu(frame_process.d_convert);
+        yolov8->preprocess_gpu(frame_process.debayer.d_debayer);
         yolov8->infer(); // it sync gpu with cpu here
         yolov8->postprocess(objs);
 

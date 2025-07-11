@@ -164,7 +164,7 @@ void GPUVideoEncoder::ThreadRunning() {
     ck(cudaSetDevice(camera_params->gpu_id));
     // innitialization
     initalize_gpu_frame(&frame_original, camera_params);
-    initialize_gpu_debayer(&debayer, camera_params);
+    initialize_gpu_debayer(&debayer, camera_params, 4);
 
     initialize_encoder(&encoder, encoder_setup, camera_params);
     initialize_writer(&writer, camera_params, folder_name, encoder_setup);

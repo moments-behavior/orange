@@ -43,7 +43,9 @@ int main(int argc, char **args) {
     std::string orange_root_dir_str =
         "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
-    std::string input_folder = orange_root_dir_str + "/exp/unsorted";
+    std::string recording_root_dir_str = "/mnt";
+    // std::string input_folder = orange_root_dir_str + "/exp/unsorted";
+    std::string input_folder = recording_root_dir_str + "/exp/unsorted";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
 
     std::vector<bool> check;
@@ -294,6 +296,7 @@ int main(int argc, char **args) {
                     IGFD::FileDialogConfig config;
                     config.countSelectionMax = 1;
                     config.path = input_folder;
+                    config.flags = ImGuiFileDialogFlags_Modal;
                     ImGuiFileDialog::Instance()->OpenDialog(
                         "ChooseRecordingDir", "Choose a Directory", nullptr,
                         config);
@@ -550,6 +553,7 @@ int main(int argc, char **args) {
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
                 config.path = input_folder;
+                config.flags = ImGuiFileDialogFlags_Modal;
                 ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir",
                                                         "Choose a Directory",
                                                         nullptr, config);
@@ -751,6 +755,7 @@ int main(int argc, char **args) {
                         IGFD::FileDialogConfig config;
                         config.countSelectionMax = 1;
                         config.path = picture_save_folder;
+                        config.flags = ImGuiFileDialogFlags_Modal;
                         ImGuiFileDialog::Instance()->OpenDialog(
                             "ChoosePictureDir", "Choose a Directory", nullptr,
                             config);

@@ -58,7 +58,7 @@ void COpenGLDisplay::ThreadRunning() {
 
     // innitialization
     initalize_gpu_frame(&frame_original, camera_params);
-    initialize_gpu_debayer(&debayer, camera_params);
+    initialize_gpu_debayer(&debayer, camera_params, 4);
     initialize_cpu_frame(&frame_cpu, camera_params);
 
     ck(cudaMalloc((void **)&d_convert,

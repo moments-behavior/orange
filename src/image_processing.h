@@ -49,9 +49,10 @@ inline void initialize_cpu_frame(FrameCPU *cpu_buffer,
 }
 
 inline void initialize_pinned_cpu_frame(FrameCPU *cpu_buffer,
-                                        CameraParams *camera_params) {
-    int size_pic = camera_params->width * camera_params->height * 3 *
-                   sizeof(unsigned char);
+                                        CameraParams *camera_params,
+                                        int output_channels) {
+    int size_pic = camera_params->width * camera_params->height *
+                   output_channels * sizeof(unsigned char);
     ck(cudaMallocHost((void **)&cpu_buffer->frame, size_pic)); // pinned memory
 }
 
@@ -63,8 +64,8 @@ inline void initalize_gpu_frame(FrameGPU *frame_original,
 }
 
 inline void initialize_gpu_debayer(Debayer *debayer,
-                                   CameraParams *camera_params) {
-    int output_channels = 4;
+                                   CameraParams *camera_params,
+                                   int output_channels) {
     int size_pic = camera_params->width * camera_params->height *
                    sizeof(unsigned char) * output_channels;
     cudaMalloc((void **)&debayer->d_debayer, size_pic);
@@ -99,9 +100,34 @@ inline void debayer_frame_gpu(CameraParams *camera_params,
     }
 }
 
+inline void debayer_frame_gpu_rgb(CameraParams *camera_params,
+                                  FrameGPU *frame_original, Debayer *debayer) {
+    const NppStatus npp_result = nppiCFAToRGB_8u_C1C3R(
+        frame_original->d_orig, camera_params->width * sizeof(unsigned char),
+        debayer->size, debayer->roi, debayer->d_debayer,
+        camera_params->width * sizeof(uchar3), debayer->grid,
+        NPPI_INTER_UNDEFINED);
+    if (npp_result != 0) {
+        std::cout << "\nNPP error %d \n" << npp_result << std::endl;
+    }
+}
+
 inline void duplicate_channel_gpu(CameraParams *camera_params,
                                   FrameGPU *frame_original, Debayer *debayer) {
     const NppStatus npp_result = nppiDup_8u_C1AC4R(
+        frame_original->d_orig, camera_params->width * sizeof(unsigned char),
+        debayer->d_debayer, camera_params->width * sizeof(uchar4),
+        debayer->size);
+
+    if (npp_result != 0) {
+        std::cout << "\nNPP error %d \n" << npp_result << std::endl;
+    }
+}
+
+inline void duplicate_channel_gpu_3(CameraParams *camera_params,
+                                    FrameGPU *frame_original,
+                                    Debayer *debayer) {
+    const NppStatus npp_result = nppiDup_8u_C1C3R(
         frame_original->d_orig, camera_params->width * sizeof(unsigned char),
         debayer->d_debayer, camera_params->width * sizeof(uchar4),
         debayer->size);

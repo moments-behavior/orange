@@ -433,6 +433,41 @@ bool GPUVideoEncoder::WorkerFunction(WORKER_ENTRY* entry)
         // Get encoder input frame and copy our IYUV data to it
         const NvEncInputFrame *encoderInputFrame = encoder.pEnc->GetNextInputFrame();
         NVTX_RANGE_POP();
+
+        std::cout << "[GPUVideoEncoder] Frame " << entry->frame_id << " - Encoder input frame details:" << std::endl;
+        std::cout << "  Main encoder resolution: " << encoder.pEnc->GetEncodeWidth() << "x" << encoder.pEnc->GetEncodeHeight() << std::endl;
+        std::cout << "  encoderInputFrame->inputPtr: " << static_cast<void*>(encoderInputFrame->inputPtr) << std::endl;
+        std::cout << "  encoderInputFrame->pitch: " << encoderInputFrame->pitch << std::endl;
+        std::cout << "  encoderInputFrame->bufferFormat: " << encoderInputFrame->bufferFormat << std::endl;
+        std::cout << "  encoderInputFrame->numChromaPlanes: " << encoderInputFrame->numChromaPlanes << std::endl;
+        std::cout << "  Expected format NV_ENC_BUFFER_FORMAT_NV12: " << NV_ENC_BUFFER_FORMAT_NV12 << std::endl;
+
+        // Print chroma offsets
+        std::cout << "  Main encoder chroma offsets: [";
+        for (int i = 0; i < encoderInputFrame->numChromaPlanes; i++) {
+            std::cout << encoderInputFrame->chromaOffsets[i];
+            if (i < encoderInputFrame->numChromaPlanes - 1) std::cout << ", ";
+        }
+        std::cout << "]" << std::endl;
+
+        std::cout << "[GPUVideoEncoder] CopyToDeviceFrame parameters:" << std::endl;
+        std::cout << "  cuContext: " << encoder.cuContext << std::endl;
+        std::cout << "  src ptr (d_iyuv_temp_): " << static_cast<void*>(d_iyuv_temp_) << std::endl;
+        std::cout << "  src pitch: " << encoder_pitch_ << std::endl;
+        std::cout << "  dst ptr (encoderInputFrame->inputPtr): " << static_cast<void*>(encoderInputFrame->inputPtr) << std::endl;
+        std::cout << "  dst pitch: " << encoderInputFrame->pitch << std::endl;
+        std::cout << "  width: " << encoder.pEnc->GetEncodeWidth() << std::endl;
+        std::cout << "  height: " << encoder.pEnc->GetEncodeHeight() << std::endl;
+        std::cout << "  memory type: CU_MEMORYTYPE_DEVICE (" << CU_MEMORYTYPE_DEVICE << ")" << std::endl;
+        std::cout << "  buffer format: " << encoderInputFrame->bufferFormat << std::endl;
+
+        if (encoderInputFrame->pitch != encoder_pitch_) {
+            std::cout << "[GPUVideoEncoder] WARNING: Pitch mismatch!" << std::endl;
+            std::cout << "  Cached pitch: " << encoder_pitch_ << std::endl;
+            std::cout << "  Current input frame pitch: " << encoderInputFrame->pitch << std::endl;
+        }
+
+        std::cout << "[GPUVideoEncoder] About to call CopyToDeviceFrame..." << std::endl;
         
         NVTX_RANGE_PUSH("Copy_To_Encoder_Buffer");
         NvEncoderCuda::CopyToDeviceFrame(encoder.cuContext,

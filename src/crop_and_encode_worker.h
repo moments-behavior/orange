@@ -29,6 +29,7 @@ private:
     cudaStream_t m_stream = nullptr;
     int frame_counter_ = 0;
     SafeQueue<WORKER_ENTRY*>& m_recycle_queue;
+    Debayer debayer_gpu_;
 };
 
 #endif // CROP_AND_ENCODE_WORKER_H

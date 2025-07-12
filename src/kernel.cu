@@ -321,3 +321,39 @@ void launch_mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* src_
                    (height + threads_per_block.y - 1) / threads_per_block.y);
     mono_to_rgb_kernel<<<num_blocks, threads_per_block, 0, stream>>>(dst_rgb, src_mono, width, height);
 }
+
+__global__ void interleave_uv_planes_kernel(
+    const unsigned char* u_plane, 
+    const unsigned char* v_plane,
+    unsigned char* uv_interleaved,
+    int width, int height, int pitch) 
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (x < width && y < height) {
+        int src_idx = y * (pitch / 2) + x;  // U and V planes have half pitch
+        int dst_idx = y * pitch + x * 2;    // Interleaved: UVUVUV...
+        
+        uv_interleaved[dst_idx] = u_plane[src_idx];      // U
+        uv_interleaved[dst_idx + 1] = v_plane[src_idx];  // V
+    }
+}
+
+void launch_interleave_uv_planes(
+    const unsigned char* u_plane, 
+    const unsigned char* v_plane,
+    unsigned char* uv_interleaved,
+    int width, int height, int pitch,
+    cudaStream_t stream)
+{
+    dim3 block(16, 16);
+    dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
+    
+    interleave_uv_planes_kernel<<<grid, block, 0, stream>>>(
+        u_plane, v_plane, uv_interleaved, width, height, pitch);
+        //                               ^
+        //                    shared memory size (0)
+        //                                  ^
+        //                                stream
+}

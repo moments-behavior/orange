@@ -1,10 +1,10 @@
-// Enhanced crop_and_encode_worker.cpp
 #include "crop_and_encode_worker.h"
 #include "kernel.cuh"
 #include <nppi.h>
 #include <npp.h>
 #include <nppi_color_conversion.h>
 #include <nppi_geometry_transforms.h>
+#include <algorithm> // For std::max_element
 
 CropAndEncodeWorker::CropAndEncodeWorker(const char* name, CameraParams* camera_params, const std::string& folder_name, SafeQueue<WORKER_ENTRY*>& recycle_queue)
     : CThreadWorker(name), camera_params_(camera_params), folder_name_(folder_name), m_recycle_queue(recycle_queue) {
@@ -14,7 +14,8 @@ CropAndEncodeWorker::CropAndEncodeWorker(const char* name, CameraParams* camera_
     ck(cudaSetDevice(camera_params_->gpu_id));
     ck(cudaStreamCreate(&m_stream));
 
-    // Initialize video writer for 256x256 cropped videos
+    initialize_gpu_debayer(&debayer_gpu_, camera_params_);
+
     writer_.video_file = folder_name_ + "/Cam" + camera_params_->camera_serial + "_crop.mp4";
     writer_.keyframe_file = folder_name_ + "/Cam" + camera_params_->camera_serial + "_crop_keyframe.csv";
     writer_.metadata_file = folder_name_ + "/Cam" + camera_params_->camera_serial + "_crop_meta.csv";
@@ -23,7 +24,6 @@ CropAndEncodeWorker::CropAndEncodeWorker(const char* name, CameraParams* camera_
                                    writer_.video_file.c_str(), writer_.keyframe_file.c_str());
     writer_.video->create_thread();
 
-    // Open metadata file
     writer_.metadata = new std::ofstream();
     writer_.metadata->open(writer_.metadata_file.c_str());
     if (!(*writer_.metadata)) {
@@ -32,11 +32,46 @@ CropAndEncodeWorker::CropAndEncodeWorker(const char* name, CameraParams* camera_
         *writer_.metadata << "frame_id,timestamp,timestamp_sys,detection_confidence,crop_x,crop_y,crop_w,crop_h\n";
     }
 
-    // Allocate GPU buffers
-    ck(cudaMalloc(&d_cropped_bgr_, 256 * 256 * 3)); // BGR buffer for the crop (now 256x256)
-    ck(cudaMalloc(&d_yuv_buffer_, 256 * 256 * 3 / 2)); // YUV420 buffer for encoding
+    ck(cudaMalloc(&d_cropped_bgr_, 256 * 256 * 3));
+    ck(cudaMalloc(&d_yuv_buffer_, 256 * 256 * 3 / 2));
 
-    std::cout << "[CropAndEncodeWorker] Initialization complete for " << name << std::endl;
+    try {
+        CUcontext cuContext;
+        ck(cuCtxGetCurrent(&cuContext));
+
+        encoder_ = new NvEncoderCuda(cuContext, 256, 256, NV_ENC_BUFFER_FORMAT_NV12);
+
+        NV_ENC_INITIALIZE_PARAMS encodeConfig = { NV_ENC_INITIALIZE_PARAMS_VER };
+        NV_ENC_TUNING_INFO tuningInfo = {NV_ENC_TUNING_INFO_HIGH_QUALITY};
+        NV_ENC_CONFIG encConfig = { NV_ENC_CONFIG_VER };
+        encodeConfig.encodeConfig = &encConfig;
+
+        encoder_->CreateDefaultEncoderParams(&encodeConfig, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P5_GUID, tuningInfo);
+
+        encodeConfig.frameRateNum = camera_params_->frame_rate;
+        encodeConfig.frameRateDen = 1;
+        encodeConfig.enablePTD = 1;
+
+        encConfig.frameIntervalP = 1;
+        encConfig.gopLength = NVENC_INFINITE_GOPLENGTH;
+        encConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
+        encConfig.rcParams.averageBitRate = 2000000;
+        encConfig.rcParams.vbvBufferSize = encConfig.rcParams.averageBitRate;
+
+        encoder_->CreateEncoder(&encodeConfig);
+        encoder_->SetIOCudaStreams((NV_ENC_CUSTREAM_PTR)&m_stream, (NV_ENC_CUSTREAM_PTR)&m_stream);
+
+        const NvEncInputFrame *tempFrame = encoder_->GetNextInputFrame();
+        encoder_pitch_ = tempFrame->pitch;
+
+    } catch (const std::exception& e) {
+        std::cerr << "[CropAndEncodeWorker] Failed to initialize encoder: " << e.what() << std::endl;
+        if (encoder_) {
+            delete encoder_;
+            encoder_ = nullptr;
+        }
+        throw;
+    }
 }
 
 CropAndEncodeWorker::~CropAndEncodeWorker() {
@@ -45,6 +80,8 @@ CropAndEncodeWorker::~CropAndEncodeWorker() {
     if (camera_params_) {
         ck(cudaSetDevice(camera_params_->gpu_id));
     }
+
+    if (debayer_gpu_.d_debayer) cudaFree(debayer_gpu_.d_debayer);
 
     if (writer_.video) {
         writer_.video->quit_thread();
@@ -61,16 +98,239 @@ CropAndEncodeWorker::~CropAndEncodeWorker() {
     if (d_yuv_buffer_) cudaFree(d_yuv_buffer_);
     if (encoder_) delete encoder_;
     if (m_stream) cudaStreamDestroy(m_stream);
-
-    std::cout << "[CropAndEncodeWorker] Destructor complete for " << threadName << std::endl;
 }
+
+// // Enhanced WorkerFunction with comprehensive debugging
+// // Enhanced WorkerFunction with comprehensive debugging
+// bool CropAndEncodeWorker::WorkerFunction(WORKER_ENTRY* entry) {
+//     if (!entry || entry->detections.empty()) {
+//         if (entry && entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+//             m_recycle_queue.push(entry);
+//         }
+//         return false;
+//     }
+
+//     ck(cudaSetDevice(camera_params_->gpu_id));
+//     nppSetStream(m_stream);
+
+//     static bool first_debug_log = true;
+
+//     try {
+//         if (entry->event_ptr) ck(cudaStreamWaitEvent(m_stream, *entry->event_ptr, 0));
+
+//         // ---------------- Best detection ----------------
+//         const auto& best_detection = *std::max_element(
+//             entry->detections.begin(), entry->detections.end(),
+//             [](const pose::Object& a, const pose::Object& b) { return a.prob < b.prob; });
+
+//         // ---------------- Debayer + RGBA→RGB -------------
+//         FrameGPU frame_original_gpu;
+//         frame_original_gpu.d_orig    = entry->d_image;
+//         frame_original_gpu.size_pic  = entry->width * entry->height;
+//         debayer_frame_gpu(camera_params_, &frame_original_gpu, &debayer_gpu_);
+
+//         unsigned char* d_rgb_full;
+//         ck(cudaMalloc(&d_rgb_full, static_cast<size_t>(entry->width) * entry->height * 3));
+//         rgba2rgb_convert(d_rgb_full, debayer_gpu_.d_debayer,
+//                          entry->width, entry->height, m_stream);
+
+//         // ---------------- Crop to 256×256 ----------------
+//         const int CROP = 256;
+//         float cx = best_detection.rect.x + best_detection.rect.width  * 0.5f;
+//         float cy = best_detection.rect.y + best_detection.rect.height * 0.5f;
+//         int   ix = std::clamp(static_cast<int>(cx) - CROP / 2, 0, entry->width  - CROP);
+//         int   iy = std::clamp(static_cast<int>(cy) - CROP / 2, 0, entry->height - CROP);
+
+//         NppStatus copy_st = nppiCopy_8u_C3R(
+//             d_rgb_full + (iy * entry->width + ix) * 3, entry->width * 3,
+//             d_cropped_bgr_, CROP * 3,
+//             {CROP, CROP});
+//         ck(cudaFree(d_rgb_full));
+//         if (copy_st != NPP_SUCCESS) {
+//             std::cerr << "[CropAndEncodeWorker] NPP crop failed: " << copy_st << std::endl;
+//             return false;
+//         }
+
+//         // ---------------- RGB → NV12 --------------------
+//         if (encoder_) {
+//             CUcontext cuContext; ck(cuCtxGetCurrent(&cuContext));
+//             ck(cudaStreamSynchronize(m_stream));
+
+//             // ============ ENHANCED DEBUGGING =============
+//             std::cout << "[CropAndEncodeWorker] Frame " << entry->frame_id << " - Starting NV12 conversion" << std::endl;
+//             std::cout << "  encoder_pitch_: " << encoder_pitch_ << std::endl;
+//             std::cout << "  Expected Y plane size: " << static_cast<size_t>(encoder_pitch_) * 256 << " bytes" << std::endl;
+//             std::cout << "  Expected UV plane size: " << static_cast<size_t>(encoder_pitch_) * 256 / 2 << " bytes" << std::endl;
+//             std::cout << "  Total NV12 buffer size: " << static_cast<size_t>(encoder_pitch_) * 256 * 3 / 2 << " bytes" << std::endl;
+
+//             // Use YUV420 planar format (IYUV) like gpu_video_encoder.cpp does
+//             unsigned char* d_y_plane = d_yuv_buffer_;
+//             unsigned char* d_u_plane = d_y_plane + static_cast<size_t>(encoder_pitch_) * 256;
+//             unsigned char* d_v_plane = d_u_plane + static_cast<size_t>(encoder_pitch_) * 256 / 4;
+
+//             std::cout << "  Y plane ptr: " << static_cast<void*>(d_y_plane) << std::endl;
+//             std::cout << "  U plane ptr: " << static_cast<void*>(d_u_plane) << std::endl;
+//             std::cout << "  V plane ptr: " << static_cast<void*>(d_v_plane) << std::endl;
+//             std::cout << "  U plane offset: " << static_cast<size_t>(encoder_pitch_) * 256 << " bytes" << std::endl;
+//             std::cout << "  V plane offset: " << static_cast<size_t>(encoder_pitch_) * 256 + static_cast<size_t>(encoder_pitch_) * 256 / 4 << " bytes" << std::endl;
+
+//             unsigned char* yuv_planes[3] = {d_y_plane, d_u_plane, d_v_plane};
+//             int yuv_steps[3] = {encoder_pitch_, encoder_pitch_ / 2, encoder_pitch_ / 2};
+
+//             std::cout << "  NPP conversion steps: Y=" << yuv_steps[0] << ", U=" << yuv_steps[1] << ", V=" << yuv_steps[2] << std::endl;
+
+//             // Use YUV420 planar conversion (IYUV format) like gpu_video_encoder.cpp
+//             NppStatus conv_st = nppiRGBToYUV420_8u_C3P3R(
+//                 d_cropped_bgr_, 256 * 3,        // RGB source
+//                 yuv_planes, yuv_steps,          // YUV destination planes  
+//                 {256, 256});
+//             if (conv_st != NPP_SUCCESS) {
+//                 std::cerr << "[CropAndEncodeWorker] RGB→NV12 conversion failed: "
+//                           << conv_st << std::endl;
+//                 return false;
+//             }
+
+//             std::cout << "  NPP conversion successful" << std::endl;
+
+//             std::cout << "[CropAndEncodeWorker] Checking buffer layout:" << std::endl;
+//             std::cout << "  d_yuv_buffer_ ptr: " << static_cast<void*>(d_yuv_buffer_) << std::endl;
+//             std::cout << "  Y plane start: " << static_cast<void*>(d_y_plane) << std::endl;
+//             std::cout << "  U plane start: " << static_cast<void*>(d_u_plane) << std::endl;
+//             std::cout << "  V plane start: " << static_cast<void*>(d_v_plane) << std::endl;
+
+//             // Sample first few bytes of each plane
+//             unsigned char h_sample[16];
+//             ck(cudaMemcpy(h_sample, d_y_plane, 16, cudaMemcpyDeviceToHost));
+//             std::cout << "  Y plane first 16 bytes: ";
+//             for(int i = 0; i < 16; i++) std::cout << (int)h_sample[i] << " ";
+//             std::cout << std::endl;
+
+//             ck(cudaMemcpy(h_sample, d_u_plane, 16, cudaMemcpyDeviceToHost));
+//             std::cout << "  U plane first 16 bytes: ";
+//             for(int i = 0; i < 16; i++) std::cout << (int)h_sample[i] << " ";
+//             std::cout << std::endl;
+
+//             ck(cudaMemcpy(h_sample, d_v_plane, 16, cudaMemcpyDeviceToHost));
+//             std::cout << "  V plane first 16 bytes: ";
+//             for(int i = 0; i < 16; i++) std::cout << (int)h_sample[i] << " ";
+//             std::cout << std::endl;
+
+//             const NvEncInputFrame* encIn = encoder_->GetNextInputFrame();
+            
+//             std::cout << "[CropAndEncodeWorker] Encoder input frame details:" << std::endl;
+//             std::cout << "  encIn->inputPtr: " << static_cast<void*>(encIn->inputPtr) << std::endl;
+//             std::cout << "  encIn->pitch: " << encIn->pitch << std::endl;
+//             std::cout << "  encIn->bufferFormat: " << encIn->bufferFormat << std::endl;
+//             std::cout << "  encIn->numChromaPlanes: " << encIn->numChromaPlanes << std::endl;
+//             std::cout << "  Expected format NV_ENC_BUFFER_FORMAT_NV12: " << NV_ENC_BUFFER_FORMAT_NV12 << std::endl;
+            
+//             // Print chroma offsets
+//             std::cout << "  Chroma offsets: [";
+//             for (int i = 0; i < encIn->numChromaPlanes; i++) {
+//                 std::cout << encIn->chromaOffsets[i];
+//                 if (i < encIn->numChromaPlanes - 1) std::cout << ", ";
+//             }
+//             std::cout << "]" << std::endl;
+
+//             if (encIn->pitch != encoder_pitch_) {
+//                 std::cout << "[CropAndEncodeWorker] WARNING: Pitch mismatch!" << std::endl;
+//                 std::cout << "  Cached pitch: " << encoder_pitch_ << std::endl;
+//                 std::cout << "  Current input frame pitch: " << encIn->pitch << std::endl;
+                
+//                 // Update our cached pitch to match
+//                 encoder_pitch_ = encIn->pitch;
+//                 std::cout << "  Updated encoder_pitch_ to: " << encoder_pitch_ << std::endl;
+//             }
+
+//             // ============ VALIDATE PARAMETERS =============
+//             std::cout << "[CropAndEncodeWorker] CopyToDeviceFrame parameters:" << std::endl;
+//             std::cout << "  cuContext: " << cuContext << std::endl;
+//             std::cout << "  src ptr (d_yuv_buffer_): " << static_cast<void*>(d_yuv_buffer_) << std::endl;
+//             std::cout << "  src pitch: " << encoder_pitch_ << std::endl;
+//             std::cout << "  dst ptr (encIn->inputPtr): " << static_cast<void*>(encIn->inputPtr) << std::endl;
+//             std::cout << "  dst pitch: " << encIn->pitch << std::endl;
+//             std::cout << "  width: 256" << std::endl;
+//             std::cout << "  height: 256" << std::endl;
+//             std::cout << "  memory type: CU_MEMORYTYPE_DEVICE (" << CU_MEMORYTYPE_DEVICE << ")" << std::endl;
+//             std::cout << "  buffer format: " << encIn->bufferFormat << std::endl;
+
+//             // ============ MEMORY VALIDATION =============
+//             // Check if our buffer is valid
+//             CUdeviceptr test_ptr = (CUdeviceptr)d_yuv_buffer_;
+//             CUcontext ptr_context;
+//             CUresult ctx_result = cuPointerGetAttribute(&ptr_context, CU_POINTER_ATTRIBUTE_CONTEXT, test_ptr);
+//             std::cout << "  Source buffer context check: " << ctx_result << std::endl;
+//             if (ctx_result == CUDA_SUCCESS) {
+//                 std::cout << "  Source buffer context: " << ptr_context << std::endl;
+//             }
+
+//             // Check encoder input buffer
+//             CUdeviceptr enc_ptr = (CUdeviceptr)encIn->inputPtr;
+//             ctx_result = cuPointerGetAttribute(&ptr_context, CU_POINTER_ATTRIBUTE_CONTEXT, enc_ptr);
+//             std::cout << "  Encoder buffer context check: " << ctx_result << std::endl;
+//             if (ctx_result == CUDA_SUCCESS) {
+//                 std::cout << "  Encoder buffer context: " << ptr_context << std::endl;
+//             }
+
+//             // ============ ATTEMPT COPY =============
+//             std::cout << "[CropAndEncodeWorker] About to call CopyToDeviceFrame..." << std::endl;
+
+//             NvEncoderCuda::CopyToDeviceFrame(cuContext,
+//                                              d_yuv_buffer_, encoder_pitch_, // src (NV12)
+//                                              (CUdeviceptr)encIn->inputPtr, encIn->pitch, // dst
+//                                              256, 256,
+//                                              CU_MEMORYTYPE_DEVICE,
+//                                              encIn->bufferFormat,
+//                                              encIn->chromaOffsets,
+//                                              encIn->numChromaPlanes);
+
+//             std::cout << "[CropAndEncodeWorker] CopyToDeviceFrame completed successfully!" << std::endl;
+
+//             std::vector<std::vector<uint8_t>> packets;
+//             encoder_->EncodeFrame(packets);
+//             for (auto& p : packets) {
+//                 writer_.video->push_packet(p.data(), static_cast<int>(p.size()), frame_counter_);
+//             }
+//         }
+
+//         // ---------------- Metadata ----------------------
+//         ++frame_counter_;
+//         if (writer_.metadata && writer_.metadata->is_open()) {
+//             *writer_.metadata << entry->frame_id << ',' << entry->timestamp << ','
+//                               << entry->timestamp_sys << ',' << best_detection.prob << ','
+//                               << best_detection.rect.x << ',' << best_detection.rect.y << ','
+//                               << best_detection.rect.width << ',' << best_detection.rect.height << '\n';
+//         }
+//     } catch (const std::exception& e) {
+//         std::cerr << "[CropAndEncodeWorker] Exception processing frame " << entry->frame_id
+//                   << ": " << e.what() << std::endl;
+        
+//         // Add additional context in error case
+//         if (encoder_) {
+//             const NvEncInputFrame* encIn = encoder_->GetNextInputFrame();
+//             std::cerr << "[CropAndEncodeWorker] Error context:" << std::endl;
+//             std::cerr << "  encoder_pitch_: " << encoder_pitch_ << std::endl;
+//             std::cerr << "  encIn->pitch: " << encIn->pitch << std::endl;
+//             std::cerr << "  encIn->bufferFormat: " << encIn->bufferFormat << std::endl;
+//             std::cerr << "  Expected NV12 format: " << NV_ENC_BUFFER_FORMAT_NV12 << std::endl;
+//         }
+//     }
+
+//     // ---------------- Reference counting / recycle -----
+//     if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+//         if (entry->gpu_direct_mode && entry->camera_instance && entry->camera_frame_struct) {
+//             EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);
+//         }
+//         m_recycle_queue.push(entry);
+//     }
+
+//     return false;
+// }
 
 bool CropAndEncodeWorker::WorkerFunction(WORKER_ENTRY* entry) {
     if (!entry || entry->detections.empty()) {
-        if (entry) {
-            if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-                m_recycle_queue.push(entry);
-            }
+        if (entry && entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            m_recycle_queue.push(entry);
         }
         return false;
     }
@@ -79,140 +339,70 @@ bool CropAndEncodeWorker::WorkerFunction(WORKER_ENTRY* entry) {
     nppSetStream(m_stream);
 
     try {
-        // Wait for YOLO processing to complete if needed
-        if (entry->event_ptr) {
-            ck(cudaStreamWaitEvent(m_stream, *entry->event_ptr, 0));
-        }
+        if (entry->event_ptr) ck(cudaStreamWaitEvent(m_stream, *entry->event_ptr, 0));
 
-        // Find the detection with the highest confidence
-        const auto& best_detection = *std::max_element(entry->detections.begin(), entry->detections.end(),
-            [](const pose::Object& a, const pose::Object& b) {
-                return a.prob < b.prob;
-            });
+        const auto& best_detection = *std::max_element(
+            entry->detections.begin(), entry->detections.end(),
+            [](const pose::Object& a, const pose::Object& b) { return a.prob < b.prob; });
 
-        // Use detection as locator, crop fixed 256x256 centered on detection
-        // This maintains high resolution and avoids tiny resize operations
+        // --- START: NEW, EFFICIENT MONO-TO-NV12 PIPELINE ---
 
-        // 1. Calculate the center point of the best detection
-        float detection_center_x = best_detection.rect.x + best_detection.rect.width / 2.0f;
-        float detection_center_y = best_detection.rect.y + best_detection.rect.height / 2.0f;
+        // 1. Define crop region and size
+        const int CROP_W = 256;
+        const int CROP_H = 256;
+        float cx = best_detection.rect.x + best_detection.rect.width  * 0.5f;
+        float cy = best_detection.rect.y + best_detection.rect.height * 0.5f;
+        int   ix = std::clamp(static_cast<int>(cx) - CROP_W / 2, 0, entry->width  - CROP_W);
+        int   iy = std::clamp(static_cast<int>(cy) - CROP_H / 2, 0, entry->height - CROP_H);
+        
+        // This is the pointer to the original, full-resolution MONO8 image
+        const unsigned char* d_mono_full = entry->d_image;
 
-        std::cout << "[CropAndEncodeWorker] Detection center: x=" << detection_center_x 
-                << ", y=" << detection_center_y 
-                << " (from rect: x=" << best_detection.rect.x 
-                << ", y=" << best_detection.rect.y 
-                << ", w=" << best_detection.rect.width 
-                << ", h=" << best_detection.rect.height << ")" << std::endl;
+        if (encoder_) {
+            const NvEncInputFrame* encIn = encoder_->GetNextInputFrame();
+            unsigned char* d_nv12_dst = static_cast<unsigned char*>(encIn->inputPtr);
 
-        // 2. Define the 256x256 crop region centered on the detection
-        const int CROP_SIZE = 256;
-        const int HALF_CROP = CROP_SIZE / 2;
+            // 2. Directly copy the cropped MONO region to the Y-plane of the encoder's buffer
+            ck(cudaMemcpy2DAsync(d_nv12_dst,
+                                 encIn->pitch, // Destination pitch
+                                 d_mono_full + (iy * entry->width + ix), // Source pointer (offset to crop region)
+                                 entry->width, // Source pitch
+                                 CROP_W, CROP_H,
+                                 cudaMemcpyDeviceToDevice,
+                                 m_stream));
 
-        int crop_x = static_cast<int>(detection_center_x) - HALF_CROP;
-        int crop_y = static_cast<int>(detection_center_y) - HALF_CROP;
+            // 3. Manually set the UV plane to a neutral gray (128)
+            unsigned char* d_uv_plane_dst = d_nv12_dst + encIn->pitch * CROP_H;
+            size_t uv_height = CROP_H / 2;
+            ck(cudaMemset2DAsync(d_uv_plane_dst,
+                                 encIn->pitch, // The UV plane has the same pitch as Y in NV12
+                                 128,          // The neutral chroma value
+                                 CROP_W,       // The width of the UV plane is the same as Y
+                                 uv_height,
+                                 m_stream));
 
-        // 3. Clamp the crop region to stay within image boundaries
-        crop_x = std::max(0, std::min(crop_x, static_cast<int>(entry->width) - CROP_SIZE));
-        crop_y = std::max(0, std::min(crop_y, static_cast<int>(entry->height) - CROP_SIZE));
-
-        // 4. Define the source ROI for the 256x256 crop
-        NppiRect src_roi;
-        src_roi.x = crop_x;
-        src_roi.y = crop_y;
-        src_roi.width = CROP_SIZE;
-        src_roi.height = CROP_SIZE;
-
-        std::cout << "[CropAndEncodeWorker] Final crop ROI: x=" << src_roi.x 
-                << ", y=" << src_roi.y 
-                << ", w=" << src_roi.width 
-                << ", h=" << src_roi.height << std::endl;
-
-        // 5. Convert the full mono frame to RGB
-        unsigned char* d_rgb_full = nullptr;
-        ck(cudaMalloc(&d_rgb_full, (size_t)entry->width * entry->height * 3));
-        launch_mono_to_rgb_kernel(d_rgb_full, entry->d_image, entry->width, entry->height, m_stream);
-
-        // 6. Define source and destination sizes  
-        NppiSize src_size = {static_cast<int>(entry->width), static_cast<int>(entry->height)};
-        NppiSize dst_size = {CROP_SIZE, CROP_SIZE};
-
-        // 7. Define destination ROI (full destination image)
-        NppiRect dst_roi = {0, 0, CROP_SIZE, CROP_SIZE};
-
-        // 8. Perform the crop operation (no resize needed since we're extracting 256x256 directly)
-        NppStatus npp_status = nppiCopy_8u_C3R(
-            d_rgb_full + (src_roi.y * entry->width + src_roi.x) * 3,  // Source pointer offset to crop region
-            entry->width * 3,        // Source pitch
-            d_cropped_bgr_,          // Destination buffer  
-            CROP_SIZE * 3,           // Destination pitch
-            dst_size                 // Copy size (256x256)
-        );
-
-        // 9. Clean up the temporary RGB buffer
-        ck(cudaFree(d_rgb_full));
-
-        if (npp_status != NPP_SUCCESS) {
-            std::cerr << "[CropAndEncodeWorker] NPP crop failed with status: " << npp_status << std::endl;
-        } else {
-            std::cout << "[CropAndEncodeWorker] High-resolution 256x256 crop completed successfully" << std::endl;
-        }
-
-        // 2. For debugging, let's skip the complex encoding and just save cropped images
-        // Synchronize the stream to ensure GPU work is complete
-        ck(cudaStreamSynchronize(m_stream));
-
-        // Copy cropped BGR data to CPU for debugging
-        size_t bgr_size = 256 * 256 * 3;
-        unsigned char* h_bgr_buffer = new unsigned char[bgr_size];
-        ck(cudaMemcpy(h_bgr_buffer, d_cropped_bgr_, bgr_size, cudaMemcpyDeviceToHost));
-
-        // Convert BGR to RGB for PPM format (PPM expects RGB)
-        unsigned char* h_rgb_buffer = new unsigned char[bgr_size];
-        for (int i = 0; i < 256 * 256; i++) {
-            h_rgb_buffer[i * 3 + 0] = h_bgr_buffer[i * 3 + 2]; // R = B
-            h_rgb_buffer[i * 3 + 1] = h_bgr_buffer[i * 3 + 1]; // G = G
-            h_rgb_buffer[i * 3 + 2] = h_bgr_buffer[i * 3 + 0]; // B = R
-        }
-
-        // Save debug images for first 20 frames to see if cropping works
-        if (frame_counter_ < 20) {
-            std::string debug_filename = folder_name_ + "/debug_crop_frame_" +
-                                       std::to_string(entry->frame_id) + "_conf_" +
-                                       std::to_string((int)(best_detection.prob * 100)) + ".ppm";
-            std::ofstream debug_file(debug_filename, std::ios::binary);
-            if (debug_file.is_open()) {
-                debug_file << "P6\n256 256\n255\n";
-                debug_file.write((char*)h_rgb_buffer, bgr_size);
-                debug_file.close();
-                std::cout << "[CropAndEncodeWorker] Saved debug frame: " << debug_filename << std::endl;
+            // 4. Encode the frame
+            std::vector<std::vector<uint8_t>> packets;
+            encoder_->EncodeFrame(packets);
+            for (auto& p : packets) {
+                writer_.video->push_packet(p.data(), static_cast<int>(p.size()), frame_counter_);
             }
         }
 
-        // For now, skip video encoding and just count frames
-        delete[] h_bgr_buffer;
-        delete[] h_rgb_buffer;
-        frame_counter_++;
+        // --- END: NEW PIPELINE ---
 
-        // 3. Write metadata
+        ++frame_counter_;
         if (writer_.metadata && writer_.metadata->is_open()) {
-            *writer_.metadata << entry->frame_id << ","
-                            << entry->timestamp << ","
-                            << entry->timestamp_sys << ","
-                            << best_detection.prob << ","
-                            << best_detection.rect.x << ","
-                            << best_detection.rect.y << ","
-                            << best_detection.rect.width << ","
-                            << best_detection.rect.height << std::endl;
+            *writer_.metadata << entry->frame_id << ',' << entry->timestamp << ','
+                              << entry->timestamp_sys << ',' << best_detection.prob << ','
+                              << best_detection.rect.x << ',' << best_detection.rect.y << ','
+                              << best_detection.rect.width << ',' << best_detection.rect.height << '\n';
         }
-
-        std::cout << "[CropAndEncodeWorker] Successfully processed and encoded frame " << entry->frame_id << std::endl;
-
     } catch (const std::exception& e) {
         std::cerr << "[CropAndEncodeWorker] Exception processing frame " << entry->frame_id
                   << ": " << e.what() << std::endl;
     }
 
-    // Handle reference counting
     if (entry->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         if (entry->gpu_direct_mode && entry->camera_instance && entry->camera_frame_struct) {
             EVT_CameraQueueFrame(entry->camera_instance, entry->camera_frame_struct);
@@ -220,5 +410,5 @@ bool CropAndEncodeWorker::WorkerFunction(WORKER_ENTRY* entry) {
         m_recycle_queue.push(entry);
     }
 
-    return false; // This worker doesn't pass data to another queue
+    return false;
 }

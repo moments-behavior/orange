@@ -23,6 +23,12 @@ void gpu_crop_and_resize(
     int dst_width, int dst_height,
     cudaStream_t stream
 );
+void launch_interleave_uv_planes(
+    const unsigned char* u_plane, 
+    const unsigned char* v_plane,
+    unsigned char* uv_interleaved,
+    int width, int height, int pitch,
+    cudaStream_t stream);
 
 void launch_mono_to_rgb_kernel(unsigned char* dst_rgb, const unsigned char* src_mono, int width, int height, cudaStream_t stream);
 

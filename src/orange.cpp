@@ -56,7 +56,7 @@ int main(int argc, char **args) {
     CameraEachSelect *cameras_select;
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
-    GL_Texture *tex;
+    GL_Texture *tex_gl;
     int num_cameras = 0;
     CameraControl *camera_control =
         new CameraControl{false, false, false, false, false};
@@ -329,7 +329,7 @@ int main(int argc, char **args) {
                     camera_control->record_video = true;
 
                     cudaSetDevice(display_gpu_id);
-                    tex = new GL_Texture[num_cameras];
+                    tex_gl = new GL_Texture[num_cameras];
                     for (int i = 0; i < num_cameras; i++) {
                         if (cameras_select[i].stream_on) {
                             int camera_width =
@@ -338,15 +338,16 @@ int main(int argc, char **args) {
                             int camera_height =
                                 int(cameras_params[i].height /
                                     cameras_select[i].downsample);
-                            setup_texture(tex[i], camera_width, camera_height);
+                            setup_texture(tex_gl[i], camera_width,
+                                          camera_height);
                         }
                     }
 
                     start_camera_streaming(
                         camera_threads, camera_control, ecams, cameras_params,
-                        cameras_select, tex, num_cameras, evt_buffer_size, true,
-                        encoder_setup, encoder_config->folder_name, ptp_params,
-                        &indigo_signal_builder, calib_yaml_folder,
+                        cameras_select, tex_gl, num_cameras, evt_buffer_size,
+                        true, encoder_setup, encoder_config->folder_name,
+                        ptp_params, &indigo_signal_builder, calib_yaml_folder,
                         detection3d_thread);
                     camera_control->subscribe = true;
                 }
@@ -440,12 +441,12 @@ int main(int argc, char **args) {
                                            cameras_select[i].downsample);
                     int camera_height = int(cameras_params[i].height /
                                             cameras_select[i].downsample);
-                    clear_upload_and_cleanup(tex[i], camera_width,
+                    clear_upload_and_cleanup(tex_gl[i], camera_width,
                                              camera_height);
                 }
             }
-            delete[] tex;
-            tex = nullptr;
+            delete[] tex_gl;
+            tex_gl = nullptr;
 
             for (auto &t : camera_threads)
                 t.join();
@@ -1052,7 +1053,7 @@ int main(int argc, char **args) {
                     (camera_control->subscribe) = !(camera_control->subscribe);
                     if (camera_control->subscribe) {
                         cudaSetDevice(display_gpu_id);
-                        tex = new GL_Texture[num_cameras];
+                        tex_gl = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =
@@ -1061,13 +1062,13 @@ int main(int argc, char **args) {
                                 int camera_height =
                                     int(cameras_params[i].height /
                                         cameras_select[i].downsample);
-                                setup_texture(tex[i], camera_width,
+                                setup_texture(tex_gl[i], camera_width,
                                               camera_height);
                             }
                         }
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
-                            cameras_params, cameras_select, tex, num_cameras,
+                            cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, "",
                             encoder_config->folder_name, ptp_params,
                             &indigo_signal_builder, calib_yaml_folder,
@@ -1081,12 +1082,12 @@ int main(int argc, char **args) {
                                 int camera_height =
                                     int(cameras_params[i].height /
                                         cameras_select[i].downsample);
-                                clear_upload_and_cleanup(tex[i], camera_width,
-                                                         camera_height);
+                                clear_upload_and_cleanup(
+                                    tex_gl[i], camera_width, camera_height);
                             }
                         }
-                        delete[] tex;
-                        tex = nullptr;
+                        delete[] tex_gl;
+                        tex_gl = nullptr;
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, num_cameras,
@@ -1120,7 +1121,7 @@ int main(int argc, char **args) {
                                         int(cameras_params[i].height /
                                             cameras_select[i].downsample);
                                     clear_upload_and_cleanup(
-                                        tex[i], camera_width, camera_height);
+                                        tex_gl[i], camera_width, camera_height);
                                 }
                             }
                             stop_camera_streaming(
@@ -1128,8 +1129,8 @@ int main(int argc, char **args) {
                                 cameras_params, cameras_select, num_cameras,
                                 evt_buffer_size, ptp_params,
                                 detection3d_thread);
-                            delete[] tex;
-                            tex = nullptr;
+                            delete[] tex_gl;
+                            tex_gl = nullptr;
                         }
 
                         camera_control->subscribe = true;
@@ -1147,7 +1148,7 @@ int main(int argc, char **args) {
                         }
 
                         cudaSetDevice(display_gpu_id);
-                        tex = new GL_Texture[num_cameras];
+                        tex_gl = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =
@@ -1156,14 +1157,14 @@ int main(int argc, char **args) {
                                 int camera_height =
                                     int(cameras_params[i].height /
                                         cameras_select[i].downsample);
-                                setup_texture(tex[i], camera_width,
+                                setup_texture(tex_gl[i], camera_width,
                                               camera_height);
                             }
                         }
 
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
-                            cameras_params, cameras_select, tex, num_cameras,
+                            cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
                             encoder_config->folder_name, ptp_params,
                             &indigo_signal_builder, calib_yaml_folder,
@@ -1180,12 +1181,12 @@ int main(int argc, char **args) {
                                 int camera_height =
                                     int(cameras_params[i].height /
                                         cameras_select[i].downsample);
-                                clear_upload_and_cleanup(tex[i], camera_width,
-                                                         camera_height);
+                                clear_upload_and_cleanup(
+                                    tex_gl[i], camera_width, camera_height);
                             }
                         }
-                        delete[] tex;
-                        tex = nullptr;
+                        delete[] tex_gl;
+                        tex_gl = nullptr;
 
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
@@ -1207,7 +1208,7 @@ int main(int argc, char **args) {
                                            cameras_select[i].downsample);
                     int camera_height = int(cameras_params[i].height /
                                             cameras_select[i].downsample);
-                    upload_texture_from_pbo(tex[i], camera_width,
+                    upload_texture_from_pbo(tex_gl[i], camera_width,
                                             camera_height);
                 }
             }
@@ -1260,11 +1261,12 @@ int main(int argc, char **args) {
                                               axisFlags); // X-axis
                             ImPlot::SetupAxis(ImAxis_Y1, nullptr,
                                               axisFlags); // Y-axis
-                            ImPlot::PlotImage("##no_image_name",
-                                              (void *)(intptr_t)tex[i].texture,
-                                              ImVec2(0, 0),
-                                              ImVec2(cameras_params[i].width,
-                                                     cameras_params[i].height));
+                            ImPlot::PlotImage(
+                                "##no_image_name",
+                                (void *)(intptr_t)tex_gl[i].texture,
+                                ImVec2(0, 0),
+                                ImVec2(cameras_params[i].width,
+                                       cameras_params[i].height));
 
                             if (detection2d[i].has_calibration_results) {
                                 if (detection2d[i].ball2d.find_ball.load()) {
@@ -1323,11 +1325,12 @@ int main(int argc, char **args) {
                                               axisFlags); // X-axis
                             ImPlot::SetupAxis(ImAxis_Y1, nullptr,
                                               axisFlags); // Y-axis
-                            ImPlot::PlotImage("##no_image_name",
-                                              (void *)(intptr_t)tex[i].texture,
-                                              ImVec2(0, 0),
-                                              ImVec2(cameras_params[i].width,
-                                                     cameras_params[i].height));
+                            ImPlot::PlotImage(
+                                "##no_image_name",
+                                (void *)(intptr_t)tex_gl[i].texture,
+                                ImVec2(0, 0),
+                                ImVec2(cameras_params[i].width,
+                                       cameras_params[i].height));
 
                             if (detection2d[i].has_calibration_results) {
                                 gui_plot_world_coordinates(

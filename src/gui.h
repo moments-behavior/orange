@@ -24,15 +24,13 @@ struct GL_Texture {
     cudaGraphicsResource_t cuda_resource;
     unsigned char *cuda_buffer;
     size_t cuda_pbo_storage_buffer_size;
-    cudaStream_t streams;
     int num_channels;
 };
 
 inline void setup_texture(GL_Texture &tex, int width, int height) {
-    cudaStreamCreate(&tex.streams);
     create_pbo(&tex.pbo, width, height);
     register_pbo_to_cuda(&tex.pbo, &tex.cuda_resource);
-    map_cuda_resource(&tex.cuda_resource, tex.streams);
+    map_cuda_resource(&tex.cuda_resource);
     cuda_pointer_from_resource(&tex.cuda_buffer,
                                &tex.cuda_pbo_storage_buffer_size,
                                &tex.cuda_resource);
@@ -57,10 +55,37 @@ inline void clear_upload_and_cleanup(GL_Texture &tex, int width, int height) {
     upload_texture_from_pbo(tex, width, height);
 
     // Cleanup resources
-    gx_delete_buffer(&tex.pbo);
-    unmap_cuda_resource(&tex.cuda_resource);
-    cuda_unregister_pbo(tex.cuda_resource);
-    cudaStreamDestroy(tex.streams);
+    // gx_delete_buffer(&tex.pbo);
+    // unmap_cuda_resource(&tex.cuda_resource);
+    // cuda_unregister_pbo(tex.cuda_resource);
+    // cudaStreamDestroy(tex.streams);
+
+    // 1. Unmap the CUDA resource (if still mapped)
+    if (tex.cuda_resource) {
+        cudaGraphicsUnmapResources(1, &tex.cuda_resource);
+    }
+
+    // 2. Unregister the PBO from CUDA
+    if (tex.cuda_resource) {
+        cudaGraphicsUnregisterResource(tex.cuda_resource);
+        tex.cuda_resource = nullptr;
+    }
+
+    // 3. Delete the OpenGL PBO
+    if (tex.pbo) {
+        glDeleteBuffers(1, &tex.pbo);
+        tex.pbo = 0;
+    }
+
+    // 4. Delete the OpenGL texture
+    if (tex.texture) {
+        glDeleteTextures(1, &tex.texture);
+        tex.texture = 0;
+    }
+
+    // 5. Null the CUDA buffer pointer (optional safety)
+    tex.cuda_buffer = nullptr;
+    tex.cuda_pbo_storage_buffer_size = 0;
 }
 
 inline void start_camera_streaming(

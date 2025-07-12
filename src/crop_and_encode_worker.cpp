@@ -20,7 +20,7 @@ CropAndEncodeWorker::CropAndEncodeWorker(const char* name, CameraParams* camera_
     writer_.keyframe_file = folder_name_ + "/Cam" + camera_params_->camera_serial + "_crop_keyframe.csv";
     writer_.metadata_file = folder_name_ + "/Cam" + camera_params_->camera_serial + "_crop_meta.csv";
 
-    writer_.video = new FFmpegWriter(AV_CODEC_ID_H264, 256, 256, camera_params_->frame_rate,
+    writer_.video = new FFmpegWriter(AV_CODEC_ID_HEVC, 256, 256, camera_params_->frame_rate,
                                    writer_.video_file.c_str(), writer_.keyframe_file.c_str());
     writer_.video->create_thread();
 
@@ -41,26 +41,38 @@ CropAndEncodeWorker::CropAndEncodeWorker(const char* name, CameraParams* camera_
 
         encoder_ = new NvEncoderCuda(cuContext, 256, 256, NV_ENC_BUFFER_FORMAT_NV12);
 
-        NV_ENC_INITIALIZE_PARAMS encodeConfig = { NV_ENC_INITIALIZE_PARAMS_VER };
-        NV_ENC_TUNING_INFO tuningInfo = {NV_ENC_TUNING_INFO_HIGH_QUALITY};
-        NV_ENC_CONFIG encConfig = { NV_ENC_CONFIG_VER };
-        encodeConfig.encodeConfig = &encConfig;
+        // 1. All encoder parameters are now in one place.
+        NV_ENC_INITIALIZE_PARAMS initializeParams = { NV_ENC_INITIALIZE_PARAMS_VER };
+        NV_ENC_CONFIG encodeConfig = { NV_ENC_CONFIG_VER };
+        initializeParams.encodeConfig = &encodeConfig;
 
-        encoder_->CreateDefaultEncoderParams(&encodeConfig, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P5_GUID, tuningInfo);
+        // 2. Set the desired GUIDs for lossless encoding.
+        // Using HEVC is required for the LOSSLESS tuning preset.
+        GUID codecGuid = NV_ENC_CODEC_HEVC_GUID;
+        GUID presetGuid = NV_ENC_PRESET_P7_GUID;
+        NV_ENC_TUNING_INFO tuningInfo = NV_ENC_TUNING_INFO_LOSSLESS;
 
-        encodeConfig.frameRateNum = camera_params_->frame_rate;
-        encodeConfig.frameRateDen = 1;
-        encodeConfig.enablePTD = 1;
+        std::cout << "[CropAndEncodeWorker] CONFIGURING FOR LOSSLESS (HEVC), HIGH-QUALITY RECORDING." << std::endl;
 
-        encConfig.frameIntervalP = 1;
-        encConfig.gopLength = NVENC_INFINITE_GOPLENGTH;
-        encConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
-        encConfig.rcParams.averageBitRate = 2000000;
-        encConfig.rcParams.vbvBufferSize = encConfig.rcParams.averageBitRate;
+        // 3. Create the default parameter set from the GUIDs.
+        encoder_->CreateDefaultEncoderParams(&initializeParams, codecGuid, presetGuid, tuningInfo);
 
-        encoder_->CreateEncoder(&encodeConfig);
+        // 4. Override any specific parameters you need.
+        encodeConfig.gopLength = NVENC_INFINITE_GOPLENGTH; // Infinite GOP length for lossless
+        encodeConfig.frameIntervalP = 1; // No B-frames, only I-
+        initializeParams.frameRateNum = camera_params_->frame_rate;
+        initializeParams.frameRateDen = 1;
+        initializeParams.enablePTD = 1;
+        
+        // The lossless preset handles the quality settings automatically,
+        // but explicitly setting a low QP (Quantization Parameter) can be good practice.
+        encodeConfig.rcParams.constQP = { 0, 0, 0 };
+
+        // 5. Create the encoder with the final parameters.
+        encoder_->CreateEncoder(&initializeParams);
+
+        // 6. Final setup steps.
         encoder_->SetIOCudaStreams((NV_ENC_CUSTREAM_PTR)&m_stream, (NV_ENC_CUSTREAM_PTR)&m_stream);
-
         const NvEncInputFrame *tempFrame = encoder_->GetNextInputFrame();
         encoder_pitch_ = tempFrame->pitch;
 

@@ -71,7 +71,7 @@ void COpenGLDisplay::ThreadRunning() {
 
         const std::string engine_file_path = camera_select->yolo_model;
         yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                            camera_params->height, true, 0);
+                            camera_params->height, d_convert, true, 0);
         yolov8->make_pipe(true);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 8);
@@ -115,7 +115,7 @@ void COpenGLDisplay::ThreadRunning() {
                 rgba2rgb_convert(d_convert, debayer.d_debayer,
                                  camera_params->width, camera_params->height,
                                  0);
-                yolov8->preprocess_gpu(d_convert);
+                yolov8->preprocess_gpu();
                 yolov8->infer();
                 yolov8->postprocess(objs);
                 yolov8->copy_keypoints_gpu(d_points, objs);

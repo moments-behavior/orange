@@ -25,9 +25,15 @@ void detection3d_proc(CameraControl *camera_control,
     }
 
     TriangulatePoints ball2d_all_cams;
-    auto start = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point start =
+        std::chrono::high_resolution_clock::time_point();
     int count = 0;
     while (camera_control->subscribe) {
+        // start timing after 10 frames
+        if (count == 10) {
+            start = std::chrono::high_resolution_clock::now();
+        }
+
         // 1. wait for all the detection ready; otherwise sleep
         std::unique_lock<std::mutex> lock(mtx3d);
         cv3d.wait(lock, [&] {
@@ -95,9 +101,15 @@ void detection3d_proc(CameraControl *camera_control,
         }
         count++;
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    float calc_frame_rate = count / elapsed.count();
-    std::cout << "Triangule Frame Rate : " + std::to_string(calc_frame_rate)
-              << std::endl;
+
+    if (start == std::chrono::high_resolution_clock::time_point()) {
+        // start is zero (uninitialized)
+        std::cout << "Run it longer for meaning report of detection fps.\n";
+    } else {
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        float calc_frame_rate = (count - 10) / elapsed.count();
+        std::cout << "Triangule Frame Rate : " + std::to_string(calc_frame_rate)
+                  << std::endl;
+    }
 }

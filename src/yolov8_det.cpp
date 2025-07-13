@@ -150,18 +150,30 @@ void YOLOv8::make_pipe(bool warmup) {
     }
 
     if (warmup) {
-        for (int i = 0; i < 10; i++) {
-            for (auto &bindings : this->input_bindings) {
-                size_t size = bindings.size * bindings.dsize;
+        // Warm up preprocessing
+        unsigned char *dummy_input;
+        size_t dummy_size = img_width * img_height * sizeof(uchar3);
+        CHECK(cudaMalloc(&dummy_input, dummy_size));
+
+        for (int i = 0; i < 5; ++i) {
+            this->preprocess_gpu(dummy_input);
+        }
+
+        // Optional: keep or free dummy_input
+        cudaFree(dummy_input);
+
+        for (int j = 0; j < 10; ++j) {
+            for (size_t i = 0; i < this->input_bindings.size(); ++i) {
+                size_t size = input_bindings[i].size * input_bindings[i].dsize;
                 void *h_ptr = malloc(size);
                 memset(h_ptr, 0, size);
-                CHECK(cudaMemcpyAsync(this->device_ptrs[0], h_ptr, size,
-                                      cudaMemcpyHostToDevice, this->stream));
+                cudaMemcpyAsync(this->device_ptrs[i], h_ptr, size,
+                                cudaMemcpyHostToDevice, this->stream);
                 free(h_ptr);
             }
-            this->infer();
+            this->infer(); // launches inference and output copy
         }
-        CHECK(cudaStreamSynchronize(this->stream));
+        cudaStreamSynchronize(this->stream); // wait for all 10 inferences
         printf("model warmup 10 times\n");
     }
 }

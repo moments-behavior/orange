@@ -20,12 +20,13 @@ class FrameDetector {
     void stop();
 
     // Called from capture thread when a frame is ready
-    void notify_frame_ready(void *device_image_ptr);
+    void notify_frame_ready(void *device_image_ptr, cudaStream_t copy_stream);
 
   private:
     void thread_loop();
 
     cudaStream_t stream;
+    cudaEvent_t copy_done_event;
     CameraParams *camera_params;
     CameraEachSelect *camera_select;
     FrameProcess frame_process;

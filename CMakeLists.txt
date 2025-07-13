@@ -145,6 +145,7 @@ target_link_libraries(orange
     opencv_calib3d
     nvinfer
     nvinfer_plugin
+    nvToolsExt
     glfw
 )
 

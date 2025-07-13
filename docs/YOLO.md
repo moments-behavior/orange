@@ -40,7 +40,7 @@ Change the arguments to fit your use case.
 
 Finally, use `trtexec` to compile `.onnx` to `.engine`:
 ```
-~/nvidia/TensorRT/bin/trtexec --onnx=yolov8s.onnx --saveEngine yolov8s.engine --fp16
+~/nvidia/TensorRT/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --fp16
 ```
 
 We can move this `.engine` file into the default directory that orange looks at:

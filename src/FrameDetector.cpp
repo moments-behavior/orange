@@ -65,7 +65,8 @@ void FrameDetector::thread_loop() {
     // initialize yolo
     const std::string engine_file_path = camera_select->yolo_model;
     yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                        camera_params->height, true, stream);
+                        camera_params->height, frame_process.debayer.d_debayer,
+                        true, stream);
     nvtxRangePush("warmup");
     yolov8->make_pipe(true);
     nvtxRangePop();
@@ -73,9 +74,15 @@ void FrameDetector::thread_loop() {
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
 
-    auto start = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point start =
+        std::chrono::high_resolution_clock::time_point();
     int count = 0;
     while (running.load()) {
+        // start timing after 10 frames
+        if (count == 10) {
+            start = std::chrono::high_resolution_clock::now();
+        }
+
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [&] {
             return camera_select->frame_detect_state.load() ==
@@ -97,15 +104,18 @@ void FrameDetector::thread_loop() {
                                     &frame_process.frame_original,
                                     &frame_process.debayer);
         }
-        nvtxRangePush("yolo_pre");
-        yolov8->preprocess_gpu(frame_process.debayer.d_debayer);
-        nvtxRangePop();
-        nvtxRangePush("yolo_infer");
-        yolov8->infer(); // it sync gpu with cpu here
-        nvtxRangePop();
-        nvtxRangePush("yolo_post");
+
+        if (yolov8->graph_captured) {
+            nvtxRangePush("graph");
+            CHECK(cudaGraphLaunch(yolov8->inference_graph_exec, stream));
+            CHECK(cudaStreamSynchronize(stream));
+            nvtxRangePop();
+        } else {
+            yolov8->preprocess_gpu();
+            yolov8->infer(); // it sync gpu with cpu here
+        }
         yolov8->postprocess(objs);
-        nvtxRangePop();
+
         if (objs.size() > 0) {
             f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
             f32 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
@@ -131,10 +141,15 @@ void FrameDetector::thread_loop() {
         count++;
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    float calc_frame_rate = count / elapsed.count();
-    std::cout << camera_params->camera_serial
-              << ", Detect Frame Rate : " + std::to_string(calc_frame_rate)
-              << std::endl;
+    if (start == std::chrono::high_resolution_clock::time_point()) {
+        // start is zero (uninitialized)
+        std::cout << "Run it longer for meaning report of detection fps.\n";
+    } else {
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        float calc_frame_rate = (count - 10) / elapsed.count();
+        std::cout << camera_params->camera_serial
+                  << ", Detect Frame Rate : " + std::to_string(calc_frame_rate)
+                  << std::endl;
+    }
 }

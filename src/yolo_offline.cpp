@@ -42,9 +42,10 @@ int main(int argc, char **argv) {
     cv::Mat image;
 
     printf("YOLO initialization...\n");
-
-    YOLOv8 *yolov8 =
-        new YOLOv8(engine_file_path, camera_width, camera_height, true, 0);
+    int frame_size = camera_width * camera_height * 3;
+    CHECK(cudaMalloc((void **)&d_frame, frame_size));
+    YOLOv8 *yolov8 = new YOLOv8(engine_file_path, camera_width, camera_height,
+                                d_frame, true, 0);
     yolov8->make_pipe(true);
 
     cudaMalloc((void **)&d_points, sizeof(float) * 8);
@@ -52,8 +53,6 @@ int main(int argc, char **argv) {
     CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8,
                      cudaMemcpyHostToDevice));
 
-    int frame_size = camera_width * camera_height * 3;
-    CHECK(cudaMalloc((void **)&d_frame, frame_size));
     std::vector<Bbox> objs;
     unsigned char *frame_draw =
         (unsigned char *)malloc(frame_size * sizeof(unsigned char));
@@ -72,7 +71,7 @@ int main(int argc, char **argv) {
                   << std::endl;
 
         start = std::chrono::high_resolution_clock::now();
-        yolov8->preprocess_gpu(d_frame);
+        yolov8->preprocess_gpu();
         yolov8->infer();
         yolov8->postprocess(objs);
         yolov8->copy_keypoints_gpu(d_points, objs);

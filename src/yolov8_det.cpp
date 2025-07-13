@@ -3,7 +3,10 @@
 #include <npp.h>
 
 YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
-               bool use_external_stream, cudaStream_t stream) {
+               unsigned char *d_input_image, bool use_external_stream,
+               cudaStream_t stream)
+    : d_input_image(d_input_image) {
+
     img_width = width;
     img_height = height;
 
@@ -98,8 +101,11 @@ YOLOv8::~YOLOv8() {
             ->runtime; // Use delete to call the destructor for `runtime`.
     }
 
-    if (!use_external_stream && stream != nullptr) {
-        CHECK(cudaStreamDestroy(this->stream));
+    if (inference_graph_exec) {
+        cudaGraphExecDestroy(inference_graph_exec);
+    }
+    if (inference_graph) {
+        cudaGraphDestroy(inference_graph);
     }
 
     for (auto &ptr : this->device_ptrs) {
@@ -118,6 +124,9 @@ YOLOv8::~YOLOv8() {
         CHECK(cudaFree(d_float));
     if (d_planar)
         CHECK(cudaFree(d_planar));
+    if (!use_external_stream && stream != nullptr) {
+        CHECK(cudaStreamDestroy(this->stream));
+    }
 }
 
 void YOLOv8::make_pipe(bool warmup) {
@@ -150,35 +159,44 @@ void YOLOv8::make_pipe(bool warmup) {
     }
 
     if (warmup) {
-        // Warm up preprocessing
-        unsigned char *dummy_input;
-        size_t dummy_size = img_width * img_height * sizeof(uchar3);
-        CHECK(cudaMalloc(&dummy_input, dummy_size));
+        // Step 1: one warmup pass to trigger JIT and plugin init
+        this->preprocess_gpu();
 
-        for (int i = 0; i < 5; ++i) {
-            this->preprocess_gpu(dummy_input);
+        for (size_t i = 0; i < this->input_bindings.size(); ++i) {
+            size_t size = input_bindings[i].size * input_bindings[i].dsize;
+            void *h_ptr = malloc(size);
+            memset(h_ptr, 0, size);
+            cudaMemcpyAsync(this->device_ptrs[i], h_ptr, size,
+                            cudaMemcpyHostToDevice, this->stream);
+            free(h_ptr);
         }
+        this->infer_capture_only(); // no sync!
 
-        // Optional: keep or free dummy_input
-        cudaFree(dummy_input);
+        // Step 2: capture graph
+        cudaGraph_t graph;
+        cudaGraphExec_t graph_exec;
 
-        for (int j = 0; j < 10; ++j) {
-            for (size_t i = 0; i < this->input_bindings.size(); ++i) {
-                size_t size = input_bindings[i].size * input_bindings[i].dsize;
-                void *h_ptr = malloc(size);
-                memset(h_ptr, 0, size);
-                cudaMemcpyAsync(this->device_ptrs[i], h_ptr, size,
-                                cudaMemcpyHostToDevice, this->stream);
-                free(h_ptr);
-            }
-            this->infer(); // launches inference and output copy
-        }
-        cudaStreamSynchronize(this->stream); // wait for all 10 inferences
-        printf("model warmup 10 times\n");
+        CHECK(cudaStreamSynchronize(this->stream)); // ensure warmup is done
+        CHECK(
+            cudaStreamBeginCapture(this->stream, cudaStreamCaptureModeGlobal));
+
+        this->preprocess_gpu();
+        this->infer_capture_only(); // no sync inside this!
+
+        CHECK(cudaStreamEndCapture(this->stream, &graph));
+        CHECK(cudaGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0));
+
+        // Save for reuse
+        this->inference_graph = graph;
+        this->inference_graph_exec = graph_exec;
+        this->graph_captured = true;
+
+        CHECK(cudaStreamSynchronize(this->stream));
+        printf("CUDA Graph captured with preprocess + inference.\n");
     }
 }
 
-void YOLOv8::preprocess_gpu(unsigned char *d_rgb) {
+void YOLOv8::preprocess_gpu() {
     const float inp_h = (float)inp_h_int;
     const float inp_w = (float)inp_w_int;
     float width = img_width;
@@ -209,8 +227,8 @@ void YOLOv8::preprocess_gpu(unsigned char *d_rgb) {
 
     // TODO: is input_w_int here correct
     const NppStatus npp_result =
-        nppiResize_8u_C3R(d_rgb, img_width * sizeof(uchar3), img_size, roi,
-                          d_temp, inp_w_int * sizeof(uchar3),
+        nppiResize_8u_C3R(d_input_image, img_width * sizeof(uchar3), img_size,
+                          roi, d_temp, inp_w_int * sizeof(uchar3),
                           output_resize_size, output_roi, NPPI_INTER_SUPER);
     if (npp_result != NPP_SUCCESS) {
         std::cerr << "Error executing Resize -- code: " << npp_result
@@ -364,6 +382,23 @@ void YOLOv8::infer() {
                               cudaMemcpyDeviceToHost, this->stream));
     }
     cudaStreamSynchronize(this->stream);
+}
+
+void YOLOv8::infer_capture_only() {
+
+    for (int32_t i = 0, e = this->engine->getNbIOTensors(); i < e; i++) {
+        auto const name = this->engine->getIOTensorName(i);
+        this->context->setTensorAddress(name, this->device_ptrs[i]);
+    }
+
+    this->context->enqueueV3(this->stream);
+    for (int i = 0; i < this->num_outputs; i++) {
+        size_t osize =
+            this->output_bindings[i].size * this->output_bindings[i].dsize;
+        CHECK(cudaMemcpyAsync(this->host_ptrs[i],
+                              this->device_ptrs[i + this->num_inputs], osize,
+                              cudaMemcpyDeviceToHost, this->stream));
+    }
 }
 
 void YOLOv8::postprocess(std::vector<Bbox> &objs) {

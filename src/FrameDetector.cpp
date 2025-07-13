@@ -35,7 +35,7 @@ void FrameDetector::stop() {
 
 void FrameDetector::notify_frame_ready(void *device_image_ptr,
                                        cudaStream_t copy_stream) {
-    nvtxRangePush("copy_frame_for_detection");
+    // nvtxRangePush("copy_frame_for_detection");
     if (camera_params->gpu_direct) {
         ck(cudaMemcpy2DAsync(
             frame_process.frame_original.d_orig, camera_params->width,
@@ -47,7 +47,7 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr,
             device_image_ptr, camera_params->width, camera_params->width,
             camera_params->height, cudaMemcpyHostToDevice, copy_stream));
     }
-    nvtxRangePop();
+    // nvtxRangePop();
     cudaEventRecord(copy_done_event, copy_stream); // mark when copy is done
     camera_select->frame_detect_state.store(State_Frame_Copy_Done);
     cv.notify_one();
@@ -67,9 +67,9 @@ void FrameDetector::thread_loop() {
     yolov8 = new YOLOv8(engine_file_path, camera_params->width,
                         camera_params->height, frame_process.debayer.d_debayer,
                         true, stream);
-    nvtxRangePush("warmup");
-    yolov8->make_pipe(true);
-    nvtxRangePop();
+    // nvtxRangePush("warmup");
+    // yolov8->make_pipe(true);
+    // nvtxRangePop();
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
@@ -106,10 +106,10 @@ void FrameDetector::thread_loop() {
         }
 
         if (yolov8->graph_captured) {
-            nvtxRangePush("graph");
+            // nvtxRangePush("graph");
             CHECK(cudaGraphLaunch(yolov8->inference_graph_exec, stream));
             CHECK(cudaStreamSynchronize(stream));
-            nvtxRangePop();
+            // nvtxRangePop();
         } else {
             yolov8->preprocess_gpu();
             yolov8->infer(); // it sync gpu with cpu here

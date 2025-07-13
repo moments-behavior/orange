@@ -6,6 +6,7 @@
 #include "kernel.cuh"
 #include "opengldisplay.h"
 #include <cuda_runtime_api.h>
+#include <nvToolsExt.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -96,6 +97,7 @@ void COpenGLDisplay::ThreadRunning() {
             WORKER_ENTRY entry = *(WORKER_ENTRY *)f;
             PutObjectToQueueOut(f);
 
+            nvtxRangePush("display_gl_copy_debayer");
             // copy frame from cpu to gpu
             ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width,
                             entry.imagePtr, camera_params->width,
@@ -107,6 +109,7 @@ void COpenGLDisplay::ThreadRunning() {
             } else {
                 duplicate_channel_gpu(camera_params, &frame_original, &debayer);
             }
+            nvtxRangePop();
 
             if (camera_select->detect_mode == Detect2D_GLThread) {
                 rgba2rgb_convert(d_convert, debayer.d_debayer,
@@ -151,6 +154,7 @@ void COpenGLDisplay::ThreadRunning() {
                 }
             }
 
+            nvtxRangePush("display_gl_copy_to_interop_buffer");
             if (camera_select->downsample != 1) {
                 const NppStatus npp_result = nppiResize_8u_C4R(
                     debayer.d_debayer, camera_params->width * sizeof(uchar4),
@@ -173,6 +177,7 @@ void COpenGLDisplay::ThreadRunning() {
                                 output_image_size.height,
                                 cudaMemcpyDeviceToDevice));
             }
+            nvtxRangePop();
             cudaDeviceSynchronize();
 
             // if (camera_select->frame_save_state==State_Write_New_Frame) {

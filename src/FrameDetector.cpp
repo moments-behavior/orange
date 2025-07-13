@@ -3,14 +3,18 @@
 #include "video_capture.h"
 #include <mutex>
 #include <npp.h>
+#include <nvToolsExt.h>
 
 FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
-    : camera_params(params), camera_select(select), running(false) {}
+    : camera_params(params), camera_select(select), running(false) {
+    cudaEventCreateWithFlags(&copy_done_event, cudaEventDisableTiming);
+}
 
 FrameDetector::~FrameDetector() {
     stop();
     cudaFree(frame_process.frame_original.d_orig);
     cudaFree(frame_process.debayer.d_debayer);
+    cudaEventDestroy(copy_done_event);
     ck(cudaStreamDestroy(stream));
 }
 
@@ -29,18 +33,22 @@ void FrameDetector::stop() {
     }
 }
 
-void FrameDetector::notify_frame_ready(void *device_image_ptr) {
+void FrameDetector::notify_frame_ready(void *device_image_ptr,
+                                       cudaStream_t copy_stream) {
+    nvtxRangePush("copy_frame_for_detection");
     if (camera_params->gpu_direct) {
         ck(cudaMemcpy2DAsync(
             frame_process.frame_original.d_orig, camera_params->width,
             device_image_ptr, camera_params->width, camera_params->width,
-            camera_params->height, cudaMemcpyDeviceToDevice, stream));
+            camera_params->height, cudaMemcpyDeviceToDevice, copy_stream));
     } else {
         ck(cudaMemcpy2DAsync(
             frame_process.frame_original.d_orig, camera_params->width,
             device_image_ptr, camera_params->width, camera_params->width,
-            camera_params->height, cudaMemcpyHostToDevice, stream));
+            camera_params->height, cudaMemcpyHostToDevice, copy_stream));
     }
+    nvtxRangePop();
+    cudaEventRecord(copy_done_event, copy_stream); // mark when copy is done
     camera_select->frame_detect_state.store(State_Frame_Copy_Done);
     cv.notify_one();
 }
@@ -58,8 +66,9 @@ void FrameDetector::thread_loop() {
     const std::string engine_file_path = camera_select->yolo_model;
     yolov8 = new YOLOv8(engine_file_path, camera_params->width,
                         camera_params->height, true, stream);
+    nvtxRangePush("warmup");
     yolov8->make_pipe(true);
-
+    nvtxRangePop();
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
@@ -79,6 +88,7 @@ void FrameDetector::thread_loop() {
         lock.unlock();
 
         // GPU processing
+        cudaStreamWaitEvent(stream, copy_done_event, 0);
         if (camera_params->color) {
             debayer_frame_gpu_rgb(camera_params, &frame_process.frame_original,
                                   &frame_process.debayer);
@@ -87,10 +97,15 @@ void FrameDetector::thread_loop() {
                                     &frame_process.frame_original,
                                     &frame_process.debayer);
         }
+        nvtxRangePush("yolo_pre");
         yolov8->preprocess_gpu(frame_process.debayer.d_debayer);
+        nvtxRangePop();
+        nvtxRangePush("yolo_infer");
         yolov8->infer(); // it sync gpu with cpu here
+        nvtxRangePop();
+        nvtxRangePush("yolo_post");
         yolov8->postprocess(objs);
-
+        nvtxRangePop();
         if (objs.size() > 0) {
             f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
             f32 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;

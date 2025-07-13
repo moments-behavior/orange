@@ -197,7 +197,7 @@ inline void get_one_frame(CameraState *camera_state,
         FrameDetector *detector = static_cast<FrameDetector *>(frame_detector);
         if (detector &&
             camera_select->frame_detect_state.load() == State_Copy_New_Frame) {
-            detector->notify_frame_ready(ecam->frame_recv.imagePtr);
+            detector->notify_frame_ready(ecam->frame_recv.imagePtr, 0);
         }
 #endif
 

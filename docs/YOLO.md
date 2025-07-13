@@ -30,7 +30,7 @@ python3 export-det.py \
 --weights yolov8s.pt \
 --iou-thres 0.65 \
 --conf-thres 0.25 \
---topk 100 \
+--topk 10 \
 --opset 11 \
 --sim \
 --input-shape 1 3 640 640 \

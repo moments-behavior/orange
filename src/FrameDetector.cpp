@@ -68,7 +68,7 @@ void FrameDetector::thread_loop() {
                         camera_params->height, frame_process.debayer.d_debayer,
                         true, stream);
     // nvtxRangePush("warmup");
-    // yolov8->make_pipe(true);
+    yolov8->make_pipe(true);
     // nvtxRangePop();
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial

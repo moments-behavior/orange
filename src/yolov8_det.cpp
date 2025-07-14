@@ -129,7 +129,7 @@ YOLOv8::~YOLOv8() {
     }
 }
 
-void YOLOv8::make_pipe(bool warmup) {
+void YOLOv8::make_pipe(bool graph_capture) {
     // allocate device resources for initialization
     CHECK(cudaMallocAsync((void **)&d_temp, padw * padh * 3,
                           this->stream)); // assuming width bigger than height
@@ -158,7 +158,7 @@ void YOLOv8::make_pipe(bool warmup) {
         this->host_ptrs.push_back(h_ptr);
     }
 
-    if (warmup) {
+    if (graph_capture) {
         // Step 1: one warmup pass to trigger JIT and plugin init
         this->preprocess_gpu();
 
@@ -193,6 +193,19 @@ void YOLOv8::make_pipe(bool warmup) {
 
         CHECK(cudaStreamSynchronize(this->stream));
         printf("CUDA Graph captured with preprocess + inference.\n");
+    } else {
+        this->preprocess_gpu();
+
+        for (size_t i = 0; i < this->input_bindings.size(); ++i) {
+            size_t size = input_bindings[i].size * input_bindings[i].dsize;
+            void *h_ptr = malloc(size);
+            memset(h_ptr, 0, size);
+            cudaMemcpyAsync(this->device_ptrs[i], h_ptr, size,
+                            cudaMemcpyHostToDevice, this->stream);
+            free(h_ptr);
+        }
+        this->infer();
+        this->graph_captured = false;
     }
 }
 
@@ -437,7 +450,6 @@ void YOLOv8::postprocess(std::vector<Bbox> &objs) {
 
 void YOLOv8::copy_keypoints_gpu(float *d_points,
                                 const std::vector<Bbox> &objs) {
-    const int num_point = 4;
     float points[8] = {0};
     // TODO: draw both the bbox and the keypoints
     for (auto &obj : objs) {
@@ -453,12 +465,11 @@ void YOLOv8::copy_keypoints_gpu(float *d_points,
         points[6] = obj.rect.x + obj.rect.width;
         points[7] = obj.rect.y;
     }
-    CHECK(cudaMemcpy(d_points, points, sizeof(float) * 8,
-                     cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpyAsync(d_points, points, sizeof(float) * 8,
+                          cudaMemcpyHostToDevice, this->stream));
 }
 
 void YOLOv8::copy_keypoints_gpu(float *d_points, const Bbox &obj) {
-    const int num_point = 4;
     float points[8] = {0};
 
     points[0] = obj.rect.x;
@@ -473,8 +484,8 @@ void YOLOv8::copy_keypoints_gpu(float *d_points, const Bbox &obj) {
     points[6] = obj.rect.x + obj.rect.width;
     points[7] = obj.rect.y;
 
-    CHECK(cudaMemcpy(d_points, points, sizeof(float) * 8,
-                     cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpyAsync(d_points, points, sizeof(float) * 8,
+                          cudaMemcpyHostToDevice, this->stream));
 }
 
 void YOLOv8::draw_objects(

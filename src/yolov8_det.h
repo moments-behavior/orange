@@ -12,7 +12,7 @@ class YOLOv8 {
                     cudaStream_t stream);
     ~YOLOv8();
 
-    void make_pipe(bool warmup = true);
+    void make_pipe(bool graph_capture);
     void preprocess_gpu();
     void infer();
     void postprocess(std::vector<Bbox> &objs);

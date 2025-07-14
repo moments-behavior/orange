@@ -1,4 +1,5 @@
 #include "realtime_tool.h"
+#include <filesystem>
 #include <iostream>
 
 std::string cvmat_type2str(int type) {
@@ -78,6 +79,12 @@ void print_calibration_results(CameraCalibResults *calib_results) {
 
 bool load_camera_calibration_results(std::string calibration_file,
                                      CameraCalibResults *calib_results) {
+
+    if (!std::filesystem::exists(calibration_file)) {
+        std::cout << "Calibration file does not exist: " << calibration_file
+                  << std::endl;
+        return false;
+    }
     cv::FileStorage fs(calibration_file, cv::FileStorage::READ);
     if (!fs.isOpened()) {
         std::cout << "Could not open the calibration file: \""

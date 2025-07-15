@@ -5,7 +5,12 @@
 YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
                unsigned char *d_input_image, bool use_external_stream,
                cudaStream_t stream)
-    : d_input_image(d_input_image) {
+    : d_input_image(d_input_image), use_external_stream(use_external_stream) {
+
+    d_temp = d_boarder = nullptr;
+    d_float = d_planar = nullptr;
+    inference_graph = nullptr;
+    inference_graph_exec = nullptr;
 
     img_width = width;
     img_height = height;
@@ -33,11 +38,9 @@ YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
     if (use_external_stream) {
         this->stream = stream;
         nppSetStream(this->stream);
-        use_external_stream = true;
     } else {
         CHECK(cudaStreamCreate(&this->stream));
         nppSetStream(this->stream);
-        use_external_stream = false;
     }
 
     this->num_bindings = this->engine->getNbIOTensors();
@@ -90,6 +93,7 @@ YOLOv8::~YOLOv8() {
     if (this->context) {
         delete this
             ->context; // Use delete to call the destructor for `context`.
+        this->context = nullptr;
     }
 
     if (this->engine) {
@@ -109,12 +113,16 @@ YOLOv8::~YOLOv8() {
     }
 
     for (auto &ptr : this->device_ptrs) {
-        CHECK(cudaFree(ptr));
+        if (ptr)
+            CHECK(cudaFreeAsync(ptr, this->stream));
     }
 
     for (auto &ptr : this->host_ptrs) {
         CHECK(cudaFreeHost(ptr));
     }
+
+    device_ptrs.clear();
+    host_ptrs.clear();
 
     if (d_temp)
         CHECK(cudaFree(d_temp));
@@ -150,7 +158,8 @@ void YOLOv8::make_pipe(bool graph_capture) {
     }
 
     for (auto &bindings : this->output_bindings) {
-        void *d_ptr, *h_ptr;
+        void *d_ptr = nullptr;
+        void *h_ptr = nullptr;
         size_t size = bindings.size * bindings.dsize;
         CHECK(cudaMallocAsync(&d_ptr, size, this->stream));
         CHECK(cudaHostAlloc(&h_ptr, size, 0));
@@ -161,15 +170,6 @@ void YOLOv8::make_pipe(bool graph_capture) {
     if (graph_capture) {
         // Step 1: one warmup pass to trigger JIT and plugin init
         this->preprocess_gpu();
-
-        for (size_t i = 0; i < this->input_bindings.size(); ++i) {
-            size_t size = input_bindings[i].size * input_bindings[i].dsize;
-            void *h_ptr = malloc(size);
-            memset(h_ptr, 0, size);
-            cudaMemcpyAsync(this->device_ptrs[i], h_ptr, size,
-                            cudaMemcpyHostToDevice, this->stream);
-            free(h_ptr);
-        }
         this->infer_capture_only(); // no sync!
 
         // Step 2: capture graph
@@ -195,15 +195,6 @@ void YOLOv8::make_pipe(bool graph_capture) {
         printf("CUDA Graph captured with preprocess + inference.\n");
     } else {
         this->preprocess_gpu();
-
-        for (size_t i = 0; i < this->input_bindings.size(); ++i) {
-            size_t size = input_bindings[i].size * input_bindings[i].dsize;
-            void *h_ptr = malloc(size);
-            memset(h_ptr, 0, size);
-            cudaMemcpyAsync(this->device_ptrs[i], h_ptr, size,
-                            cudaMemcpyHostToDevice, this->stream);
-            free(h_ptr);
-        }
         this->infer();
         this->graph_captured = false;
     }

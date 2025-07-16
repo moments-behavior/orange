@@ -74,7 +74,7 @@ void COpenGLDisplay::ThreadRunning() {
 
         const std::string engine_file_path = camera_select->yolo_model;
         yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                            camera_params->height, d_convert, true, 0, npp_ctx);
+                            camera_params->height, 0, d_convert, npp_ctx);
         yolov8->make_pipe(false);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 8);

@@ -239,24 +239,25 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     unsigned char *display_buffer, std::string encoder_setup,
                     std::string folder_name, PTPParams *ptp_params,
                     INDIGOSignalBuilder *indigo_signal_builder) {
-    ck(cudaSetDevice(camera_params->gpu_id));
+    CHECK(cudaSetDevice(camera_params->gpu_id));
     CameraState camera_state;
     PTPState ptp_state;
     StopWatch w;
 
 #ifndef HEADLESS
-    bool detector_ready_signal = false;
     FrameDetector *frame_detector = nullptr;
-    if (camera_select->detect_mode == Detect3d_Standoff ||
+    if (camera_select->detect_mode == Detect3D_Standoff ||
         camera_select->detect_mode == Detect2D_Standoff) {
-        frame_detector = new FrameDetector(camera_params, camera_select,
-                                           &detector_ready_signal);
+        frame_detector = new FrameDetector(camera_params, camera_select);
         frame_detector->start();
-        // wait till encoder is ready
-        while (!detector_ready_signal) {
+
+        while (detector_counter.load() !=
+               camera_select->total_standoff_detector) {
+            // printf(".");
+            // fflush(stdout);
             usleep(10);
         }
-        std::cout << "encoder ready\n" << std::endl;
+        camera_select->frame_detect_state.store(State_Copy_New_Frame);
     }
 
     COpenGLDisplay *openGLDisplay = nullptr;
@@ -357,7 +358,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
         delete openGLDisplay;
     }
 
-    if (camera_select->detect_mode == Detect3d_Standoff ||
+    if (camera_select->detect_mode == Detect3D_Standoff ||
         camera_select->detect_mode == Detect2D_Standoff) {
         frame_detector->stop();
         delete frame_detector;

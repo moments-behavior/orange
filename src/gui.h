@@ -7,7 +7,6 @@
 #include "gx_helper.h"
 #include "imgui.h"
 #include "realtime_tool.h"
-#include "utils.h"
 #include "video_capture.h"
 #include <math.h>
 #include <thread>
@@ -52,7 +51,7 @@ inline void clear_upload_and_cleanup(GL_Texture &tex, int width, int height) {
     if (tex.cuda_buffer) {
         int size_pic =
             width * height * 4 * sizeof(unsigned char); // assuming uchar4
-        cudaMemset(tex.cuda_buffer, 0xFF, size_pic);
+        cudaMemset(tex.cuda_buffer, 0, size_pic);
     }
 
     // 2. Upload from PBO to texture
@@ -97,6 +96,7 @@ inline void start_camera_streaming(
 
     detection2d = new DetectionDataPerCam[num_cameras];
     int idx3d = 0;
+    int total_standoff_detector = 0;
     for (int i = 0; i < num_cameras; i++) {
         detection2d[i].calibration_file = calib_yaml_folder + "/Cam" +
                                           cameras_params[i].camera_serial +
@@ -108,12 +108,20 @@ inline void start_camera_streaming(
             std::cout << detection2d[i].calibration_file << std::endl;
         }
         cameras_select[i].idx2d = i;
-        if (cameras_select[i].detect_mode == Detect3d_Standoff) {
+        if (cameras_select[i].detect_mode == Detect3D_Standoff) {
             cameras_select[i].idx3d = idx3d;
             idx3d++;
         }
-        cameras_select[i].frame_detect_state.store(State_Copy_New_Frame);
+        if (cameras_select[i].detect_mode == Detect3D_Standoff ||
+            cameras_select[i].detect_mode == Detect2D_Standoff) {
+            total_standoff_detector++;
+        }
     }
+
+    for (int i = 0; i < num_cameras; i++) {
+        cameras_select[i].total_standoff_detector = total_standoff_detector;
+    }
+
     if (idx3d >= 2) {
         detection3d_thread = std::thread(&detection3d_proc, camera_control,
                                          cameras_select, num_cameras);
@@ -190,6 +198,14 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
     }
     delete[] detection2d;
     detection2d = nullptr;
+
+    for (int i = 0; i < num_cameras; i++) {
+        cameras_select[i].frame_detect_state.store(State_Frame_Idle);
+        cameras_select[i].total_standoff_detector = 0;
+        cameras_select[i].idx2d = 0;
+        cameras_select[i].idx3d = 0;
+    }
+    detector_counter.store(0);
 }
 
 inline bool input_text(const char *label, std::string &str,

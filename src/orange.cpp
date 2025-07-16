@@ -1029,6 +1029,7 @@ int main(int argc, char **args) {
                         close_camera(&ecams[i].camera, &cameras_params[i]);
                     }
                     delete[] cameras_params;
+                    delete[] cameras_select;
                     delete[] ecams;
                 }
             }
@@ -1433,6 +1434,7 @@ int main(int argc, char **args) {
         }
         delete[] cameras_params;
         delete[] ecams;
+        delete[] cameras_select;
     }
 
     quite_enet = true;

@@ -3,7 +3,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "global.h"
 #include "gpu_video_encoder.h"
-#include "thread.h"
+#include "utils.h"
 #ifndef HEADLESS
 #include "FrameDetector.h"
 #include "opengldisplay.h"
@@ -244,10 +244,21 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     PTPState ptp_state;
     StopWatch w;
 
-    FrameSaver frame_saver(camera_params, camera_select);
-    frame_saver.start();
-
 #ifndef HEADLESS
+    bool detector_ready_signal = false;
+    FrameDetector *frame_detector = nullptr;
+    if (camera_select->detect_mode == Detect3d_Standoff ||
+        camera_select->detect_mode == Detect2D_Standoff) {
+        frame_detector = new FrameDetector(camera_params, camera_select,
+                                           &detector_ready_signal);
+        frame_detector->start();
+        // wait till encoder is ready
+        while (!detector_ready_signal) {
+            usleep(10);
+        }
+        std::cout << "encoder ready\n" << std::endl;
+    }
+
     COpenGLDisplay *openGLDisplay = nullptr;
     if (camera_select->stream_on) {
         openGLDisplay =
@@ -255,14 +266,10 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                                indigo_signal_builder);
         openGLDisplay->StartThread();
     }
-
-    FrameDetector *frame_detector = nullptr;
-    if (camera_select->detect_mode == Detect3d_Standoff ||
-        camera_select->detect_mode == Detect2D_Standoff) {
-        frame_detector = new FrameDetector(camera_params, camera_select);
-        frame_detector->start();
-    }
 #endif
+
+    FrameSaver frame_saver(camera_params, camera_select);
+    frame_saver.start();
 
     GPUVideoEncoder *gpu_encoder = nullptr;
     bool encoder_ready_signal = false;

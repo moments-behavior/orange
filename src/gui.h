@@ -7,6 +7,7 @@
 #include "gx_helper.h"
 #include "imgui.h"
 #include "realtime_tool.h"
+#include "utils.h"
 #include "video_capture.h"
 #include <math.h>
 #include <thread>
@@ -47,43 +48,40 @@ inline void upload_texture_from_pbo(GL_Texture &tex, int width, int height) {
 }
 
 inline void clear_upload_and_cleanup(GL_Texture &tex, int width, int height) {
-    // Clear the CUDA buffer
-    int size_pic = width * height * sizeof(unsigned char) * 4;
-    cudaMemset(tex.cuda_buffer, 0, size_pic);
-
-    // Upload from PBO to texture
-    upload_texture_from_pbo(tex, width, height);
-
-    // Cleanup resources
-    // gx_delete_buffer(&tex.pbo);
-    // unmap_cuda_resource(&tex.cuda_resource);
-    // cuda_unregister_pbo(tex.cuda_resource);
-    // cudaStreamDestroy(tex.streams);
-
-    // 1. Unmap the CUDA resource (if still mapped)
-    if (tex.cuda_resource) {
-        cudaGraphicsUnmapResources(1, &tex.cuda_resource);
+    // 1. Clear the buffer (only if valid)
+    if (tex.cuda_buffer) {
+        int size_pic =
+            width * height * 4 * sizeof(unsigned char); // assuming uchar4
+        cudaMemset(tex.cuda_buffer, 0xFF, size_pic);
     }
 
-    // 2. Unregister the PBO from CUDA
+    // 2. Upload from PBO to texture
+    upload_texture_from_pbo(tex, width, height);
+
+    // 3. Unmap if mapped
+    if (tex.cuda_resource) {
+        cudaError_t err = cudaGraphicsUnmapResources(1, &tex.cuda_resource, 0);
+    }
+
+    // 4. Now it's safe to unregister
     if (tex.cuda_resource) {
         cudaGraphicsUnregisterResource(tex.cuda_resource);
         tex.cuda_resource = nullptr;
     }
 
-    // 3. Delete the OpenGL PBO
+    // 5. Delete OpenGL PBO
     if (tex.pbo) {
         glDeleteBuffers(1, &tex.pbo);
         tex.pbo = 0;
     }
 
-    // 4. Delete the OpenGL texture
+    // 6. Delete OpenGL texture
     if (tex.texture) {
         glDeleteTextures(1, &tex.texture);
         tex.texture = 0;
     }
 
-    // 5. Null the CUDA buffer pointer (optional safety)
+    // 7. Null everything else
     tex.cuda_buffer = nullptr;
     tex.cuda_pbo_storage_buffer_size = 0;
 }

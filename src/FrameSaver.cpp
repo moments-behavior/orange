@@ -1,16 +1,17 @@
 #include "FrameSaver.h"
 #include "kernel.cuh"
+#include "utils.h"
 #include <npp.h>
 
 FrameSaver::FrameSaver(CameraParams *params, CameraEachSelect *select)
     : camera_params(params), camera_select(select), running(false) {
-    ck(cudaStreamCreate(&stream));
+    CHECK(cudaStreamCreate(&stream));
     initalize_gpu_frame(&frame_process.frame_original, camera_params);
     initialize_gpu_debayer(&frame_process.debayer, camera_params, 4);
     initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params, 3);
 
-    ck(cudaMalloc((void **)&frame_process.d_convert,
-                  camera_params->width * camera_params->height * 3));
+    CHECK(cudaMalloc((void **)&frame_process.d_convert,
+                     camera_params->width * camera_params->height * 3));
 }
 
 FrameSaver::~FrameSaver() {
@@ -54,7 +55,6 @@ void FrameSaver::notify_frame_ready(void *device_image_ptr) {
 
 void FrameSaver::thread_loop() {
     ck(cudaSetDevice(camera_params->gpu_id));
-    ck(nppSetStream(stream));
 
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);

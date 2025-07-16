@@ -1,21 +1,25 @@
 #include "FrameDetector.h"
 #include "global.h"
+#include "utils.h"
 #include "video_capture.h"
 #include <mutex>
 #include <npp.h>
 #include <nvToolsExt.h>
 
-FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
-    : camera_params(params), camera_select(select), running(false) {
+FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select,
+                             bool *detector_ready_signal)
+    : camera_params(params), camera_select(select),
+      detector_ready_signal(detector_ready_signal), running(false) {
     cudaEventCreateWithFlags(&copy_done_event, cudaEventDisableTiming);
 }
 
 FrameDetector::~FrameDetector() {
     stop();
+    delete yolov8;
     cudaFree(frame_process.frame_original.d_orig);
     cudaFree(frame_process.debayer.d_debayer);
     cudaEventDestroy(copy_done_event);
-    ck(cudaStreamDestroy(stream));
+    CHECK(cudaStreamDestroy(stream));
 }
 
 void FrameDetector::start() {
@@ -37,12 +41,12 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr,
                                        cudaStream_t copy_stream) {
     // nvtxRangePush("copy_frame_for_detection");
     if (camera_params->gpu_direct) {
-        ck(cudaMemcpy2DAsync(
+        CHECK(cudaMemcpy2DAsync(
             frame_process.frame_original.d_orig, camera_params->width,
             device_image_ptr, camera_params->width, camera_params->width,
             camera_params->height, cudaMemcpyDeviceToDevice, copy_stream));
     } else {
-        ck(cudaMemcpy2DAsync(
+        CHECK(cudaMemcpy2DAsync(
             frame_process.frame_original.d_orig, camera_params->width,
             device_image_ptr, camera_params->width, camera_params->width,
             camera_params->height, cudaMemcpyHostToDevice, copy_stream));
@@ -54,22 +58,22 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr,
 }
 
 void FrameDetector::thread_loop() {
-    ck(cudaSetDevice(camera_params->gpu_id));
-    ck(cudaStreamCreate(&stream));
-    ck(nppSetStream(stream));
+    CHECK(cudaSetDevice(camera_params->gpu_id));
+    CHECK(cudaStreamCreate(&stream));
+    NppStreamContext npp_ctx =
+        make_npp_stream_context(camera_params->gpu_id, stream);
     initalize_gpu_frame(&frame_process.frame_original, camera_params);
-    initialize_gpu_debayer(&frame_process.debayer, camera_params, 3);
+    initialize_gpu_debayer(&frame_process.debayer, camera_params, 3, stream);
 
-    ck(cudaMalloc((void **)&frame_process.d_convert,
-                  camera_params->width * camera_params->height * 3));
-    // initialize yolo
     const std::string engine_file_path = camera_select->yolo_model;
     yolov8 = new YOLOv8(engine_file_path, camera_params->width,
                         camera_params->height, frame_process.debayer.d_debayer,
-                        true, stream);
+                        true, stream, npp_ctx);
     // nvtxRangePush("warmup");
     yolov8->make_pipe(true);
     // nvtxRangePop();
+    *detector_ready_signal = true;
+
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
@@ -97,12 +101,13 @@ void FrameDetector::thread_loop() {
         // GPU processing
         cudaStreamWaitEvent(stream, copy_done_event, 0);
         if (camera_params->color) {
-            debayer_frame_gpu_rgb(camera_params, &frame_process.frame_original,
-                                  &frame_process.debayer);
+            debayer_frame_gpu_rgb_ctx(camera_params,
+                                      &frame_process.frame_original,
+                                      &frame_process.debayer, npp_ctx);
         } else {
-            duplicate_channel_gpu_3(camera_params,
-                                    &frame_process.frame_original,
-                                    &frame_process.debayer);
+            duplicate_channel_gpu_3_ctx(camera_params,
+                                        &frame_process.frame_original,
+                                        &frame_process.debayer, npp_ctx);
         }
 
         if (yolov8->graph_captured) {

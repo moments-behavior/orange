@@ -41,8 +41,8 @@ struct CameraEachSelect {
     std::string picture_save_folder;
     std::string yolo_model;
     DetectMode detect_mode = Detect_OFF;
-    int idx2d;
-    int idx3d;
+    int idx2d = 0;
+    int idx3d = 0;
     std::atomic<PictureState> frame_detect_state;
     CameraEachSelect()
         : frame_save_state(State_Frame_Idle),

@@ -8,6 +8,8 @@ std::atomic<int64_t> record_start_time_ns{0};
 std::atomic<CalibState> calib_state{CalibIdle};
 Detection3d detection3d;
 DetectionDataPerCam *detection2d;
+std::atomic<uint64_t> detector_counter{0};
+std::mutex graph_capture_mutex;
 
 bool try_start_timer() {
     int64_t expected = record_start_time_ns.load();

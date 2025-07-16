@@ -63,6 +63,15 @@ inline void initalize_gpu_frame(FrameGPU *frame_original,
     ck(cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic));
 }
 
+inline void initalize_gpu_frame_async(FrameGPU *frame_original,
+                                      CameraParams *camera_params,
+                                      cudaStream_t stream) {
+    frame_original->size_pic = camera_params->width * camera_params->height *
+                               1 * sizeof(unsigned char);
+    ck(cudaMallocAsync((void **)&frame_original->d_orig,
+                       frame_original->size_pic, stream));
+}
+
 inline void initialize_gpu_debayer(Debayer *debayer,
                                    CameraParams *camera_params,
                                    int output_channels) {
@@ -88,13 +97,14 @@ inline void initialize_gpu_debayer(Debayer *debayer,
     }
 }
 
-inline void initialize_gpu_debayer(Debayer *debayer,
-                                   CameraParams *camera_params,
-                                   int output_channels, cudaStream_t stream) {
+inline void initialize_gpu_debayer_async(Debayer *debayer,
+                                         CameraParams *camera_params,
+                                         int output_channels,
+                                         cudaStream_t stream) {
     int size_pic = camera_params->width * camera_params->height *
                    output_channels * sizeof(unsigned char);
 
-    ck(cudaMalloc((void **)&debayer->d_debayer, size_pic));
+    ck(cudaMallocAsync((void **)&debayer->d_debayer, size_pic, stream));
     ck(cudaMemsetAsync(debayer->d_debayer, 0xFF, size_pic, stream));
 
     debayer->size.width = camera_params->width;

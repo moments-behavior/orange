@@ -6,19 +6,21 @@
 #include <npp.h>
 #include <nvToolsExt.h>
 
-FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select,
-                             bool *detector_ready_signal)
-    : camera_params(params), camera_select(select),
-      detector_ready_signal(detector_ready_signal), running(false) {
+FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
+    : camera_params(params), camera_select(select), running(false) {
+    CHECK(cudaSetDevice(camera_params->gpu_id));
+    stream = nullptr;
     cudaEventCreateWithFlags(&copy_done_event, cudaEventDisableTiming);
 }
 
 FrameDetector::~FrameDetector() {
     stop();
     delete yolov8;
-    cudaFree(frame_process.frame_original.d_orig);
-    cudaFree(frame_process.debayer.d_debayer);
+    yolov8 = nullptr;
+    cudaFreeAsync(frame_process.frame_original.d_orig, stream);
+    cudaFreeAsync(frame_process.debayer.d_debayer, stream);
     cudaEventDestroy(copy_done_event);
+    CHECK(cudaStreamSynchronize(stream));
     CHECK(cudaStreamDestroy(stream));
 }
 
@@ -62,17 +64,26 @@ void FrameDetector::thread_loop() {
     CHECK(cudaStreamCreate(&stream));
     NppStreamContext npp_ctx =
         make_npp_stream_context(camera_params->gpu_id, stream);
-    initalize_gpu_frame(&frame_process.frame_original, camera_params);
-    initialize_gpu_debayer(&frame_process.debayer, camera_params, 3, stream);
+    initalize_gpu_frame_async(&frame_process.frame_original, camera_params,
+                              stream);
+    initialize_gpu_debayer_async(&frame_process.debayer, camera_params, 3,
+                                 stream);
 
+    printf("detector counter %lu\n", detector_counter.load());
     const std::string engine_file_path = camera_select->yolo_model;
-    yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                        camera_params->height, frame_process.debayer.d_debayer,
-                        true, stream, npp_ctx);
-    // nvtxRangePush("warmup");
-    yolov8->make_pipe(true);
-    // nvtxRangePop();
-    *detector_ready_signal = true;
+    {
+        std::lock_guard<std::mutex> lock(graph_capture_mutex);
+        printf("make pipe for gpu %d\n", camera_params->gpu_id);
+        // nvtxRangePush("warmup");
+        yolov8 = new YOLOv8(engine_file_path, camera_params->width,
+                            camera_params->height, stream,
+                            frame_process.debayer.d_debayer, npp_ctx);
+        yolov8->make_pipe(true);
+        // nvtxRangePop();
+    }
+    uint64_t current_counter =
+        detector_counter.fetch_add(1); // Atomic increment
+    printf("%lu\n", current_counter);
 
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
@@ -135,7 +146,7 @@ void FrameDetector::thread_loop() {
         }
 
         // running detection
-        if (camera_select->detect_mode == Detect3d_Standoff) {
+        if (camera_select->detect_mode == Detect3D_Standoff) {
             camera_select->frame_detect_state.store(
                 State_Frame_Detection_Ready);
             std::lock_guard<std::mutex> lock(mtx3d);

@@ -2,12 +2,12 @@
 #include "common.hpp"
 #include "utils.h"
 #include <npp.h>
+#include <nvToolsExt.h>
 
 YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
-               unsigned char *d_input_image, bool use_external_stream,
-               cudaStream_t stream, const NppStreamContext &npp_ctx)
-    : d_input_image(d_input_image), use_external_stream(use_external_stream),
-      npp_ctx_(npp_ctx) {
+               cudaStream_t stream, unsigned char *d_input_image,
+               const NppStreamContext &npp_ctx)
+    : stream(stream), d_input_image(d_input_image), npp_ctx_(npp_ctx) {
 
     d_temp = d_boarder = nullptr;
     d_float = d_planar = nullptr;
@@ -120,16 +120,14 @@ YOLOv8::~YOLOv8() {
     host_ptrs.clear();
 
     if (d_temp)
-        CHECK(cudaFree(d_temp));
+        CHECK(cudaFreeAsync(d_temp, stream));
     if (d_boarder)
-        CHECK(cudaFree(d_boarder));
+        CHECK(cudaFreeAsync(d_boarder, stream));
     if (d_float)
-        CHECK(cudaFree(d_float));
+        CHECK(cudaFreeAsync(d_float, stream));
     if (d_planar)
-        CHECK(cudaFree(d_planar));
-    if (!use_external_stream && stream != nullptr) {
-        CHECK(cudaStreamDestroy(this->stream));
-    }
+        CHECK(cudaFreeAsync(d_planar, stream));
+    stream = nullptr;
 }
 
 void YOLOv8::make_pipe(bool graph_capture) {
@@ -164,20 +162,17 @@ void YOLOv8::make_pipe(bool graph_capture) {
 
     if (graph_capture) {
         // Step 1: one warmup pass to trigger JIT and plugin init
-        // this->preprocess_gpu();
-        // this->infer_capture_only(); // no sync!
+        this->preprocess_gpu();
+        this->infer_capture_only(); // no sync!
 
         // Step 2: capture graph
         cudaGraph_t graph;
         cudaGraphExec_t graph_exec;
-        std::cout << "before capture?" << std::endl;
 
         CHECK(cudaStreamSynchronize(this->stream)); // ensure warmup is done
         CHECK(
             cudaStreamBeginCapture(this->stream, cudaStreamCaptureModeGlobal));
-
         this->preprocess_gpu();
-        std::cout << "ever here?" << std::endl;
         this->infer_capture_only(); // no sync inside this!
 
         CHECK(cudaStreamEndCapture(this->stream, &graph));
@@ -299,16 +294,6 @@ void YOLOv8::preprocess_gpu() {
     const char *name = this->engine->getIOTensorName(0);
     this->context->setInputShape(
         name, nvinfer1::Dims{4, {1, 3, inp_w_int, inp_w_int}});
-
-    cudaStreamCaptureStatus status;
-    cudaStreamIsCapturing(this->stream, &status);
-    std::cout << "Stream capture status: " << status << std::endl;
-
-    if (!this->device_ptrs[0] || !d_planar) {
-        std::cerr << "Invalid pointers: device_ptrs[0] = "
-                  << this->device_ptrs[0] << ", d_planar = " << d_planar
-                  << std::endl;
-    }
 
     CHECK(cudaMemcpyAsync(this->device_ptrs[0], d_planar,
                           inp_w_int * inp_w_int * sizeof(float3),

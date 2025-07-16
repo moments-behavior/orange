@@ -19,7 +19,7 @@ void detection3d_proc(CameraControl *camera_control,
     // threads for 3d triangulations
     std::vector<int> cam3d_idx;
     for (int i = 0; i < num_cameras; i++) {
-        if (cameras_select[i].detect_mode == Detect3d_Standoff) {
+        if (cameras_select[i].detect_mode == Detect3D_Standoff) {
             cam3d_idx.push_back(i);
         }
     }

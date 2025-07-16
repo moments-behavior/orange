@@ -8,8 +8,8 @@
 class YOLOv8 {
   public:
     explicit YOLOv8(const std::string &engine_file_path, int width, int height,
-                    unsigned char *d_input_image, bool use_external_stream,
-                    cudaStream_t stream);
+                    cudaStream_t stream, unsigned char *d_input_image,
+                    const NppStreamContext &npp_ctx);
     ~YOLOv8();
 
     void make_pipe(bool graph_capture);
@@ -53,7 +53,7 @@ class YOLOv8 {
     int padh;
     int inp_h_int;
     int inp_w_int;
-    bool use_external_stream;
+    NppStreamContext npp_ctx_;
 
     nvinfer1::ICudaEngine *engine = nullptr;
     nvinfer1::IRuntime *runtime = nullptr;

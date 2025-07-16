@@ -1,26 +1,9 @@
-//
-// Created by ubuntu on 4/7/23.
-//
-
 #ifndef POSE_NORMAL_COMMON_HPP
 #define POSE_NORMAL_COMMON_HPP
 #include "NvInfer.h"
 #include "opencv2/opencv.hpp"
 #include <sys/stat.h>
 #include <unistd.h>
-
-#define CHECK(call)                                                            \
-    do {                                                                       \
-        const cudaError_t error_code = call;                                   \
-        if (error_code != cudaSuccess) {                                       \
-            printf("CUDA Error:\n");                                           \
-            printf("    File:       %s\n", __FILE__);                          \
-            printf("    Line:       %d\n", __LINE__);                          \
-            printf("    Error code: %d\n", error_code);                        \
-            printf("    Error text: %s\n", cudaGetErrorString(error_code));    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
 class Logger : public nvinfer1::ILogger {
   public:

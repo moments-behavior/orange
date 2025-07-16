@@ -47,43 +47,40 @@ inline void upload_texture_from_pbo(GL_Texture &tex, int width, int height) {
 }
 
 inline void clear_upload_and_cleanup(GL_Texture &tex, int width, int height) {
-    // Clear the CUDA buffer
-    int size_pic = width * height * sizeof(unsigned char) * 4;
-    cudaMemset(tex.cuda_buffer, 0, size_pic);
-
-    // Upload from PBO to texture
-    upload_texture_from_pbo(tex, width, height);
-
-    // Cleanup resources
-    // gx_delete_buffer(&tex.pbo);
-    // unmap_cuda_resource(&tex.cuda_resource);
-    // cuda_unregister_pbo(tex.cuda_resource);
-    // cudaStreamDestroy(tex.streams);
-
-    // 1. Unmap the CUDA resource (if still mapped)
-    if (tex.cuda_resource) {
-        cudaGraphicsUnmapResources(1, &tex.cuda_resource);
+    // 1. Clear the buffer (only if valid)
+    if (tex.cuda_buffer) {
+        int size_pic =
+            width * height * 4 * sizeof(unsigned char); // assuming uchar4
+        cudaMemset(tex.cuda_buffer, 0, size_pic);
     }
 
-    // 2. Unregister the PBO from CUDA
+    // 2. Upload from PBO to texture
+    upload_texture_from_pbo(tex, width, height);
+
+    // 3. Unmap if mapped
+    if (tex.cuda_resource) {
+        cudaError_t err = cudaGraphicsUnmapResources(1, &tex.cuda_resource, 0);
+    }
+
+    // 4. Now it's safe to unregister
     if (tex.cuda_resource) {
         cudaGraphicsUnregisterResource(tex.cuda_resource);
         tex.cuda_resource = nullptr;
     }
 
-    // 3. Delete the OpenGL PBO
+    // 5. Delete OpenGL PBO
     if (tex.pbo) {
         glDeleteBuffers(1, &tex.pbo);
         tex.pbo = 0;
     }
 
-    // 4. Delete the OpenGL texture
+    // 6. Delete OpenGL texture
     if (tex.texture) {
         glDeleteTextures(1, &tex.texture);
         tex.texture = 0;
     }
 
-    // 5. Null the CUDA buffer pointer (optional safety)
+    // 7. Null everything else
     tex.cuda_buffer = nullptr;
     tex.cuda_pbo_storage_buffer_size = 0;
 }
@@ -99,6 +96,7 @@ inline void start_camera_streaming(
 
     detection2d = new DetectionDataPerCam[num_cameras];
     int idx3d = 0;
+    int total_standoff_detector = 0;
     for (int i = 0; i < num_cameras; i++) {
         detection2d[i].calibration_file = calib_yaml_folder + "/Cam" +
                                           cameras_params[i].camera_serial +
@@ -110,12 +108,20 @@ inline void start_camera_streaming(
             std::cout << detection2d[i].calibration_file << std::endl;
         }
         cameras_select[i].idx2d = i;
-        if (cameras_select[i].detect_mode == Detect3d_Standoff) {
+        if (cameras_select[i].detect_mode == Detect3D_Standoff) {
             cameras_select[i].idx3d = idx3d;
             idx3d++;
         }
-        cameras_select[i].frame_detect_state.store(State_Copy_New_Frame);
+        if (cameras_select[i].detect_mode == Detect3D_Standoff ||
+            cameras_select[i].detect_mode == Detect2D_Standoff) {
+            total_standoff_detector++;
+        }
     }
+
+    for (int i = 0; i < num_cameras; i++) {
+        cameras_select[i].total_standoff_detector = total_standoff_detector;
+    }
+
     if (idx3d >= 2) {
         detection3d_thread = std::thread(&detection3d_proc, camera_control,
                                          cameras_select, num_cameras);
@@ -192,6 +198,14 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
     }
     delete[] detection2d;
     detection2d = nullptr;
+
+    for (int i = 0; i < num_cameras; i++) {
+        cameras_select[i].frame_detect_state.store(State_Frame_Idle);
+        cameras_select[i].total_standoff_detector = 0;
+        cameras_select[i].idx2d = 0;
+        cameras_select[i].idx3d = 0;
+    }
+    detector_counter.store(0);
 }
 
 inline bool input_text(const char *label, std::string &str,

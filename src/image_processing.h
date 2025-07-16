@@ -63,6 +63,15 @@ inline void initalize_gpu_frame(FrameGPU *frame_original,
     ck(cudaMalloc((void **)&frame_original->d_orig, frame_original->size_pic));
 }
 
+inline void initalize_gpu_frame_async(FrameGPU *frame_original,
+                                      CameraParams *camera_params,
+                                      cudaStream_t stream) {
+    frame_original->size_pic = camera_params->width * camera_params->height *
+                               1 * sizeof(unsigned char);
+    ck(cudaMallocAsync((void **)&frame_original->d_orig,
+                       frame_original->size_pic, stream));
+}
+
 inline void initialize_gpu_debayer(Debayer *debayer,
                                    CameraParams *camera_params,
                                    int output_channels) {
@@ -88,6 +97,32 @@ inline void initialize_gpu_debayer(Debayer *debayer,
     }
 }
 
+inline void initialize_gpu_debayer_async(Debayer *debayer,
+                                         CameraParams *camera_params,
+                                         int output_channels,
+                                         cudaStream_t stream) {
+    int size_pic = camera_params->width * camera_params->height *
+                   output_channels * sizeof(unsigned char);
+
+    ck(cudaMallocAsync((void **)&debayer->d_debayer, size_pic, stream));
+    ck(cudaMemsetAsync(debayer->d_debayer, 0xFF, size_pic, stream));
+
+    debayer->size.width = camera_params->width;
+    debayer->size.height = camera_params->height;
+    debayer->nAlpha = 255;
+    debayer->roi.x = 0;
+    debayer->roi.y = 0;
+    debayer->roi.width = camera_params->width;
+    debayer->roi.height = camera_params->height;
+    if (camera_params->need_reorder) {
+        debayer->grid = NPPI_BAYER_GRBG;
+    } else if (camera_params->pixel_format == "BayerRG8") {
+        debayer->grid = NPPI_BAYER_RGGB;
+    } else {
+        debayer->grid = NPPI_BAYER_GBRG;
+    }
+}
+
 inline void debayer_frame_gpu(CameraParams *camera_params,
                               FrameGPU *frame_original, Debayer *debayer) {
     const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(
@@ -100,13 +135,15 @@ inline void debayer_frame_gpu(CameraParams *camera_params,
     }
 }
 
-inline void debayer_frame_gpu_rgb(CameraParams *camera_params,
-                                  FrameGPU *frame_original, Debayer *debayer) {
-    const NppStatus npp_result = nppiCFAToRGB_8u_C1C3R(
+inline void debayer_frame_gpu_rgb_ctx(CameraParams *camera_params,
+                                      FrameGPU *frame_original,
+                                      Debayer *debayer,
+                                      const NppStreamContext &npp_ctx) {
+    const NppStatus npp_result = nppiCFAToRGB_8u_C1C3R_Ctx(
         frame_original->d_orig, camera_params->width * sizeof(unsigned char),
         debayer->size, debayer->roi, debayer->d_debayer,
         camera_params->width * sizeof(uchar3), debayer->grid,
-        NPPI_INTER_UNDEFINED);
+        NPPI_INTER_UNDEFINED, npp_ctx);
     if (npp_result != 0) {
         std::cout << "\nNPP error %d \n" << npp_result << std::endl;
     }
@@ -124,13 +161,14 @@ inline void duplicate_channel_gpu(CameraParams *camera_params,
     }
 }
 
-inline void duplicate_channel_gpu_3(CameraParams *camera_params,
-                                    FrameGPU *frame_original,
-                                    Debayer *debayer) {
-    const NppStatus npp_result = nppiDup_8u_C1C3R(
+inline void duplicate_channel_gpu_3_ctx(CameraParams *camera_params,
+                                        FrameGPU *frame_original,
+                                        Debayer *debayer,
+                                        const NppStreamContext &npp_ctx) {
+    const NppStatus npp_result = nppiDup_8u_C1C3R_Ctx(
         frame_original->d_orig, camera_params->width * sizeof(unsigned char),
         debayer->d_debayer, camera_params->width * sizeof(uchar4),
-        debayer->size);
+        debayer->size, npp_ctx);
 
     if (npp_result != 0) {
         std::cout << "\nNPP error %d \n" << npp_result << std::endl;

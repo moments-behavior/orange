@@ -43,7 +43,7 @@ int main(int argc, char **args) {
     std::string orange_root_dir_str =
         "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
-    std::string recording_root_dir_str = "/mnt";
+    std::string recording_root_dir_str = "/data0";
     // std::string input_folder = orange_root_dir_str + "/exp/unsorted";
     std::string input_folder = recording_root_dir_str + "/exp/unsorted";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
@@ -604,7 +604,7 @@ int main(int argc, char **args) {
             {
                 const char *items[] = {"1", "2", "4", "8", "16"};
                 static const int item_numbers[] = {1, 2, 4, 8, 16};
-                static int downsample_current = 1;
+                static int downsample_current = 0;
                 if (ImGui::Combo("downsample streaming", &downsample_current,
                                  items, IM_ARRAYSIZE(items))) {
                     for (int i = 0; i < num_cameras; i++) {
@@ -1029,6 +1029,7 @@ int main(int argc, char **args) {
                         close_camera(&ecams[i].camera, &cameras_params[i]);
                     }
                     delete[] cameras_params;
+                    delete[] cameras_select;
                     delete[] ecams;
                 }
             }
@@ -1074,6 +1075,10 @@ int main(int argc, char **args) {
                             &indigo_signal_builder, calib_yaml_folder,
                             detection3d_thread);
                     } else {
+                        stop_camera_streaming(
+                            camera_threads, camera_control, ecams,
+                            cameras_params, cameras_select, num_cameras,
+                            evt_buffer_size, ptp_params, detection3d_thread);
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =
@@ -1088,10 +1093,6 @@ int main(int argc, char **args) {
                         }
                         delete[] tex_gl;
                         tex_gl = nullptr;
-                        stop_camera_streaming(
-                            camera_threads, camera_control, ecams,
-                            cameras_params, cameras_select, num_cameras,
-                            evt_buffer_size, ptp_params, detection3d_thread);
                     }
                 }
             }
@@ -1112,6 +1113,11 @@ int main(int argc, char **args) {
                     if (camera_control->stop_record) {
                         if (camera_control->subscribe) {
                             camera_control->subscribe = false;
+                            stop_camera_streaming(
+                                camera_threads, camera_control, ecams,
+                                cameras_params, cameras_select, num_cameras,
+                                evt_buffer_size, ptp_params,
+                                detection3d_thread);
                             for (int i = 0; i < num_cameras; i++) {
                                 if (cameras_select[i].stream_on) {
                                     int camera_width =
@@ -1124,11 +1130,6 @@ int main(int argc, char **args) {
                                         tex_gl[i], camera_width, camera_height);
                                 }
                             }
-                            stop_camera_streaming(
-                                camera_threads, camera_control, ecams,
-                                cameras_params, cameras_select, num_cameras,
-                                evt_buffer_size, ptp_params,
-                                detection3d_thread);
                             delete[] tex_gl;
                             tex_gl = nullptr;
                         }
@@ -1171,8 +1172,11 @@ int main(int argc, char **args) {
                             detection3d_thread);
                     } else {
                         camera_control->subscribe = false;
+                        stop_camera_streaming(
+                            camera_threads, camera_control, ecams,
+                            cameras_params, cameras_select, num_cameras,
+                            evt_buffer_size, ptp_params, detection3d_thread);
                         ptp_stream_sync = false;
-
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =
@@ -1187,11 +1191,6 @@ int main(int argc, char **args) {
                         }
                         delete[] tex_gl;
                         tex_gl = nullptr;
-
-                        stop_camera_streaming(
-                            camera_threads, camera_control, ecams,
-                            cameras_params, cameras_select, num_cameras,
-                            evt_buffer_size, ptp_params, detection3d_thread);
                         camera_control->record_video = false;
                     }
                 }
@@ -1435,6 +1434,7 @@ int main(int argc, char **args) {
         }
         delete[] cameras_params;
         delete[] ecams;
+        delete[] cameras_select;
     }
 
     quite_enet = true;

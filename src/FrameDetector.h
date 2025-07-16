@@ -9,7 +9,6 @@
 #include <mutex>
 #include <opencv2/opencv.hpp>
 #include <thread>
-#include <vector>
 
 class FrameDetector {
   public:

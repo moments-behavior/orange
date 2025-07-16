@@ -1,5 +1,6 @@
 #include "kernel.cuh"
 #include "opencv2/opencv.hpp"
+#include "utils.h"
 #include "yolov8_det.h"
 #include <string> // for std::stoi
 
@@ -44,9 +45,14 @@ int main(int argc, char **argv) {
     printf("YOLO initialization...\n");
     int frame_size = camera_width * camera_height * 3;
     CHECK(cudaMalloc((void **)&d_frame, frame_size));
+
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
+    NppStreamContext npp_ctx = make_npp_stream_context(device_id, stream);
     YOLOv8 *yolov8 = new YOLOv8(engine_file_path, camera_width, camera_height,
-                                d_frame, true, 0);
-    yolov8->make_pipe(true);
+                                stream, d_frame, npp_ctx);
+    yolov8->make_pipe(false);
 
     cudaMalloc((void **)&d_points, sizeof(float) * 8);
     cudaMalloc((void **)&d_skeleton, sizeof(unsigned int) * 8);
@@ -71,8 +77,16 @@ int main(int argc, char **argv) {
                   << std::endl;
 
         start = std::chrono::high_resolution_clock::now();
-        yolov8->preprocess_gpu();
-        yolov8->infer();
+
+        if (yolov8->graph_captured) {
+            // nvtxRangePush("graph");
+            CHECK(cudaGraphLaunch(yolov8->inference_graph_exec, stream));
+            CHECK(cudaStreamSynchronize(stream));
+            // nvtxRangePop();
+        } else {
+            yolov8->preprocess_gpu();
+            yolov8->infer(); // it sync gpu with cpu here
+        }
         yolov8->postprocess(objs);
         yolov8->copy_keypoints_gpu(d_points, objs);
         cudaDeviceSynchronize();

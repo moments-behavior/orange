@@ -1,11 +1,13 @@
 #include "yolov8_det.h"
 #include "common.hpp"
+#include "utils.h"
 #include <npp.h>
 
 YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
                unsigned char *d_input_image, bool use_external_stream,
-               cudaStream_t stream)
-    : d_input_image(d_input_image), use_external_stream(use_external_stream) {
+               cudaStream_t stream, const NppStreamContext &npp_ctx)
+    : d_input_image(d_input_image), use_external_stream(use_external_stream),
+      npp_ctx_(npp_ctx) {
 
     d_temp = d_boarder = nullptr;
     d_float = d_planar = nullptr;
@@ -34,14 +36,6 @@ YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
     this->context = this->engine->createExecutionContext();
 
     assert(this->context != nullptr);
-
-    if (use_external_stream) {
-        this->stream = stream;
-        nppSetStream(this->stream);
-    } else {
-        CHECK(cudaStreamCreate(&this->stream));
-        nppSetStream(this->stream);
-    }
 
     this->num_bindings = this->engine->getNbIOTensors();
 
@@ -98,6 +92,7 @@ YOLOv8::~YOLOv8() {
 
     if (this->engine) {
         delete this->engine; // Use delete to call the destructor for `engine`.
+        this->engine = nullptr;
     }
 
     if (this->runtime) {
@@ -169,18 +164,20 @@ void YOLOv8::make_pipe(bool graph_capture) {
 
     if (graph_capture) {
         // Step 1: one warmup pass to trigger JIT and plugin init
-        this->preprocess_gpu();
-        this->infer_capture_only(); // no sync!
+        // this->preprocess_gpu();
+        // this->infer_capture_only(); // no sync!
 
         // Step 2: capture graph
         cudaGraph_t graph;
         cudaGraphExec_t graph_exec;
+        std::cout << "before capture?" << std::endl;
 
         CHECK(cudaStreamSynchronize(this->stream)); // ensure warmup is done
         CHECK(
             cudaStreamBeginCapture(this->stream, cudaStreamCaptureModeGlobal));
 
         this->preprocess_gpu();
+        std::cout << "ever here?" << std::endl;
         this->infer_capture_only(); // no sync inside this!
 
         CHECK(cudaStreamEndCapture(this->stream, &graph));
@@ -230,10 +227,10 @@ void YOLOv8::preprocess_gpu() {
     output_roi.height = padh;
 
     // TODO: is input_w_int here correct
-    const NppStatus npp_result =
-        nppiResize_8u_C3R(d_input_image, img_width * sizeof(uchar3), img_size,
-                          roi, d_temp, inp_w_int * sizeof(uchar3),
-                          output_resize_size, output_roi, NPPI_INTER_SUPER);
+    const NppStatus npp_result = nppiResize_8u_C3R_Ctx(
+        d_input_image, img_width * sizeof(uchar3), img_size, roi, d_temp,
+        inp_w_int * sizeof(uchar3), output_resize_size, output_roi,
+        NPPI_INTER_SUPER, npp_ctx_);
     if (npp_result != NPP_SUCCESS) {
         std::cerr << "Error executing Resize -- code: " << npp_result
                   << std::endl;
@@ -253,9 +250,10 @@ void YOLOv8::preprocess_gpu() {
     int left = int(std::round(dw - 0.1f));
 
     Npp8u boarder_color[3] = {114, 114, 114};
-    const NppStatus npp_result2 = nppiCopyConstBorder_8u_C3R(
+    const NppStatus npp_result2 = nppiCopyConstBorder_8u_C3R_Ctx(
         d_temp, inp_w_int * sizeof(uchar3), output_resize_size, d_boarder,
-        inp_w_int * sizeof(uchar3), boarder_size, top, left, boarder_color);
+        inp_w_int * sizeof(uchar3), boarder_size, top, left, boarder_color,
+        npp_ctx_);
 
     if (npp_result2 != NPP_SUCCESS) {
         std::cerr << "Error executing CopyConstBoarder -- code: " << npp_result2
@@ -264,9 +262,9 @@ void YOLOv8::preprocess_gpu() {
 
     // blobImageNPP: 1. convert to float: nppiConvert_8u32f_C3R; 2. normalize,
     // nppiDivC_32f_C3IR; 3. transpose: nppiCopy_32f_C3P3R
-    const NppStatus npp_result3 =
-        nppiConvert_8u32f_C3R(d_boarder, inp_w_int * sizeof(uchar3), d_float,
-                              inp_w_int * sizeof(float3), boarder_size);
+    const NppStatus npp_result3 = nppiConvert_8u32f_C3R_Ctx(
+        d_boarder, inp_w_int * sizeof(uchar3), d_float,
+        inp_w_int * sizeof(float3), boarder_size, npp_ctx_);
     if (npp_result3 != NPP_SUCCESS) {
         std::cerr << "Error executing Convert to float -- code: " << npp_result3
                   << std::endl;
@@ -274,8 +272,9 @@ void YOLOv8::preprocess_gpu() {
 
     Npp32f scale_factor[3] = {255.0f, 255.0f, 255.0f};
 
-    const NppStatus npp_result4 = nppiDivC_32f_C3IR(
-        scale_factor, d_float, inp_w_int * sizeof(float3), boarder_size);
+    const NppStatus npp_result4 =
+        nppiDivC_32f_C3IR_Ctx(scale_factor, d_float, inp_w_int * sizeof(float3),
+                              boarder_size, npp_ctx_);
     if (npp_result4 != NPP_SUCCESS) {
         std::cerr << "Error executing Convert to float -- code: " << npp_result4
                   << std::endl;
@@ -283,9 +282,9 @@ void YOLOv8::preprocess_gpu() {
 
     float *const inputArr[3]{d_planar, d_planar + inp_w_int * inp_w_int,
                              d_planar + (inp_w_int * inp_w_int * 2)};
-    const NppStatus npp_result5 =
-        nppiCopy_32f_C3P3R(d_float, inp_w_int * sizeof(float3), inputArr,
-                           inp_w_int * sizeof(float), boarder_size);
+    const NppStatus npp_result5 = nppiCopy_32f_C3P3R_Ctx(
+        d_float, inp_w_int * sizeof(float3), inputArr,
+        inp_w_int * sizeof(float), boarder_size, npp_ctx_);
     if (npp_result5 != NPP_SUCCESS) {
         std::cerr << "Error executing convert to plannar -- code: "
                   << npp_result5 << std::endl;
@@ -300,6 +299,17 @@ void YOLOv8::preprocess_gpu() {
     const char *name = this->engine->getIOTensorName(0);
     this->context->setInputShape(
         name, nvinfer1::Dims{4, {1, 3, inp_w_int, inp_w_int}});
+
+    cudaStreamCaptureStatus status;
+    cudaStreamIsCapturing(this->stream, &status);
+    std::cout << "Stream capture status: " << status << std::endl;
+
+    if (!this->device_ptrs[0] || !d_planar) {
+        std::cerr << "Invalid pointers: device_ptrs[0] = "
+                  << this->device_ptrs[0] << ", d_planar = " << d_planar
+                  << std::endl;
+    }
+
     CHECK(cudaMemcpyAsync(this->device_ptrs[0], d_planar,
                           inp_w_int * inp_w_int * sizeof(float3),
                           cudaMemcpyDeviceToDevice, this->stream));

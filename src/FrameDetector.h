@@ -13,7 +13,8 @@
 
 class FrameDetector {
   public:
-    FrameDetector(CameraParams *params, CameraEachSelect *select);
+    FrameDetector(CameraParams *params, CameraEachSelect *select,
+                  bool *detector_ready_signal);
     ~FrameDetector();
 
     void start();
@@ -31,6 +32,7 @@ class FrameDetector {
     CameraEachSelect *camera_select;
     FrameProcess frame_process;
     YOLOv8 *yolov8;
+    bool *detector_ready_signal;
 
     std::atomic<bool> running;
     std::mutex mtx;

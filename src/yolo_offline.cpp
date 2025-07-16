@@ -1,5 +1,6 @@
 #include "kernel.cuh"
 #include "opencv2/opencv.hpp"
+#include "utils.h"
 #include "yolov8_det.h"
 #include <string> // for std::stoi
 
@@ -44,8 +45,10 @@ int main(int argc, char **argv) {
     printf("YOLO initialization...\n");
     int frame_size = camera_width * camera_height * 3;
     CHECK(cudaMalloc((void **)&d_frame, frame_size));
+
+    NppStreamContext npp_ctx = make_npp_stream_context(device_id, 0);
     YOLOv8 *yolov8 = new YOLOv8(engine_file_path, camera_width, camera_height,
-                                d_frame, true, 0);
+                                d_frame, true, 0, npp_ctx);
     yolov8->make_pipe(true);
 
     cudaMalloc((void **)&d_points, sizeof(float) * 8);

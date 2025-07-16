@@ -5,6 +5,7 @@
 #include "global.h"
 #include "kernel.cuh"
 #include "opengldisplay.h"
+#include "utils.h"
 #include <cuda_runtime_api.h>
 #include <nvToolsExt.h>
 #include <stdio.h>
@@ -66,12 +67,14 @@ void COpenGLDisplay::ThreadRunning() {
                   camera_params->width * camera_params->height * 3));
 
     unsigned int skeleton[8] = {0, 1, 1, 2, 2, 3, 3, 0}; // box
+    NppStreamContext npp_ctx =
+        make_npp_stream_context(camera_params->gpu_id, 0);
     if (camera_select->detect_mode == Detect2D_GLThread) {
         printf("YOLO initialization...\n");
 
         const std::string engine_file_path = camera_select->yolo_model;
         yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                            camera_params->height, d_convert, true, 0);
+                            camera_params->height, d_convert, true, 0, npp_ctx);
         yolov8->make_pipe(false);
 
         cudaMalloc((void **)&d_points, sizeof(float) * 8);
@@ -99,10 +102,10 @@ void COpenGLDisplay::ThreadRunning() {
 
             // nvtxRangePush("display_gl_copy_debayer");
             // copy frame from cpu to gpu
-            ck(cudaMemcpy2D(frame_original.d_orig, camera_params->width,
-                            entry.imagePtr, camera_params->width,
-                            camera_params->width, camera_params->height,
-                            cudaMemcpyHostToDevice));
+            CHECK(cudaMemcpy2D(frame_original.d_orig, camera_params->width,
+                               entry.imagePtr, camera_params->width,
+                               camera_params->width, camera_params->height,
+                               cudaMemcpyHostToDevice));
 
             if (camera_params->color) {
                 debayer_frame_gpu(camera_params, &frame_original, &debayer);
@@ -172,40 +175,20 @@ void COpenGLDisplay::ThreadRunning() {
                     std::cerr << "Error executing resize in display -- code: "
                               << npp_result << std::endl;
                 }
-                ck(cudaMemcpy2D(
+                CHECK(cudaMemcpy2D(
                     display_buffer, output_image_size.width * 4, d_resize,
                     output_image_size.width * 4, output_image_size.width * 4,
                     output_image_size.height, cudaMemcpyDeviceToDevice));
 
             } else {
-                ck(cudaMemcpy2D(display_buffer, output_image_size.width * 4,
-                                debayer.d_debayer, output_image_size.width * 4,
-                                output_image_size.width * 4,
-                                output_image_size.height,
-                                cudaMemcpyDeviceToDevice));
+                CHECK(cudaMemcpy2D(
+                    display_buffer, output_image_size.width * 4,
+                    debayer.d_debayer, output_image_size.width * 4,
+                    output_image_size.width * 4, output_image_size.height,
+                    cudaMemcpyDeviceToDevice));
             }
             // nvtxRangePop();
             cudaDeviceSynchronize();
-
-            // if (camera_select->frame_save_state==State_Write_New_Frame) {
-            //     rgba2bgr_convert(d_convert, debayer.d_debayer,
-            //     camera_params->width, camera_params->height, 0);
-
-            //     // copy frame back to cpu, and then save
-            //     cudaMemcpy2D(frame_cpu.frame, camera_params->width*3,
-            //     d_convert, camera_params->width*3, camera_params->width*3,
-            //     camera_params->height, cudaMemcpyDeviceToHost); cv::Mat view
-            //     = cv::Mat(camera_params->width * camera_params->height * 3,
-            //     1, CV_8U, frame_cpu.frame).reshape(3, camera_params->height);
-
-            //     std::string image_name = camera_select->picture_save_folder +
-            //     "/" + camera_params->camera_serial + "_" +
-            //     camera_select->frame_save_name + "." +
-            //     camera_select->frame_save_format; std::cout << image_name <<
-            //     std::endl; cv::imwrite(image_name, view);
-            //     camera_select->pictures_counter++;
-            //     camera_select->frame_save_state = State_Frame_Idle;
-            // }
         }
         // Count frame for FPS
         frameCount++;

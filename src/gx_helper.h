@@ -7,9 +7,11 @@
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
 #include "types.h"
+#include "utils.h"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cuda_gl_interop.h>
 #include <stdio.h>
 
@@ -150,27 +152,27 @@ static void unbind_pbo() { glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0); }
 
 static void register_pbo_to_cuda(GLuint *pbo,
                                  cudaGraphicsResource_t *cuda_resource) {
-    cudaGraphicsGLRegisterBuffer(cuda_resource, *pbo,
-                                 cudaGraphicsRegisterFlagsNone);
+    CHECK(cudaGraphicsGLRegisterBuffer(cuda_resource, *pbo,
+                                       cudaGraphicsRegisterFlagsNone));
 }
 
-void cuda_unregister_pbo(cudaGraphicsResource_t cuda_resource) {
-    cudaGraphicsUnregisterResource(cuda_resource);
+static void cuda_unregister_pbo(cudaGraphicsResource_t cuda_resource) {
+    CHECK(cudaGraphicsUnregisterResource(cuda_resource));
 }
 
 static void map_cuda_resource(cudaGraphicsResource_t *cuda_resource) {
-    cudaGraphicsMapResources(1, cuda_resource);
+    CHECK(cudaGraphicsMapResources(1, cuda_resource));
 }
 
 static void cuda_pointer_from_resource(unsigned char **cuda_buffer_p,
                                        size_t *size_p,
                                        cudaGraphicsResource_t *cuda_resource) {
-    cudaGraphicsResourceGetMappedPointer((void **)cuda_buffer_p, size_p,
-                                         *cuda_resource);
+    CHECK(cudaGraphicsResourceGetMappedPointer((void **)cuda_buffer_p, size_p,
+                                               *cuda_resource));
 }
 
 static void unmap_cuda_resource(cudaGraphicsResource_t *cuda_resource) {
-    cudaGraphicsUnmapResources(1, cuda_resource);
+    CHECK(cudaGraphicsUnmapResources(1, cuda_resource));
 }
 
 void render_initialize_target(gx_context *window) {

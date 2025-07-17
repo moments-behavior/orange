@@ -4,6 +4,8 @@
 #include "video_capture.h"
 #include <mutex>
 #include <npp.h>
+#include "shaman/shaman.h"
+#include "shaman/pose_shaman.h"
 
 FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
     : camera_params(params), camera_select(select), running(false) {}
@@ -63,6 +65,9 @@ void FrameDetector::thread_loop() {
                         camera_params->height, true, stream);
     yolov8->make_pipe(true);
 
+    shaman::SharedBoxQueue writer(true);
+    std::vector<shaman::Object> shaman_objs;
+
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
@@ -98,6 +103,7 @@ void FrameDetector::thread_loop() {
         yolov8->postprocess(objs);
 
         if (objs.size() > 0) {
+            writer.push(conv_shaman(objs));
             f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
             f32 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
 

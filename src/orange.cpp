@@ -104,7 +104,7 @@ int main(int argc, char **args) {
     std::string calib_save_folder =
         orange_root_dir_str + "/exp/calibration/" + get_current_date();
 
-    int local_config_select = 0;
+    int local_config_select = 1;
     bool select_all_cameras = false;
     char *temp_string = (char *)malloc(64);
     *temp_string = '\0';
@@ -319,7 +319,7 @@ int main(int argc, char **args) {
                     encoder_config->folder_name =
                         input_folder + "/" + get_current_date_time();
                     make_folder(encoder_config->folder_name);
-                    ptp_params->network_sync = true;
+                    ptp_params->network_sync = false;
                     host_broadcast_start_threads(fb_builder, &server,
                                                  encoder_config->folder_name,
                                                  encoder_setup);

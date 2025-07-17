@@ -138,6 +138,7 @@ void FrameDetector::thread_loop() {
 
             detection2d[camera_select->idx2d].ball2d.center[0] = {
                 bbox_center_x, bbox_center_y};
+            detection2d[camera_select->idx2d].ball2d.rect = objs[0].rect;
             // std::cout << detection2d[camera_select->idx2d].ball2d.center[0].x
             //           << std::endl;
             detection2d[camera_select->idx2d].ball2d.find_ball.store(true);

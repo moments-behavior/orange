@@ -37,6 +37,7 @@ struct Aruco2d {
 struct Ball2d {
     std::atomic<bool> find_ball;
     cv::Point2f center[1];
+    cv::Rect_<float> rect;
     cv::Point2f proj_center[1];
     Ball2d() : find_ball(false) {}
 };

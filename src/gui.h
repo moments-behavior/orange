@@ -475,4 +475,26 @@ inline void draw_ball_center(cv::Point2f ball_center, int frame_height,
     ImPlot::PlotScatter(name.c_str(), &ball_center_x, &ball_center_y, 1);
 }
 
+inline void draw_box(cv::Point2f box_center, cv::Rect_<float> bbox, int frame_height, ImVec4 color, std::string name, ImPlotMarker marker, float pt_size) {
+    double x[5] = {
+        (double)box_center.x + bbox.x,
+        (double)box_center.x + bbox.x + bbox.width,
+        (double)box_center.x + bbox.x + bbox.width,
+        (double)box_center.x + bbox.x,
+        (double)box_center.x + bbox.x
+    };
+
+    double y[5] = {
+        (double)frame_height - ((double)box_center.y + bbox.y),
+        (double)frame_height - ((double)box_center.y + bbox.y),
+        (double)frame_height - ((double)box_center.y + bbox.y + bbox.height),
+        (double)frame_height - ((double)box_center.y + bbox.y + bbox.height),
+        (double)frame_height - ((double)box_center.y + bbox.y)
+    }
+
+    ImPlot::SetNextLineStyle(color, 2.0);
+    ImPlot::PlotLine(name.c_str(), x, y, 5);
+
+}
+
 #endif

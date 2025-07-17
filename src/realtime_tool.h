@@ -8,6 +8,7 @@
 #include <csignal>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/sfm.hpp>
+#include <vector> 
 
 #define PI 3.14159265
 
@@ -37,7 +38,7 @@ struct Aruco2d {
 struct Ball2d {
     std::atomic<bool> find_ball;
     cv::Point2f center[1];
-    cv::Rect_<float> rect;
+    std::vector<cv::Rect_<float>> rects;
     cv::Point2f proj_center[1];
     Ball2d() : find_ball(false) {}
 };

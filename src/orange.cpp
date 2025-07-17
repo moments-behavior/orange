@@ -1350,7 +1350,8 @@ int main(int argc, char **args) {
                                              ball2d_name, ImPlotMarker_Circle, 6.0);
                                 }
 
-                                if (detection3d.ball3d.new_detection.load()) {
+                                // only draw if user selected detect3d_standoff
+                                if (detection3d.ball3d.new_detection.load() && cameras_select[i].detect_mode == Detect3D_Standoff) {
                                     gui_plot_world_coordinates(
                                         &detection2d[i].camera_calib,
                                         &cameras_params[i]);

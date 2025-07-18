@@ -52,7 +52,9 @@ cp ./best.pt ~/src/YOLOv8-TensorRT/best.pt
 cd ~/src/YOLOv8-TensorRT/
 ```
 
-Now we're ready to compile into an engine file. Install the requirements:
+Now we're ready to compile into an engine file. You can use `mechanic.py` and follow the steps outlined in that README or follow the steps below.
+
+Install the requirements:
 ```
 pip install -r requirements.txt
 pip install tensorrt==10.11.0.33

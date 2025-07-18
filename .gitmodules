@@ -16,3 +16,6 @@
 [submodule "third_party/ImGuiFileDialog"]
 	path = third_party/ImGuiFileDialog
 	url = https://github.com/aiekick/ImGuiFileDialog.git
+[submodule "mechanic"]
+	path = mechanic
+	url = https://github.com/johnsonlabjanelia/mechanic

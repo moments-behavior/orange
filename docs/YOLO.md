@@ -5,20 +5,9 @@ Adapted from [YOLOv8-TensorRT](https://github.com/triple-Mu/YOLOv8-TensorRT), we
 ### Preparation
 You will need a `mp4` recording to create the training data for your YOLO model. 
 
-### Roboflow Instructions
-We first want to extract frames from our video using ffmpeg. Open a terminal in the folder where the video recording is and enter the following: 
-```
-mkdir frames
-ffmpeg -i input.mp4 -vf "fps=5" frames/frame_%05d.jpg
-```
-This will extract every 5 frames of your video and put them in a folder called frames.
+Label and create a YOLOv8 compatible dataset using frames from your recording. 
 
-Next, we want to set up Roboflow. Visit [roboflow](https://app.roboflow.com/) and create an account. A public account is limited to one workspace, but that one workspace can have multiple projects. Create a workspace and a new project. 
-
-You can upload the frames folder to Roboflow. This will put all the extracted frames into your project. Begin annotating and follow along with the Roboflow tutorial. When you've annotated enough images, back out and select the `Add to Dataset` button in the top right of the screen. Be sure to update the distribution of the pictures in the dropdown to ensure that the pictures will be split between training, testing, and validation datasets. 
-
-Now in the Datasets tab, we can create a new dataset version. For the preprocessing steps, add a step that will resize the image to 640x640. For the augmentation step, select any augmentations you wish to have in your dataset. Create your new dataset and download it, making sure to select the `yolov8` format when prompted. 
-
+### Compiling the model
 Clone the repo: 
 ```
 cd ~/src/

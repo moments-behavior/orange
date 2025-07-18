@@ -5,27 +5,27 @@
 #include "fstream"
 #include <nppi.h>
 
-using namespace pose;
-
-class YOLOv8
-{
-public:
-    explicit YOLOv8(const std::string &engine_file_path, int width, int height);
+class YOLOv8 {
+  public:
+    explicit YOLOv8(const std::string &engine_file_path, int width, int height,
+                    cudaStream_t stream, unsigned char *d_input_image,
+                    const NppStreamContext &npp_ctx);
     ~YOLOv8();
 
-    void make_pipe(bool warmup = true);
-    void preprocess_gpu(unsigned char *d_rgb);
+    void make_pipe(bool graph_capture);
+    void preprocess_gpu();
     void infer();
-    void postprocess(std::vector<Object> &objs);
-    static void draw_objects(const cv::Mat&                                image,
-                           cv::Mat&                                      res,
-                           const std::vector<Object>&                    objs,
-                           const std::vector<std::string>&               CLASS_NAMES,
-                           const std::vector<std::vector<unsigned int>>& COLORS);
+    void postprocess(std::vector<Bbox> &objs);
+    static void
+    draw_objects(const cv::Mat &image, cv::Mat &res,
+                 const std::vector<Bbox> &objs,
+                 const std::vector<std::string> &CLASS_NAMES,
+                 const std::vector<std::vector<unsigned int>> &COLORS);
 
-    void copy_keypoints_gpu(float* d_points, const std::vector<Object>& objs);
-    void copy_keypoints_gpu(float* d_points, const Object& obj);
-    
+    void copy_keypoints_gpu(float *d_points, const std::vector<Bbox> &objs);
+    void copy_keypoints_gpu(float *d_points, const Bbox &obj);
+    void infer_capture_only();
+
     int num_bindings;
     int num_inputs = 0;
     int num_outputs = 0;
@@ -36,9 +36,13 @@ public:
 
     PreParam pparam;
     cudaStream_t stream = nullptr;
+    cudaGraph_t inference_graph = nullptr;
+    cudaGraphExec_t inference_graph_exec = nullptr;
+    bool graph_captured = false;
 
-private:
+  private:
     // device pointer for gpu preprocessing
+    unsigned char *d_input_image;
     unsigned char *d_temp;
     unsigned char *d_boarder;
     float *d_float;
@@ -49,6 +53,7 @@ private:
     int padh;
     int inp_h_int;
     int inp_w_int;
+    NppStreamContext npp_ctx_;
 
     nvinfer1::ICudaEngine *engine = nullptr;
     nvinfer1::IRuntime *runtime = nullptr;

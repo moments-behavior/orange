@@ -10,7 +10,7 @@ nvcc -c src/kernel.cu -arch=sm_80 -o $targets_folder/kernel.o
 DIR_TENSORRT=$HOME/nvidia/TensorRT
 
 g++ -Ofast -ffast-math -std=c++17 $targets_folder/kernel.o -o $targets_folder/yolo_offline \
-    -I./src/ benchmark/yolo_offline.cpp src/yolov8_det.cpp \
+    -I./src/ src/yolo_offline.cpp src/yolov8_det.cpp \
     -I/usr/local/include/opencv4 \
     -lopencv_sfm -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_highgui -lopencv_video \
     -I$DIR_TENSORRT/include -L$DIR_TENSORRT/lib/ -lnvinfer -lnvinfer_plugin \

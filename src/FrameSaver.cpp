@@ -1,28 +1,19 @@
 #include "FrameSaver.h"
+#include "image_processing.h"
 #include "kernel.cuh"
+#include "utils.h"
 #include <npp.h>
 
-FrameSaver::FrameSaver(CameraParams *params,
-                       CameraEachSelect *select)
-    : camera_params(params),
-      camera_select(select),
-      running(false)
-{
-    ck(cudaStreamCreate(&stream));
-    initalize_gpu_frame(&frame_process.frame_original, camera_params);
-    initialize_gpu_debayer(&frame_process.debayer, camera_params);
-    initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params);
-
-    ck(cudaMalloc((void **)&frame_process.d_convert,
-                  camera_params->width * camera_params->height * 3));
-}
+FrameSaver::FrameSaver(CameraParams *params, CameraEachSelect *select)
+    : camera_params(params), camera_select(select), running(false) {}
 
 FrameSaver::~FrameSaver() {
     stop();
-    cudaFree(frame_process.frame_original.d_orig);
-    cudaFree(frame_process.debayer.d_debayer);
+    cudaFreeAsync(frame_process.frame_original.d_orig, stream);
+    cudaFreeAsync(frame_process.debayer.d_debayer, stream);
     cudaFreeHost(frame_process.frame_cpu.frame);
-    ck(cudaStreamDestroy(stream));
+    CHECK(cudaStreamSynchronize(stream));
+    CHECK(cudaStreamDestroy(stream));
 }
 
 void FrameSaver::start() {
@@ -40,23 +31,17 @@ void FrameSaver::stop() {
     }
 }
 
-void FrameSaver::notify_frame_ready(void* device_image_ptr) {
+void FrameSaver::notify_frame_ready(void *device_image_ptr) {
     if (camera_params->gpu_direct) {
-        ck(cudaMemcpy2D(frame_process.frame_original.d_orig,
-            camera_params->width,
-            device_image_ptr,
-            camera_params->width,
-            camera_params->width,
-            camera_params->height,
-            cudaMemcpyDeviceToDevice)); 
+        CHECK(cudaMemcpy2D(frame_process.frame_original.d_orig,
+                           camera_params->width, device_image_ptr,
+                           camera_params->width, camera_params->width,
+                           camera_params->height, cudaMemcpyDeviceToDevice));
     } else {
-        ck(cudaMemcpy2D(frame_process.frame_original.d_orig,
-            camera_params->width,
-            device_image_ptr,
-            camera_params->width,
-            camera_params->width,
-            camera_params->height,
-            cudaMemcpyHostToDevice)); 
+        CHECK(cudaMemcpy2D(frame_process.frame_original.d_orig,
+                           camera_params->width, device_image_ptr,
+                           camera_params->width, camera_params->width,
+                           camera_params->height, cudaMemcpyHostToDevice));
     }
     camera_select->frame_save_state.store(State_Frame_Copy_Done);
     cv.notify_one();
@@ -64,44 +49,52 @@ void FrameSaver::notify_frame_ready(void* device_image_ptr) {
 
 void FrameSaver::thread_loop() {
     ck(cudaSetDevice(camera_params->gpu_id));
-    ck(nppSetStream(stream));
+    CHECK(cudaStreamCreate(&stream));
+    initalize_gpu_frame_async(&frame_process.frame_original, camera_params,
+                              stream);
+    initialize_gpu_debayer_async(&frame_process.debayer, camera_params, 4,
+                                 stream);
+    initialize_pinned_cpu_frame(&frame_process.frame_cpu, camera_params, 3);
+
+    CHECK(cudaMallocAsync((void **)&frame_process.d_convert,
+                          camera_params->width * camera_params->height * 3,
+                          stream));
 
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [&] {
-            return camera_select->frame_save_state.load() == State_Frame_Copy_Done || !running.load();
+            return camera_select->frame_save_state.load() ==
+                       State_Frame_Copy_Done ||
+                   !running.load();
         });
 
-        if (!running.load()) break;
+        if (!running.load())
+            break;
         lock.unlock();
 
         // GPU processing
         if (camera_params->color) {
-            debayer_frame_gpu(camera_params, &frame_process.frame_original, &frame_process.debayer);
+            debayer_frame_gpu(camera_params, &frame_process.frame_original,
+                              &frame_process.debayer);
         } else {
-            duplicate_channel_gpu(camera_params, &frame_process.frame_original, &frame_process.debayer);
+            duplicate_channel_gpu(camera_params, &frame_process.frame_original,
+                                  &frame_process.debayer);
         }
 
         rgba2bgr_convert(frame_process.d_convert,
-                         frame_process.debayer.d_debayer,
-                         camera_params->width,
-                         camera_params->height,
-                         stream);
-           
+                         frame_process.debayer.d_debayer, camera_params->width,
+                         camera_params->height, stream);
+
         ck(cudaMemcpy2DAsync(frame_process.frame_cpu.frame,
-                    camera_params->width * 3,
-                    frame_process.d_convert,
-                    camera_params->width * 3,
-                    camera_params->width * 3,
-                    camera_params->height,
-                    cudaMemcpyDeviceToHost,
-                    stream));
+                             camera_params->width * 3, frame_process.d_convert,
+                             camera_params->width * 3, camera_params->width * 3,
+                             camera_params->height, cudaMemcpyDeviceToHost,
+                             stream));
 
         ck(cudaStreamSynchronize(stream));
 
         // Save to disk
-        cv::Mat view(camera_params->width * camera_params->height * 3,
-                     1, CV_8U,
+        cv::Mat view(camera_params->width * camera_params->height * 3, 1, CV_8U,
                      frame_process.frame_cpu.frame);
         view = view.reshape(3, camera_params->height);
 

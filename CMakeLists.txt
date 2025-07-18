@@ -27,7 +27,7 @@ file(GLOB ORANGE_SOURCES
     ${DIR_NVENCODER}/*.cpp
 )
 
-list(REMOVE_ITEM ORANGE_SOURCES ${SRC_DIR}/orange_headless_client.cpp)
+list(REMOVE_ITEM ORANGE_SOURCES ${SRC_DIR}/orange_headless_client.cpp ${SRC_DIR}/yolo_offline.cpp)
 
 file(GLOB NVENCODER_SOURCES ${PROJECT_SOURCE_DIR}/src/NvEncoder/*.cpp)
 # Add sourc files for orange_client
@@ -35,10 +35,10 @@ file(GLOB ORANGE_CLIENT_SOURCES
     ${SRC_DIR}/*.cpp
     ${DIR_NVENCODER}/*.cpp
 )
-list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp)
+list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolo_offline.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp ${SRC_DIR}/FrameDetector.cpp ${SRC_DIR}/realtime_tool.cpp ${SRC_DIR}/detect3d.cpp)
 
 set(YOLO_OFFLINE_SOURCES
-    benchmark/yolo_offline.cpp
+    src/yolo_offline.cpp
     src/yolov8_det.cpp
 )
 
@@ -142,8 +142,10 @@ target_link_libraries(orange
     opencv_core
     opencv_imgcodecs
     opencv_imgproc
+    opencv_calib3d
     nvinfer
     nvinfer_plugin
+    nvToolsExt
     glfw
 )
 

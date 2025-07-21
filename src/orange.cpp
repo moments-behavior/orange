@@ -1278,6 +1278,13 @@ int main(int argc, char **args) {
                                         ball2d_name, ImPlotMarker_Circle, 6.0);
                                 }
 
+                                if (cameras_select[i].detect_mode ==
+                                    Detect3D_Standoff) {
+                                    gui_plot_world_coordinates(
+                                        &detection2d[i].camera_calib,
+                                        &cameras_params[i]);
+                                }
+
                                 if (detection3d.ball3d.new_detection.load()) {
                                     std::string ball_proj_name =
                                         "detect_proj##" + std::to_string(i);

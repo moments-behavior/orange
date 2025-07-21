@@ -1270,10 +1270,9 @@ int main(int argc, char **args) {
                             if (detection2d[i].has_calibration_results) {
                                 if (detection2d[i].dets.find_new.load()) {
                                     std::string ball2d_name =
-                                        "ball##" + std::to_string(i);
-
-                                    draw_keypoints(
-                                        detection2d[i].dets.kps_proj,
+                                        "detect##" + std::to_string(i);
+                                    draw_detection(
+                                        detection2d[i].dets.obj2d,
                                         cameras_params[i].height,
                                         (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
                                         ball2d_name, ImPlotMarker_Circle, 6.0);
@@ -1281,8 +1280,7 @@ int main(int argc, char **args) {
 
                                 if (detection3d.ball3d.new_detection.load()) {
                                     std::string ball_proj_name =
-                                        "ball_proj##" + std::to_string(i);
-
+                                        "detect_proj##" + std::to_string(i);
                                     draw_keypoints(
                                         detection2d[i].dets.kps_proj,
                                         cameras_params[i].height,
@@ -1335,9 +1333,8 @@ int main(int argc, char **args) {
 
                                 if (detection2d[i].dets.find_new.load()) {
                                     std::string ball2d_name =
-                                        "ball##" + std::to_string(i);
-
-                                    draw_boxes(
+                                        "detect##" + std::to_string(i);
+                                    draw_detection(
                                         detection2d[i].dets.obj2d,
                                         cameras_params[i].height,
                                         (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
@@ -1354,9 +1351,8 @@ int main(int argc, char **args) {
                                 if (detection3d.ball3d.new_detection.load() &&
                                     cameras_select[i].detect_mode ==
                                         Detect3D_Standoff) {
-
                                     std::string ball_proj_name =
-                                        "ball_proj##" + std::to_string(i);
+                                        "detect_proj##" + std::to_string(i);
                                     draw_keypoints(
                                         detection2d[i].dets.kps_proj,
                                         cameras_params[i].height,

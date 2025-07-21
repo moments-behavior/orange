@@ -502,12 +502,16 @@ inline void draw_box(cv::Rect_<float> bbox, int frame_height, ImVec4 color,
     ImPlot::PlotLine(name.c_str(), x, y, 5);
 }
 
-inline void draw_boxes(std::vector<Object> bboxes, int frame_height,
-                       ImVec4 color, std::string name, ImPlotMarker marker,
-                       float pt_size) {
-    for (size_t i = 0; i < bboxes.size(); i++) {
-        draw_box(bboxes[i].rect, frame_height, color, name + std::to_string(i),
-                 marker, pt_size);
+inline void draw_detection(std::vector<Object> objs, int frame_height,
+                           ImVec4 color, std::string name, ImPlotMarker marker,
+                           float pt_size) {
+    for (size_t i = 0; i < objs.size(); i++) {
+        draw_box(objs[i].rect, frame_height, color,
+                 name + "bbox2d" + std::to_string(i), marker, pt_size);
+        if (!objs[i].kps.empty()) {
+            std::string kp_name = name + "kps" + std::to_string(i);
+            draw_keypoints(objs[i].kps, frame_height, color, kp_name);
+        }
     }
 }
 

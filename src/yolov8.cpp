@@ -456,16 +456,17 @@ void YOLOv8::postprocess_kp(std::vector<Object> &objs, float score_thres,
         }
     }
 
-    auto t_start = std::chrono::high_resolution_clock::now();
+    // auto t_start = std::chrono::high_resolution_clock::now();
 
     cv::dnn::NMSBoxesBatched(bboxes, scores, labels, score_thres, iou_thres,
                              indices);
 
-    auto t_end = std::chrono::high_resolution_clock::now();
-    double duration_ms =
-        std::chrono::duration<double, std::milli>(t_end - t_start).count();
+    // auto t_end = std::chrono::high_resolution_clock::now();
+    // double duration_ms =
+    //     std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
-    std::cout << "NMSBoxesBatched took " << duration_ms << " ms" << std::endl;
+    // std::cout << "NMSBoxesBatched took " << duration_ms << " ms" <<
+    // std::endl;
 
     // Step 1: group indices by class label
     std::unordered_map<int, std::vector<int>> class_to_indices;
@@ -577,16 +578,16 @@ void YOLOv8::draw_objects_kp(
     const int num_point = 4;
     for (auto &obj : objs) {
         cv::Scalar obj_color; // Use this for drawing
+        char text[256];
         if (obj.label == 0) {
-            obj_color = cv::Scalar(0, 0, 255); // Red
+            obj_color = cv::Scalar(0, 0, 255);
+            sprintf(text, "rat %.1f%%", obj.prob * 100);
         } else {
             obj_color = cv::Scalar(255, 0, 0);
+            sprintf(text, "ball %.1f%%", obj.prob * 100);
         }
 
         cv::rectangle(res, obj.rect, obj_color, 2);
-
-        char text[256];
-        sprintf(text, "person %.1f%%", obj.prob * 100);
 
         int baseLine = 0;
         cv::Size label_size =

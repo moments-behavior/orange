@@ -4,6 +4,7 @@
 #include "camera.h"
 #include "opencv2/core/core.hpp"
 #include "types.h"
+#include "yolov8.h"
 #include <atomic>
 #include <csignal>
 #include <opencv2/calib3d.hpp>
@@ -34,19 +35,18 @@ struct Aruco2d {
     cv::Point2f proj_corners[4];
 };
 
-struct Ball2d {
-    std::atomic<bool> find_ball;
-    cv::Point2f center[1];
-    cv::Point2f proj_center[1];
-    Ball2d() : find_ball(false) {}
+struct DetectedObjects {
+    std::atomic<bool> find_new;
+    std::vector<Object> obj2d;
+    std::vector<float> kps_proj;
+    DetectedObjects() : find_new(false) {}
 };
 
 struct DetectionDataPerCam {
     bool has_calibration_results;
     std::string calibration_file;
     CameraCalibResults camera_calib;
-    Aruco2d marker2d;
-    Ball2d ball2d;
+    DetectedObjects dets;
 };
 
 struct Aruco3d {

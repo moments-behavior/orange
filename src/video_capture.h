@@ -39,6 +39,7 @@ struct CameraEachSelect {
     bool selected_to_save = false;
     std::string picture_save_folder;
     std::string yolo_model;
+    std::string yolo_mode;
     DetectMode detect_mode = Detect_OFF;
     int idx2d = 0;
     int idx3d = 0;

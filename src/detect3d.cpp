@@ -53,8 +53,8 @@ void detection3d_proc(CameraControl *camera_control,
 
         // triangulation calculation
         for (int idx : cam3d_idx) {
-            if (detection2d[idx].ball2d.find_ball.load()) {
-                // make a copy
+            if (detection2d[idx].dets.find_new.load()) {
+                // make a copy of the kepts
                 std::vector<cv::Point2f> corners;
                 corners.push_back(detection2d[idx].ball2d.center[0]);
                 ball2d_all_cams.detected_points.push_back(corners);

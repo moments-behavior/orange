@@ -92,6 +92,12 @@ void FrameDetector::thread_loop() {
     std::chrono::high_resolution_clock::time_point start =
         std::chrono::high_resolution_clock::time_point();
     int count = 0;
+
+    // for pose only
+    int topk = 1;
+    float score_thres = 0.2f;
+    float iou_thres = 0.2f;
+
     while (running.load()) {
         // start timing after 10 frames
         if (count == 10) {
@@ -130,19 +136,26 @@ void FrameDetector::thread_loop() {
             yolov8->preprocess_gpu();
             yolov8->infer(); // it sync gpu with cpu here
         }
-        yolov8->postprocess(objs);
+        if (camera_select->yolo_mode == "detect") {
+            yolov8->postprocess(objs);
+        } else {
+            yolov8->postprocess_kp(objs, score_thres, iou_thres, topk);
+        }
 
         if (objs.size() > 0) {
-            f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width / 2.0;
-            f32 bbox_center_y = objs[0].rect.y + objs[0].rect.height / 2.0;
-
-            detection2d[camera_select->idx2d].ball2d.center[0] = {
-                bbox_center_x, bbox_center_y};
-            // std::cout << detection2d[camera_select->idx2d].ball2d.center[0].x
-            //           << std::endl;
-            detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
+            for (const auto &obj : objs) {
+                // use obj.rect, obj.label, obj.prob, obj.kps, etc.
+                // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width
+                // / 2.0; f32 bbox_center_y = objs[0].rect.y +
+                // objs[0].rect.height / 2.0;
+                detection2d[camera_select->idx2d].dets.obj2d.push_back(obj);
+                // std::cout <<
+                // detection2d[camera_select->idx2d].ball2d.center[0].x
+                //           << std::endl;
+                detection2d[camera_select->idx2d].dets.find_new.store(true);
+            }
         } else {
-            detection2d[camera_select->idx2d].ball2d.find_ball.store(false);
+            detection2d[camera_select->idx2d].dets.find_new.store(false);
         }
 
         // running detection

@@ -148,6 +148,7 @@ void load_camera_json_config_files(std::string file_name,
         camera_params->gop = 1;
     }
     if (camera_config.contains("yolo")) {
+        camera_select->yolo_mode = camera_config["yolo_mode"];
         camera_select->yolo_model = camera_config["yolo"];
     }
 }

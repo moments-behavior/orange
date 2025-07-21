@@ -1268,12 +1268,12 @@ int main(int argc, char **args) {
                                        cameras_params[i].height));
 
                             if (detection2d[i].has_calibration_results) {
-                                if (detection2d[i].ball2d.find_ball.load()) {
+                                if (detection2d[i].dets.find_new.load()) {
                                     std::string ball2d_name =
                                         "ball##" + std::to_string(i);
 
-                                    draw_ball_center(
-                                        detection2d[i].ball2d.center[0],
+                                    draw_keypoints(
+                                        detection2d[i].dets.kps_proj,
                                         cameras_params[i].height,
                                         (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
                                         ball2d_name, ImPlotMarker_Circle, 6.0);
@@ -1283,12 +1283,12 @@ int main(int argc, char **args) {
                                     std::string ball_proj_name =
                                         "ball_proj##" + std::to_string(i);
 
-                                    draw_ball_center(
-                                        detection2d[i].ball2d.proj_center[0],
+                                    draw_keypoints(
+                                        detection2d[i].dets.kps_proj,
                                         cameras_params[i].height,
-                                        (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
-                                        ball_proj_name, ImPlotMarker_Cross,
-                                        8.0);
+                                        (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
+                                        ball_proj_name, ImPlotMarker_Circle,
+                                        6.0);
                                 }
                             }
 
@@ -1332,27 +1332,33 @@ int main(int argc, char **args) {
                                        cameras_params[i].height));
 
                             if (detection2d[i].has_calibration_results) {
-                                gui_plot_world_coordinates(
-                                    &detection2d[i].camera_calib,
-                                    &cameras_params[i]);
 
-                                if (detection2d[i].ball2d.find_ball.load()) {
+                                if (detection2d[i].dets.find_new.load()) {
                                     std::string ball2d_name =
                                         "ball##" + std::to_string(i);
 
-                                    draw_ball_center(
-                                        detection2d[i].ball2d.center[0],
+                                    draw_boxes(
+                                        detection2d[i].dets.obj2d,
                                         cameras_params[i].height,
                                         (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
                                         ball2d_name, ImPlotMarker_Circle, 6.0);
                                 }
 
-                                if (detection3d.ball3d.new_detection.load()) {
+                                if (cameras_select[i].detect_mode ==
+                                    Detect3D_Standoff) {
+                                    gui_plot_world_coordinates(
+                                        &detection2d[i].camera_calib,
+                                        &cameras_params[i]);
+                                }
+                                // only draw if user selected detect3d_standoff
+                                if (detection3d.ball3d.new_detection.load() &&
+                                    cameras_select[i].detect_mode ==
+                                        Detect3D_Standoff) {
+
                                     std::string ball_proj_name =
                                         "ball_proj##" + std::to_string(i);
-
-                                    draw_ball_center(
-                                        detection2d[i].ball2d.proj_center[0],
+                                    draw_keypoints(
+                                        detection2d[i].dets.kps_proj,
                                         cameras_params[i].height,
                                         (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
                                         ball_proj_name, ImPlotMarker_Cross,

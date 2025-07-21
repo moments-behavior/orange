@@ -466,13 +466,49 @@ inline void draw_aruco_markers(Aruco2d *aruco_marker, int frame_height) {
     ImPlot::PlotLine("Aruco", x, y, 5);
 }
 
-inline void draw_ball_center(cv::Point2f ball_center, int frame_height,
-                             ImVec4 color, std::string name,
-                             ImPlotMarker marker, float pt_size) {
-    double ball_center_x = (double)ball_center.x;
-    double ball_center_y = (double)frame_height - (double)ball_center.y;
-    ImPlot::SetNextMarkerStyle(marker, pt_size, color, 2.5);
-    ImPlot::PlotScatter(name.c_str(), &ball_center_x, &ball_center_y, 1);
+inline void draw_keypoints(const std::vector<float> &keypoints,
+                           int frame_height, ImVec4 color,
+                           const std::string &name,
+                           ImPlotMarker marker = ImPlotMarker_Circle,
+                           float pt_size = 4.0f) {
+    int num_points = keypoints.size() / 2;
+    if (num_points == 0)
+        return;
+
+    std::vector<double> xs(num_points);
+    std::vector<double> ys(num_points);
+
+    for (int i = 0; i < num_points; ++i) {
+        xs[i] = static_cast<double>(keypoints[2 * i]);
+        ys[i] = static_cast<double>(frame_height - keypoints[2 * i + 1]);
+    }
+
+    ImPlot::SetNextMarkerStyle(marker, pt_size, color, 2.5f);
+    ImPlot::PlotScatter(name.c_str(), xs.data(), ys.data(), num_points);
+}
+
+inline void draw_box(cv::Rect_<float> bbox, int frame_height, ImVec4 color,
+                     std::string name, ImPlotMarker marker, float pt_size) {
+    double x[5] = {(double)bbox.x, (double)bbox.x + bbox.width,
+                   (double)bbox.x + bbox.width, (double)bbox.x, (double)bbox.x};
+
+    double y[5] = {(double)frame_height - ((double)bbox.y),
+                   (double)frame_height - ((double)bbox.y),
+                   (double)frame_height - ((double)bbox.y + bbox.height),
+                   (double)frame_height - ((double)bbox.y + bbox.height),
+                   (double)frame_height - ((double)bbox.y)};
+
+    ImPlot::SetNextLineStyle(color, 2.0);
+    ImPlot::PlotLine(name.c_str(), x, y, 5);
+}
+
+inline void draw_boxes(std::vector<Object> bboxes, int frame_height,
+                       ImVec4 color, std::string name, ImPlotMarker marker,
+                       float pt_size) {
+    for (size_t i = 0; i < bboxes.size(); i++) {
+        draw_box(bboxes[i].rect, frame_height, color, name + std::to_string(i),
+                 marker, pt_size);
+    }
 }
 
 #endif

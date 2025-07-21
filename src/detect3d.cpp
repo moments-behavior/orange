@@ -56,7 +56,9 @@ void detection3d_proc(CameraControl *camera_control,
             if (detection2d[idx].dets.find_new.load()) {
                 // make a copy of the kepts
                 std::vector<cv::Point2f> corners;
-                corners.push_back(detection2d[idx].ball2d.center[0]);
+                cv::Point2f kp = {detection2d[idx].dets.obj2d[0].kps[0],
+                                  detection2d[idx].dets.obj2d[0].kps[1]};
+                corners.push_back(kp);
                 ball2d_all_cams.detected_points.push_back(corners);
                 ball2d_all_cams.detected_cameras.push_back(idx);
                 ball2d_all_cams.calib_results.push_back(
@@ -92,10 +94,10 @@ void detection3d_proc(CameraControl *camera_control,
 
                     // std::cout << image_pts.at<float>(0, 0) << ", "
                     //           << image_pts.at<float>(0, 1) << std::endl;
-                    detection2d[i].ball2d.proj_center[0].x =
-                        image_pts.at<float>(0, 0);
-                    detection2d[i].ball2d.proj_center[0].y =
-                        image_pts.at<float>(0, 1);
+                    std::vector<float> kps_proj;
+                    kps_proj.push_back(image_pts.at<float>(0, 0));
+                    kps_proj.push_back(image_pts.at<float>(0, 1));
+                    detection2d[i].dets.kps_proj = kps_proj;
                 }
             }
         }

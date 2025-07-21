@@ -145,10 +145,17 @@ void FrameDetector::thread_loop() {
         if (objs.size() > 0) {
             for (const auto &obj : objs) {
                 // use obj.rect, obj.label, obj.prob, obj.kps, etc.
-                // f32 bbox_center_x = objs[0].rect.x + objs[0].rect.width
-                // / 2.0; f32 bbox_center_y = objs[0].rect.y +
-                // objs[0].rect.height / 2.0;
-                detection2d[camera_select->idx2d].dets.obj2d.push_back(obj);
+                detection2d[camera_select->idx2d].dets.obj2d.clear();
+                Object one_obj = obj;
+                if (camera_select->yolo_mode == "detect") {
+                    f32 bbox_center_x =
+                        objs[0].rect.x + objs[0].rect.width / 2.0;
+                    f32 bbox_center_y =
+                        objs[0].rect.y + objs[0].rect.height / 2.0;
+                    one_obj.kps.push_back(bbox_center_x);
+                    one_obj.kps.push_back(bbox_center_y);
+                }
+                detection2d[camera_select->idx2d].dets.obj2d.push_back(one_obj);
                 // std::cout <<
                 // detection2d[camera_select->idx2d].ball2d.center[0].x
                 //           << std::endl;

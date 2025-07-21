@@ -9,6 +9,7 @@
 #include <csignal>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/sfm.hpp>
+#include <vector> 
 
 #define PI 3.14159265
 

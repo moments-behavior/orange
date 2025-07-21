@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     cv::Mat image;
 
     // for pose only
-    int topk = 2;
+    int topk = 1;
     float score_thres = 0.2f;
     float iou_thres = 0.2f;
 

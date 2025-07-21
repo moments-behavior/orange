@@ -371,24 +371,6 @@ void YOLOv8::postprocess(std::vector<Object> &objs) {
     }
 }
 
-float sigmoid(float x) { return 1.0f / (1.0f + expf(-x)); }
-int select_binary_class(const float *row, float *out_score) {
-    float objectness = row[4];
-    float class_score_logit = row[5];
-
-    float class1_prob = sigmoid(class_score_logit);
-    float conf1 = objectness * class1_prob;
-    float conf0 = objectness * (1.0f - class1_prob);
-
-    if (conf1 > conf0) {
-        *out_score = conf1;
-        return 1;
-    } else {
-        *out_score = conf0;
-        return 0;
-    }
-}
-
 void YOLOv8::postprocess_kp(std::vector<Object> &objs, float score_thres,
                             float iou_thres, int topk) {
     objs.clear();
@@ -410,19 +392,35 @@ void YOLOv8::postprocess_kp(std::vector<Object> &objs, float score_thres,
     cv::Mat output = cv::Mat(num_channels, num_anchors, CV_32F,
                              static_cast<float *>(this->host_ptrs[0]));
     output = output.t();
+
+    // cv::Mat column = output.col(5); // extract column 1 (2nd column)
+    // double minVal, maxVal;
+    // cv::minMaxLoc(column, &minVal, &maxVal);
+    // std::cout << "Min: " << minVal << ", Max: " << maxVal << std::endl;
+    // for (int j = 0; j < output.cols; ++j) {
+    //     std::cout << row_ptr[j] << " ";
+    // }
+    // std::cout << std::endl;
+
     for (int i = 0; i < num_anchors; i++) {
 
         auto row_ptr = output.row(i).ptr<float>();
         auto bboxes_ptr = row_ptr;
 
+        float score_class0 = *(row_ptr + 4);
+        float score_class1 = *(row_ptr + 5);
         float score;
-        int class_id = select_binary_class(row_ptr, &score);
+        int class_id;
+        if (score_class1 > score_class0) {
+            score = score_class1;
+            class_id = 1;
+        } else {
+            score = score_class0;
+            class_id = 0;
+        }
 
         auto kps_ptr = row_ptr + 6;
-        for (int j = 0; j < output.cols; ++j) {
-            std::cout << row_ptr[j] << " ";
-        }
-        std::cout << std::endl;
+
         if (score > score_thres) {
             float x = *bboxes_ptr++ - dw;
             float y = *bboxes_ptr++ - dh;
@@ -442,7 +440,7 @@ void YOLOv8::postprocess_kp(std::vector<Object> &objs, float score_thres,
             std::vector<float> kps;
             for (int k = 0; k < 4; k++) {
                 float kps_x = (*(kps_ptr + 3 * k) - dw) * ratio;
-                float kps_y = (*(kps_ptr + 3 * k) - dh) * ratio;
+                float kps_y = (*(kps_ptr + 3 * k + 1) - dh) * ratio;
                 float kps_s = *(kps_ptr + 3 * k + 2);
                 kps_x = clamp(kps_x, 0.f, width);
                 kps_y = clamp(kps_y, 0.f, height);
@@ -458,8 +456,16 @@ void YOLOv8::postprocess_kp(std::vector<Object> &objs, float score_thres,
         }
     }
 
+    auto t_start = std::chrono::high_resolution_clock::now();
+
     cv::dnn::NMSBoxesBatched(bboxes, scores, labels, score_thres, iou_thres,
                              indices);
+
+    auto t_end = std::chrono::high_resolution_clock::now();
+    double duration_ms =
+        std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+    std::cout << "NMSBoxesBatched took " << duration_ms << " ms" << std::endl;
 
     // Step 1: group indices by class label
     std::unordered_map<int, std::vector<int>> class_to_indices;
@@ -570,7 +576,14 @@ void YOLOv8::draw_objects_kp(
     res = image.clone();
     const int num_point = 4;
     for (auto &obj : objs) {
-        cv::rectangle(res, obj.rect, {0, 0, 255}, 2);
+        cv::Scalar obj_color; // Use this for drawing
+        if (obj.label == 0) {
+            obj_color = cv::Scalar(0, 0, 255); // Red
+        } else {
+            obj_color = cv::Scalar(255, 0, 0);
+        }
+
+        cv::rectangle(res, obj.rect, obj_color, 2);
 
         char text[256];
         sprintf(text, "person %.1f%%", obj.prob * 100);
@@ -587,7 +600,7 @@ void YOLOv8::draw_objects_kp(
 
         cv::rectangle(
             res, cv::Rect(x, y, label_size.width, label_size.height + baseLine),
-            {0, 0, 255}, -1);
+            obj_color, -1);
 
         cv::putText(res, text, cv::Point(x, y + label_size.height),
                     cv::FONT_HERSHEY_SIMPLEX, 0.4, {255, 255, 255}, 1);

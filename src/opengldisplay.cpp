@@ -83,8 +83,8 @@ void COpenGLDisplay::ThreadRunning() {
                          cudaMemcpyHostToDevice));
     }
 
-    std::vector<Bbox> objs;
-    std::vector<Bbox> objs_last_frame;
+    std::vector<Object> objs;
+    std::vector<Object> objs_last_frame;
 
     using clock = std::chrono::steady_clock;
 

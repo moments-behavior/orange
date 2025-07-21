@@ -3,11 +3,10 @@
 #include "camera.h"
 #include "image_processing.h"
 #include "video_capture.h"
-#include "yolov8_det.h"
+#include "yolov8.h"
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include <opencv2/opencv.hpp>
 #include <thread>
 
 class FrameDetector {

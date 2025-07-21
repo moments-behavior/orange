@@ -85,7 +85,7 @@ void FrameDetector::thread_loop() {
         detector_counter.fetch_add(1); // Atomic increment
     printf("%lu\n", current_counter);
 
-    std::vector<Bbox> objs;
+    std::vector<Object> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
 

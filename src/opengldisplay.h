@@ -1,7 +1,7 @@
 #pragma once
 #include "image_processing.h"
 #include "threadworker.h"
-#include "yolov8_det.h"
+#include "yolov8.h"
 #include <nppi.h>
 #define WORK_ENTRIES_MAX 2
 

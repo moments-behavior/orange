@@ -35,11 +35,11 @@ file(GLOB ORANGE_CLIENT_SOURCES
     ${SRC_DIR}/*.cpp
     ${DIR_NVENCODER}/*.cpp
 )
-list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolo_offline.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp ${SRC_DIR}/FrameDetector.cpp ${SRC_DIR}/realtime_tool.cpp ${SRC_DIR}/detect3d.cpp)
+list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolo_offline.cpp ${SRC_DIR}/yolov8.cpp ${SRC_DIR}/opengldisplay.cpp ${SRC_DIR}/FrameDetector.cpp ${SRC_DIR}/realtime_tool.cpp ${SRC_DIR}/detect3d.cpp)
 
 set(YOLO_OFFLINE_SOURCES
     src/yolo_offline.cpp
-    src/yolov8_det.cpp
+    src/yolov8.cpp
 )
 
 # ImGui Sources
@@ -143,6 +143,7 @@ target_link_libraries(orange
     opencv_imgcodecs
     opencv_imgproc
     opencv_calib3d
+    opencv_dnn
     nvinfer
     nvinfer_plugin
     nvToolsExt
@@ -182,6 +183,7 @@ target_link_libraries(yolo_offline
     opencv_videoio
     opencv_highgui
     opencv_video
+    opencv_dnn
     nvinfer
     nvinfer_plugin
     cudart

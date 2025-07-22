@@ -483,8 +483,10 @@ inline void draw_keypoints(const std::vector<float> &keypoints,
         ys[i] = static_cast<double>(frame_height - keypoints[2 * i + 1]);
     }
 
+    ImPlot::PushStyleColor(ImPlotCol_Line, color);
     ImPlot::SetNextMarkerStyle(marker, pt_size, color, 2.5f);
     ImPlot::PlotScatter(name.c_str(), xs.data(), ys.data(), num_points);
+    ImPlot::PopStyleColor();
 }
 
 inline void draw_box(cv::Rect_<float> bbox, int frame_height, ImVec4 color,
@@ -502,15 +504,36 @@ inline void draw_box(cv::Rect_<float> bbox, int frame_height, ImVec4 color,
     ImPlot::PlotLine(name.c_str(), x, y, 5);
 }
 
-inline void draw_detection(std::vector<Object> objs, int frame_height,
-                           ImVec4 color, std::string name, ImPlotMarker marker,
+inline void draw_detection(std::vector<Object> objs, int num_classes,
+                           int frame_height, ImPlotMarker marker,
                            float pt_size) {
+
+    std::vector<ImVec4> colors;
+    for (int i = 0; i < num_classes; i++) {
+        ImVec4 color = (ImVec4)ImColor::HSV(i / (float)num_classes, 0.8f, 0.8f);
+        colors.push_back(color);
+    }
+
     for (size_t i = 0; i < objs.size(); i++) {
-        draw_box(objs[i].rect, frame_height, color,
-                 name + "bbox2d" + std::to_string(i), marker, pt_size);
+        std::string bbox_name = "##bbox" + std::to_string(i);
+        draw_box(objs[i].rect, frame_height, colors[objs[i].label], bbox_name,
+                 marker, pt_size);
         if (!objs[i].kps.empty()) {
-            std::string kp_name = name + "kps" + std::to_string(i);
-            draw_keypoints(objs[i].kps, frame_height, color, kp_name);
+            std::vector<float> filtered_xy;
+            for (size_t j = 0; j + 2 < objs[i].kps.size(); j += 3) {
+                float x = objs[i].kps[j];
+                float y = objs[i].kps[j + 1];
+                float s = objs[i].kps[j + 2];
+
+                if (s > 0.5f) {
+                    filtered_xy.push_back(x);
+                    filtered_xy.push_back(y);
+                }
+            }
+
+            std::string kp_name = "##kps" + std::to_string(i);
+            draw_keypoints(filtered_xy, frame_height, colors[objs[i].label],
+                           kp_name);
         }
     }
 }

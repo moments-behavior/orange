@@ -1274,13 +1274,9 @@ int main(int argc, char **args) {
 
                         if (detection2d[i].has_calibration_results) {
                             if (detection2d[i].dets.find_new.load()) {
-                                std::string ball2d_name =
-                                    "detect##" + std::to_string(i);
-                                draw_detection(
-                                    detection2d[i].dets.obj2d,
-                                    cameras_params[i].height,
-                                    (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
-                                    ball2d_name, ImPlotMarker_Circle, 6.0);
+                                draw_detection(detection2d[i].dets.obj2d, 2,
+                                               cameras_params[i].height,
+                                               ImPlotMarker_Circle, 6.0);
                             }
 
                             if (cameras_select[i].detect_mode ==
@@ -1292,12 +1288,12 @@ int main(int argc, char **args) {
 
                             if (detection3d.ball3d.new_detection.load()) {
                                 std::string ball_proj_name =
-                                    "detect_proj##" + std::to_string(i);
+                                    "proj##" + std::to_string(i);
                                 draw_keypoints(
                                     detection2d[i].dets.kps_proj,
                                     cameras_params[i].height,
                                     (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
-                                    ball_proj_name, ImPlotMarker_Circle, 6.0);
+                                    ball_proj_name, ImPlotMarker_Cross, 6.0);
                             }
                         }
 

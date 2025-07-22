@@ -143,9 +143,9 @@ void FrameDetector::thread_loop() {
         }
 
         if (objs.size() > 0) {
+            detection2d[camera_select->idx2d].dets.obj2d.clear();
             for (const auto &obj : objs) {
                 // use obj.rect, obj.label, obj.prob, obj.kps, etc.
-                detection2d[camera_select->idx2d].dets.obj2d.clear();
                 Object one_obj = obj;
                 if (camera_select->yolo_mode == "detect") {
                     f32 bbox_center_x =

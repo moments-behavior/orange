@@ -9,7 +9,8 @@
 #include <csignal>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/sfm.hpp>
-#include <vector> 
+#include <unordered_map>
+#include <vector>
 
 #define PI 3.14159265
 
@@ -22,8 +23,17 @@ struct CameraCalibResults {
     cv::Mat projection_mat;
 };
 
-struct TriangulatePoints {
-    int id;
+struct TriangulatePoint {
+    int obj_id;
+    int kp_id;
+    std::vector<int> detected_cameras;
+    std::vector<cv::Point2f> detected_points;
+    std::vector<CameraCalibResults *> calib_results;
+};
+
+struct TriangulateMultiplePoints {
+    int obj_id;
+    int kp_id;
     std::vector<int> detected_cameras;
     std::vector<std::vector<cv::Point2f>> detected_points;
     std::vector<CameraCalibResults *> calib_results;
@@ -39,7 +49,6 @@ struct Aruco2d {
 struct DetectedObjects {
     std::atomic<bool> find_new;
     std::vector<Object> obj2d;
-    std::vector<float> kps_proj;
     DetectedObjects() : find_new(false) {}
 };
 
@@ -59,14 +68,17 @@ struct Aruco3d {
     std::atomic_bool new_detection;
 };
 
-struct Ball3d {
-    cv::Point3f center;
-    std::atomic_bool new_detection;
+struct Keypoints3d {
+    cv::Point3f pt;
+    int kp_id;
+    int obj_id;
 };
 
 struct Detection3d {
-    Aruco3d marker3d;
-    Ball3d ball3d;
+    std::atomic<bool> find_new;
+    std::vector<Keypoints3d> kps;
+    std::unordered_map<int, std::unordered_map<int, std::vector<float>>>
+        cam_object_kps;
 };
 
 void print_calibration_results(CameraCalibResults *calib_results);
@@ -85,8 +97,8 @@ void world_coordinates_projection_points(CameraCalibResults *cvp,
 cv::Mat triangulate_points(std::vector<cv::Point2f> image_points,
                            std::vector<CameraCalibResults *> calib_results);
 void marker3d_to_pose(Aruco3d *aruco_maker_3d);
-bool find_marker3d(TriangulatePoints *aruco_marker_2d,
+bool find_marker3d(TriangulateMultiplePoints *aruco_marker_2d,
                    std::vector<CameraCalibResults *> &calib_results,
                    Aruco3d *marker3d);
-bool find_ball3d(TriangulatePoints *ball_2d, Ball3d *ball3d);
+bool find_kp3d(TriangulatePoint *kp2d, Keypoints3d *kp3d);
 #endif

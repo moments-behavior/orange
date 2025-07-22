@@ -1273,10 +1273,19 @@ int main(int argc, char **args) {
                                                  cameras_params[i].height));
 
                         if (detection2d[i].has_calibration_results) {
+                            std::vector<ImVec4> colors;
+                            int num_classes = 2;
+                            for (int i = 0; i < num_classes; i++) {
+                                ImVec4 color = (ImVec4)ImColor::HSV(
+                                    i / (float)num_classes, 0.8f, 0.8f);
+                                colors.push_back(color);
+                            }
+
                             if (detection2d[i].dets.find_new.load()) {
-                                draw_detection(detection2d[i].dets.obj2d, 2,
+                                draw_detection(detection2d[i].dets.obj2d,
                                                cameras_params[i].height,
-                                               ImPlotMarker_Circle, 6.0);
+                                               ImPlotMarker_Circle, 6.0,
+                                               colors);
                             }
 
                             if (cameras_select[i].detect_mode ==
@@ -1286,14 +1295,10 @@ int main(int argc, char **args) {
                                     &cameras_params[i]);
                             }
 
-                            if (detection3d.ball3d.new_detection.load()) {
-                                std::string ball_proj_name =
-                                    "proj##" + std::to_string(i);
-                                draw_keypoints(
-                                    detection2d[i].dets.kps_proj,
-                                    cameras_params[i].height,
-                                    (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
-                                    ball_proj_name, ImPlotMarker_Cross, 6.0);
+                            if (detection3d.find_new.load()) {
+                                draw_projection(detection3d.cam_object_kps[i],
+                                                cameras_params[i].height,
+                                                colors);
                             }
                         }
 

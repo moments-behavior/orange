@@ -1,7 +1,9 @@
 #include "detect3d.h"
 #include "global.h"
+#include "opencv2/features2d.hpp"
 #include "realtime_tool.h"
 #include "video_capture.h"
+#include <iterator>
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
@@ -24,7 +26,7 @@ void detection3d_proc(CameraControl *camera_control,
         }
     }
 
-    TriangulatePoints ball2d_all_cams;
+    std::vector<TriangulatePoint> kps_all_cams;
     std::chrono::high_resolution_clock::time_point start =
         std::chrono::high_resolution_clock::time_point();
     int count = 0;
@@ -45,24 +47,35 @@ void detection3d_proc(CameraControl *camera_control,
             break; // exit cleanly if subscription is turned off
         }
 
-        if (!ball2d_all_cams.detected_cameras.empty()) {
-            ball2d_all_cams.detected_cameras.clear();
-            ball2d_all_cams.detected_points.clear();
-            ball2d_all_cams.calib_results.clear();
-        }
-
-        // triangulation calculation
-        for (int idx : cam3d_idx) {
-            if (detection2d[idx].dets.find_new.load()) {
-                // make a copy of the kepts
-                std::vector<cv::Point2f> corners;
-                cv::Point2f kp = {detection2d[idx].dets.obj2d[0].kps[0],
-                                  detection2d[idx].dets.obj2d[0].kps[1]};
-                corners.push_back(kp);
-                ball2d_all_cams.detected_points.push_back(corners);
-                ball2d_all_cams.detected_cameras.push_back(idx);
-                ball2d_all_cams.calib_results.push_back(
-                    &detection2d[idx].camera_calib);
+        kps_all_cams.clear();
+        for (int obj_id = 0; obj_id < 2; obj_id++) {
+            for (int kp_idx = 0; kp_idx < 4; kp_idx++) {
+                TriangulatePoint kp3d;
+                for (int idx : cam3d_idx) {
+                    if (detection2d[idx].dets.find_new.load()) {
+                        for (int det_idx = 0;
+                             det_idx < detection2d[idx].dets.obj2d.size();
+                             det_idx++) {
+                            Object detected_obj =
+                                detection2d[idx].dets.obj2d[det_idx];
+                            if (detected_obj.label == obj_id &&
+                                !detected_obj.kps.empty()) {
+                                if (detected_obj.kps[kp_idx * 3 + 2] > 0.5f) {
+                                    cv::Point2f kp = {
+                                        detected_obj.kps[kp_idx * 3],
+                                        detected_obj.kps[kp_idx * 3 + 1]};
+                                    kp3d.detected_points.push_back(kp);
+                                    kp3d.detected_cameras.push_back(idx);
+                                    kp3d.calib_results.push_back(
+                                        &detection2d[idx].camera_calib);
+                                    kp3d.obj_id = obj_id;
+                                    kp3d.kp_id = kp_idx;
+                                }
+                            }
+                        }
+                    }
+                }
+                kps_all_cams.push_back(kp3d);
             }
         }
 
@@ -71,42 +84,50 @@ void detection3d_proc(CameraControl *camera_control,
             cameras_select[idx].frame_detect_state.store(State_Copy_New_Frame);
         }
 
-        detection3d.ball3d.new_detection.store(
-            find_ball3d(&ball2d_all_cams, &detection3d.ball3d));
+        detection3d.find_new = false;
+        detection3d.kps.clear();
+        detection3d.cam_object_kps.clear();
+        bool any_true = false;
+        for (size_t i = 0; i < kps_all_cams.size(); i++) {
+            Keypoints3d kp3d;
+            if (find_kp3d(&kps_all_cams[i], &kp3d)) {
+                any_true = true;
+                detection3d.kps.push_back(kp3d);
+            }
+        }
 
-        // project to all the streaming cameras
-        if (detection3d.ball3d.new_detection.load()) {
+        if (any_true) {
+            // project to all the streaming cameras
             for (int i = 0; i < num_cameras; i++) {
-
                 if (cameras_select[i].stream_on &&
                     detection2d[i].has_calibration_results) {
-
+                    std::vector<cv::Point3f> points3d;
                     cv::Mat image_pts;
+                    for (int j = 0; j < detection3d.kps.size(); j++) {
+                        points3d.push_back(detection3d.kps[j].pt);
+                    }
                     CameraCalibResults *cam_calib =
                         &detection2d[i].camera_calib;
-
-                    std::vector<cv::Point3f> points3d;
-                    points3d.push_back(detection3d.ball3d.center);
-
                     cv::projectPoints(points3d, cam_calib->rvec,
                                       cam_calib->tvec, cam_calib->k,
                                       cam_calib->dist_coeffs, image_pts);
 
-                    // std::cout << image_pts.at<float>(0, 0) << ", "
-                    //           << image_pts.at<float>(0, 1) << std::endl;
-                    std::vector<float> kps_proj;
-                    kps_proj.push_back(image_pts.at<float>(0, 0));
-                    kps_proj.push_back(image_pts.at<float>(0, 1));
-                    detection2d[i].dets.kps_proj = kps_proj;
+                    for (int j = 0; j < image_pts.rows; ++j) {
+                        detection3d.cam_object_kps[i][detection3d.kps[j].obj_id]
+                            .emplace_back(image_pts.at<cv::Point2f>(j).x);
+                        detection3d.cam_object_kps[i][detection3d.kps[j].obj_id]
+                            .emplace_back(image_pts.at<cv::Point2f>(j).y);
+                    }
                 }
             }
+            detection3d.find_new.store(true);
         }
         count++;
     }
 
     if (start == std::chrono::high_resolution_clock::time_point()) {
         // start is zero (uninitialized)
-        std::cout << "Run it longer for meaning report of detection fps.\n";
+        std::cout << "Run it longer for meaningful report of detection fps.\n";
     } else {
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;

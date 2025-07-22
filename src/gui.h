@@ -504,15 +504,9 @@ inline void draw_box(cv::Rect_<float> bbox, int frame_height, ImVec4 color,
     ImPlot::PlotLine(name.c_str(), x, y, 5);
 }
 
-inline void draw_detection(std::vector<Object> objs, int num_classes,
-                           int frame_height, ImPlotMarker marker,
-                           float pt_size) {
-
-    std::vector<ImVec4> colors;
-    for (int i = 0; i < num_classes; i++) {
-        ImVec4 color = (ImVec4)ImColor::HSV(i / (float)num_classes, 0.8f, 0.8f);
-        colors.push_back(color);
-    }
+inline void draw_detection(std::vector<Object> objs, int frame_height,
+                           ImPlotMarker marker, float pt_size,
+                           std::vector<ImVec4> colors) {
 
     for (size_t i = 0; i < objs.size(); i++) {
         std::string bbox_name = "##bbox" + std::to_string(i);
@@ -535,6 +529,18 @@ inline void draw_detection(std::vector<Object> objs, int num_classes,
             draw_keypoints(filtered_xy, frame_height, colors[objs[i].label],
                            kp_name);
         }
+    }
+}
+
+inline void
+draw_projection(std::unordered_map<int, std::vector<float>> object_kps,
+                int frame_height, std::vector<ImVec4> colors) {
+
+    for (const auto &[object_id, xy] : object_kps) {
+        // Extract x and y
+        std::string proj_name = "##proj" + std::to_string(object_id);
+        draw_keypoints(xy, frame_height, colors[object_id], proj_name,
+                       ImPlotMarker_Cross, 6.0);
     }
 }
 

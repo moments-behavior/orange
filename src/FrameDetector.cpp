@@ -179,7 +179,7 @@ void FrameDetector::thread_loop() {
 
     if (start == std::chrono::high_resolution_clock::time_point()) {
         // start is zero (uninitialized)
-        std::cout << "Run it longer for meaning report of detection fps.\n";
+        std::cout << "Run it longer for meaningful report of detection fps.\n";
     } else {
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;

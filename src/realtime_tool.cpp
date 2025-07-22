@@ -232,7 +232,7 @@ void marker3d_to_pose(Aruco3d *aruco_maker_3d) {
     // printf("The marker is %f degrees from world x-axis. \n",  result);
 }
 
-bool find_marker3d(TriangulatePoints *aruco_marker_2d,
+bool find_marker3d(TriangulateMultiplePoints *aruco_marker_2d,
                    std::vector<CameraCalibResults *> &calib_results,
                    Aruco3d *marker3d) {
     int num_detected_cams = aruco_marker_2d->detected_cameras.size();
@@ -271,26 +271,26 @@ bool find_marker3d(TriangulatePoints *aruco_marker_2d,
     return true;
 }
 
-bool find_ball3d(TriangulatePoints *ball_2d, Ball3d *ball3d) {
-    int num_detected_cams = ball_2d->detected_cameras.size();
+bool find_kp3d(TriangulatePoint *kp2d, Keypoints3d *kp3d) {
+    int num_detected_cams = kp2d->detected_cameras.size();
     if (num_detected_cams >= 2) {
         // triangulate
         std::vector<cv::Point2f> image_points_all;
         for (size_t j = 0; j < num_detected_cams; j++) {
-            image_points_all.push_back(ball_2d->detected_points[j][0]);
+            image_points_all.push_back(kp2d->detected_points[j]);
             // print_calibration_results(ball_2d->calib_results[j]);
         }
         cv::Mat output3d =
-            triangulate_points(image_points_all, ball_2d->calib_results);
+            triangulate_points(image_points_all, kp2d->calib_results);
         cv::Point3f pts3d = cv::Point3d(output3d);
         // cv::Point3f(output3d.at<float>(0), output3d.at<float>(1),
         // output3d.at<float>(2));
-        ball3d->center = pts3d;
+        kp3d->pt = pts3d;
+        kp3d->kp_id = kp2d->kp_id;
+        kp3d->obj_id = kp2d->obj_id;
         // std::cout << "Ball: " << ball3d->center << std::endl;
-
     } else {
         return false;
     }
-
     return true;
 }

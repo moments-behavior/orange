@@ -194,6 +194,7 @@ target_link_libraries(yolo_offline
     nppc
     nppig
     nppial
+    nvToolsExt
 )
 
 # Link pkg-config libraries

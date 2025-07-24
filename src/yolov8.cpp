@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <math.h>
 #include <npp.h>
-#include <nvToolsExt.h>
 #include <unordered_map>
 
 YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,

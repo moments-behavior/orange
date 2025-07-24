@@ -1,9 +1,8 @@
 #include "detect3d.h"
 #include "global.h"
-#include "opencv2/features2d.hpp"
 #include "realtime_tool.h"
 #include "video_capture.h"
-#include <iterator>
+#include <nvToolsExt.h>
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
@@ -47,6 +46,7 @@ void detection3d_proc(CameraControl *camera_control,
             break; // exit cleanly if subscription is turned off
         }
 
+        nvtxRangePush("copy detection");
         kps_all_cams.clear();
         for (int obj_id = 0; obj_id < 2; obj_id++) {
             for (int kp_idx = 0; kp_idx < 4; kp_idx++) {
@@ -78,12 +78,14 @@ void detection3d_proc(CameraControl *camera_control,
                 kps_all_cams.push_back(kp3d);
             }
         }
+        nvtxRangePop();
 
         // reset the 3d camera states
         for (int idx : cam3d_idx) {
             cameras_select[idx].frame_detect_state.store(State_Copy_New_Frame);
         }
 
+        nvtxRangePush("triangulation");
         detection3d.find_new = false;
         detection3d.kps.clear();
         detection3d.cam_object_kps.clear();
@@ -95,7 +97,9 @@ void detection3d_proc(CameraControl *camera_control,
                 detection3d.kps.push_back(kp3d);
             }
         }
+        nvtxRangePop();
 
+        nvtxRangePush("reprojection");
         if (any_true) {
             // project to all the streaming cameras
             for (int i = 0; i < num_cameras; i++) {
@@ -122,6 +126,7 @@ void detection3d_proc(CameraControl *camera_control,
             }
             detection3d.find_new.store(true);
         }
+        nvtxRangePop();
         count++;
     }
 

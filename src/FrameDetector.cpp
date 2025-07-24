@@ -41,7 +41,7 @@ void FrameDetector::stop() {
 
 void FrameDetector::notify_frame_ready(void *device_image_ptr,
                                        cudaStream_t copy_stream) {
-    // nvtxRangePush("copy_frame_for_detection");
+    nvtxRangePush("copy_frame_for_detection");
     if (camera_params->gpu_direct) {
         CHECK(cudaMemcpy2DAsync(
             frame_process.frame_original.d_orig, camera_params->width,
@@ -53,7 +53,7 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr,
             device_image_ptr, camera_params->width, camera_params->width,
             camera_params->height, cudaMemcpyHostToDevice, copy_stream));
     }
-    // nvtxRangePop();
+    nvtxRangePop();
     cudaEventRecord(copy_done_event, copy_stream); // mark when copy is done
     camera_select->frame_detect_state.store(State_Frame_Copy_Done);
     cv.notify_one();
@@ -74,12 +74,12 @@ void FrameDetector::thread_loop() {
     {
         std::lock_guard<std::mutex> lock(graph_capture_mutex);
         printf("make pipe for gpu %d\n", camera_params->gpu_id);
-        // nvtxRangePush("warmup");
+        nvtxRangePush("warmup");
         yolov8 = new YOLOv8(engine_file_path, camera_params->width,
                             camera_params->height, stream,
                             frame_process.debayer.d_debayer, npp_ctx);
         yolov8->make_pipe(true);
-        // nvtxRangePop();
+        nvtxRangePop();
     }
     uint64_t current_counter =
         detector_counter.fetch_add(1); // Atomic increment
@@ -127,20 +127,22 @@ void FrameDetector::thread_loop() {
                                         &frame_process.debayer, npp_ctx);
         }
 
+        nvtxRangePush("pre-infer");
         if (yolov8->graph_captured) {
-            // nvtxRangePush("graph");
             CHECK(cudaGraphLaunch(yolov8->inference_graph_exec, stream));
             CHECK(cudaStreamSynchronize(stream));
-            // nvtxRangePop();
         } else {
             yolov8->preprocess_gpu();
             yolov8->infer(); // it sync gpu with cpu here
         }
+        nvtxRangePop();
+        nvtxRangePush("post");
         if (camera_select->yolo_mode == "detect") {
             yolov8->postprocess(objs);
         } else {
             yolov8->postprocess_kp(objs, score_thres, iou_thres, topk);
         }
+        nvtxRangePop();
 
         if (objs.size() > 0) {
             detection2d[camera_select->idx2d].dets.obj2d.clear();

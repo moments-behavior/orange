@@ -2,6 +2,7 @@
 #include "opencv2/opencv.hpp"
 #include "utils.h"
 #include "yolov8.h"
+#include <nvToolsExt.h>
 #include <string> // for std::stoi
 
 const std::vector<std::string> CLASS_NAMES = {"rat"};
@@ -106,20 +107,23 @@ int main(int argc, char **argv) {
 
             start = std::chrono::high_resolution_clock::now();
 
+            nvtxRangePush("pre-infer");
             if (yolov8->graph_captured) {
-                // nvtxRangePush("graph");
                 CHECK(cudaGraphLaunch(yolov8->inference_graph_exec, stream));
                 CHECK(cudaStreamSynchronize(stream));
-                // nvtxRangePop();
             } else {
                 yolov8->preprocess_gpu();
                 yolov8->infer(); // it sync gpu with cpu here
             }
+            nvtxRangePop();
+
+            nvtxRangePush("post");
             if (mode == "det")
                 yolov8->postprocess(objs);
             else {
                 yolov8->postprocess_kp(objs, score_thres, iou_thres, topk);
             }
+            nvtxRangePop();
 
             // gpu drawing
             // yolov8->copy_keypoints_gpu(d_points, objs);

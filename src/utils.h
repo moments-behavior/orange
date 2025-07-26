@@ -1,6 +1,7 @@
 #ifndef ORANGE_UTILS
 #define ORANGE_UTILS
 #include <atomic>
+#include <chrono>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <memory>
@@ -111,6 +112,43 @@ template <typename T> class lock_free_queue {
         old_tail->data.swap(new_data);
         old_tail->next = p;
         tail.store(p);
+    }
+};
+
+class FPSEstimator {
+    using Clock = std::chrono::high_resolution_clock;
+    Clock::time_point start_time;
+    float accumulated_time = 0.0f;
+    int frame_count = 0;
+    float report_interval = 0.5f; // seconds
+    float last_fps = 0.0f;
+
+  public:
+    FPSEstimator() { start_time = Clock::now(); }
+
+    // Call this once per frame
+    void update() {
+        auto now = Clock::now();
+        float dt = std::chrono::duration<float>(now - start_time).count();
+        start_time = now;
+
+        accumulated_time += dt;
+        frame_count++;
+
+        if (accumulated_time >= report_interval) {
+            last_fps = frame_count / accumulated_time;
+            accumulated_time = 0.0f;
+            frame_count = 0;
+        }
+    }
+
+    float get_fps() const { return last_fps; }
+
+    void reset() {
+        start_time = Clock::now();
+        accumulated_time = 0.0f;
+        frame_count = 0;
+        last_fps = 0.0f;
     }
 };
 

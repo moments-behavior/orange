@@ -5,6 +5,7 @@
 #include "NvEncoder/NvEncoderCuda.h"
 #include "image_processing.h"
 #include "threadworker.h"
+#include "video_capture.h"
 
 #define ENCODER_ENTRIES_MAX 20
 
@@ -28,7 +29,8 @@ struct EncoderContext {
 class GPUVideoEncoder : public CThreadWorker {
   public:
     GPUVideoEncoder(const char *name, CameraParams *camera_params,
-                    std::string encoder_setup, std::string folder_name,
+                    CameraEachSelect *camera_select, std::string encoder_setup,
+                    std::string folder_name,
                     bool *encoder_ready_signal); // name is the thread name
     ~GPUVideoEncoder();
 
@@ -38,8 +40,8 @@ class GPUVideoEncoder : public CThreadWorker {
     void ProcessOneFrame(void *f);
 
     // open gl dimensions:
-    bool *encoder_ready_signal;
     CameraParams *camera_params;
+    CameraEachSelect *camera_select;
     unsigned char *display_buffer;
     FrameGPU frame_original; // frame on gpu device
     Debayer debayer;
@@ -49,6 +51,7 @@ class GPUVideoEncoder : public CThreadWorker {
     Writer writer;
     std::string encoder_setup;
     std::string folder_name;
+    bool *encoder_ready_signal;
 
   private:
     virtual void

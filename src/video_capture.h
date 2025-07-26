@@ -2,6 +2,7 @@
 #define ORANGE_VIDEO_CAPTURE
 #include "camera.h"
 #include "network_base.h"
+#include "utils.h"
 #include <atomic>
 
 enum PictureState {
@@ -44,6 +45,7 @@ struct CameraEachSelect {
     int idx3d = 0;
     int total_standoff_detector = 0;
     std::atomic<PictureState> frame_detect_state;
+    FPSEstimator encoder_fps_estimator;
     CameraEachSelect()
         : frame_save_state(State_Frame_Idle),
           frame_detect_state(State_Frame_Idle) {}

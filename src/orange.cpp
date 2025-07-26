@@ -1255,6 +1255,13 @@ int main(int argc, char **args) {
                     oss << std::fixed << std::setprecision(1);
 
                     oss << "Streaming FPS: " << streaming_fps.load();
+                    if (cameras_select[i].record &&
+                        camera_control->record_video) {
+                        oss << "  |  "
+                            << "Encoding FPS: "
+                            << cameras_select[i]
+                                   .encoder_fps_estimator.get_fps();
+                    }
                     if (cameras_select[i].detect_mode == Detect2D_Standoff) {
                         oss << "  |  "
                             << "Detection2D FPS: "

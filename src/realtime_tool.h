@@ -4,6 +4,7 @@
 #include "camera.h"
 #include "opencv2/core/core.hpp"
 #include "types.h"
+#include "utils.h"
 #include <atomic>
 #include <csignal>
 #include <opencv2/calib3d.hpp>
@@ -41,36 +42,6 @@ struct Ball2d {
     std::vector<cv::Rect_<float>> rects;
     cv::Point2f proj_center[1];
     Ball2d() : find_ball(false) {}
-};
-
-class FPSEstimator {
-    using Clock = std::chrono::high_resolution_clock;
-    Clock::time_point start_time;
-    float accumulated_time = 0.0f;
-    int frame_count = 0;
-    float report_interval = 0.5f; // seconds
-    float last_fps = 0.0f;
-
-  public:
-    FPSEstimator() { start_time = Clock::now(); }
-
-    // Call this once per frame
-    void update() {
-        auto now = Clock::now();
-        float dt = std::chrono::duration<float>(now - start_time).count();
-        start_time = now;
-
-        accumulated_time += dt;
-        frame_count++;
-
-        if (accumulated_time >= report_interval) {
-            last_fps = frame_count / accumulated_time;
-            accumulated_time = 0.0f;
-            frame_count = 0;
-        }
-    }
-
-    float get_fps() const { return last_fps; }
 };
 
 struct DetectionDataPerCam {

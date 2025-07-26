@@ -275,8 +275,9 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     GPUVideoEncoder *gpu_encoder = nullptr;
     bool encoder_ready_signal = false;
     if (camera_control->record_video && camera_select->record) {
-        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup,
-                                          folder_name, &encoder_ready_signal);
+        gpu_encoder =
+            new GPUVideoEncoder("", camera_params, camera_select, encoder_setup,
+                                folder_name, &encoder_ready_signal);
         gpu_encoder->StartThread();
 
         // wait till encoder is ready

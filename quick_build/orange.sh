@@ -43,7 +43,7 @@ g++ -Ofast -ffast-math -std=c++17 $targets_folder/*.o \
     -lpthread \
     -I./third_party/flatbuffers/include \
     -lenet -I/usr/local/include/ \
-    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc -lnppig -lnppial \
+    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc -lnppig -lnppial -lnvToolsExt \
     -lGLEW -lGL \
     -I$DIR_FFMPEG/build/include/ \
     -L$DIR_FFMPEG/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \

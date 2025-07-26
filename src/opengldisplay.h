@@ -3,7 +3,7 @@
 #include "threadworker.h"
 #include "yolov8_det.h"
 #include <nppi.h>
-#define WORK_ENTRIES_MAX 2
+#define WORK_ENTRIES_MAX 1
 
 class COpenGLDisplay : public CThreadWorker {
   public:
@@ -18,6 +18,7 @@ class COpenGLDisplay : public CThreadWorker {
                        unsigned long long frame_id);
 
     // open gl dimensions:
+    cudaStream_t stream;
     CameraParams *camera_params;
     CameraEachSelect *camera_select;
     unsigned char *display_buffer;

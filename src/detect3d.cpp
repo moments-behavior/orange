@@ -100,6 +100,7 @@ void detection3d_proc(CameraControl *camera_control,
             }
         }
         count++;
+        detection3d.fps_estimator.update();
     }
 
     if (start == std::chrono::high_resolution_clock::time_point()) {

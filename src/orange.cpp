@@ -602,8 +602,8 @@ int main(int argc, char **args) {
             }
 
             {
-                const char *items[] = {"1", "2", "4", "8", "16"};
-                static const int item_numbers[] = {1, 2, 4, 8, 16};
+                const char *items[] = {"1", "2", "4", "8", "16", "32"};
+                static const int item_numbers[] = {1, 2, 4, 8, 16, 32};
                 static int downsample_current = 0;
                 if (ImGui::Combo("downsample streaming", &downsample_current,
                                  items, IM_ARRAYSIZE(items))) {
@@ -1212,9 +1212,11 @@ int main(int argc, char **args) {
                 }
             }
 
+            std::string g_formatted_elapsed_time;
+            int64_t start_ns;
+
             if (camera_control->record_video) {
-                int64_t start_ns = record_start_time_ns.load();
-                std::string g_formatted_elapsed_time;
+                start_ns = record_start_time_ns.load();
                 if (start_ns > 0) {
                     int64_t now_ns =
                         std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -1225,148 +1227,99 @@ int main(int argc, char **args) {
                         (now_ns - start_ns) / 1'000'000'000);
                     g_formatted_elapsed_time = format_elapsed_time(elapsed_sec);
                 }
+            }
 
-                for (int i = 0; i < num_cameras; i++) {
-                    if (cameras_select[i].stream_on) {
-                        std::string window_name = cameras_params[i].camera_name;
-                        ImGui::Begin(window_name.c_str());
+            for (int i = 0; i < num_cameras; i++) {
+                if (cameras_select[i].stream_on) {
+                    std::string window_name = cameras_params[i].camera_name;
+                    ImGui::Begin(window_name.c_str());
 
-                        if (start_ns > 0) {
-                            ImGui::TextColored(
-                                ImVec4{0.0, 1.0f, 0, 1.0f}, "Elapsed Time: %s",
-                                g_formatted_elapsed_time.c_str());
-                        } else {
+                    if (start_ns > 0) {
+                        ImGui::TextColored(ImVec4{0.0, 1.0f, 0, 1.0f},
+                                           "Elapsed Time: %s",
+                                           g_formatted_elapsed_time.c_str());
+                    } else {
+                        if (camera_control->record_video) {
                             ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f},
                                                "Recording starting...");
+
+                        } else {
+                            ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f},
+                                               "NOT RECORDING, ");
                         }
-                        ImGui::SameLine();
-                        ImGui::Text("FPS: %.1f", streaming_fps.load());
+                    }
 
-                        ImVec2 avail_size = ImGui::GetContentRegionAvail();
+                    ImGui::SameLine();
 
-                        // ImGui::Image((void*)(intptr_t)texture[i],
-                        // avail_size);
-                        ImPlotAxisFlags axisFlags =
-                            ImPlotAxisFlags_NoTickLabels |
-                            ImPlotAxisFlags_NoTickMarks |
-                            ImPlotAxisFlags_NoGridLines;
-                        if (ImPlot::BeginPlot("##no_plot_name", avail_size,
-                                              ImPlotFlags_Equal |
-                                                  ImPlotAxisFlags_AutoFit)) {
-                            ImPlot::SetupAxesLimits(0, cameras_params[i].width,
-                                                    0,
-                                                    cameras_params[i].height);
-                            ImPlot::SetupAxis(ImAxis_X1, nullptr,
-                                              axisFlags); // X-axis
-                            ImPlot::SetupAxis(ImAxis_Y1, nullptr,
-                                              axisFlags); // Y-axis
-                            ImPlot::PlotImage(
-                                "##no_image_name",
-                                (void *)(intptr_t)tex_gl[i].texture,
-                                ImVec2(0, 0),
-                                ImVec2(cameras_params[i].width,
-                                       cameras_params[i].height));
+                    std::ostringstream oss;
+                    oss << std::fixed << std::setprecision(1);
 
-                            if (detection2d[i].has_calibration_results) {
-                                if (detection2d[i].ball2d.find_ball.load()) {
-                                    std::string ball2d_name =
-                                        "ball##" + std::to_string(i);
+                    oss << "Streaming FPS: " << streaming_fps.load();
+                    if (cameras_select[i].detect_mode == Detect2D_Standoff) {
+                        oss << "  |  "
+                            << "Detection2D FPS: "
+                            << detection2d[i].fps_estimator.get_fps();
+                    } else if (cameras_select[i].detect_mode ==
+                               Detect3D_Standoff) {
+                        oss << "  |  "
+                            << "Detection2D FPS: "
+                            << detection2d[i].fps_estimator.get_fps();
+                        oss << "  |  "
+                            << "Detection3D FPS: "
+                            << detection3d.fps_estimator.get_fps();
+                    }
+                    std::string text = oss.str();
+                    ImGui::Text("%s", text.c_str());
 
-                                    draw_ball_center(
-                                        detection2d[i].ball2d.center[0],
-                                        cameras_params[i].height,
-                                        (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
-                                        ball2d_name, ImPlotMarker_Circle, 6.0);
-                                }
+                    ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-                                if (detection3d.ball3d.new_detection.load()) {
-                                    std::string ball_proj_name =
-                                        "ball_proj##" + std::to_string(i);
+                    // ImGui::Image((void*)(intptr_t)texture[i],
+                    // avail_size);
+                    ImPlotAxisFlags axisFlags = ImPlotAxisFlags_NoTickLabels |
+                                                ImPlotAxisFlags_NoTickMarks |
+                                                ImPlotAxisFlags_NoGridLines;
+                    if (ImPlot::BeginPlot("##no_plot_name", avail_size,
+                                          ImPlotFlags_Equal |
+                                              ImPlotAxisFlags_AutoFit)) {
+                        ImPlot::SetupAxesLimits(0, cameras_params[i].width, 0,
+                                                cameras_params[i].height);
+                        ImPlot::SetupAxis(ImAxis_X1, nullptr,
+                                          axisFlags); // X-axis
+                        ImPlot::SetupAxis(ImAxis_Y1, nullptr,
+                                          axisFlags); // Y-axis
+                        ImPlot::PlotImage("##no_image_name",
+                                          (void *)(intptr_t)tex_gl[i].texture,
+                                          ImVec2(0, 0),
+                                          ImVec2(cameras_params[i].width,
+                                                 cameras_params[i].height));
 
-                                    draw_ball_center(
-                                        detection2d[i].ball2d.proj_center[0],
-                                        cameras_params[i].height,
-                                        (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
-                                        ball_proj_name, ImPlotMarker_Cross,
-                                        8.0);
-                                }
+                        if (detection2d[i].has_calibration_results) {
+                            if (detection2d[i].ball2d.find_ball.load()) {
+                                std::string ball2d_name =
+                                    "ball##" + std::to_string(i);
+
+                                draw_ball_center(
+                                    detection2d[i].ball2d.center[0],
+                                    cameras_params[i].height,
+                                    (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
+                                    ball2d_name, ImPlotMarker_Circle, 6.0);
                             }
 
-                            ImPlot::EndPlot();
-                        }
-                        ImGui::End();
-                    }
-                }
-            } else {
-                for (int i = 0; i < num_cameras; i++) {
-                    if (cameras_select[i].stream_on) {
-                        std::string window_name = cameras_params[i].camera_name;
-                        ImGui::Begin(window_name.c_str());
-                        ImGui::TextColored(ImVec4{1.0, 0.0f, 0, 1.0f},
-                                           "NOT RECORDING, ");
-                        ImGui::SameLine();
-                        ImGui::Text("FPS: %.1f", streaming_fps.load());
-                        ImVec2 avail_size = ImGui::GetContentRegionAvail();
+                            if (detection3d.ball3d.new_detection.load()) {
+                                std::string ball_proj_name =
+                                    "ball_proj##" + std::to_string(i);
 
-                        // ImGui::Image((void*)(intptr_t)texture[i],
-                        // avail_size);
-                        ImPlotAxisFlags axisFlags =
-                            ImPlotAxisFlags_NoTickLabels |
-                            ImPlotAxisFlags_NoTickMarks |
-                            ImPlotAxisFlags_NoGridLines;
-                        if (ImPlot::BeginPlot("##no_plot_name", avail_size,
-                                              ImPlotFlags_Equal |
-                                                  ImPlotAxisFlags_AutoFit)) {
-                            ImPlot::SetupAxesLimits(0, cameras_params[i].width,
-                                                    0,
-                                                    cameras_params[i].height);
-                            ImPlot::SetupAxis(ImAxis_X1, nullptr,
-                                              axisFlags); // X-axis
-                            ImPlot::SetupAxis(ImAxis_Y1, nullptr,
-                                              axisFlags); // Y-axis
-                            ImPlot::PlotImage(
-                                "##no_image_name",
-                                (void *)(intptr_t)tex_gl[i].texture,
-                                ImVec2(0, 0),
-                                ImVec2(cameras_params[i].width,
-                                       cameras_params[i].height));
-
-                            if (detection2d[i].has_calibration_results) {
-
-                                if (detection2d[i].ball2d.find_ball.load()) {
-                                    std::string ball2d_name =
-                                        "ball##" + std::to_string(i);
-
-                                    
-                                    draw_boxes(detection2d[i].ball2d.rects,
-                                             cameras_params[i].height,
-                                             (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
-                                             ball2d_name, ImPlotMarker_Circle, 6.0);
-                                }
-
-                                if (cameras_select[i].detect_mode == Detect3D_Standoff) {
-                                    gui_plot_world_coordinates(
-                                        &detection2d[i].camera_calib,
-                                        &cameras_params[i]);
-                                }
-                                // only draw if user selected detect3d_standoff
-                                if (detection3d.ball3d.new_detection.load() && cameras_select[i].detect_mode == Detect3D_Standoff) {
-
-                                    std::string ball_proj_name =
-                                        "ball_proj##" + std::to_string(i);
-                                    draw_ball_center(
-                                        detection2d[i].ball2d.proj_center[0],
-                                        cameras_params[i].height,
-                                        (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
-                                        ball_proj_name, ImPlotMarker_Cross,
-                                        8.0);
-                                }
+                                draw_ball_center(
+                                    detection2d[i].ball2d.proj_center[0],
+                                    cameras_params[i].height,
+                                    (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
+                                    ball_proj_name, ImPlotMarker_Cross, 8.0);
                             }
-
-                            ImPlot::EndPlot();
                         }
-                        ImGui::End();
+
+                        ImPlot::EndPlot();
                     }
+                    ImGui::End();
                 }
             }
         }

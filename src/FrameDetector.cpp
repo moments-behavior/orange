@@ -41,7 +41,7 @@ void FrameDetector::stop() {
 
 void FrameDetector::notify_frame_ready(void *device_image_ptr,
                                        cudaStream_t copy_stream) {
-    // nvtxRangePush("copy_frame_for_detection");
+    nvtxRangePush("copy_frame_for_detection");
     if (camera_params->gpu_direct) {
         CHECK(cudaMemcpy2DAsync(
             frame_process.frame_original.d_orig, camera_params->width,
@@ -53,7 +53,7 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr,
             device_image_ptr, camera_params->width, camera_params->width,
             camera_params->height, cudaMemcpyHostToDevice, copy_stream));
     }
-    // nvtxRangePop();
+    nvtxRangePop();
     cudaEventRecord(copy_done_event, copy_stream); // mark when copy is done
     camera_select->frame_detect_state.store(State_Frame_Copy_Done);
     cv.notify_one();
@@ -111,6 +111,7 @@ void FrameDetector::thread_loop() {
 
         // GPU processing
         cudaStreamWaitEvent(stream, copy_done_event, 0);
+        nvtxRangePush("yolo-pre");
         if (camera_params->color) {
             debayer_frame_gpu_rgb_ctx(camera_params,
                                       &frame_process.frame_original,
@@ -120,16 +121,17 @@ void FrameDetector::thread_loop() {
                                         &frame_process.frame_original,
                                         &frame_process.debayer, npp_ctx);
         }
+        nvtxRangePop();
 
+        nvtxRangePush("yolo-infer");
         if (yolov8->graph_captured) {
-            // nvtxRangePush("graph");
             CHECK(cudaGraphLaunch(yolov8->inference_graph_exec, stream));
             CHECK(cudaStreamSynchronize(stream));
-            // nvtxRangePop();
         } else {
             yolov8->preprocess_gpu();
             yolov8->infer(); // it sync gpu with cpu here
         }
+        nvtxRangePop();
         yolov8->postprocess(objs);
 
         if (objs.size() > 0) {
@@ -140,7 +142,8 @@ void FrameDetector::thread_loop() {
                 bbox_center_x, bbox_center_y};
             detection2d[camera_select->idx2d].ball2d.rects.clear();
             for (const auto &bbox : objs) {
-                detection2d[camera_select->idx2d].ball2d.rects.push_back(bbox.rect);
+                detection2d[camera_select->idx2d].ball2d.rects.push_back(
+                    bbox.rect);
             }
             // std::cout << detection2d[camera_select->idx2d].ball2d.center[0].x
             //           << std::endl;
@@ -159,6 +162,7 @@ void FrameDetector::thread_loop() {
             camera_select->frame_detect_state.store(State_Copy_New_Frame);
         }
         count++;
+        detection2d[camera_select->idx2d].fps_estimator.update();
     }
 
     if (start == std::chrono::high_resolution_clock::time_point()) {

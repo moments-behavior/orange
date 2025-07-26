@@ -1300,7 +1300,10 @@ int main(int argc, char **args) {
                                           ImVec2(cameras_params[i].width,
                                                  cameras_params[i].height));
 
-                        if (detection2d[i].has_calibration_results) {
+                        if (cameras_select[i].detect_mode ==
+                                Detect3D_Standoff ||
+                            cameras_select[i].detect_mode ==
+                                Detect2D_Standoff) {
                             if (detection2d[i].ball2d.find_ball.load()) {
                                 std::string ball2d_name =
                                     "ball##" + std::to_string(i);
@@ -1310,7 +1313,9 @@ int main(int argc, char **args) {
                                     (ImVec4)ImColor::HSV(0.0, 0.9f, 1.0f),
                                     ball2d_name, ImPlotMarker_Circle, 6.0);
                             }
+                        }
 
+                        if (detection2d[i].has_calibration_results) {
                             if (detection3d.ball3d.new_detection.load()) {
                                 std::string ball_proj_name =
                                     "ball_proj##" + std::to_string(i);

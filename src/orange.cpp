@@ -42,7 +42,7 @@ int main(int argc, char **args) {
     std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
     std::string orange_root_dir_str = "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
-    std::string input_folder = orange_root_dir_str + "/exp/unsorted";
+    std::string input_folder = orange_root_dir_str + "/exp/orma";
 
     std::string yolo_model_folder = orange_root_dir_str + "/detect";
     std::string yolo_model = yolo_model_folder + "/mouse_ball_bbox_ir.engine";
@@ -264,7 +264,7 @@ int main(int argc, char **args) {
 
                         for (int i = 0; i < num_cameras; i++) {
                             cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name == "Cam16") {
+                            if (cameras_params[i].camera_name == "2005325") { //ceiling center
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = true;
                             }
@@ -272,7 +272,7 @@ int main(int argc, char **args) {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = false;
                             }
-                            if (cameras_params[i].camera_name == "710040")
+                            if (cameras_params[i].camera_name == "710040") //shelter
                             {
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = false;                                
@@ -804,7 +804,7 @@ int main(int argc, char **args) {
                         
                         for (int i = 0; i < num_cameras; i++) {
                             cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name == "ceiling_center") {
+                            if (cameras_params[i].camera_name == "2005325") { //ceiling center
                                 cameras_select[i].stream_on = true;
                                 cameras_select[i].yolo = true;
                             }

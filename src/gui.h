@@ -205,6 +205,9 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
         cameras_select[i].idx2d = 0;
         cameras_select[i].idx3d = 0;
         cameras_select[i].encoder_fps_estimator.reset();
+        cameras_select[i].capture_fps_estimator.reset();
+        cameras_select[i].dropped_frames = 0;
+        cameras_select[i].pictures_counter = 0;
     }
     detector_counter.store(0);
 }

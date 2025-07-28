@@ -623,7 +623,7 @@ int main(int argc, char **args) {
                     fps_temp = 1;
                 if (fps_temp > 240)
                     fps_temp = 240;
-                streaming_target_fps.store(fps_temp); // write it back safely
+                streaming_target_fps.store(fps_temp);
             }
 
             if (camera_control->record_video) {
@@ -1255,6 +1255,13 @@ int main(int argc, char **args) {
                     oss << std::fixed << std::setprecision(1);
 
                     oss << "Streaming FPS: " << streaming_fps.load();
+                    oss << "  |  "
+                        << "Capture FPS: "
+                        << cameras_select[i].capture_fps_estimator.get_fps();
+                    oss << "  |  "
+                        << "Dropped Frames: "
+                        << cameras_select[i].dropped_frames;
+
                     if (cameras_select[i].record &&
                         camera_control->record_video) {
                         oss << "  |  "

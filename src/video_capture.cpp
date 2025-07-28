@@ -163,10 +163,12 @@ inline void get_one_frame(CameraState *camera_state,
     if (!camera_state->camera_return) {
         // Counting dropped frames through frame_id as redundant check.
         if (((ecam->frame_recv.frame_id) != camera_state->id_prev + 1) &&
-            (camera_state->frame_count != 0))
+            (camera_state->frame_count != 0)) {
             camera_state->dropped_frames++;
-        else {
+            camera_select->dropped_frames++;
+        } else {
             camera_state->frames_recd++;
+            camera_select->capture_fps_estimator.update();
         }
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max

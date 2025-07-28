@@ -46,6 +46,8 @@ struct CameraEachSelect {
     int total_standoff_detector = 0;
     std::atomic<PictureState> frame_detect_state;
     FPSEstimator encoder_fps_estimator;
+    FPSEstimator capture_fps_estimator;
+    int dropped_frames = 0;
     CameraEachSelect()
         : frame_save_state(State_Frame_Idle),
           frame_detect_state(State_Frame_Idle) {}

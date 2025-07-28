@@ -601,19 +601,6 @@ int main(int argc, char **args) {
                 }
             }
 
-            {
-                const char *items[] = {"1", "2", "4", "8", "16", "32"};
-                static const int item_numbers[] = {1, 2, 4, 8, 16, 32};
-                static int downsample_current = 0;
-                if (ImGui::Combo("downsample streaming", &downsample_current,
-                                 items, IM_ARRAYSIZE(items))) {
-                    for (int i = 0; i < num_cameras; i++) {
-                        cameras_select[i].downsample =
-                            item_numbers[downsample_current];
-                    }
-                }
-            }
-
             int fps_temp =
                 streaming_target_fps.load(); // get the current atomic value
 
@@ -716,6 +703,41 @@ int main(int argc, char **args) {
                         sprintf(temp_string, "##checkbox_stream%d", i);
                         ImGui::Checkbox(temp_string,
                                         &cameras_select[i].stream_on);
+                        ImGui::SameLine();
+                        if (cameras_select[i].stream_on) {
+                            {
+                                static const char *downsample_labels[] = {
+                                    "1", "2", "4", "8", "16", "32"};
+                                static const int downsample_options[] = {
+                                    1, 2, 4, 8, 16, 32};
+                                const int num_options =
+                                    IM_ARRAYSIZE(downsample_options);
+
+                                // Find index from current value
+                                int current_index = 0;
+                                for (int j = 0; j < num_options; ++j) {
+                                    if (cameras_select[i].downsample ==
+                                        downsample_options[j]) {
+                                        current_index = j;
+                                        break;
+                                    }
+                                }
+
+                                // Show Combo by index
+                                ImGui::PushItemWidth(50);
+                                std::string ds_label =
+                                    "downsample##" + std::to_string(i);
+                                if (ImGui::Combo(
+                                        ds_label.c_str(), &current_index,
+                                        downsample_labels, num_options)) {
+                                    // Update value from selected index
+                                    cameras_select[i].downsample =
+                                        downsample_options[current_index];
+                                }
+                                ImGui::PopItemWidth();
+                            }
+                        }
+
                         ImGui::TableNextColumn();
                         sprintf(temp_string, "##checkbox_record%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].record);

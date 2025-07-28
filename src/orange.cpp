@@ -1316,6 +1316,9 @@ int main(int argc, char **args) {
                         }
 
                         if (detection2d[i].has_calibration_results) {
+                            gui_plot_world_coordinates(
+                                &detection2d[i].camera_calib,
+                                &cameras_params[i]);
                             if (detection3d.ball3d.new_detection.load()) {
                                 std::string ball_proj_name =
                                     "ball_proj##" + std::to_string(i);

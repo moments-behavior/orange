@@ -6,6 +6,7 @@
 #include "global.h"
 #include "gx_helper.h"
 #include "imgui.h"
+#include "implot.h"
 #include "realtime_tool.h"
 #include "video_capture.h"
 #include <math.h>
@@ -475,8 +476,8 @@ inline void draw_ball_center(cv::Point2f ball_center, int frame_height,
                              ImPlotMarker marker, float pt_size) {
     double ball_center_x = (double)ball_center.x;
     double ball_center_y = (double)frame_height - (double)ball_center.y;
-    ImPlot::PushStyleColor(ImPlotCol_Line, color);
-    ImPlot::SetNextLineStyle(color, 1.0f);
+    ImPlot::PushStyleColor(ImPlotCol_MarkerFill, color);
+    ImPlot::PushStyleColor(ImPlotCol_MarkerOutline, color);
     ImPlot::SetNextMarkerStyle(marker, pt_size, color, 2.5);
     ImPlot::PlotScatter(name.c_str(), &ball_center_x, &ball_center_y, 1);
     ImPlot::PopStyleColor();

@@ -1121,10 +1121,18 @@ int main(int argc, char **args) {
 
             if (camera_control->stop_record) {
                 ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0.5f, 0, 0, 1.0f});
+                                      ImVec4{0.4f, 0.0f, 0.0f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImVec4{0.7f, 0.1f, 0.1f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      ImVec4{0.5f, 0.0f, 0.0f, 1.0f});
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0, 0.5f, 0, 1.0f});
+                                      ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
             }
 
             if (camera_control->open) {
@@ -1218,7 +1226,7 @@ int main(int argc, char **args) {
                 }
             }
 
-            ImGui::PopStyleColor(1);
+            ImGui::PopStyleColor(3);
         }
         ImGui::End();
 

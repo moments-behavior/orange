@@ -162,7 +162,7 @@ void COpenGLDisplay::ThreadRunning() {
                     // std::endl; if (objs[0].rect.x < 2260.41 && objs[0].rect.x
                     // < objs_last_frame[0].rect.x) { if (objs[0].rect.x <
                     // 2500.0 && objs[0].rect.x > 2100.0) {
-                    if (objs[0].rect.x < 2600.0 &&
+                    if (objs[0].rect.x < 2800.0 &&
                         objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
                         if (indigo_signal_builder->indigo_connection != NULL) {

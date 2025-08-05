@@ -488,10 +488,11 @@ int main(int argc, char **args) {
             }
         }
 
-        if (ImGui::Begin("Orange", nullptr, ImGuiWindowFlags_MenuBar)) {
+        if (ImGui::Begin("Orange", nullptr)) {
             // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
             // 1000.0f / ImGui::GetIO().Framerate,
             //            ImGui::GetIO().Framerate);
+            //
 
             if (camera_control->open) {
                 ImGui::BeginDisabled();

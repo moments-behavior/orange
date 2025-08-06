@@ -7,10 +7,9 @@
 
 class COpenGLDisplay : public CThreadWorker {
   public:
-    COpenGLDisplay(
-        const char *name, CameraParams *camera_params,
-        CameraEachSelect *camera_select, unsigned char *display_buffer,
-        INDIGOSignalBuilder *indigo_signal_builder); // name is the thread name
+    COpenGLDisplay(const char *name, CameraParams *camera_params,
+                   CameraEachSelect *camera_select,
+                   unsigned char *display_buffer);
     ~COpenGLDisplay();
 
     bool PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height,
@@ -22,10 +21,8 @@ class COpenGLDisplay : public CThreadWorker {
     CameraParams *camera_params;
     CameraEachSelect *camera_select;
     unsigned char *display_buffer;
-    FrameGPU frame_original; // frame on gpu device
+    FrameGPU frame_original;
     Debayer debayer;
-    INDIGOSignalBuilder *indigo_signal_builder;
-    // for real time: refactor this
     unsigned char *d_convert;
     YOLOv8 *yolov8;
     FrameCPU frame_cpu;

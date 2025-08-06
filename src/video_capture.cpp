@@ -239,8 +239,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraEachSelect *camera_select,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
-                    std::string folder_name, PTPParams *ptp_params,
-                    INDIGOSignalBuilder *indigo_signal_builder) {
+                    std::string folder_name, PTPParams *ptp_params) {
     CHECK(cudaSetDevice(camera_params->gpu_id));
     CameraState camera_state;
     PTPState ptp_state;
@@ -264,9 +263,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
 
     COpenGLDisplay *openGLDisplay = nullptr;
     if (camera_select->stream_on) {
-        openGLDisplay =
-            new COpenGLDisplay("", camera_params, camera_select, display_buffer,
-                               indigo_signal_builder);
+        openGLDisplay = new COpenGLDisplay("gl", camera_params, camera_select,
+                                           display_buffer);
         openGLDisplay->StartThread();
     }
 #endif
@@ -277,9 +275,9 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     GPUVideoEncoder *gpu_encoder = nullptr;
     bool encoder_ready_signal = false;
     if (camera_control->record_video && camera_select->record) {
-        gpu_encoder =
-            new GPUVideoEncoder("", camera_params, camera_select, encoder_setup,
-                                folder_name, &encoder_ready_signal);
+        gpu_encoder = new GPUVideoEncoder("encoder", camera_params,
+                                          camera_select, encoder_setup,
+                                          folder_name, &encoder_ready_signal);
         gpu_encoder->StartThread();
 
         // wait till encoder is ready

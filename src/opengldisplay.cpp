@@ -15,11 +15,9 @@
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
-                               unsigned char *display_buffer,
-                               INDIGOSignalBuilder *indigo_signal_builder)
+                               unsigned char *display_buffer)
     : CThreadWorker(name), camera_params(camera_params),
-      camera_select(camera_select), display_buffer(display_buffer),
-      indigo_signal_builder(indigo_signal_builder) {
+      camera_select(camera_select), display_buffer(display_buffer) {
     input_image_size.width = camera_params->width;
     input_image_size.height = camera_params->height;
     input_image_roi.x = 0;
@@ -165,11 +163,11 @@ void COpenGLDisplay::ThreadRunning() {
                     if (objs[0].rect.x < 2800.0 &&
                         objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
-                        if (indigo_signal_builder->indigo_connection != NULL) {
+                        if (indigo_signal_builder.indigo_connection != NULL) {
                             send_indigo_message(
-                                indigo_signal_builder->server,
-                                indigo_signal_builder->builder,
-                                indigo_signal_builder->indigo_connection,
+                                &indigo_signal_builder.server,
+                                &indigo_signal_builder.builder,
+                                indigo_signal_builder.indigo_connection,
                                 FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
                         }
                     }

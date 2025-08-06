@@ -50,8 +50,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads,
                          CameraEachSelect *cameras_select,
                          GigEVisionDeviceInfo *device_info, int num_cameras,
                          PTPParams *ptp_params, std::string record_folder,
-                         std::string encoder_basic_setup,
-                         INDIGOSignalBuilder *indigo_signal_builder) {
+                         std::string encoder_basic_setup) {
     std::cout << "start camera sthread..." << std::endl;
     try {
         allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size,
@@ -82,10 +81,10 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads,
     }
 
     for (int i = 0; i < num_cameras; i++) {
-        camera_threads.push_back(std::thread(
-            &acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i],
-            camera_control, nullptr, encoder_basic_setup, record_folder,
-            ptp_params, indigo_signal_builder));
+        camera_threads.push_back(
+            std::thread(&acquire_frames, &ecams[i], &cameras_params[i],
+                        &cameras_select[i], camera_control, nullptr,
+                        encoder_basic_setup, record_folder, ptp_params));
     }
 
     // wait for all camera ready
@@ -126,7 +125,6 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
     std::vector<std::thread> camera_threads;
     CameraEachSelect *cameras_select;
     CameraControl *camera_control = new CameraControl;
-    INDIGOSignalBuilder indigo_signal_builder{};
     manager_context->state = FetchGame::ManagerState_IDLE;
     while (!manager_context->quit) {
         switch (manager_context->state) {
@@ -154,8 +152,7 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
                                     camera_control, cameras_select, device_info,
                                     *cam_count, ptp_params,
                                     recording_setup->record_folder,
-                                    recording_setup->encoder_basic_setup,
-                                    &indigo_signal_builder)) {
+                                    recording_setup->encoder_basic_setup)) {
                 manager_context->state = FetchGame::ManagerState_THREADREADY;
             } else {
                 manager_context->state = FetchGame::ManagerState_ERROR;

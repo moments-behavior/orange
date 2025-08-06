@@ -72,19 +72,12 @@ int main(int argc, char **args) {
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
 
-    flatbuffers::FlatBufferBuilder *fb_builder =
-        new flatbuffers::FlatBufferBuilder(1024);
-
-    EnetContext server;
-    if (enet_initialize(&server, 3333, 5)) {
-        printf("Server Initiated\n");
+    if (enet_initialize(&indigo_signal_builder.server, 3333, 5)) {
+        printf("ENet server initialized\n");
     }
+
     ConnectedServer my_servers[2];
     intialize_servers(my_servers);
-
-    INDIGOSignalBuilder indigo_signal_builder{};
-    indigo_signal_builder = {
-        .builder = fb_builder, .server = &server, .indigo_connection = nullptr};
 
     std::vector<std::string> network_config_folders;
     std::string network_start_folder_name =
@@ -114,8 +107,8 @@ int main(int argc, char **args) {
     bool quite_enet = false;
 
     std::thread enet_thread =
-        std::thread(&create_enet_thread, &server, my_servers,
-                    &indigo_signal_builder, &quite_enet);
+        std::thread(&create_enet_thread, &indigo_signal_builder.server,
+                    my_servers, &quite_enet);
     std::vector<std::string> color_temps = {"CT_Off",   "CT_2800K", "CT_3000K",
                                             "CT_4000K", "CT_5000K", "CT_6500K",
                                             "CT_Custom"};
@@ -180,7 +173,8 @@ int main(int argc, char **args) {
                             enet_peer_disconnect(my_servers[i].peer, 0);
                         } else {
                             my_servers[i].peer = connect_peer(
-                                &server, my_servers[i].ip_add[0],
+                                &indigo_signal_builder.server,
+                                my_servers[i].ip_add[0],
                                 my_servers[i].ip_add[1],
                                 my_servers[i].ip_add[2],
                                 my_servers[i].ip_add[3], my_servers[i].port);
@@ -237,7 +231,8 @@ int main(int argc, char **args) {
                     select_cameras_have_configs(camera_config_files,
                                                 device_info, check, cam_count);
                     host_broadcast_open_cameras(
-                        fb_builder, &server,
+                        &indigo_signal_builder.builder,
+                        &indigo_signal_builder.server,
                         network_config_folders[network_config_select]);
                     // open cameras
                     num_cameras = 0;
@@ -323,7 +318,8 @@ int main(int argc, char **args) {
                         input_folder + "/" + get_current_date_time();
                     make_folder(encoder_config->folder_name);
                     ptp_params->network_sync = true;
-                    host_broadcast_start_threads(fb_builder, &server,
+                    host_broadcast_start_threads(&indigo_signal_builder.builder,
+                                                 &indigo_signal_builder.server,
                                                  encoder_config->folder_name,
                                                  encoder_setup);
                     camera_control->record_video = true;
@@ -347,8 +343,7 @@ int main(int argc, char **args) {
                         camera_threads, camera_control, ecams, cameras_params,
                         cameras_select, tex_gl, num_cameras, evt_buffer_size,
                         true, encoder_setup, encoder_config->folder_name,
-                        ptp_params, &indigo_signal_builder, calib_yaml_folder,
-                        detection3d_thread);
+                        ptp_params, calib_yaml_folder, detection3d_thread);
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -372,7 +367,9 @@ int main(int argc, char **args) {
                             ((unsigned long long)delay_in_second) * 1000000000 +
                             ptp_time;
                         host_broadcast_set_start_ptp(
-                            fb_builder, &server, ptp_params->ptp_global_time);
+                            &indigo_signal_builder.builder,
+                            &indigo_signal_builder.server,
+                            ptp_params->ptp_global_time);
                         ptp_params->network_set_start_ptp = true;
                     }
                     ImGui::PopStyleColor(1);
@@ -395,19 +392,23 @@ int main(int argc, char **args) {
                         ((unsigned long long)delay_in_second) * 1000000000 +
                         ptp_time;
                     std::cout << ptp_params->ptp_stop_time << std::endl;
-                    fb_builder->Clear();
-                    FetchGame::ServerBuilder server_builder(*fb_builder);
+                    indigo_signal_builder.builder.Clear();
+                    FetchGame::ServerBuilder server_builder(
+                        indigo_signal_builder.builder);
                     server_builder.add_control(
                         FetchGame::ServerControl_STOPRECORDING);
                     server_builder.add_ptp_global_time(
                         ptp_params->ptp_stop_time);
                     auto my_server = server_builder.Finish();
-                    fb_builder->Finish(my_server);
-                    uint8_t *server_buffer = fb_builder->GetBufferPointer();
-                    size_t server_buf_size = fb_builder->GetSize();
+                    indigo_signal_builder.builder.Finish(my_server);
+                    uint8_t *server_buffer =
+                        indigo_signal_builder.builder.GetBufferPointer();
+                    size_t server_buf_size =
+                        indigo_signal_builder.builder.GetSize();
                     ENetPacket *enet_packet =
                         enet_packet_create(server_buffer, server_buf_size, 0);
-                    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                    enet_host_broadcast(indigo_signal_builder.server.m_pNetwork,
+                                        0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -417,16 +418,20 @@ int main(int argc, char **args) {
                 my_servers[1].server_state == FetchGame::ManagerState_IDLE) {
                 if (ImGui::Button("Clients close")) {
                     // broadcast data
-                    fb_builder->Clear();
-                    FetchGame::ServerBuilder server_builder(*fb_builder);
+                    indigo_signal_builder.builder.Clear();
+                    FetchGame::ServerBuilder server_builder(
+                        indigo_signal_builder.builder);
                     server_builder.add_control(FetchGame::ServerControl_QUIT);
                     auto my_server = server_builder.Finish();
-                    fb_builder->Finish(my_server);
-                    uint8_t *server_buffer = fb_builder->GetBufferPointer();
-                    size_t server_buf_size = fb_builder->GetSize();
+                    indigo_signal_builder.builder.Finish(my_server);
+                    uint8_t *server_buffer =
+                        indigo_signal_builder.builder.GetBufferPointer();
+                    size_t server_buf_size =
+                        indigo_signal_builder.builder.GetSize();
                     ENetPacket *enet_packet =
                         enet_packet_create(server_buffer, server_buf_size, 0);
-                    enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
+                    enet_host_broadcast(indigo_signal_builder.server.m_pNetwork,
+                                        0, enet_packet);
                 }
             }
         }
@@ -876,8 +881,8 @@ int main(int argc, char **args) {
                         if (save_image_all_ready &&
                             calib_state == CalibSavePictures) {
                             send_indigo_message(
-                                indigo_signal_builder.server,
-                                indigo_signal_builder.builder,
+                                &indigo_signal_builder.server,
+                                &indigo_signal_builder.builder,
                                 indigo_signal_builder.indigo_connection,
                                 FetchGame::SignalType_CalibrationNextPose);
                             calib_state = CalibNextPose;
@@ -1095,8 +1100,7 @@ int main(int argc, char **args) {
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, "",
                             encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder, calib_yaml_folder,
-                            detection3d_thread);
+                            calib_yaml_folder, detection3d_thread);
                     } else {
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
@@ -1199,8 +1203,7 @@ int main(int argc, char **args) {
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
                             encoder_config->folder_name, ptp_params,
-                            &indigo_signal_builder, calib_yaml_folder,
-                            detection3d_thread);
+                            calib_yaml_folder, detection3d_thread);
                     } else {
                         camera_control->subscribe = false;
                         stop_camera_streaming(
@@ -1449,6 +1452,6 @@ int main(int argc, char **args) {
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();
-    enet_release(&server);
+    enet_release(&indigo_signal_builder.server);
     return 0;
 }

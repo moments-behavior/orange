@@ -1,11 +1,11 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include "network_base.h"
 #include "realtime_tool.h"
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-
 extern std::atomic<double> streaming_fps;
 extern std::atomic<int> streaming_target_fps;
 extern std::atomic<int64_t> record_start_time_ns;
@@ -13,6 +13,7 @@ extern std::mutex mtx3d;
 extern std::condition_variable cv3d;
 extern std::atomic<uint64_t> detector_counter;
 extern std::mutex graph_capture_mutex;
+extern IndigoSignalBuilder indigo_signal_builder;
 
 bool try_start_timer();
 bool try_stop_timer();

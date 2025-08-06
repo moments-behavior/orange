@@ -223,7 +223,11 @@ int main(int argc, char **args) {
                 my_servers[1].server_state == FetchGame::ManagerState_IDLE &&
                 my_servers[0].connected && my_servers[1].connected) {
                 ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0, 0.5f, 0, 1.0f});
+                                      ImVec4{0.0f, 0.5f, 0.0f, 1.0f}); // normal
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImVec4{0.2f, 0.8f, 0.2f, 1.0f}); // hover
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      ImVec4{0.1f, 0.6f, 0.1f, 1.0f}); // active
                 if (ImGui::Button("Open Cameras")) {
                     update_camera_configs(
                         camera_config_files,
@@ -283,10 +287,15 @@ int main(int argc, char **args) {
                     }
                     camera_control->open = true;
                 }
-                ImGui::PopStyleColor(1);
+                ImGui::PopStyleColor(3);
                 ImGui::SameLine();
+
                 ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
+                                      ImVec4(0.5f, 0.0f, 0.7f, 1.0f)); // normal
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImVec4(0.7f, 0.2f, 0.9f, 1.0f)); // hover
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      ImVec4(0.4f, 0.0f, 0.6f, 1.0f)); // active
                 if (ImGui::Button("Save to")) {
                     IGFD::FileDialogConfig config;
                     config.countSelectionMax = 1;
@@ -296,7 +305,7 @@ int main(int argc, char **args) {
                         "ChooseRecordingDir", "Choose a Directory", nullptr,
                         config);
                 }
-                ImGui::PopStyleColor(1);
+                ImGui::PopStyleColor(3);
                 ImGui::SameLine();
                 ImGui::SetWindowFontScale(1.5f); // 1.0 is default
                 ImGui::Text("%s", input_folder.c_str());
@@ -309,7 +318,11 @@ int main(int argc, char **args) {
                 my_servers[1].server_state ==
                     FetchGame::ManagerState_WAITTHREAD) {
                 ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0, 0.5f, 0, 1.0f});
+                                      ImVec4{0.0f, 0.5f, 0.0f, 1.0f}); // normal
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImVec4{0.2f, 0.8f, 0.2f, 1.0f}); // hover
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      ImVec4{0.1f, 0.6f, 0.1f, 1.0f}); // active
                 if (ImGui::Button("Clients start camera threads")) {
                     std::string encoder_setup =
                         "-codec " + encoder_config->encoder_codec +
@@ -346,7 +359,7 @@ int main(int argc, char **args) {
                         ptp_params, calib_yaml_folder, detection3d_thread);
                     camera_control->subscribe = true;
                 }
-                ImGui::PopStyleColor(1);
+                ImGui::PopStyleColor(3);
             }
 
             if (my_servers[0].server_state ==
@@ -355,8 +368,16 @@ int main(int argc, char **args) {
                     FetchGame::ManagerState_WAITSTART) {
                 // check network servers are ready as well as local computer
                 if (ptp_params->ptp_counter == num_cameras) {
-                    ImGui::PushStyleColor(ImGuiCol_Button,
-                                          ImVec4{0, 0.5f, 0, 1.0f});
+                    ImGui::PushStyleColor(
+                        ImGuiCol_Button,
+                        ImVec4{0.0f, 0.5f, 0.0f, 1.0f}); // normal
+                    ImGui::PushStyleColor(
+                        ImGuiCol_ButtonHovered,
+                        ImVec4{0.2f, 0.8f, 0.2f, 1.0f}); // hover
+                    ImGui::PushStyleColor(
+                        ImGuiCol_ButtonActive,
+                        ImVec4{0.1f, 0.6f, 0.1f, 1.0f}); // active
+
                     if (ImGui::Button("Start Recording")) {
                         // get the host ready, and then set global ptp time to
                         // start recording
@@ -372,7 +393,7 @@ int main(int argc, char **args) {
                             ptp_params->ptp_global_time);
                         ptp_params->network_set_start_ptp = true;
                     }
-                    ImGui::PopStyleColor(1);
+                    ImGui::PopStyleColor(3);
                 }
             }
 
@@ -382,8 +403,15 @@ int main(int argc, char **args) {
                     FetchGame::ManagerState_WAITSTOP &&
                 my_servers[1].server_state ==
                     FetchGame::ManagerState_WAITSTOP) {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0, 0.5f, 0, 1.0f});
+                ImGui::PushStyleColor(
+                    ImGuiCol_Button,
+                    ImVec4(0.6f, 0.1f, 0.1f, 1.0f)); // normal (dark red)
+                ImGui::PushStyleColor(
+                    ImGuiCol_ButtonHovered,
+                    ImVec4(0.9f, 0.2f, 0.2f, 1.0f)); // hover (bright red)
+                ImGui::PushStyleColor(
+                    ImGuiCol_ButtonActive,
+                    ImVec4(0.7f, 0.0f, 0.0f, 1.0f)); // active (deep red)
                 if (ImGui::Button("Stop Recording")) {
                     unsigned long long ptp_time =
                         get_current_PTP_time(&ecams[0].camera);
@@ -411,7 +439,7 @@ int main(int argc, char **args) {
                                         0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
                 }
-                ImGui::PopStyleColor(1);
+                ImGui::PopStyleColor(3);
             }
 
             if (my_servers[0].server_state == FetchGame::ManagerState_IDLE &&
@@ -555,7 +583,11 @@ int main(int argc, char **args) {
             }
 
             ImGui::PushStyleColor(ImGuiCol_Button,
-                                  ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
+                                  ImVec4(0.5f, 0.0f, 0.7f, 1.0f)); // normal
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  ImVec4(0.7f, 0.2f, 0.9f, 1.0f)); // hover
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                  ImVec4(0.4f, 0.0f, 0.6f, 1.0f)); // active
             if (ImGui::Button("Save to")) {
                 IGFD::FileDialogConfig config;
                 config.countSelectionMax = 1;
@@ -565,7 +597,7 @@ int main(int argc, char **args) {
                                                         "Choose a Directory",
                                                         nullptr, config);
             }
-            ImGui::PopStyleColor(1);
+            ImGui::PopStyleColor(3);
             ImGui::SameLine();
             ImGui::Text("%s", input_folder.c_str());
 

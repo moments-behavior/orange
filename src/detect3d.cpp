@@ -3,6 +3,7 @@
 #include "realtime_tool.h"
 #include "video_capture.h"
 #include <nvToolsExt.h>
+#include "shaman.h"
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
@@ -24,6 +25,8 @@ void detection3d_proc(CameraControl *camera_control,
             cam3d_idx.push_back(i);
         }
     }
+
+    shaman::SharedBoxQueue writer(true);
 
     std::vector<TriangulatePoint> kps_all_cams;
     std::chrono::high_resolution_clock::time_point start =
@@ -107,9 +110,22 @@ void detection3d_proc(CameraControl *camera_control,
                     detection2d[i].has_calibration_results) {
                     std::vector<cv::Point3f> points3d;
                     cv::Mat image_pts;
+
+                    shaman::Object obj;
+                    std::vector<shaman::Object> kp_vec;
+
                     for (int j = 0; j < detection3d.kps.size(); j++) {
                         points3d.push_back(detection3d.kps[j].pt);
+
+                        obj.kps[3*j] = detection3d.kps[j].pt.x;
+                        obj.kps[3*j+1] = detection3d.kps[j].pt.y;
+                        obj.kps[3*j+2] = detection3d.kps[j].pt.z;
                     }
+    
+                    kp_vec.reserve(1);
+                    kp_vec.push_back(obj);
+                    writer.push(kp_vec);
+
                     CameraCalibResults *cam_calib =
                         &detection2d[i].camera_calib;
                     cv::projectPoints(points3d, cam_calib->rvec,

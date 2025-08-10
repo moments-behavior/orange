@@ -10,6 +10,11 @@ extern "C" {
 } // for enet_uint32
 #include <stdexcept> // for std::runtime_error
 
+struct PeerSnapshot {
+    uint32_t peer_id;
+    ENetAddress addr;
+};
+
 // Event from ENet to the app
 struct Incoming {
     enum Type { Connect, Receive, Disconnect } type;

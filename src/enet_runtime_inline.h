@@ -124,6 +124,15 @@ class EnetRuntimeInline {
         channels_ = 0;
     }
 
+    void peers_snapshot(std::vector<PeerSnapshot> &out) {
+        out.clear();
+        out.reserve(peers_.size());
+        for (const auto &kv : peers_) {
+            PeerSnapshot ps{kv.first, kv.second->address};
+            out.push_back(ps);
+        }
+    }
+
   private:
     ENetHost *host_ = nullptr;
     size_t channels_ = 0;

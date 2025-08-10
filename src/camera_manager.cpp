@@ -1,4 +1,5 @@
 #include "camera_manager.h"
+#include "fetch_generated.h"
 #include <chrono>
 #include <filesystem>
 #include <iostream>
@@ -39,18 +40,18 @@ void CameraManager::stop() {
 }
 
 void CameraManager::run_loop() {
-    mgr_->state = ManagerState::IDLE;
+    mgr_->state = FetchGame::ManagerState_IDLE;
 
     while (running_.load() && !mgr_->quit.load()) {
         switch (mgr_->state) {
-        case ManagerState::CONNECT: {
+        case FetchGame::ManagerState_CONNECT: {
             *cam_count_ = scan_cameras(kMaxCameras, unsorted_);
             sort_cameras_ip(unsorted_, sorted_, *cam_count_);
-            mgr_->state = ManagerState::CONNECTED;
+            mgr_->state = FetchGame::ManagerState_CONNECTED;
             break;
         }
 
-        case ManagerState::OPENCAMERA: {
+        case FetchGame::ManagerState_OPENCAMERA: {
             // Allocate non-movable arrays (value-initialized)
             cams_count_ = *cam_count_;
             ecams_.reset(new CameraEmergent[cams_count_]{});
@@ -67,16 +68,16 @@ void CameraManager::run_loop() {
                                         &cams_params_[i]);
             }
 
-            mgr_->state = ManagerState::CAMERAOPENED;
+            mgr_->state = FetchGame::ManagerState_CAMERAOPENED;
             break;
         }
 
-        case ManagerState::STARTCAMTHREAD: {
+        case FetchGame::ManagerState_STARTCAMTHREAD: {
             try {
                 allocate_camera_frame_buffers(ecams_.get(), cams_params_.get(),
                                               kEvtBufferSize, cams_count_);
             } catch (...) {
-                mgr_->state = ManagerState::ERROR;
+                mgr_->state = FetchGame::ManagerState_ERROR;
                 break;
             }
 
@@ -92,7 +93,7 @@ void CameraManager::run_loop() {
             } catch (const std::exception &e) {
                 std::cerr << "Error creating " << record_folder_ << ": "
                           << e.what() << "\n";
-                mgr_->state = ManagerState::ERROR;
+                mgr_->state = FetchGame::ManagerState_ERROR;
                 break;
             }
 
@@ -116,7 +117,7 @@ void CameraManager::run_loop() {
                                           record_folder_, ptp_);
             }
 
-            mgr_->state = ManagerState::THREADREADY;
+            mgr_->state = FetchGame::ManagerState_THREADREADY;
             break;
         }
 
@@ -154,7 +155,7 @@ void CameraManager::run_loop() {
             cams_select_.reset();
             cams_count_ = 0;
 
-            mgr_->state = ManagerState::RECORDSTOPPED;
+            mgr_->state = FetchGame::ManagerState_RECORDSTOPPED;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));

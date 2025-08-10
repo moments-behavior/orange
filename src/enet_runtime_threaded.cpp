@@ -48,6 +48,15 @@ void EnetRuntimeThreaded::stop() {
     next_peer_id_ = 1;
 }
 
+void EnetRuntimeThreaded::peers_snapshot(std::vector<PeerSnapshot> &out) {
+    std::lock_guard<std::mutex> lk(peers_m_);
+    out.clear();
+    out.reserve(peers_.size());
+    for (const auto &kv : peers_) {
+        out.push_back(PeerSnapshot{kv.first, kv.second->address});
+    }
+}
+
 void EnetRuntimeThreaded::io_loop() {
     while (running_.load()) {
         // Handle queued connect requests (client mode)

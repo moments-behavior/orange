@@ -5,19 +5,19 @@
 #include <chrono>
 #include <thread>
 
-inline void run_enet_loop(EnetRuntime &net, PeerRegistry &registry,
+inline void run_enet_loop(EnetRuntime &net, PeerRegistry &peers,
                           std::atomic<bool> &stop) {
     // Common event handler used by both modes
     auto handle = [&](const Incoming &evt) {
         switch (evt.type) {
         case Incoming::Connect:
-            registry.add(evt.peer_id);
-            std::printf("[APP] Peer %u connected\n", evt.peer_id);
+            peers.add(evt.peer_id);
+            std::printf("[ENet] Peer %u connected\n", evt.peer_id);
             break;
 
         case Incoming::Disconnect:
-            registry.remove(evt.peer_id);
-            std::printf("[APP] Peer %u disconnected\n", evt.peer_id);
+            peers.remove(evt.peer_id);
+            std::printf("[ENet] Peer %u disconnected\n", evt.peer_id);
             break;
 
         case Incoming::Receive: {
@@ -29,38 +29,30 @@ inline void run_enet_loop(EnetRuntime &net, PeerRegistry &registry,
                 },
                 [](const uint8_t *p) { return FetchGame::GetServer(p); }, msg);
             if (!ok || !msg) {
-                std::fprintf(stderr, "[APP] Dropped invalid packet from %u\n",
+                std::fprintf(stderr, "[ENet] Dropped invalid packet from %u\n",
                              evt.peer_id);
                 break;
             }
 
             switch (msg->signal_type()) {
             case FetchGame::SignalType_ClientBringup: {
-                const auto *sm = msg->server_mesg();
-                const char *name_c = (sm && sm->server_name())
-                                         ? sm->server_name()->c_str()
-                                         : "unknown";
-                const int cameras = sm ? sm->num_cameras() : 0;
-                const int state = msg->server_state();
+                if (auto sm = msg->server_mesg()) {
+                    if (auto n = sm->server_name())
+                        peers.set_name(evt.peer_id, n->str());
+                }
 
-                std::printf("[APP] Bringup from %u: name=%s cams=%d state=%d\n",
-                            evt.peer_id, name_c, cameras, state);
-
-                // Map role by reported name (no hardcoded "indigo")
-                if (name_c && name_c[0] != '\0')
-                    registry.set_role(name_c, evt.peer_id);
                 break;
             }
             case FetchGame::SignalType_CalibrationPoseReached:
-                std::puts("[APP] Calibration pose reached.");
+                std::puts("[ENet] Calibration pose reached.");
                 break;
 
             case FetchGame::SignalType_CalibrationDone:
-                std::puts("[APP] Calibration done.");
+                std::puts("[ENet] Calibration done.");
                 break;
 
             default:
-                std::printf("[APP] Peer %u state=%d\n", evt.peer_id,
+                std::printf("[ENet] Peer %u state=%d\n", evt.peer_id,
                             msg->server_state());
                 break;
             }

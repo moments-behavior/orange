@@ -6,37 +6,85 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// Thread-safe peer + role registry
 class PeerRegistry {
   public:
     void add(uint32_t pid) {
         std::lock_guard<std::mutex> lk(m_);
         peers_.insert(pid);
     }
+
     void remove(uint32_t pid) {
         std::lock_guard<std::mutex> lk(m_);
         peers_.erase(pid);
-        for (auto it = role2peer_.begin(); it != role2peer_.end();)
-            it->second == pid ? it = role2peer_.erase(it) : ++it;
+        if (auto it = pid2name_.find(pid); it != pid2name_.end()) {
+            name2pid_.erase(it->second);
+            pid2name_.erase(it);
+        }
     }
-    void set_role(const std::string &role, uint32_t pid) {
+
+    // Set/rename peer's name. Enforces a bijection (name <-> pid).
+    void set_name(uint32_t pid, const std::string &name) {
         std::lock_guard<std::mutex> lk(m_);
-        role2peer_[role] = pid;
+        if (name.empty()) {
+            // treat empty as “clear name”
+            if (auto it = pid2name_.find(pid); it != pid2name_.end()) {
+                name2pid_.erase(it->second);
+                pid2name_.erase(it);
+            }
+            return;
+        }
+        // If this pid had an old name, drop it.
+        if (auto it = pid2name_.find(pid);
+            it != pid2name_.end() && it->second != name) {
+            name2pid_.erase(it->second);
+        }
+        // If another pid was using this name, drop that mapping.
+        if (auto jt = name2pid_.find(name);
+            jt != name2pid_.end() && jt->second != pid) {
+            pid2name_.erase(jt->second);
+        }
+        pid2name_[pid] = name;
+        name2pid_[name] = pid;
     }
-    uint32_t get_role(const std::string &role) const {
+
+    uint32_t get_pid_by_name(const std::string &name) const {
         std::lock_guard<std::mutex> lk(m_);
-        auto it = role2peer_.find(role);
-        return it == role2peer_.end() ? 0u : it->second;
+        auto it = name2pid_.find(name);
+        return it == name2pid_.end() ? 0u : it->second;
     }
-    std::vector<uint32_t> snapshot() const {
+
+    std::string get_name(uint32_t pid) const {
+        std::lock_guard<std::mutex> lk(m_);
+        auto it = pid2name_.find(pid);
+        return it == pid2name_.end() ? std::string() : it->second;
+    }
+
+    std::vector<uint32_t> snapshot_ids() const {
         std::lock_guard<std::mutex> lk(m_);
         return {peers_.begin(), peers_.end()};
+    }
+
+    struct PeerInfo {
+        uint32_t peer_id;
+        std::string name;
+    };
+    std::vector<PeerInfo> snapshot_info() const {
+        std::lock_guard<std::mutex> lk(m_);
+        std::vector<PeerInfo> out;
+        out.reserve(peers_.size());
+        for (auto pid : peers_) {
+            auto it = pid2name_.find(pid);
+            out.push_back(
+                {pid, it == pid2name_.end() ? std::string() : it->second});
+        }
+        return out;
     }
 
   private:
     mutable std::mutex m_;
     std::unordered_set<uint32_t> peers_;
-    std::unordered_map<std::string, uint32_t> role2peer_;
+    std::unordered_map<uint32_t, std::string> pid2name_;
+    std::unordered_map<std::string, uint32_t> name2pid_;
 };
 
 // FlatBuffers build-and-send helpers (work with either runtime alias)

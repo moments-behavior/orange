@@ -1,28 +1,15 @@
 #pragma once
 #include "camera.h"
 #include "enet_runtime_select.h"
+#include "fetch_generated.h"
 #include "project.h"
 #include <atomic>
 #include <string>
 #include <thread>
 #include <vector>
 
-enum class ManagerState {
-    IDLE,
-    CONNECT,
-    CONNECTED,
-    OPENCAMERA,
-    CAMERAOPENED,
-    STARTCAMTHREAD,
-    THREADREADY,
-    WAITSTART,
-    WAITSTOP,
-    RECORDSTOPPED,
-    ERROR
-};
-
 struct ManagerContext {
-    ManagerState state = ManagerState::IDLE;
+    FetchGame::ManagerState state = FetchGame::ManagerState_IDLE;
     std::atomic<bool> quit{false};
 };
 

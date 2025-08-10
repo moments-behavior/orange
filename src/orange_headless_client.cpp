@@ -2,7 +2,7 @@
 #include "camera_manager.h"
 #include "enet_fb_helpers.h"
 #include "enet_runtime_select.h"
-#include "fetch_generated.h" // your FB schema
+#include "fetch_generated.h"
 #include <csignal>
 #include <iostream>
 #include <thread>
@@ -13,6 +13,29 @@ simplelogger::Logger *logger =
 static std::atomic<bool> g_quit{false};
 extern "C" void on_sigint(int) {
     g_quit.store(true, std::memory_order_relaxed);
+}
+
+inline void send_client_bringup(FBMessageSender &sender, uint32_t peer_id,
+                                int cam_count,
+                                FetchGame::ManagerState mgr_state) {
+    sender.to_peer(peer_id, [&](flatbuffers::FlatBufferBuilder &b) {
+        char hostname[128]{};
+        (void)gethostname(hostname, sizeof(hostname));
+        if (!hostname[0])
+            std::snprintf(hostname, sizeof(hostname), "unknown");
+
+        auto server_name = b.CreateString(hostname);
+        // NOTE: keep your schema’s function name exactly (it looked like
+        // Createbring_up_message)
+        auto msg = FetchGame::Createbring_up_message(b, server_name, cam_count);
+
+        FetchGame::ServerBuilder sb(b);
+        sb.add_signal_type(FetchGame::SignalType_ClientBringup);
+        sb.add_server_mesg(msg);
+        sb.add_server_state(mgr_state); // cast if your schema expects int
+        auto root = sb.Finish();
+        b.Finish(root);
+    });
 }
 
 int main(int, char **) {
@@ -46,6 +69,15 @@ int main(int, char **) {
                 if (evt.type == Incoming::Connect) {
                     peers.add(evt.peer_id);
                     std::cout << "peer " << evt.peer_id << " connected\n";
+                    if (mgr.state == FetchGame::ManagerState_IDLE) {
+                        std::puts("Network: Successfully connected! Rescanning "
+                                  "cameras.");
+                        mgr.state = FetchGame::ManagerState_CONNECTED;
+                    } else {
+                        std::puts("Network: Successfully connected!");
+                        send_client_bringup(sender, evt.peer_id, cam_count,
+                                            mgr.state);
+                    }
                 } else if (evt.type == Incoming::Disconnect) {
                     peers.remove(evt.peer_id);
                     std::cout << "peer " << evt.peer_id << " disconnected\n";
@@ -66,13 +98,13 @@ int main(int, char **) {
                     switch (msg->control()) {
                     case FetchGame::ServerControl_OPENCAMERA:
                         cfg_folder = msg->config_folder()->str();
-                        mgr.state = ManagerState::OPENCAMERA;
+                        mgr.state = FetchGame::ManagerState_OPENCAMERA;
                         break;
 
                     case FetchGame::ServerControl_STARTTHREAD:
                         record_folder = msg->record_folder()->str();
                         encoder_setup = msg->encoder_setup()->str();
-                        mgr.state = ManagerState::STARTCAMTHREAD;
+                        mgr.state = FetchGame::ManagerState_STARTCAMTHREAD;
                         break;
 
                     case FetchGame::ServerControl_QUIT:
@@ -82,7 +114,7 @@ int main(int, char **) {
                     case FetchGame::ServerControl_STARTRECORDING:
                         ptp.ptp_global_time = msg->ptp_global_time();
                         ptp.network_set_start_ptp = true;
-                        mgr.state = ManagerState::WAITSTOP;
+                        mgr.state = FetchGame::ManagerState_WAITSTOP;
                         // // Example reply (same thread; safe for inline send)
                         // sender.to_peer(
                         //     evt.peer_id,

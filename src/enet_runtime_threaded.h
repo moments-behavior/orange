@@ -27,6 +27,7 @@ class EnetRuntimeThreaded {
     bool poll(Incoming &evt) { return incoming_.try_pop(evt); } // non-blocking
     void send(Outgoing msg) { outgoing_.push(std::move(msg)); } // thread-safe
     bool is_running() const { return running_.load(); }
+    void peers_snapshot(std::vector<PeerSnapshot> &out);
 
   private:
     void io_loop();

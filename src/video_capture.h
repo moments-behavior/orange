@@ -1,7 +1,6 @@
 #ifndef ORANGE_VIDEO_CAPTURE
 #define ORANGE_VIDEO_CAPTURE
 #include "camera.h"
-#include "network_base.h"
 #include "utils.h"
 #include <atomic>
 

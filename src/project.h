@@ -2,24 +2,12 @@
 #define ORANGE_PROJECT
 #include "camera.h"
 #include "json.hpp"
-#include "network_base.h"
 #include "video_capture.h"
 #include <sys/stat.h>
 #include <unistd.h>
 using json = nlohmann::json;
 
-struct ConnectedServer {
-    char name[80];
-    uint8_t ip_add[4];
-    uint16_t port;
-    ENetPeer *peer;
-    int num_cameras;
-    FetchGame::ManagerState server_state;
-    bool connected;
-};
-
 void prepare_application_folders(std::string orange_root_dir_str);
-void intialize_servers(ConnectedServer *my_servers);
 std::vector<std::string> string_split(std::string s, std::string delimiter);
 std::vector<std::string> string_split_char(char *string_c,
                                            std::string delimiter);
@@ -59,23 +47,23 @@ bool set_camera_params(CameraParams *camera_params,
 void allocate_camera_frame_buffers(CameraEmergent *ecams,
                                    CameraParams *cameras_params,
                                    int evt_buffer_size, int num_cameras);
-void client_send_bringup_message(EnetContext *enet_context,
-                                 flatbuffers::FlatBufferBuilder *builder,
-                                 ENetPeer *server_connection, int cam_count,
-                                 FetchGame::ManagerState server_state);
-void client_send_state_update_message(EnetContext *enet_context,
-                                      flatbuffers::FlatBufferBuilder *builder,
-                                      ENetPeer *server_connection,
-                                      FetchGame::ManagerState server_state);
-void host_broadcast_open_cameras(flatbuffers::FlatBufferBuilder *builder,
-                                 EnetContext *server,
-                                 std::string config_file_name);
-void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder *builder,
-                                  EnetContext *server,
-                                  std::string record_folder_name,
-                                  std::string encoder_basic_setup);
-void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder *builder,
-                                  EnetContext *server,
-                                  unsigned long long ptp_global_time);
+// void client_send_bringup_message(EnetContext *enet_context,
+//                                  flatbuffers::FlatBufferBuilder *builder,
+//                                  ENetPeer *server_connection, int cam_count,
+//                                  FetchGame::ManagerState server_state);
+// void client_send_state_update_message(EnetContext *enet_context,
+//                                       flatbuffers::FlatBufferBuilder
+//                                       *builder, ENetPeer *server_connection,
+//                                       FetchGame::ManagerState server_state);
+// void host_broadcast_open_cameras(flatbuffers::FlatBufferBuilder *builder,
+//                                  EnetContext *server,
+//                                  std::string config_file_name);
+// void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder *builder,
+//                                   EnetContext *server,
+//                                   std::string record_folder_name,
+//                                   std::string encoder_basic_setup);
+// void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder *builder,
+//                                   EnetContext *server,
+//                                   unsigned long long ptp_global_time);
 
 #endif

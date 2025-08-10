@@ -26,12 +26,6 @@ struct EnetContext {
     float m_SecondTimer = 0.0f;
 };
 
-struct IndigoSignalBuilder {
-    flatbuffers::FlatBufferBuilder builder;
-    EnetContext server;
-    ENetPeer *indigo_connection;
-};
-
 bool enet_initialize(EnetContext *enet_context, uint16_t external_port_number,
                      size_t max_peers);
 void enet_release(EnetContext *enet_context);

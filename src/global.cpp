@@ -10,7 +10,6 @@ Detection3d detection3d;
 DetectionDataPerCam *detection2d;
 std::atomic<uint64_t> detector_counter{0};
 std::mutex graph_capture_mutex;
-IndigoSignalBuilder indigo_signal_builder;
 
 bool try_start_timer() {
     int64_t expected = record_start_time_ns.load();

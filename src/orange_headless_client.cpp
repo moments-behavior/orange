@@ -34,6 +34,18 @@ inline void send_client_bringup(FBMessageSender &sender, uint32_t peer_id,
     });
 }
 
+inline void
+send_client_state_update_message(FBMessageSender &sender, uint32_t peer_id,
+                                 FetchGame::ManagerState server_state) {
+    sender.to_peer(peer_id, [&](flatbuffers::FlatBufferBuilder &b) {
+        b.Clear();
+        FetchGame::ServerBuilder sb(b);
+        sb.add_signal_type(FetchGame::SignalType_ClientStateUpdate);
+        sb.add_server_state(server_state); // cast if schema uses int
+        b.Finish(sb.Finish());
+    });
+}
+
 int main(int, char **) {
     try {
         ENetGuard enet_guard;
@@ -104,24 +116,12 @@ int main(int, char **) {
                         mgr.state = FetchGame::ManagerState_STARTCAMTHREAD;
                         break;
 
-                    case FetchGame::ServerControl_QUIT:
-                        g_quit.store(true, std::memory_order_relaxed);
-                        break;
-
                     case FetchGame::ServerControl_STARTRECORDING:
                         ptp.ptp_global_time = msg->ptp_global_time();
                         ptp.network_set_start_ptp = true;
                         mgr.state = FetchGame::ManagerState_WAITSTOP;
-                        // // Example reply (same thread; safe for inline send)
-                        // sender.to_peer(
-                        //     evt.peer_id,
-                        //     [&](flatbuffers::FlatBufferBuilder &fbb) {
-                        //         auto root = FetchGame::CreateServer(
-                        //             fbb, FetchGame::SignalType_ServerState,
-                        //             /*state=*/(int)ManagerState::WAITSTOP,
-                        //             0);
-                        //         fbb.Finish(root);
-                        //     });
+                        send_client_state_update_message(sender, evt.peer_id,
+                                                         mgr.state);
                         break;
 
                     case FetchGame::ServerControl_STOPRECORDING:
@@ -137,7 +137,6 @@ int main(int, char **) {
 
             // Example: do other per-frame work here
             // e.g., periodic broadcast using sender.broadcast(...)
-
             if (mgr.state == FetchGame::ManagerState_CONNECTED) {
                 std::cout << "here?" << std::endl;
                 mgr.state = FetchGame::ManagerState_IDLE;
@@ -146,19 +145,16 @@ int main(int, char **) {
             }
             if (mgr.state == FetchGame::ManagerState_CAMERAOPENED) {
                 mgr.state = FetchGame::ManagerState_WAITTHREAD;
-                // client_send_state_update_message(
-                //     &client, fb_builder, &client.m_pNetwork->peers[0],
-                //     manager_context.state);
+                send_client_state_update_message(
+                    sender, peers.get_pid_by_name("orange"), mgr.state);
             } else if (mgr.state == FetchGame::ManagerState_THREADREADY) {
                 mgr.state = FetchGame::ManagerState_WAITSTART;
-                // client_send_state_update_message(
-                //     &client, fb_builder, &client.m_pNetwork->peers[0],
-                //     manager_context.state);
+                send_client_state_update_message(
+                    sender, peers.get_pid_by_name("orange"), mgr.state);
             } else if (mgr.state == FetchGame::ManagerState_RECORDSTOPPED) {
                 mgr.state = FetchGame::ManagerState_IDLE;
-                // client_send_state_update_message(
-                //     &client, fb_builder, &client.m_pNetwork->peers[0],
-                //     manager_context.state);
+                send_client_state_update_message(
+                    sender, peers.get_pid_by_name("orange"), mgr.state);
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1));

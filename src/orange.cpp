@@ -2,6 +2,7 @@
 #include "enet_fb_helpers.h"
 #include "enet_loop.h"
 #include "enet_types.h"
+#include "fetch_generated.h"
 #include "global.h"
 #include "gui.h"
 #include "imgui.h"
@@ -174,390 +175,287 @@ int main(int argc, char **args) {
             const bool can_open = (!camera_control->open) && all_connected() &&
                                   all_idle() && !selected_cfg_folder.empty();
 
-            // Open Cameras
-            ImGui::PushStyleColor(ImGuiCol_Button,
-                                  ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                  ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                  ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
-            ImGui::BeginDisabled(!can_open);
-            if (ImGui::Button("Open Cameras")) {
+            if (can_open) {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
 
-                camera_control->open = true;
+                if (ImGui::Button("Open Cameras")) {
+                    update_camera_configs(
+                        camera_config_files,
+                        network_config_folders[network_config_select]);
+                    select_cameras_have_configs(camera_config_files,
+                                                device_info, check, cam_count);
+
+                    send_open_cameras_to(sender, peers, server_names,
+                                         selected_cfg_folder);
+
+                    // open cameras
+                    num_cameras = 0;
+                    for (int i = 0; i < cam_count; i++) {
+                        if (check[i]) {
+                            num_cameras++;
+                        }
+                    }
+                    if (num_cameras > 0) {
+                        cameras_params = new CameraParams[num_cameras]();
+                        cameras_select = new CameraEachSelect[num_cameras]();
+
+                        std::vector<int> selected_cameras;
+                        for (int i = 0; i < cam_count; i++) {
+                            if (check[i]) {
+                                selected_cameras.push_back(i);
+                            }
+                        }
+                        for (int i = 0; i < num_cameras; i++) {
+                            set_camera_params(&cameras_params[i],
+                                              &cameras_select[i],
+                                              &device_info[selected_cameras[i]],
+                                              camera_config_files,
+                                              selected_cameras[i], num_cameras);
+                        }
+
+                        for (int i = 0; i < num_cameras; i++) {
+                            cameras_select[i].stream_on = false;
+                            if (cameras_params[i].camera_name == "Cam16") {
+                                cameras_select[i].stream_on = true;
+                                cameras_select[i].detect_mode =
+                                    Detect2D_GLThread;
+                            }
+                            if (cameras_params[i].camera_name == "shelter") {
+                                cameras_select[i].stream_on = true;
+                            }
+                        }
+
+                        ecams = new CameraEmergent[num_cameras];
+                        for (int i = 0; i < num_cameras; i++) {
+                            open_camera_with_params(
+                                &ecams[i].camera,
+                                &device_info[cameras_params[i].camera_id],
+                                &cameras_params[i]);
+                        }
+
+                        realtime_plot_data = new ScrollingBuffer[num_cameras];
+                    }
+                    camera_control->open = true;
+                }
+                ImGui::PopStyleColor(3);
+
+                ImGui::SameLine();
+
+                // Save to…
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImVec4(0.7f, 0.2f, 0.9f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      ImVec4(0.4f, 0.0f, 0.6f, 1.0f));
+                if (ImGui::Button("Save to")) {
+                    IGFD::FileDialogConfig cfg;
+                    cfg.countSelectionMax = 1;
+                    cfg.path = input_folder;
+                    cfg.flags = ImGuiFileDialogFlags_Modal;
+                    ImGuiFileDialog::Instance()->OpenDialog(
+                        "ChooseRecordingDir", "Choose a Directory", nullptr,
+                        cfg);
+                }
+                ImGui::PopStyleColor(3);
+
+                ImGui::SameLine();
+                ImGui::SetWindowFontScale(1.5f);
+                ImGui::Text("%s", input_folder.c_str());
+                ImGui::SetWindowFontScale(1.0f);
             }
-            ImGui::EndDisabled();
-            ImGui::PopStyleColor(3);
 
-            ImGui::SameLine();
+            auto all_wait_thread = [&]() {
+                for (const auto &name : server_names) {
+                    uint32_t pid = peers.get_pid_by_name(name);
+                    if (!pid)
+                        return false;
+                    int st = 0;
+                    if (!peers.state_known(pid, &st))
+                        return false;
+                    if (st != (int)FetchGame::ManagerState_WAITTHREAD)
+                        return false;
+                }
+                return true;
+            };
 
-            // Save to…
-            ImGui::PushStyleColor(ImGuiCol_Button,
-                                  ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                  ImVec4(0.7f, 0.2f, 0.9f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                  ImVec4(0.4f, 0.0f, 0.6f, 1.0f));
-            if (ImGui::Button("Save to")) {
-                IGFD::FileDialogConfig cfg;
-                cfg.countSelectionMax = 1;
-                cfg.path = input_folder;
-                cfg.flags = ImGuiFileDialogFlags_Modal;
-                ImGuiFileDialog::Instance()->OpenDialog(
-                    "ChooseRecordingDir", "Choose a Directory", nullptr, cfg);
+            const bool can_start_thread = (!camera_control->subscribe) &&
+                                          all_connected() && all_wait_thread();
+            if (can_start_thread) {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4{0, 0.5f, 0, 1.0f});
+                if (ImGui::Button("Clients start camera threads")) {
+                    std::string encoder_setup =
+                        "-codec " + encoder_config->encoder_codec +
+                        " -preset " + encoder_config->encoder_preset;
+                    encoder_config->folder_name =
+                        input_folder + "/" + get_current_date_time();
+                    make_folder(encoder_config->folder_name);
+                    ptp_params->network_sync = true;
+                    send_start_threads_to(sender, peers, server_names,
+                                          encoder_config->folder_name,
+                                          encoder_setup);
+                    camera_control->record_video = true;
+                    cudaSetDevice(display_gpu_id);
+                    tex_gl = new GL_Texture[num_cameras];
+                    for (int i = 0; i < num_cameras; i++) {
+                        if (cameras_select[i].stream_on) {
+                            int camera_width =
+                                int(cameras_params[i].width /
+                                    cameras_select[i].downsample);
+                            int camera_height =
+                                int(cameras_params[i].height /
+                                    cameras_select[i].downsample);
+                            setup_texture(tex_gl[i], camera_width,
+                                          camera_height);
+                        }
+                    }
+                    start_camera_streaming(
+                        camera_threads, camera_control, ecams, cameras_params,
+                        cameras_select, tex_gl, num_cameras, evt_buffer_size,
+                        true, encoder_setup, encoder_config->folder_name,
+                        ptp_params, calib_yaml_folder, detection3d_thread);
+                    camera_control->subscribe = true;
+                }
+                ImGui::PopStyleColor(1);
             }
-            ImGui::PopStyleColor(3);
 
-            ImGui::SameLine();
-            ImGui::SetWindowFontScale(1.5f);
-            ImGui::Text("%s", input_folder.c_str());
-            ImGui::SetWindowFontScale(1.0f);
+            auto all_wait_start = [&]() {
+                for (const auto &name : server_names) {
+                    uint32_t pid = peers.get_pid_by_name(name);
+                    if (!pid)
+                        return false;
+                    int st = 0;
+                    if (!peers.state_known(pid, &st))
+                        return false;
+                    if (st != (int)FetchGame::ManagerState_WAITSTART)
+                        return false;
+                }
+                return true;
+            };
+
+            const bool can_start_record = all_wait_start();
+            if (can_start_record) {
+                // check network servers are ready as well as local computer
+                if (ptp_params->ptp_counter == num_cameras) {
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          ImVec4{0, 0.5f, 0, 1.0f});
+                    if (ImGui::Button("Start Recording")) {
+                        // get the host ready, and then set global ptp time to
+                        // start recording
+                        unsigned long long ptp_time =
+                            get_current_PTP_time(&ecams[0].camera);
+                        int delay_in_second = 3;
+                        ptp_params->ptp_global_time =
+                            ((unsigned long long)delay_in_second) * 1000000000 +
+                            ptp_time;
+                        send_set_start_ptp_to(sender, peers, server_names,
+                                              ptp_params->ptp_global_time);
+                        ptp_params->network_set_start_ptp = true;
+                    }
+                    ImGui::PopStyleColor(1);
+                }
+            }
+
+            auto all_wait_stop = [&]() {
+                for (const auto &name : server_names) {
+                    uint32_t pid = peers.get_pid_by_name(name);
+                    if (!pid)
+                        return false;
+                    int st = 0;
+                    if (!peers.state_known(pid, &st))
+                        return false;
+                    if (st != (int)FetchGame::ManagerState_WAITSTOP)
+                        return false;
+                }
+                return true;
+            };
+
+            const bool can_stop_record = all_wait_stop() &&
+                                         !ptp_params->network_set_stop_ptp &&
+                                         ptp_params->ptp_start_reached;
+
+            if (can_stop_record) {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4{0, 0.5f, 0, 1.0f});
+                if (ImGui::Button("Stop Recording")) {
+                    unsigned long long ptp_time =
+                        get_current_PTP_time(&ecams[0].camera);
+                    int delay_in_second = 3;
+                    ptp_params->ptp_stop_time =
+                        ((unsigned long long)delay_in_second) * 1000000000 +
+                        ptp_time;
+                    std::cout << ptp_params->ptp_stop_time << std::endl;
+                    send_set_stop_ptp_to(sender, peers, server_names,
+                                         ptp_params->ptp_stop_time);
+
+                    ptp_params->network_set_stop_ptp = true;
+                }
+                ImGui::PopStyleColor(1);
+            }
         }
         ImGui::End();
-        // if (ImGui::BeginTable("##Local Apps", 2,
-        //                       ImGuiTableFlags_Resizable |
-        //                           ImGuiTableFlags_NoSavedSettings |
-        //                           ImGuiTableFlags_Borders)) {
-        //     ImGui::TableNextRow();
-        //     ImGui::TableNextColumn();
-        //     ImGui::Text("Indigo");
-        //     ImGui::TableNextColumn();
-        //     sprintf(temp_string, "Not connected");
-        //     if (indigo_signal_builder.indigo_connection != nullptr) {
-        //         if (indigo_signal_builder.indigo_connection->state ==
-        //             ENET_PEER_STATE_CONNECTED) {
-        //             sprintf(temp_string, "Connected");
-        //         }
-        //     }
-        //     ImGui::Text("%s", temp_string);
-        //     ImGui::TableNextRow();
-        //     ImGui::TableNextColumn();
-        //     ImGui::Text("Calibration");
-        //     ImGui::TableNextColumn();
-        //     if (indigo_signal_builder.indigo_connection != nullptr) {
-        //         ImGui::Text("%s", enum_names_calib_state()[calib_state]);
-        //     } else {
-        //         ImGui::Text("%s", "Not connected");
-        //     }
-        //     ImGui::EndTable();
-        // }
 
-        // if (!camera_control->open &&
-        //     my_servers[0].server_state == FetchGame::ManagerState_IDLE &&
-        //     my_servers[1].server_state == FetchGame::ManagerState_IDLE &&
-        //     my_servers[0].connected && my_servers[1].connected) {
-        //     ImGui::PushStyleColor(ImGuiCol_Button,
-        //                           ImVec4{0.0f, 0.5f, 0.0f, 1.0f}); //
-        //     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        //                           ImVec4{0.2f, 0.8f, 0.2f, 1.0f}); //
-        //     ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        //                           ImVec4{0.1f, 0.6f, 0.1f, 1.0f}); //
-        //     if (ImGui::Button("Open Cameras")) {
-        //         update_camera_configs(
-        //             camera_config_files,
-        //             network_config_folders[network_config_select]);
-        //         select_cameras_have_configs(camera_config_files, device_info,
-        //                                     check, cam_count);
-        //         host_broadcast_open_cameras(
-        //             &indigo_signal_builder.builder,
-        //             &indigo_signal_builder.server,
-        //             network_config_folders[network_config_select]);
-        //         // open cameras
-        //         num_cameras = 0;
-        //         for (int i = 0; i < cam_count; i++) {
-        //             if (check[i]) {
-        //                 num_cameras++;
-        //             }
-        //         }
-        //         if (num_cameras > 0) {
-        //             cameras_params = new CameraParams[num_cameras]();
-        //             cameras_select = new CameraEachSelect[num_cameras]();
+        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
+            ptp_params->network_set_stop_ptp = false;
 
-        //             std::vector<int> selected_cameras;
-        //             for (int i = 0; i < cam_count; i++) {
-        //                 if (check[i]) {
-        //                     selected_cameras.push_back(i);
-        //                 }
-        //             }
-        //             for (int i = 0; i < num_cameras; i++) {
-        //                 set_camera_params(&cameras_params[i],
-        //                                   &cameras_select[i],
-        //                                   &device_info[selected_cameras[i]],
-        //                                   camera_config_files,
-        //                                   selected_cameras[i], num_cameras);
-        //             }
+            for (int i = 0; i < num_cameras; i++) {
+                if (cameras_select[i].stream_on) {
+                    int camera_width = int(cameras_params[i].width /
+                                           cameras_select[i].downsample);
+                    int camera_height = int(cameras_params[i].height /
+                                            cameras_select[i].downsample);
+                    clear_upload_and_cleanup(tex_gl[i], camera_width,
+                                             camera_height);
+                }
+            }
+            delete[] tex_gl;
+            tex_gl = nullptr;
 
-        //             for (int i = 0; i < num_cameras; i++) {
-        //                 cameras_select[i].stream_on = false;
-        //                 if (cameras_params[i].camera_name == "Cam16") {
-        //                     cameras_select[i].stream_on = true;
-        //                     cameras_select[i].detect_mode =
-        //                     Detect2D_GLThread;
-        //                 }
-        //                 if (cameras_params[i].camera_name == "shelter") {
-        //                     cameras_select[i].stream_on = true;
-        //                 }
-        //             }
+            for (auto &t : camera_threads)
+                t.join();
 
-        //             ecams = new CameraEmergent[num_cameras];
-        //             for (int i = 0; i < num_cameras; i++) {
-        //                 open_camera_with_params(
-        //                     &ecams[i].camera,
-        //                     &device_info[cameras_params[i].camera_id],
-        //                     &cameras_params[i]);
-        //             }
+            for (int i = 0; i < num_cameras; i++) {
+                camera_threads.pop_back();
+            }
+            for (int i = 0; i < num_cameras; i++) {
+                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,
+                                     evt_buffer_size, &cameras_params[i]);
+                delete[] ecams[i].evt_frame;
+                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera),
+                                    cameras_params[i].camera_serial.c_str());
+            }
 
-        //             realtime_plot_data = new ScrollingBuffer[num_cameras];
-        //         }
-        //         camera_control->open = true;
-        //     }
-        //     ImGui::PopStyleColor(3);
-        //     ImGui::SameLine();
+            for (int i = 0; i < num_cameras; i++) {
+                ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
+            }
+            camera_control->sync_camera = false;
+            camera_control->record_video = false;
 
-        //     ImGui::PushStyleColor(ImGuiCol_Button,
-        //                           ImVec4(0.5f, 0.0f, 0.7f, 1.0f)); //
-        //     ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        //                           ImVec4(0.7f, 0.2f, 0.9f, 1.0f)); //
-        //     ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        //                           ImVec4(0.4f, 0.0f, 0.6f, 1.0f)); //
-        //     if (ImGui::Button("Save to")) {
-        //         IGFD::FileDialogConfig config;
-        //         config.countSelectionMax = 1;
-        //         config.path = input_folder;
-        //         config.flags = ImGuiFileDialogFlags_Modal;
-        //         ImGuiFileDialog::Instance()->OpenDialog("ChooseRecordingDir",
-        //                                                 "Choose a Directory",
-        //                                                 nullptr, config);
-        //     }
-        //     ImGui::PopStyleColor(3);
-        //     ImGui::SameLine();
-        //     ImGui::SetWindowFontScale(1.5f); // 1.0 is default
-        //     ImGui::Text("%s", input_folder.c_str());
-        //     ImGui::SetWindowFontScale(1.0f); // Reset to normal
-        // }
+            ptp_params->ptp_global_time = 0;
+            ptp_params->ptp_stop_time = 0;
+            ptp_params->ptp_counter = 0;
+            ptp_params->ptp_stop_counter = 0;
+            ptp_params->network_sync = false;
+            ptp_params->network_set_start_ptp = false;
+            ptp_params->ptp_stop_reached = false;
+            ptp_params->ptp_start_reached = false;
 
-        //     if (!camera_control->subscribe &&
-        //         my_servers[0].server_state ==
-        //             FetchGame::ManagerState_WAITTHREAD &&
-        //         my_servers[1].server_state ==
-        //             FetchGame::ManagerState_WAITTHREAD) {
-        //         ImGui::PushStyleColor(ImGuiCol_Button,
-        //                               ImVec4{0.0f, 0.5f, 0.0f, 1.0f}); //
-        //         normal ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-        //                                      ImVec4{0.2f, 0.8f,
-        //                                      0.2f, 1.0f}); //
-        //         hover ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-        //                                     ImVec4{0.1f, 0.6f,
-        //                                     0.1f, 1.0f}); //
-        //         active if (ImGui::Button("Clients start camera threads"))
-        //         {
-        //             std::string encoder_setup =
-        //                 "-codec " + encoder_config->encoder_codec +
-        //                 " -preset " + encoder_config->encoder_preset;
-        //             encoder_config->folder_name =
-        //                 input_folder + "/" + get_current_date_time();
-        //             make_folder(encoder_config->folder_name);
-        //             ptp_params->network_sync = true;
-        //             host_broadcast_start_threads(&indigo_signal_builder.builder,
-        //                                          &indigo_signal_builder.server,
-        //                                          encoder_config->folder_name,
-        //                                          encoder_setup);
-        //             camera_control->record_video = true;
+            for (int i = 0; i < num_cameras; i++) {
+                close_camera(&ecams[i].camera, &cameras_params[i]);
+            }
 
-        //             cudaSetDevice(display_gpu_id);
-        //             tex_gl = new GL_Texture[num_cameras];
-        //             for (int i = 0; i < num_cameras; i++) {
-        //                 if (cameras_select[i].stream_on) {
-        //                     int camera_width =
-        //                         int(cameras_params[i].width /
-        //                             cameras_select[i].downsample);
-        //                     int camera_height =
-        //                         int(cameras_params[i].height /
-        //                             cameras_select[i].downsample);
-        //                     setup_texture(tex_gl[i], camera_width,
-        //                                   camera_height);
-        //                 }
-        //             }
+            camera_control->open = false;
 
-        //             start_camera_streaming(
-        //                 camera_threads, camera_control, ecams,
-        //                 cameras_params, cameras_select, tex_gl,
-        //                 num_cameras, evt_buffer_size, true,
-        //                 encoder_setup, encoder_config->folder_name,
-        //                 ptp_params, calib_yaml_folder,
-        //                 detection3d_thread);
-        //             camera_control->subscribe = true;
-        //         }
-        //         ImGui::PopStyleColor(3);
-        //     }
-
-        //     if (my_servers[0].server_state ==
-        //             FetchGame::ManagerState_WAITSTART &&
-        //         my_servers[1].server_state ==
-        //             FetchGame::ManagerState_WAITSTART) {
-        //         // check network servers are ready as well as local
-        //         computer if (ptp_params->ptp_counter == num_cameras) {
-        //             ImGui::PushStyleColor(
-        //                 ImGuiCol_Button,
-        //                 ImVec4{0.0f, 0.5f, 0.0f, 1.0f}); // normal
-        //             ImGui::PushStyleColor(
-        //                 ImGuiCol_ButtonHovered,
-        //                 ImVec4{0.2f, 0.8f, 0.2f, 1.0f}); // hover
-        //             ImGui::PushStyleColor(
-        //                 ImGuiCol_ButtonActive,
-        //                 ImVec4{0.1f, 0.6f, 0.1f, 1.0f}); // active
-
-        //             if (ImGui::Button("Start Recording")) {
-        //                 // get the host ready, and then set global ptp
-        //                 time to
-        //                     // start recording
-        //                     unsigned long long ptp_time =
-        //                         get_current_PTP_time(&ecams[0].camera);
-        //                 int delay_in_second = 3;
-        //                 ptp_params->ptp_global_time =
-        //                     ((unsigned long long)delay_in_second) *
-        //                     1000000000 + ptp_time;
-        //                 host_broadcast_set_start_ptp(
-        //                     &indigo_signal_builder.builder,
-        //                     &indigo_signal_builder.server,
-        //                     ptp_params->ptp_global_time);
-        //                 ptp_params->network_set_start_ptp = true;
-        //             }
-        //             ImGui::PopStyleColor(3);
-        //         }
-        //     }
-
-        //     if (!ptp_params->network_set_stop_ptp &&
-        //         ptp_params->ptp_start_reached &&
-        //         my_servers[0].server_state ==
-        //             FetchGame::ManagerState_WAITSTOP &&
-        //         my_servers[1].server_state ==
-        //             FetchGame::ManagerState_WAITSTOP) {
-        //         ImGui::PushStyleColor(
-        //             ImGuiCol_Button,
-        //             ImVec4(0.6f, 0.1f, 0.1f, 1.0f)); // normal (dark red)
-        //         ImGui::PushStyleColor(
-        //             ImGuiCol_ButtonHovered,
-        //             ImVec4(0.9f, 0.2f, 0.2f, 1.0f)); // hover (bright
-        //             red)
-        //         ImGui::PushStyleColor(
-        //             ImGuiCol_ButtonActive,
-        //             ImVec4(0.7f, 0.0f, 0.0f, 1.0f)); // active (deep red)
-        //         if (ImGui::Button("Stop Recording")) {
-        //             unsigned long long ptp_time =
-        //                 get_current_PTP_time(&ecams[0].camera);
-        //             int delay_in_second = 3;
-        //             ptp_params->ptp_stop_time =
-        //                 ((unsigned long long)delay_in_second) *
-        //                 1000000000 + ptp_time;
-        //             std::cout << ptp_params->ptp_stop_time << std::endl;
-        //             indigo_signal_builder.builder.Clear();
-        //             FetchGame::ServerBuilder server_builder(
-        //                 indigo_signal_builder.builder);
-        //             server_builder.add_control(
-        //                 FetchGame::ServerControl_STOPRECORDING);
-        //             server_builder.add_ptp_global_time(
-        //                 ptp_params->ptp_stop_time);
-        //             auto my_server = server_builder.Finish();
-        //             indigo_signal_builder.builder.Finish(my_server);
-        //             uint8_t *server_buffer =
-        //                 indigo_signal_builder.builder.GetBufferPointer();
-        //             size_t server_buf_size =
-        //                 indigo_signal_builder.builder.GetSize();
-        //             ENetPacket *enet_packet =
-        //                 enet_packet_create(server_buffer,
-        //                 server_buf_size, 0);
-        //             enet_host_broadcast(indigo_signal_builder.server.m_pNetwork,
-        //                                 0, enet_packet);
-        //             ptp_params->network_set_stop_ptp = true;
-        //         }
-        //         ImGui::PopStyleColor(3);
-        //     }
-
-        //     if (my_servers[0].server_state ==
-        //     FetchGame::ManagerState_IDLE &&
-        //         my_servers[1].server_state ==
-        //         FetchGame::ManagerState_IDLE) { if
-        //         (ImGui::Button("Clients close")) {
-        //             // broadcast data
-        //             indigo_signal_builder.builder.Clear();
-        //             FetchGame::ServerBuilder server_builder(
-        //                 indigo_signal_builder.builder);
-        //             server_builder.add_control(FetchGame::ServerControl_QUIT);
-        //             auto my_server = server_builder.Finish();
-        //             indigo_signal_builder.builder.Finish(my_server);
-        //             uint8_t *server_buffer =
-        //                 indigo_signal_builder.builder.GetBufferPointer();
-        //             size_t server_buf_size =
-        //                 indigo_signal_builder.builder.GetSize();
-        //             ENetPacket *enet_packet =
-        //                 enet_packet_create(server_buffer,
-        //                 server_buf_size, 0);
-        //             enet_host_broadcast(indigo_signal_builder.server.m_pNetwork,
-        //                                 0, enet_packet);
-        //         }
-        //     }
-        // }
-        // ImGui::End();
-
-        // if (ptp_params->network_set_stop_ptp &&
-        // ptp_params->ptp_stop_reached) {
-        //     ptp_params->network_set_stop_ptp = false;
-
-        //     for (int i = 0; i < num_cameras; i++) {
-        //         if (cameras_select[i].stream_on) {
-        //             int camera_width = int(cameras_params[i].width /
-        //                                    cameras_select[i].downsample);
-        //             int camera_height = int(cameras_params[i].height /
-        //                                     cameras_select[i].downsample);
-        //             clear_upload_and_cleanup(tex_gl[i], camera_width,
-        //                                      camera_height);
-        //         }
-        //     }
-        //     delete[] tex_gl;
-        //     tex_gl = nullptr;
-
-        //     for (auto &t : camera_threads)
-        //         t.join();
-
-        //     for (int i = 0; i < num_cameras; i++) {
-        //         camera_threads.pop_back();
-        //     }
-        //     for (int i = 0; i < num_cameras; i++) {
-        //         destroy_frame_buffer(&ecams[i].camera,
-        //         ecams[i].evt_frame,
-        //                              evt_buffer_size,
-        //                              &cameras_params[i]);
-        //         delete[] ecams[i].evt_frame;
-        //         check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera),
-        //                             cameras_params[i].camera_serial.c_str());
-        //     }
-
-        //     for (int i = 0; i < num_cameras; i++) {
-        //         ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
-        //     }
-        //     camera_control->sync_camera = false;
-        //     camera_control->record_video = false;
-
-        //     ptp_params->ptp_global_time = 0;
-        //     ptp_params->ptp_stop_time = 0;
-        //     ptp_params->ptp_counter = 0;
-        //     ptp_params->ptp_stop_counter = 0;
-        //     ptp_params->network_sync = false;
-        //     ptp_params->network_set_start_ptp = false;
-        //     ptp_params->ptp_stop_reached = false;
-        //     ptp_params->ptp_start_reached = false;
-
-        //     for (int i = 0; i < num_cameras; i++) {
-        //         close_camera(&ecams[i].camera, &cameras_params[i]);
-        //     }
-
-        //     camera_control->open = false;
-
-        //     for (int i = 0; i < cam_count; i++) {
-        //         check[i] = 0;
-        //     }
-        // }
+            for (int i = 0; i < cam_count; i++) {
+                check[i] = 0;
+            }
+        }
 
         if (ImGui::Begin("Orange", nullptr)) {
             // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",

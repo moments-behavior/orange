@@ -40,7 +40,7 @@ int main(int, char **) {
         std::signal(SIGINT, on_sigint);
 
         EnetRuntime net; // alias -> EnetRuntimeInline here
-        if (!net.start_server(3333)) {
+        if (!net.start_server(2222)) {
             std::cerr << "ENet host create failed\n";
             return 1;
         }
@@ -64,6 +64,7 @@ int main(int, char **) {
             net.step(2, [&](const Incoming &evt) {
                 if (evt.type == Incoming::Connect) {
                     peers.add(evt.peer_id);
+                    peers.set_name(evt.peer_id, "orange");
                     std::cout << "peer " << evt.peer_id << " connected\n";
                     if (mgr.state == FetchGame::ManagerState_IDLE) {
                         std::puts("Network: Successfully connected! Rescanning "
@@ -132,33 +133,33 @@ int main(int, char **) {
                         break;
                     }
                 }
-
-                // coordinate with other thread
-                if (mgr.state == FetchGame::ManagerState_CONNECTED) {
-                    mgr.state = FetchGame::ManagerState_IDLE;
-                    send_client_bringup(sender, evt.peer_id, cam_count,
-                                        mgr.state);
-                }
-                if (mgr.state == FetchGame::ManagerState_CAMERAOPENED) {
-                    mgr.state = FetchGame::ManagerState_WAITTHREAD;
-                    // client_send_state_update_message(
-                    //     &client, fb_builder, &client.m_pNetwork->peers[0],
-                    //     manager_context.state);
-                } else if (mgr.state == FetchGame::ManagerState_THREADREADY) {
-                    mgr.state = FetchGame::ManagerState_WAITSTART;
-                    // client_send_state_update_message(
-                    //     &client, fb_builder, &client.m_pNetwork->peers[0],
-                    //     manager_context.state);
-                } else if (mgr.state == FetchGame::ManagerState_RECORDSTOPPED) {
-                    mgr.state = FetchGame::ManagerState_IDLE;
-                    // client_send_state_update_message(
-                    //     &client, fb_builder, &client.m_pNetwork->peers[0],
-                    //     manager_context.state);
-                }
             });
 
             // Example: do other per-frame work here
             // e.g., periodic broadcast using sender.broadcast(...)
+
+            if (mgr.state == FetchGame::ManagerState_CONNECTED) {
+                std::cout << "here?" << std::endl;
+                mgr.state = FetchGame::ManagerState_IDLE;
+                send_client_bringup(sender, peers.get_pid_by_name("orange"),
+                                    cam_count, mgr.state);
+            }
+            if (mgr.state == FetchGame::ManagerState_CAMERAOPENED) {
+                mgr.state = FetchGame::ManagerState_WAITTHREAD;
+                // client_send_state_update_message(
+                //     &client, fb_builder, &client.m_pNetwork->peers[0],
+                //     manager_context.state);
+            } else if (mgr.state == FetchGame::ManagerState_THREADREADY) {
+                mgr.state = FetchGame::ManagerState_WAITSTART;
+                // client_send_state_update_message(
+                //     &client, fb_builder, &client.m_pNetwork->peers[0],
+                //     manager_context.state);
+            } else if (mgr.state == FetchGame::ManagerState_RECORDSTOPPED) {
+                mgr.state = FetchGame::ManagerState_IDLE;
+                // client_send_state_update_message(
+                //     &client, fb_builder, &client.m_pNetwork->peers[0],
+                //     manager_context.state);
+            }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }

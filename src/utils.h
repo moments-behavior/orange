@@ -1,13 +1,18 @@
 #ifndef ORANGE_UTILS
 #define ORANGE_UTILS
-#include <atomic>
-#include <chrono>
+#include "camera.h"
+#include "json.hpp"
+#include "video_capture.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <memory>
 #include <npp.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
+#include <vector>
+
+using json = nlohmann::json;
 
 #define CHECK(call)                                                            \
     do {                                                                       \
@@ -29,6 +34,15 @@ inline float tick() {
         return 0;
     }
     return ((float)((ts.tv_sec * 1e9) + ts.tv_nsec)) / (float)1.0e9;
+}
+
+inline int find_cfg_index(const std::vector<std::string> &folders,
+                          const char *base) {
+    for (int i = 0; i < (int)folders.size(); ++i) {
+        if (std::filesystem::path(folders[i]).filename() == base)
+            return i;
+    }
+    return -1;
 }
 
 // Increment value with a lock and return the previous value
@@ -68,41 +82,45 @@ inline NppStreamContext make_npp_stream_context(int device_id,
     return ctx;
 }
 
-class FPSEstimator {
-    using Clock = std::chrono::high_resolution_clock;
-    Clock::time_point start_time;
-    float accumulated_time = 0.0f;
-    int frame_count = 0;
-    float report_interval = 0.5f; // seconds
-    float last_fps = 0.0f;
-
-  public:
-    FPSEstimator() { start_time = Clock::now(); }
-
-    // Call this once per frame
-    void update() {
-        auto now = Clock::now();
-        float dt = std::chrono::duration<float>(now - start_time).count();
-        start_time = now;
-
-        accumulated_time += dt;
-        frame_count++;
-
-        if (accumulated_time >= report_interval) {
-            last_fps = frame_count / accumulated_time;
-            accumulated_time = 0.0f;
-            frame_count = 0;
-        }
-    }
-
-    float get_fps() const { return last_fps; }
-
-    void reset() {
-        start_time = Clock::now();
-        accumulated_time = 0.0f;
-        frame_count = 0;
-        last_fps = 0.0f;
-    }
-};
+void prepare_application_folders(std::string orange_root_dir_str);
+std::vector<std::string> string_split(std::string s, std::string delimiter);
+std::vector<std::string> string_split_char(char *string_c,
+                                           std::string delimiter);
+void load_camera_json_config_files(std::string file_name,
+                                   CameraParams *camera_params,
+                                   CameraEachSelect *camera_select,
+                                   int camera_id, int num_cameras);
+std::string get_current_time_milliseconds();
+std::string get_current_date();
+std::string get_current_date_time();
+std::string format_elapsed_time(std::chrono::seconds elapsed_seconds);
+void init_galvo_camera_params(CameraParams *camera_params, int camera_id,
+                              int num_cameras, int gain, int exposure);
+void init_65MP_camera_params_mono(CameraParams *camera_params, int camera_id,
+                                  int num_cameras, int gain, int exposure,
+                                  int gpu_id, int frame_rate);
+void init_65MP_camera_params_color(CameraParams *camera_params, int camera_id,
+                                   int num_cameras, int gain, int exposure,
+                                   int gpu_id, int frame_rate);
+void init_7MP_camera_params_color(CameraParams *camera_params, int camera_id,
+                                  int num_cameras, int gain, int exposure,
+                                  int gpu_id, int frame_rate);
+void init_7MP_camera_params_mono(CameraParams *camera_params, int camera_id,
+                                 int num_cameras, int gain, int exposure,
+                                 int gpu_id, int frame_rate);
+bool make_folder(std::string folder_name);
+void update_camera_configs(std::vector<std::string> &camera_config_files,
+                           std::string input_folder);
+void select_cameras_have_configs(std::vector<std::string> &camera_config_files,
+                                 GigEVisionDeviceInfo *device_info,
+                                 std::vector<bool> &check, int cam_count);
+bool set_camera_params(CameraParams *camera_params,
+                       CameraEachSelect *camera_select,
+                       GigEVisionDeviceInfo *device_info,
+                       std::vector<std::string> &camera_config_files,
+                       int camera_idx, int num_cameras);
+void allocate_camera_frame_buffers(CameraEmergent *ecams,
+                                   CameraParams *cameras_params,
+                                   int evt_buffer_size, int num_cameras);
 
 #endif // ORANGE_THREADS

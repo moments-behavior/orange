@@ -9,6 +9,7 @@
 #include "implot.h"
 #include "realtime_tool.h"
 #include "video_capture.h"
+#include <iostream>
 #include <math.h>
 #include <thread>
 

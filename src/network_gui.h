@@ -1,17 +1,33 @@
 #include "enet_fb_helpers.h"
-#include "enet_runtime_select.h" // EnetRuntime + peers_snapshot(...)
-#include "enet_types.h"          // PeerSnapshot, ENetAddress (+ enet.h)
-#include <algorithm>
+#include "enet_runtime_select.h"
+#include "enet_types.h"
+#include "fetch_generated.h"
+#include "utils.h"
+#include <ImGuiFileDialog.h>
 #include <cstdio>
 #include <imgui.h>
 #include <string>
 #include <vector>
 
+inline const char *ManagerStateName(int v) {
+    const char *const *names = FetchGame::EnumNamesManagerState();
+    if (v < 0)
+        return "Unknown";
+    for (int i = 0; names[i] != nullptr; ++i)
+        if (i == v)
+            return names[i];
+    return "Unknown";
+}
+
 struct PeerRow {
     uint32_t pid;
-    std::string name;
-    std::string ip;
+    std::string name, ip;
     uint16_t port;
+    bool camsK;
+    int cameras;
+    bool stateK;
+    int state;
+    std::string state_label;
 };
 
 inline std::string enet_ip_string(const ENetAddress &a) {
@@ -26,16 +42,17 @@ static void BuildPeerRows(EnetRuntime &net, const PeerRegistry &reg,
                           std::vector<PeerRow> &out) {
     std::vector<PeerSnapshot> snaps;
     net.peers_snapshot(snaps);
-
     out.clear();
     out.reserve(snaps.size());
     for (const auto &ps : snaps) {
         PeerRow r;
         r.pid = ps.peer_id;
-        r.name = reg.get_name(ps.peer_id); // may be empty
-        r.ip = enet_ip_string(
-            ps.addr); // helper that calls enet_address_get_host_ip
+        r.name = reg.get_name(ps.peer_id);
+        r.ip = enet_ip_string(ps.addr);
         r.port = ps.addr.port;
+        r.camsK = reg.cameras_known(ps.peer_id, &r.cameras);
+        r.stateK = reg.state_known(ps.peer_id, &r.state);
+        r.state_label = r.stateK ? ManagerStateName(r.state) : "N/A";
         out.push_back(std::move(r));
     }
 }
@@ -50,11 +67,10 @@ static bool is_connected_to(EnetRuntime &net, const char *ip, uint16_t port) {
     return false;
 }
 
-static void ConnectButtons(EnetRuntime &net, uint16_t port = 3333,
-                           size_t channels = 2) {
+static void connect_buttons(EnetRuntime &net, uint16_t port = 3333,
+                            size_t channels = 2) {
     const char *ipA = "192.168.20.60";
     const char *ipB = "192.168.20.61";
-
     // Button A
     bool haveA = is_connected_to(net, ipA, port);
     ImGui::BeginDisabled(haveA);
@@ -86,14 +102,81 @@ static void ConnectButtons(EnetRuntime &net, uint16_t port = 3333,
     ImGui::EndDisabled();
 }
 
-void draw_peers_window(EnetRuntime &net, const PeerRegistry &reg) {
-    std::vector<PeerRow> rows;
-    BuildPeerRows(net, reg, rows);
+using OpenCamerasFn = std::function<void(const std::string &cfg_folder)>;
 
-    ImGui::Begin("Connected Peers");
+inline void draw_camera_open(const PeerRegistry &reg,
+                             CameraControl *camera_control,
+                             const std::vector<std::string> &server_names,
+                             const std::string &selected_cfg_folder,
+                             OpenCamerasFn on_open_cameras,
+                             std::string &input_folder) {
+    auto all_connected = [&]() {
+        for (const auto &name : server_names)
+            if (reg.get_pid_by_name(name) == 0)
+                return false;
+        return true;
+    };
+    auto all_idle = [&]() {
+        for (const auto &name : server_names) {
+            uint32_t pid = reg.get_pid_by_name(name);
+            if (!pid)
+                return false;
+            int st = 0;
+            if (!reg.state_known(pid, &st))
+                return false;
+            if (st != (int)FetchGame::ManagerState_IDLE)
+                return false;
+        }
+        return true;
+    };
+
+    const bool can_open = (!camera_control->open) && all_connected() &&
+                          all_idle() && !selected_cfg_folder.empty();
+
+    // Open Cameras
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                          ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                          ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
+    ImGui::BeginDisabled(!can_open);
+    if (ImGui::Button("Open Cameras")) {
+        on_open_cameras(selected_cfg_folder);
+        camera_control->open = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine();
+
+    // Save to…
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                          ImVec4(0.7f, 0.2f, 0.9f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                          ImVec4(0.4f, 0.0f, 0.6f, 1.0f));
+    if (ImGui::Button("Save to")) {
+        IGFD::FileDialogConfig cfg;
+        cfg.countSelectionMax = 1;
+        cfg.path = input_folder;
+        cfg.flags = ImGuiFileDialogFlags_Modal;
+        ImGuiFileDialog::Instance()->OpenDialog(
+            "ChooseRecordingDir", "Choose a Directory", nullptr, cfg);
+    }
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine();
+    ImGui::SetWindowFontScale(1.5f);
+    ImGui::Text("%s", input_folder.c_str());
+    ImGui::SetWindowFontScale(1.0f);
+}
+
+inline void draw_peers_window(EnetRuntime &net, const PeerRegistry &peers) {
+    std::vector<PeerRow> rows;
+    BuildPeerRows(net, peers, rows);
 
     // Connect buttons row
-    ConnectButtons(net, /*port=*/3333, /*channels=*/2);
+    connect_buttons(net, /*port=*/3333, /*channels=*/2);
     ImGui::Separator();
 
     const ImGuiTableFlags flags =
@@ -101,45 +184,14 @@ void draw_peers_window(EnetRuntime &net, const PeerRegistry &reg) {
         ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable |
         ImGuiTableFlags_SizingStretchProp;
 
-    if (ImGui::BeginTable("peers_table", 4, flags)) {
-        ImGui::TableSetupColumn("Peer ID", ImGuiTableColumnFlags_DefaultSort);
+    if (ImGui::BeginTable("peers", 6, flags)) {
+        ImGui::TableSetupColumn("Peer ID");
         ImGui::TableSetupColumn("Name");
         ImGui::TableSetupColumn("IP");
         ImGui::TableSetupColumn("Port");
+        ImGui::TableSetupColumn("Cameras");
+        ImGui::TableSetupColumn("Server State");
         ImGui::TableHeadersRow();
-
-        // Optional: sort rows by the active column
-        if (ImGuiTableSortSpecs *sort = ImGui::TableGetSortSpecs();
-            sort && sort->SpecsCount > 0) {
-            const ImGuiTableColumnSortSpecs &s = sort->Specs[0];
-            auto asc = (s.SortDirection == ImGuiSortDirection_Ascending);
-            switch (s.ColumnIndex) {
-            case 0:
-                std::sort(rows.begin(), rows.end(),
-                          [&](const PeerRow &a, const PeerRow &b) {
-                              return asc ? a.pid < b.pid : a.pid > b.pid;
-                          });
-                break;
-            case 1:
-                std::sort(rows.begin(), rows.end(),
-                          [&](const PeerRow &a, const PeerRow &b) {
-                              return asc ? a.name < b.name : a.name > b.name;
-                          });
-                break;
-            case 2:
-                std::sort(rows.begin(), rows.end(),
-                          [&](const PeerRow &a, const PeerRow &b) {
-                              return asc ? a.ip < b.ip : a.ip > b.ip;
-                          });
-                break;
-            case 3:
-                std::sort(rows.begin(), rows.end(),
-                          [&](const PeerRow &a, const PeerRow &b) {
-                              return asc ? a.port < b.port : a.port > b.port;
-                          });
-                break;
-            }
-        }
 
         for (const auto &r : rows) {
             ImGui::TableNextRow();
@@ -152,10 +204,12 @@ void draw_peers_window(EnetRuntime &net, const PeerRegistry &reg) {
             ImGui::TextUnformatted(r.ip.c_str());
             ImGui::TableSetColumnIndex(3);
             ImGui::Text("%u", r.port);
+            ImGui::TableSetColumnIndex(4);
+            r.camsK ? ImGui::Text("%d", r.cameras)
+                    : ImGui::TextUnformatted("N/A");
+            ImGui::TableSetColumnIndex(5);
+            ImGui::TextUnformatted(r.state_label.c_str());
         }
-
         ImGui::EndTable();
     }
-
-    ImGui::End();
 }

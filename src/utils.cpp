@@ -1,7 +1,11 @@
-#include "project.h"
+#include "utils.h"
+#include "NvEncoder/NvCodecUtils.h"
 #include "video_capture.h"
 #include <fstream>
 #include <iostream>
+
+simplelogger::Logger *logger =
+    simplelogger::LoggerFactory::CreateConsoleLogger();
 
 void prepare_application_folders(std::string orange_root_dir_str) {
 

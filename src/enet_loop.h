@@ -36,11 +36,16 @@ inline void run_enet_loop(EnetRuntime &net, PeerRegistry &peers,
 
             switch (msg->signal_type()) {
             case FetchGame::SignalType_ClientBringup: {
-                if (auto sm = msg->server_mesg()) {
-                    if (auto n = sm->server_name())
-                        peers.set_name(evt.peer_id, n->str());
-                }
-
+                const auto *sm = msg->server_mesg();
+                const std::string name =
+                    (sm && sm->server_name()) ? sm->server_name()->str() : "";
+                const int cameras = sm ? sm->num_cameras() : 0;
+                const int state = msg->server_state();
+                peers.set_bringup(evt.peer_id, name, cameras, state);
+                break;
+            }
+            case FetchGame::SignalType_INDIGO: {
+                peers.set_indigo(evt.peer_id, "indigo");
                 break;
             }
             case FetchGame::SignalType_CalibrationPoseReached:

@@ -1,4 +1,3 @@
-#include "NvEncoder/NvCodecUtils.h"
 #include "camera_manager.h"
 #include "enet_fb_helpers.h"
 #include "enet_runtime_select.h"
@@ -6,9 +5,6 @@
 #include <csignal>
 #include <iostream>
 #include <thread>
-
-simplelogger::Logger *logger =
-    simplelogger::LoggerFactory::CreateConsoleLogger();
 
 static std::atomic<bool> g_quit{false};
 extern "C" void on_sigint(int) {

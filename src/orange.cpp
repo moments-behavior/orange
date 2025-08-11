@@ -76,6 +76,7 @@ int main(int argc, char **args) {
     PeerRegistry peers;
     std::atomic<bool> quit_enet{false};
     std::thread enet_thread([&] { run_enet_loop(net, peers, quit_enet); });
+    FBMessageSender sender{&net, /*channel=*/0, ENET_PACKET_FLAG_RELIABLE};
 
     std::vector<std::string> network_config_folders;
     int network_config_select = -1;
@@ -147,9 +148,70 @@ int main(int argc, char **args) {
 
             draw_peers_window(net, peers);
 
-            // draw_camera_open(peers, camera_control, server_names,
-            //                  network_config_folders[network_config_select],
-            //                  on_open_cameras, input_folder);
+            std::string selected_cfg_folder =
+                network_config_folders[network_config_select];
+
+            auto all_connected = [&]() {
+                for (const auto &name : server_names)
+                    if (peers.get_pid_by_name(name) == 0)
+                        return false;
+                return true;
+            };
+            auto all_idle = [&]() {
+                for (const auto &name : server_names) {
+                    uint32_t pid = peers.get_pid_by_name(name);
+                    if (!pid)
+                        return false;
+                    int st = 0;
+                    if (!peers.state_known(pid, &st))
+                        return false;
+                    if (st != (int)FetchGame::ManagerState_IDLE)
+                        return false;
+                }
+                return true;
+            };
+
+            const bool can_open = (!camera_control->open) && all_connected() &&
+                                  all_idle() && !selected_cfg_folder.empty();
+
+            // Open Cameras
+            ImGui::PushStyleColor(ImGuiCol_Button,
+                                  ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                  ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
+            ImGui::BeginDisabled(!can_open);
+            if (ImGui::Button("Open Cameras")) {
+
+                camera_control->open = true;
+            }
+            ImGui::EndDisabled();
+            ImGui::PopStyleColor(3);
+
+            ImGui::SameLine();
+
+            // Save to…
+            ImGui::PushStyleColor(ImGuiCol_Button,
+                                  ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  ImVec4(0.7f, 0.2f, 0.9f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                  ImVec4(0.4f, 0.0f, 0.6f, 1.0f));
+            if (ImGui::Button("Save to")) {
+                IGFD::FileDialogConfig cfg;
+                cfg.countSelectionMax = 1;
+                cfg.path = input_folder;
+                cfg.flags = ImGuiFileDialogFlags_Modal;
+                ImGuiFileDialog::Instance()->OpenDialog(
+                    "ChooseRecordingDir", "Choose a Directory", nullptr, cfg);
+            }
+            ImGui::PopStyleColor(3);
+
+            ImGui::SameLine();
+            ImGui::SetWindowFontScale(1.5f);
+            ImGui::Text("%s", input_folder.c_str());
+            ImGui::SetWindowFontScale(1.0f);
         }
         ImGui::End();
         // if (ImGui::BeginTable("##Local Apps", 2,

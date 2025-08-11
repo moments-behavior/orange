@@ -68,7 +68,7 @@ int main(int, char **) {
                     if (mgr.state == FetchGame::ManagerState_IDLE) {
                         std::puts("Network: Successfully connected! Rescanning "
                                   "cameras.");
-                        mgr.state = FetchGame::ManagerState_CONNECTED;
+                        mgr.state = FetchGame::ManagerState_CONNECT;
                     } else {
                         std::puts("Network: Successfully connected!");
                         send_client_bringup(sender, evt.peer_id, cam_count,

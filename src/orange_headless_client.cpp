@@ -138,7 +138,6 @@ int main(int, char **) {
             // Example: do other per-frame work here
             // e.g., periodic broadcast using sender.broadcast(...)
             if (mgr.state == FetchGame::ManagerState_CONNECTED) {
-                std::cout << "here?" << std::endl;
                 mgr.state = FetchGame::ManagerState_IDLE;
                 send_client_bringup(sender, peers.get_pid_by_name("orange"),
                                     cam_count, mgr.state);

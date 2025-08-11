@@ -56,9 +56,14 @@ inline void run_enet_loop(EnetRuntime &net, PeerRegistry &peers,
                 std::puts("[ENet] Calibration done.");
                 break;
 
-            default:
+            case FetchGame::SignalType_ClientStateUpdate:
                 std::printf("[ENet] Peer %u state=%d\n", evt.peer_id,
                             msg->server_state());
+                peers.set_server_state(evt.peer_id, msg->server_state());
+                break;
+            default:
+                std::printf("[ENet] Peer %u not recognized signal.\n",
+                            evt.peer_id);
                 break;
             }
             break;

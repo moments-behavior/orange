@@ -17,8 +17,8 @@ class CameraManager {
     // Launches the manager thread
     bool start(int *cam_count, ManagerContext *mgr,
                GigEVisionDeviceInfo *unsorted, GigEVisionDeviceInfo *sorted,
-               std::string *config_folder, std::string record_folder,
-               std::string encoder_setup, PTPParams *ptp);
+               std::string *config_folder, std::string *record_folder,
+               std::string *encoder_setup, PTPParams *ptp);
 
     // Joins the manager thread; safe to call multiple times
     void stop();
@@ -35,8 +35,8 @@ class CameraManager {
     PTPParams *ptp_ = nullptr;
 
     // Config
-    std::string record_folder_;
-    std::string encoder_setup_;
+    std::string *record_folder_;
+    std::string *encoder_setup_;
 
     // Resources — now as single, non-moving allocations
     int cams_count_ = 0;

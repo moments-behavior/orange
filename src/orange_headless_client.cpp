@@ -63,13 +63,12 @@ int main(int, char **) {
         // Camera manager
         int cam_count = 0;
         GigEVisionDeviceInfo unsorted[20]{}, sorted[20]{};
-        std::string cfg_folder, record_folder = "recordings",
-                                encoder_setup = "h264";
+        std::string cfg_folder, record_folder, encoder_setup;
         PTPParams ptp;
         ManagerContext mgr;
         CameraManager cmgr;
         cmgr.start(&cam_count, &mgr, unsorted, sorted, &cfg_folder,
-                   record_folder, encoder_setup, &ptp);
+                   &record_folder, &encoder_setup, &ptp);
 
         while (!g_quit.load(std::memory_order_relaxed)) {
             // Service ENet and handle events inline

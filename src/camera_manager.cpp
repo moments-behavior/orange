@@ -13,8 +13,9 @@ constexpr int kEvtBufferSize = 100; // evt_buffer_size
 bool CameraManager::start(int *cam_count, ManagerContext *mgr,
                           GigEVisionDeviceInfo *unsorted,
                           GigEVisionDeviceInfo *sorted,
-                          std::string *config_folder, std::string record_folder,
-                          std::string encoder_setup, PTPParams *ptp) {
+                          std::string *config_folder,
+                          std::string *record_folder,
+                          std::string *encoder_setup, PTPParams *ptp) {
     if (running_.load())
         return true;
 
@@ -23,8 +24,8 @@ bool CameraManager::start(int *cam_count, ManagerContext *mgr,
     unsorted_ = unsorted;
     sorted_ = sorted;
     config_folder_ = config_folder;
-    record_folder_ = std::move(record_folder);
-    encoder_setup_ = std::move(encoder_setup);
+    record_folder_ = record_folder;
+    encoder_setup_ = encoder_setup;
     ptp_ = ptp;
 
     running_.store(true);
@@ -87,11 +88,11 @@ void CameraManager::run_loop() {
 
             // Create output dir
             try {
-                std::filesystem::create_directories(record_folder_);
-                std::cout << "Recorded video saves to: " << record_folder_
+                std::filesystem::create_directories(*record_folder_);
+                std::cout << "Recorded video saves to: " << *record_folder_
                           << "\n";
             } catch (const std::exception &e) {
-                std::cerr << "Error creating " << record_folder_ << ": "
+                std::cerr << "Error creating " << *record_folder_ << ": "
                           << e.what() << "\n";
                 mgr_->state = FetchGame::ManagerState_ERROR;
                 break;
@@ -113,8 +114,8 @@ void CameraManager::run_loop() {
             for (int i = 0; i < cams_count_; ++i) {
                 cam_threads_.emplace_back(acquire_frames, &ecams_[i],
                                           &cams_params_[i], &cams_select_[i],
-                                          &cam_ctl_, nullptr, encoder_setup_,
-                                          record_folder_, ptp_);
+                                          &cam_ctl_, nullptr, *encoder_setup_,
+                                          *record_folder_, ptp_);
             }
 
             mgr_->state = FetchGame::ManagerState_THREADREADY;

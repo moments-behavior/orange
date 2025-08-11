@@ -73,7 +73,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads,
                          CameraEachSelect *cameras_select,
                          GigEVisionDeviceInfo *device_info, int num_cameras,
                          PTPParams *ptp_params, std::string record_folder,
-                         std::string encoder_basic_setup) {
+                         std::string encoder_basic_setup, AppContext &ctx) {
     std::cout << "start camera sthread..." << std::endl;
     try {
         allocate_camera_frame_buffers(ecams, cameras_params, evt_buffer_size,
@@ -104,10 +104,10 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads,
     }
 
     for (int i = 0; i < num_cameras; i++) {
-        camera_threads.push_back(
-            std::thread(&acquire_frames, &ecams[i], &cameras_params[i],
-                        &cameras_select[i], camera_control, nullptr,
-                        encoder_basic_setup, record_folder, ptp_params));
+        camera_threads.push_back(std::thread(
+            &acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i],
+            camera_control, nullptr, encoder_basic_setup, record_folder,
+            ptp_params, std::ref(ctx)));
     }
 
     // wait for all camera ready
@@ -133,7 +133,7 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
                            GigEVisionDeviceInfo *device_info,
                            std::string *config_folder,
                            RecordingContext *recording_setup,
-                           PTPParams *ptp_params) {
+                           PTPParams *ptp_params, AppContext &ctx) {
     CameraEmergent *ecams;
     CameraParams *cameras_params;
     std::vector<std::thread> camera_threads;
@@ -163,11 +163,11 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
         case FetchGame::ManagerState_STARTCAMTHREAD:
 
             std::cout << recording_setup->encoder_basic_setup << std::endl;
-            if (start_camera_thread(camera_threads, cameras_params, ecams,
-                                    camera_control, cameras_select, device_info,
-                                    *cam_count, ptp_params,
-                                    recording_setup->record_folder,
-                                    recording_setup->encoder_basic_setup)) {
+            if (start_camera_thread(
+                    camera_threads, cameras_params, ecams, camera_control,
+                    cameras_select, device_info, *cam_count, ptp_params,
+                    recording_setup->record_folder,
+                    recording_setup->encoder_basic_setup, ctx)) {
                 manager_context->state = FetchGame::ManagerState_THREADREADY;
             } else {
                 manager_context->state = FetchGame::ManagerState_ERROR;
@@ -219,17 +219,11 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
 
 int main(int, char **) {
     try {
-        ENetGuard enet_guard;
+
+        AppContext ctx; // ENetGuard constructed here (enet_initialize)
         std::signal(SIGINT, on_sigint);
-
-        EnetRuntime net; // alias -> EnetRuntimeInline here
-        if (!net.start_server(3333)) {
-            std::cerr << "ENet host create failed\n";
+        if (!ctx.net.start_server(3333))
             return 1;
-        }
-
-        PeerRegistry peers;
-        FBMessageSender sender{&net, /*channel=*/0, ENET_PACKET_FLAG_RELIABLE};
 
         int cam_count;
         GigEVisionDeviceInfo unsorted_device_info[max_cameras];
@@ -244,17 +238,17 @@ int main(int, char **) {
         PTPParams *ptp_params =
             new PTPParams{0, 0, 0, 0, true, false, false, false};
 
-        std::thread *manager_thread =
-            new std::thread(&create_camera_manager, &cam_count,
-                            &manager_context, unsorted_device_info, device_info,
-                            &config_folder, &recording_setup, ptp_params);
+        std::thread *manager_thread = new std::thread(
+            &create_camera_manager, &cam_count, &manager_context,
+            unsorted_device_info, device_info, &config_folder, &recording_setup,
+            ptp_params, std::ref(ctx));
 
         while (!g_quit.load(std::memory_order_relaxed)) {
             // Service ENet and handle events inline
-            net.step(2, [&](const Incoming &evt) {
+            ctx.net.step(2, [&](const Incoming &evt) {
                 if (evt.type == Incoming::Connect) {
-                    peers.add(evt.peer_id);
-                    peers.set_name(evt.peer_id, "orange");
+                    ctx.peers.add(evt.peer_id);
+                    ctx.peers.set_name(evt.peer_id, "orange");
                     std::cout << "peer " << evt.peer_id << " connected\n";
                     if (manager_context.state == FetchGame::ManagerState_IDLE) {
                         std::puts("Network: Successfully connected! Rescanning "
@@ -262,11 +256,11 @@ int main(int, char **) {
                         manager_context.state = FetchGame::ManagerState_CONNECT;
                     } else {
                         std::puts("Network: Successfully connected!");
-                        send_client_bringup(sender, evt.peer_id, cam_count,
+                        send_client_bringup(ctx.sender, evt.peer_id, cam_count,
                                             manager_context.state);
                     }
                 } else if (evt.type == Incoming::Disconnect) {
-                    peers.remove(evt.peer_id);
+                    ctx.peers.remove(evt.peer_id);
                     std::cout << "peer " << evt.peer_id << " disconnected\n";
                 } else if (evt.type == Incoming::Receive) {
                     const FetchGame::Server *msg = nullptr;
@@ -304,8 +298,8 @@ int main(int, char **) {
                         ptp_params->network_set_start_ptp = true;
                         manager_context.state =
                             FetchGame::ManagerState_WAITSTOP;
-                        send_client_state_update_message(sender, evt.peer_id,
-                                                         manager_context.state);
+                        send_client_state_update_message(
+                            ctx.sender, evt.peer_id, manager_context.state);
                         break;
 
                     case FetchGame::ServerControl_STOPRECORDING:
@@ -325,25 +319,26 @@ int main(int, char **) {
             // e.g., periodic broadcast using sender.broadcast(...)
             if (manager_context.state == FetchGame::ManagerState_CONNECTED) {
                 manager_context.state = FetchGame::ManagerState_IDLE;
-                send_client_bringup(sender, peers.get_pid_by_name("orange"),
+                send_client_bringup(ctx.sender,
+                                    ctx.peers.get_pid_by_name("orange"),
                                     cam_count, manager_context.state);
             }
             if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {
                 manager_context.state = FetchGame::ManagerState_WAITTHREAD;
                 send_client_state_update_message(
-                    sender, peers.get_pid_by_name("orange"),
+                    ctx.sender, ctx.peers.get_pid_by_name("orange"),
                     manager_context.state);
             } else if (manager_context.state ==
                        FetchGame::ManagerState_THREADREADY) {
                 manager_context.state = FetchGame::ManagerState_WAITSTART;
                 send_client_state_update_message(
-                    sender, peers.get_pid_by_name("orange"),
+                    ctx.sender, ctx.peers.get_pid_by_name("orange"),
                     manager_context.state);
             } else if (manager_context.state ==
                        FetchGame::ManagerState_RECORDSTOPPED) {
                 manager_context.state = FetchGame::ManagerState_IDLE;
                 send_client_state_update_message(
-                    sender, peers.get_pid_by_name("orange"),
+                    ctx.sender, ctx.peers.get_pid_by_name("orange"),
                     manager_context.state);
             }
 
@@ -352,7 +347,7 @@ int main(int, char **) {
 
         manager_context.quit = true;
         manager_thread->join();
-        net.stop();
+        ctx.net.stop();
         return 0;
 
     } catch (const std::exception &e) {

@@ -1,22 +1,22 @@
 #pragma once
-#include "enet_fb_helpers.h" // EnetRuntime alias, PeerRegistry, fb_parse
-#include "fetch_generated.h" // your FlatBuffers schema
-#include "global.h"
+#include "enet_fb_helpers.h"
+#include "enet_utils.h"
+#include "fetch_generated.h"
 #include <atomic>
 #include <chrono>
 #include <thread>
 
-inline void run_enet_loop(std::atomic<bool> &stop) {
+inline void run_enet_loop(AppContext &ctx, std::atomic<bool> &stop) {
     // Common event handler used by both modes
     auto handle = [&](const Incoming &evt) {
         switch (evt.type) {
         case Incoming::Connect:
-            peers.add(evt.peer_id);
+            ctx.peers.add(evt.peer_id);
             std::printf("[ENet] Peer %u connected\n", evt.peer_id);
             break;
 
         case Incoming::Disconnect:
-            peers.remove(evt.peer_id);
+            ctx.peers.remove(evt.peer_id);
             std::printf("[ENet] Peer %u disconnected\n", evt.peer_id);
             break;
 
@@ -41,11 +41,11 @@ inline void run_enet_loop(std::atomic<bool> &stop) {
                     (sm && sm->server_name()) ? sm->server_name()->str() : "";
                 const int cameras = sm ? sm->num_cameras() : 0;
                 const int state = msg->server_state();
-                peers.set_bringup(evt.peer_id, name, cameras, state);
+                ctx.peers.set_bringup(evt.peer_id, name, cameras, state);
                 break;
             }
             case FetchGame::SignalType_INDIGO: {
-                peers.set_indigo(evt.peer_id, "indigo");
+                ctx.peers.set_indigo(evt.peer_id, "indigo");
                 break;
             }
             case FetchGame::SignalType_CalibrationPoseReached:
@@ -59,7 +59,7 @@ inline void run_enet_loop(std::atomic<bool> &stop) {
             case FetchGame::SignalType_ClientStateUpdate:
                 std::printf("[ENet] Peer %u state=%d\n", evt.peer_id,
                             msg->server_state());
-                peers.set_server_state(evt.peer_id, msg->server_state());
+                ctx.peers.set_server_state(evt.peer_id, msg->server_state());
                 break;
             default:
                 std::printf("[ENet] Peer %u not recognized signal.\n",
@@ -78,14 +78,14 @@ inline void run_enet_loop(std::atomic<bool> &stop) {
     // Threaded: poll events produced by the I/O thread
     while (!stop.load(std::memory_order_relaxed)) {
         Incoming evt;
-        while (net.poll(evt))
+        while (ctx.net.poll(evt))
             handle(evt);
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 #else
     // Inline: service ENet and dispatch events via callback each frame
     while (!stop.load(std::memory_order_relaxed)) {
-        net.step(2, handle); // 2 ms timeout; tweak as needed
+        ctx.net.step(2, handle); // 2 ms timeout; tweak as needed
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 #endif

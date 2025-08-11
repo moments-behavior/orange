@@ -1,8 +1,12 @@
 #ifndef ORANGE_VIDEO_CAPTURE
 #define ORANGE_VIDEO_CAPTURE
 #include "camera.h"
+#include "enet_utils.h"
+#include "json.hpp"
 #include <atomic>
 #include <chrono>
+
+using json = nlohmann::json;
 
 class FPSEstimator {
     using Clock = std::chrono::high_resolution_clock;
@@ -133,5 +137,17 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraEachSelect *camera_select,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
-                    std::string folder_name, PTPParams *ptp_params);
+                    std::string folder_name, PTPParams *ptp_params,
+                    AppContext &ctx);
+
+void load_camera_json_config_files(std::string file_name,
+                                   CameraParams *camera_params,
+                                   CameraEachSelect *camera_select,
+                                   int camera_id, int num_cameras);
+bool set_camera_params(CameraParams *camera_params,
+                       CameraEachSelect *camera_select,
+                       GigEVisionDeviceInfo *device_info,
+                       std::vector<std::string> &camera_config_files,
+                       int camera_idx, int num_cameras);
+
 #endif

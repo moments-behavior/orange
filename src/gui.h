@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "implot.h"
 #include "realtime_tool.h"
+#include "utils.h"
 #include "video_capture.h"
 #include <iostream>
 #include <math.h>
@@ -93,7 +94,8 @@ inline void start_camera_streaming(
     CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras,
     int evt_buffer_size, bool ptp_stream_sync, const std::string &encoder_setup,
     const std::string &folder_name, PTPParams *ptp_params,
-    std::string calib_yaml_folder, std::thread &detection3d_thread) {
+    std::string calib_yaml_folder, std::thread &detection3d_thread,
+    AppContext &ctx) {
 
     detection2d = new DetectionDataPerCam[num_cameras];
     int idx3d = 0;
@@ -154,10 +156,10 @@ inline void start_camera_streaming(
     }
 
     for (int i = 0; i < num_cameras; i++) {
-        camera_threads.emplace_back(&acquire_frames, &ecams[i],
-                                    &cameras_params[i], &cameras_select[i],
-                                    camera_control, tex[i].cuda_buffer,
-                                    encoder_setup, folder_name, ptp_params);
+        camera_threads.emplace_back(
+            &acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i],
+            camera_control, tex[i].cuda_buffer, encoder_setup, folder_name,
+            ptp_params, std::ref(ctx));
     }
 }
 

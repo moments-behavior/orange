@@ -16,9 +16,9 @@
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
-                               unsigned char *display_buffer)
+                               unsigned char *display_buffer, AppContext &ctx)
     : CThreadWorker(name), camera_params(camera_params),
-      camera_select(camera_select), display_buffer(display_buffer) {
+      camera_select(camera_select), display_buffer(display_buffer), ctx_(ctx) {
     input_image_size.width = camera_params->width;
     input_image_size.height = camera_params->height;
     input_image_roi.x = 0;
@@ -90,7 +90,6 @@ void COpenGLDisplay::ThreadRunning() {
 
     int frameCount = 0;
     auto lastFPSUpdate = clock::now();
-    FBMessageSender sender{&net, /*channel=*/0, ENET_PACKET_FLAG_RELIABLE};
 
     while (IsMachineOn()) {
         auto frameStart = clock::now();
@@ -167,7 +166,7 @@ void COpenGLDisplay::ThreadRunning() {
                         objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
                         send_message_to_indigo(
-                            sender, peers, "indigo",
+                            ctx_.sender, ctx_.peers, "indigo",
                             FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
                     }
                     objs_last_frame.push_back(objs[0]);

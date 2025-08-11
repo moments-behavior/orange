@@ -4,7 +4,7 @@
 #include "camera.h"
 #include "opencv2/core/core.hpp"
 #include "types.h"
-#include "utils.h"
+#include "video_capture.h"
 #include <atomic>
 #include <csignal>
 #include <opencv2/calib3d.hpp>

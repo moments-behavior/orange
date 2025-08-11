@@ -1,9 +1,8 @@
 #include "utils.h"
 #include "NvEncoder/NvCodecUtils.h"
-#include "video_capture.h"
+#include <algorithm>
 #include <fstream>
 #include <iostream>
-
 simplelogger::Logger *logger =
     simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -95,41 +94,6 @@ std::vector<std::string> string_split_char(char *string_c,
 
     res.push_back(s.substr(pos_start));
     return res;
-}
-
-void load_camera_json_config_files(std::string file_name,
-                                   CameraParams *camera_params,
-                                   CameraEachSelect *camera_select,
-                                   int camera_id, int num_cameras) {
-
-    std::ifstream f(file_name);
-    json camera_config = json::parse(f);
-
-    camera_params->camera_id = camera_id;
-    camera_params->num_cameras = num_cameras;
-    camera_params->need_reorder = false;
-
-    camera_params->camera_name = camera_config["name"];
-    camera_params->width = camera_config["width"];
-    camera_params->height = camera_config["height"];
-    camera_params->frame_rate = camera_config["frame_rate"];
-    camera_params->gain = camera_config["gain"];
-    camera_params->exposure = camera_config["exposure"];
-    camera_params->pixel_format = camera_config["pixel_format"];
-    camera_params->color_temp = camera_config["color_temp"];
-    camera_params->gpu_id = camera_config["gpu_id"];
-    camera_params->gpu_direct = camera_config["gpu_direct"];
-    camera_params->color = camera_config["color"];
-    camera_params->focus = camera_config["focus"];
-    camera_params->iris = camera_config["iris"];
-    if (camera_config.contains("gop")) {
-        camera_params->gop = camera_config["gop"];
-    } else {
-        camera_params->gop = 1;
-    }
-    if (camera_config.contains("yolo")) {
-        camera_select->yolo_model = camera_config["yolo"];
-    }
 }
 
 std::string get_current_time_milliseconds() {
@@ -335,54 +299,6 @@ void select_cameras_have_configs(std::vector<std::string> &camera_config_files,
             check[i] = false;
         }
     }
-}
-
-bool set_camera_params(CameraParams *camera_params,
-                       CameraEachSelect *camera_select,
-                       GigEVisionDeviceInfo *device_info,
-                       std::vector<std::string> &camera_config_files,
-                       int camera_idx, int num_cameras) {
-    // first checkt to see if it is in the config files
-    camera_params->camera_serial.append(device_info->serialNumber);
-    camera_params->camera_name = camera_params->camera_serial;
-
-    std::string sub_str = camera_params->camera_serial + ".json";
-    auto it =
-        std::find_if(camera_config_files.begin(), camera_config_files.end(),
-                     [&](const std::string &str) {
-                         return str.find(sub_str) != std::string::npos;
-                     });
-
-    if (it == camera_config_files.end()) {
-        if (strcmp(device_info->modelName, "HB-65000GM") == 0) {
-            int gpu_id = 0;
-            init_65MP_camera_params_mono(camera_params, camera_idx, num_cameras,
-                                         2000, 1000, gpu_id, 400); // 458
-        } else if (strcmp(device_info->modelName, "HB-7000SC") == 0) {
-            int gpu_id = 0;
-            init_7MP_camera_params_color(camera_params, camera_idx, num_cameras,
-                                         1500, 3000, gpu_id, 30); // 2000, 3000
-        } else if (strcmp(device_info->modelName, "HB-65000GC") == 0) {
-            int gpu_id = 0;
-            init_65MP_camera_params_color(camera_params, camera_idx,
-                                          num_cameras, 2000, 28000, gpu_id, 10);
-        } else if (strcmp(device_info->modelName, "HB-7000SM") == 0) {
-            int gpu_id = 0;
-            init_7MP_camera_params_mono(camera_params, camera_idx, num_cameras,
-                                        1000, 3000, gpu_id, 30); // 2000, 3000
-        } else {
-            printf("Use default parameters. \n");
-            return false;
-        }
-    } else {
-        auto config_idx = std::distance(camera_config_files.begin(), it);
-        std::cout << "Load camera json file: "
-                  << camera_config_files[config_idx] << std::endl;
-        load_camera_json_config_files(camera_config_files[config_idx],
-                                      camera_params, camera_select, camera_idx,
-                                      num_cameras);
-    }
-    return true;
 }
 
 void allocate_camera_frame_buffers(CameraEmergent *ecams,

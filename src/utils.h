@@ -1,20 +1,15 @@
 #ifndef ORANGE_UTILS
 #define ORANGE_UTILS
 #include "camera.h"
-#include "enet_fb_helpers.h"
-#include "fetch_generated.h"
-#include "json.hpp"
-#include "video_capture.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <filesystem>
 #include <npp.h>
 #include <stdint.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #include <vector>
-
-using json = nlohmann::json;
 
 #define CHECK(call)                                                            \
     do {                                                                       \
@@ -88,10 +83,6 @@ void prepare_application_folders(std::string orange_root_dir_str);
 std::vector<std::string> string_split(std::string s, std::string delimiter);
 std::vector<std::string> string_split_char(char *string_c,
                                            std::string delimiter);
-void load_camera_json_config_files(std::string file_name,
-                                   CameraParams *camera_params,
-                                   CameraEachSelect *camera_select,
-                                   int camera_id, int num_cameras);
 std::string get_current_time_milliseconds();
 std::string get_current_date();
 std::string get_current_date_time();
@@ -116,33 +107,8 @@ void update_camera_configs(std::vector<std::string> &camera_config_files,
 void select_cameras_have_configs(std::vector<std::string> &camera_config_files,
                                  GigEVisionDeviceInfo *device_info,
                                  std::vector<bool> &check, int cam_count);
-bool set_camera_params(CameraParams *camera_params,
-                       CameraEachSelect *camera_select,
-                       GigEVisionDeviceInfo *device_info,
-                       std::vector<std::string> &camera_config_files,
-                       int camera_idx, int num_cameras);
 void allocate_camera_frame_buffers(CameraEmergent *ecams,
                                    CameraParams *cameras_params,
                                    int evt_buffer_size, int num_cameras);
 
-inline void send_message(FBMessageSender &sender, uint32_t peer_id,
-                         FetchGame::SignalType signal_type) {
-    sender.to_peer(peer_id, [&](flatbuffers::FlatBufferBuilder &b) {
-        b.Clear();
-        FetchGame::ServerBuilder sb(b);
-        sb.add_signal_type(signal_type);
-        b.Finish(sb.Finish());
-    });
-}
-
-// Convenience: send to a peer by its name (e.g., "indigo")
-inline void send_message_to_indigo(FBMessageSender &sender,
-                                   const PeerRegistry &reg,
-                                   const std::string &peer_name,
-                                   FetchGame::SignalType signal_type) {
-    if (uint32_t pid = reg.get_pid_by_name(peer_name)) {
-        send_message(sender, pid, signal_type);
-    }
-}
-
-#endif // ORANGE_THREADS
+#endif

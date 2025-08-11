@@ -74,7 +74,7 @@ static void connect_buttons(EnetRuntime &net, uint16_t port = 3333,
     // Button A
     bool haveA = is_connected_to(net, ipA, port);
     ImGui::BeginDisabled(haveA);
-    if (ImGui::Button("Connect 192.168.20.60")) {
+    if (ImGui::Button("Connect waffle-0")) {
         ConnectReq cr{ipA, port, channels, 0};
 #ifdef ENET_RUNTIME_THREADED
         net.connect(std::move(cr)); // queued; result via Connect event
@@ -90,7 +90,7 @@ static void connect_buttons(EnetRuntime &net, uint16_t port = 3333,
     // Button B
     bool haveB = is_connected_to(net, ipB, port);
     ImGui::BeginDisabled(haveB);
-    if (ImGui::Button("Connect 192.168.20.61")) {
+    if (ImGui::Button("Connect waffle-1")) {
         ConnectReq cr{ipB, port, channels, 0};
 #ifdef ENET_RUNTIME_THREADED
         net.connect(std::move(cr));

@@ -132,6 +132,29 @@ int main(int, char **) {
                         break;
                     }
                 }
+
+                // coordinate with other thread
+                if (mgr.state == FetchGame::ManagerState_CONNECTED) {
+                    mgr.state = FetchGame::ManagerState_IDLE;
+                    send_client_bringup(sender, evt.peer_id, cam_count,
+                                        mgr.state);
+                }
+                if (mgr.state == FetchGame::ManagerState_CAMERAOPENED) {
+                    mgr.state = FetchGame::ManagerState_WAITTHREAD;
+                    // client_send_state_update_message(
+                    //     &client, fb_builder, &client.m_pNetwork->peers[0],
+                    //     manager_context.state);
+                } else if (mgr.state == FetchGame::ManagerState_THREADREADY) {
+                    mgr.state = FetchGame::ManagerState_WAITSTART;
+                    // client_send_state_update_message(
+                    //     &client, fb_builder, &client.m_pNetwork->peers[0],
+                    //     manager_context.state);
+                } else if (mgr.state == FetchGame::ManagerState_RECORDSTOPPED) {
+                    mgr.state = FetchGame::ManagerState_IDLE;
+                    // client_send_state_update_message(
+                    //     &client, fb_builder, &client.m_pNetwork->peers[0],
+                    //     manager_context.state);
+                }
             });
 
             // Example: do other per-frame work here

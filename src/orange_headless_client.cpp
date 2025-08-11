@@ -124,6 +124,8 @@ int main(int, char **) {
                         break;
 
                     case FetchGame::ServerControl_STOPRECORDING:
+                        printf("stop signal\n");
+                        std::cout << msg->ptp_global_time();
                         ptp.ptp_stop_time = msg->ptp_global_time();
                         ptp.network_set_stop_ptp = true;
                         break;

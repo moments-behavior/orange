@@ -40,7 +40,7 @@ int main(int, char **) {
         std::signal(SIGINT, on_sigint);
 
         EnetRuntime net; // alias -> EnetRuntimeInline here
-        if (!net.start_server(2222)) {
+        if (!net.start_server(3333)) {
             std::cerr << "ENet host create failed\n";
             return 1;
         }

@@ -56,7 +56,7 @@ targets*/
 
 imgui.ini
 
-
+release/
 .vscode/
 profile/
 imgui.ini

@@ -32,7 +32,8 @@ inline const char *const *enum_names_calib_state() {
 
 // Atomic calibration state (now using CalibState instead of int)
 extern std::atomic<CalibState> calib_state;
-
+extern PeerRegistry peers;
+extern EnetRuntime net;
 // for 3d detection
 extern Detection3d detection3d;
 extern DetectionDataPerCam *detection2d;

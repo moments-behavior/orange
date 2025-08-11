@@ -1,3 +1,4 @@
+#include "fetch_generated.h"
 #include "image_processing.h"
 #include "video_capture.h"
 #if defined(__GNUC__)
@@ -89,6 +90,7 @@ void COpenGLDisplay::ThreadRunning() {
 
     int frameCount = 0;
     auto lastFPSUpdate = clock::now();
+    FBMessageSender sender{&net, /*channel=*/0, ENET_PACKET_FLAG_RELIABLE};
 
     while (IsMachineOn()) {
         auto frameStart = clock::now();
@@ -161,18 +163,13 @@ void COpenGLDisplay::ThreadRunning() {
                     // < objs_last_frame[0].rect.x) { if (objs[0].rect.x <
                     // 2500.0 && objs[0].rect.x > 2100.0) {
 
-                    // if (objs[0].rect.x < 2800.0 &&
-                    //     objs[0].rect.x > 2100.0) { // trigger earlier
-                    //     // std::cout << "trigger ball drop" << std::endl;
-                    //     if (indigo_signal_builder.indigo_connection != NULL)
-                    //     {
-                    //         send_indigo_message(
-                    //             &indigo_signal_builder.server,
-                    //             &indigo_signal_builder.builder,
-                    //             indigo_signal_builder.indigo_connection,
-                    //             FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
-                    //     }
-                    // }
+                    if (objs[0].rect.x < 2800.0 &&
+                        objs[0].rect.x > 2100.0) { // trigger earlier
+                        // std::cout << "trigger ball drop" << std::endl;
+                        send_message_to_indigo(
+                            sender, peers, "indigo",
+                            FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
+                    }
                     objs_last_frame.push_back(objs[0]);
                 } else {
                     objs_last_frame.clear();

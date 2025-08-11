@@ -71,12 +71,10 @@ int main(int argc, char **args) {
     bool ptp_stream_sync = false;
 
     ENetGuard guard;
-    EnetRuntime net;
     if (!net.start_server(3333))
         return 1;
-    PeerRegistry peers;
     std::atomic<bool> quit_enet{false};
-    std::thread enet_thread([&] { run_enet_loop(net, peers, quit_enet); });
+    std::thread enet_thread([&] { run_enet_loop(quit_enet); });
     FBMessageSender sender{&net, /*channel=*/0, ENET_PACKET_FLAG_RELIABLE};
 
     std::vector<std::string> network_config_folders;
@@ -847,15 +845,13 @@ int main(int argc, char **args) {
                         }
 
                         // order important
-                        // if (save_image_all_ready &&
-                        //     calib_state == CalibSavePictures) {
-                        //     send_indigo_message(
-                        //         &indigo_signal_builder.server,
-                        //         &indigo_signal_builder.builder,
-                        //         indigo_signal_builder.indigo_connection,
-                        //         FetchGame::SignalType_CalibrationNextPose);
-                        //     calib_state = CalibNextPose;
-                        // }
+                        if (save_image_all_ready &&
+                            calib_state == CalibSavePictures) {
+                            send_message_to_indigo(
+                                sender, peers, "indigo",
+                                FetchGame::SignalType_CalibrationNextPose);
+                            calib_state = CalibNextPose;
+                        }
 
                         if (calib_state == CalibPoseReached) {
                             make_folder(calib_save_folder);

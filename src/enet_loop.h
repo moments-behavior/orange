@@ -1,12 +1,12 @@
 #pragma once
 #include "enet_fb_helpers.h" // EnetRuntime alias, PeerRegistry, fb_parse
 #include "fetch_generated.h" // your FlatBuffers schema
+#include "global.h"
 #include <atomic>
 #include <chrono>
 #include <thread>
 
-inline void run_enet_loop(EnetRuntime &net, PeerRegistry &peers,
-                          std::atomic<bool> &stop) {
+inline void run_enet_loop(std::atomic<bool> &stop) {
     // Common event handler used by both modes
     auto handle = [&](const Incoming &evt) {
         switch (evt.type) {

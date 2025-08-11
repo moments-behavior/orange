@@ -128,6 +128,7 @@ void CameraManager::run_loop() {
 
         // Stop recording / teardown sequence
         if (ptp_->network_set_stop_ptp && ptp_->ptp_stop_reached) {
+            std::cout << "here?" << std::endl;
             ptp_->network_set_stop_ptp = false;
 
             // Join acquisition threads
@@ -155,6 +156,7 @@ void CameraManager::run_loop() {
             cams_params_.reset();
             cams_select_.reset();
             cams_count_ = 0;
+            std::cout << "there?" << std::endl;
 
             mgr_->state = FetchGame::ManagerState_RECORDSTOPPED;
         }

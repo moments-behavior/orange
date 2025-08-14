@@ -16,11 +16,39 @@ int main() try {
     if (!ctx.net.start_server(3333))
         return 1;
 
-    // Create manager with event callback that notifies client
     CameraManager mgr(ctx, [&](const ManagerEvent &ev) {
-        // translate to your FB messages
-        auto pid = ctx.peers.get_pid_by_name("orange");
-        send_client_state_update_message(ctx.sender, pid, ev.state);
+        const auto pid = ctx.peers.get_pid_by_name("orange");
+
+        switch (ev.state) {
+        case FetchGame::ManagerState_CONNECTED:
+            // Your old code sent bringup and set next state to IDLE.
+            // We can send bringup with IDLE here (no need to mutate state
+            // locally).
+            send_client_bringup(ctx.sender, pid, mgr.cam_count(),
+                                FetchGame::ManagerState_IDLE);
+            break;
+
+        case FetchGame::ManagerState_CAMERAOPENED:
+            // You previously flipped to WAITTHREAD and sent it.
+            send_client_state_update_message(
+                ctx.sender, pid, FetchGame::ManagerState_WAITTHREAD);
+            break;
+
+        case FetchGame::ManagerState_THREADREADY:
+            // You previously flipped to WAITSTART and sent it.
+            send_client_state_update_message(ctx.sender, pid,
+                                             FetchGame::ManagerState_WAITSTART);
+            break;
+
+        case FetchGame::ManagerState_RECORDSTOPPED:
+            // You previously flipped back to IDLE and sent it.
+            send_client_state_update_message(ctx.sender, pid,
+                                             FetchGame::ManagerState_IDLE);
+            break;
+
+        default:
+            break;
+        }
     });
 
     // Kick off initial scan on first connect

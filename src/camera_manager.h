@@ -63,6 +63,7 @@ class CameraManager {
 
     // thread-safe command API
     void post(const ManagerCmd &cmd);
+    int cam_count() const noexcept { return cam_count_; }
 
   private:
     // manager thread

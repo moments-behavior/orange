@@ -1,5 +1,6 @@
 // camera_manager.cpp
 #include "camera_manager.h"
+#include "fetch_game.h"
 #include <chrono>
 #include <cstring>
 #include <errno.h>
@@ -153,7 +154,7 @@ void CameraManager::do_start_recording(uint64_t ptp_time) {
     }
     ptp_->ptp_global_time = ptp_time;
     ptp_->network_set_start_ptp = true;
-    emit(FetchGame::ManagerState_WAITSTOP);
+    emit(FetchGame::ManagerState_RECORDINGSTARTED);
 }
 
 void CameraManager::do_stop_recording(uint64_t ptp_time) {

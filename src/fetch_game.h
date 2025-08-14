@@ -124,11 +124,12 @@ enum ManagerState : int8_t {
   ManagerState_WAITTHREAD = 9,
   ManagerState_WAITSTART = 10,
   ManagerState_WAITSTOP = 11,
+  ManagerState_RECORDINGSTARTED = 12,
   ManagerState_MIN = ManagerState_IDLE,
-  ManagerState_MAX = ManagerState_WAITSTOP
+  ManagerState_MAX = ManagerState_RECORDINGSTARTED
 };
 
-inline const ManagerState (&EnumValuesManagerState())[12] {
+inline const ManagerState (&EnumValuesManagerState())[13] {
   static const ManagerState values[] = {
     ManagerState_IDLE,
     ManagerState_CONNECT,
@@ -141,13 +142,14 @@ inline const ManagerState (&EnumValuesManagerState())[12] {
     ManagerState_RECORDSTOPPED,
     ManagerState_WAITTHREAD,
     ManagerState_WAITSTART,
-    ManagerState_WAITSTOP
+    ManagerState_WAITSTOP,
+    ManagerState_RECORDINGSTARTED
   };
   return values;
 }
 
 inline const char * const *EnumNamesManagerState() {
-  static const char * const names[13] = {
+  static const char * const names[14] = {
     "IDLE",
     "CONNECT",
     "CONNECTED",
@@ -160,13 +162,14 @@ inline const char * const *EnumNamesManagerState() {
     "WAITTHREAD",
     "WAITSTART",
     "WAITSTOP",
+    "RECORDINGSTARTED",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameManagerState(ManagerState e) {
-  if (::flatbuffers::IsOutRange(e, ManagerState_IDLE, ManagerState_WAITSTOP)) return "";
+  if (::flatbuffers::IsOutRange(e, ManagerState_IDLE, ManagerState_RECORDINGSTARTED)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesManagerState()[index];
 }

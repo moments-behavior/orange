@@ -2,6 +2,7 @@
 #include "camera_manager.h"
 #include "enet_fb_helpers.h"
 #include "enet_runtime_select.h"
+#include "fetch_game.h"
 #include <csignal>
 #include <iostream>
 
@@ -40,6 +41,11 @@ int main() try {
                                              FetchGame::ManagerState_WAITSTART);
             break;
 
+        case FetchGame::ManagerState_RECORDINGSTARTED:
+            // You previously flipped to WAITSTART and sent it.
+            send_client_state_update_message(ctx.sender, pid,
+                                             FetchGame::ManagerState_WAITSTOP);
+            break;
         case FetchGame::ManagerState_RECORDSTOPPED:
             // You previously flipped back to IDLE and sent it.
             send_client_state_update_message(ctx.sender, pid,

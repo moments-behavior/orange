@@ -32,7 +32,8 @@ enum ManagerState: byte {
     RECORDSTOPPED,
     WAITTHREAD,
     WAITSTART,
-    WAITSTOP
+    WAITSTOP,
+    RECORDINGSTARTED
 }
 
 table bring_up_message {

@@ -24,9 +24,6 @@ struct RecordingSetup {
 
 struct OpenArgs {
     std::string config_folder;
-    int num_cameras = 0;
-    GigEVisionDeviceInfo *device_info =
-        nullptr; // caller-owned or copied inside
 };
 
 struct StartArgs {

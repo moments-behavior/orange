@@ -76,16 +76,6 @@ int main() try {
                 case FetchGame::ServerControl_OPENCAMERA: {
                     OpenArgs o{};
                     o.config_folder = msg->config_folder()->str();
-                    o.num_cameras = scan_cameras(
-                        max_cameras, /*out*/ nullptr); // or reuse cached count
-                    // Prefer: use the sorted_ kept inside the manager; or pass
-                    // device list here. For simplicity assume we rescan and
-                    // sort here:
-                    GigEVisionDeviceInfo uns[max_cameras], dev[max_cameras];
-                    o.num_cameras = scan_cameras(max_cameras, uns);
-                    sort_cameras_ip(uns, dev, o.num_cameras);
-                    o.device_info =
-                        dev; // if you need ownership, copy inside do_open
                     mgr.post(ManagerCmd{ManagerCmdType::OpenCameras, o});
                 } break;
                 case FetchGame::ServerControl_STARTTHREAD: {

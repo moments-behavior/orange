@@ -73,25 +73,30 @@ void CameraManager::do_connect_scan() {
 }
 
 void CameraManager::do_open(const OpenArgs &args) {
-    // Allocate contiguous, non-moving arrays.
-    cam_n_ = static_cast<size_t>(args.num_cameras);
+    if (cam_count_ <= 0) {
+        // Safety net: we expect do_connect_scan() already ran.
+        emit(FetchGame::ManagerState_ERROR);
+        return;
+    }
+
+    cam_n_ = static_cast<size_t>(cam_count_);
     ecams_ = std::make_unique<CameraEmergent[]>(cam_n_);
     cameras_params_ = std::make_unique<CameraParams[]>(cam_n_);
     cameras_select_ = std::make_unique<CameraEachSelect[]>(cam_n_);
 
-    // load configs & open
     std::vector<std::string> camera_config_files;
     update_camera_configs(camera_config_files, args.config_folder);
 
-    for (int i = 0; i < args.num_cameras; ++i) {
-        set_camera_params(&cameras_params_[i], &cameras_select_[i],
-                          &args.device_info[i], camera_config_files, i,
-                          args.num_cameras);
+    for (int i = 0; i < cam_count_; ++i) {
+        // use cached sorted_ as the authoritative device list
+        set_camera_params(&cameras_params_[i], &cameras_select_[i], &sorted_[i],
+                          camera_config_files, i, cam_count_);
 
         open_camera_with_params(&ecams_[i].camera,
-                                &args.device_info[cameras_params_[i].camera_id],
+                                &sorted_[cameras_params_[i].camera_id],
                                 &cameras_params_[i]);
     }
+
     emit(FetchGame::ManagerState_CAMERAOPENED);
 }
 

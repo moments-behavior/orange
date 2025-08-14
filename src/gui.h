@@ -173,9 +173,7 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
     for (auto &t : camera_threads)
         t.join();
 
-    for (int i = 0; i < num_cameras; i++) {
-        camera_threads.pop_back();
-    }
+    camera_threads.clear();
 
     for (int i = 0; i < num_cameras; i++) {
         destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,

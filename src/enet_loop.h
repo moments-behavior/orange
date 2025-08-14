@@ -1,7 +1,7 @@
 #pragma once
 #include "enet_fb_helpers.h"
 #include "enet_utils.h"
-#include "fetch_generated.h"
+#include "fetch_game.h"
 #include "global.h"
 #include <atomic>
 #include <chrono>

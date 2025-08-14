@@ -1,6 +1,7 @@
 #include "enet_fb_helpers.h"
 #include "enet_runtime_select.h"
-#include "fetch_generated.h"
+#include "enet_utils.h"
+#include "fetch_game.h"
 #include "utils.h"
 #include "video_capture.h"
 #include <csignal>
@@ -13,41 +14,6 @@
 static std::atomic<bool> g_quit{false};
 extern "C" void on_sigint(int) {
     g_quit.store(true, std::memory_order_relaxed);
-}
-
-inline void send_client_bringup(FBMessageSender &sender, uint32_t peer_id,
-                                int cam_count,
-                                FetchGame::ManagerState mgr_state) {
-    sender.to_peer(peer_id, [&](flatbuffers::FlatBufferBuilder &b) {
-        char hostname[128]{};
-        (void)gethostname(hostname, sizeof(hostname));
-        if (!hostname[0])
-            std::snprintf(hostname, sizeof(hostname), "unknown");
-
-        auto server_name = b.CreateString(hostname);
-        // NOTE: keep your schema’s function name exactly (it looked like
-        // Createbring_up_message)
-        auto msg = FetchGame::Createbring_up_message(b, server_name, cam_count);
-
-        FetchGame::ServerBuilder sb(b);
-        sb.add_signal_type(FetchGame::SignalType_ClientBringup);
-        sb.add_server_mesg(msg);
-        sb.add_server_state(mgr_state); // cast if your schema expects int
-        auto root = sb.Finish();
-        b.Finish(root);
-    });
-}
-
-inline void
-send_client_state_update_message(FBMessageSender &sender, uint32_t peer_id,
-                                 FetchGame::ManagerState server_state) {
-    sender.to_peer(peer_id, [&](flatbuffers::FlatBufferBuilder &b) {
-        b.Clear();
-        FetchGame::ServerBuilder sb(b);
-        sb.add_signal_type(FetchGame::SignalType_ClientStateUpdate);
-        sb.add_server_state(server_state); // cast if schema uses int
-        b.Finish(sb.Finish());
-    });
 }
 
 bool open_cameras(CameraParams *cameras_params, CameraEmergent *ecams,
@@ -88,11 +54,11 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads,
     camera_control->sync_camera = true;
 
     // Creating a directory to save recorded video;
-    if (mkdir(record_folder.c_str(), 0777) == -1) {
+    if (make_folder(record_folder)) {
+        std::cout << "Recorded video saves to : " << record_folder << std::endl;
+    } else {
         std::cerr << "Error :  " << std::strerror(errno) << std::endl;
         return false;
-    } else {
-        std::cout << "Recorded video saves to : " << record_folder << std::endl;
     }
 
     for (int i = 0; i < num_cameras; i++) {
@@ -100,7 +66,7 @@ bool start_camera_thread(std::vector<std::thread> &camera_threads,
     }
 
     for (int i = 0; i < num_cameras; i++) {
-        cameras_select->stream_on = false;
+        cameras_select[i].stream_on = false;
     }
 
     for (int i = 0; i < num_cameras; i++) {
@@ -183,9 +149,7 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
             for (auto &t : camera_threads)
                 t.join();
 
-            for (int i = 0; i < *cam_count; i++) {
-                camera_threads.pop_back();
-            }
+            camera_threads.clear();
 
             for (int i = 0; i < *cam_count; i++) {
                 ptp_sync_off(&ecams[i].camera, &cameras_params[i]);

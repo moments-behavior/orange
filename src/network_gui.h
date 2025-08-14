@@ -1,7 +1,7 @@
 #include "enet_fb_helpers.h"
 #include "enet_runtime_select.h"
 #include "enet_types.h"
-#include "fetch_generated.h"
+#include "fetch_game.h"
 #include "utils.h"
 #include <ImGuiFileDialog.h>
 #include <cstdio>
@@ -100,78 +100,6 @@ static void connect_buttons(EnetRuntime &net, uint16_t port = 3333,
 #endif
     }
     ImGui::EndDisabled();
-}
-
-inline void send_open_cameras_to(FBMessageSender &sender,
-                                 const PeerRegistry &reg,
-                                 const std::vector<std::string> &names,
-                                 const std::string &config_folder) {
-    auto build = [&](flatbuffers::FlatBufferBuilder &b) {
-        b.Clear();
-        auto cfg = b.CreateString(config_folder);
-        FetchGame::ServerBuilder sb(b);
-        sb.add_config_folder(cfg);
-        sb.add_control(FetchGame::ServerControl_OPENCAMERA);
-        auto root = sb.Finish();
-        b.Finish(root);
-    };
-    for (const auto &n : names) {
-        if (uint32_t pid = reg.get_pid_by_name(n)) {
-            sender.to_peer(pid, build);
-        }
-    }
-}
-
-inline void send_start_threads_to(FBMessageSender &sender,
-                                  const PeerRegistry &reg,
-                                  const std::vector<std::string> &names,
-                                  const std::string &record_folder_name,
-                                  const std::string &encoder_basic_setup) {
-    auto build = [&](flatbuffers::FlatBufferBuilder &b) {
-        b.Clear();
-        auto rec = b.CreateString(record_folder_name);
-        auto enc = b.CreateString(encoder_basic_setup);
-        FetchGame::ServerBuilder sb(b);
-        sb.add_record_folder(rec);
-        sb.add_encoder_setup(enc);
-        sb.add_control(FetchGame::ServerControl_STARTTHREAD);
-        b.Finish(sb.Finish());
-    };
-    for (const auto &n : names)
-        if (uint32_t pid = reg.get_pid_by_name(n))
-            sender.to_peer(pid, build);
-}
-
-inline void send_set_start_ptp_to(FBMessageSender &sender,
-                                  const PeerRegistry &reg,
-                                  const std::vector<std::string> &names,
-                                  std::uint64_t ptp_global_time) {
-    auto build = [&](flatbuffers::FlatBufferBuilder &b) {
-        b.Clear();
-        FetchGame::ServerBuilder sb(b);
-        sb.add_control(FetchGame::ServerControl_STARTRECORDING);
-        sb.add_ptp_global_time(ptp_global_time);
-        b.Finish(sb.Finish());
-    };
-    for (const auto &n : names)
-        if (uint32_t pid = reg.get_pid_by_name(n))
-            sender.to_peer(pid, build);
-}
-
-inline void send_set_stop_ptp_to(FBMessageSender &sender,
-                                 const PeerRegistry &reg,
-                                 const std::vector<std::string> &names,
-                                 std::uint64_t ptp_stop_time) {
-    auto build = [&](flatbuffers::FlatBufferBuilder &b) {
-        b.Clear();
-        FetchGame::ServerBuilder sb(b);
-        sb.add_control(FetchGame::ServerControl_STOPRECORDING);
-        sb.add_ptp_global_time(ptp_stop_time);
-        b.Finish(sb.Finish());
-    };
-    for (const auto &n : names)
-        if (uint32_t pid = reg.get_pid_by_name(n))
-            sender.to_peer(pid, build);
 }
 
 inline void draw_peers_window(EnetRuntime &net, const PeerRegistry &peers) {

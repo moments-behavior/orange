@@ -1,7 +1,7 @@
 #include "camera.h"
 #include "enet_fb_helpers.h"
 #include "enet_loop.h"
-#include "fetch_generated.h"
+#include "fetch_game.h"
 #include "global.h"
 #include "gui.h"
 #include "imgui.h"
@@ -93,8 +93,7 @@ int main(int argc, char **args) {
     }
     std::string picture_save_folder =
         orange_root_dir_str + "/pictures/" + get_current_date();
-    std::string calib_save_folder =
-        recording_root_dir_str + "/exp/calibration/" + get_current_date_time();
+    std::string calib_save_folder;
 
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -177,7 +176,6 @@ int main(int argc, char **args) {
                         network_config_folders[network_config_select]);
                     select_cameras_have_configs(camera_config_files,
                                                 device_info, check, cam_count);
-
                     send_open_cameras_to(ctx.sender, ctx.peers, server_names,
                                          selected_cfg_folder);
 
@@ -386,9 +384,7 @@ int main(int argc, char **args) {
             for (auto &t : camera_threads)
                 t.join();
 
-            for (int i = 0; i < num_cameras; i++) {
-                camera_threads.pop_back();
-            }
+            camera_threads.clear();
             for (int i = 0; i < num_cameras; i++) {
                 destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,
                                      evt_buffer_size, &cameras_params[i]);
@@ -734,93 +730,89 @@ int main(int argc, char **args) {
                             picture_format_items[current_picture_format]);
                     }
 
-                    if (ImGui::TreeNode("Save pictures")) {
-                        if (save_pics_counter == num_cameras) {
-                            save_image_all_ready = true;
-                        }
-
-                        ImGui::Text("Reset counter: ");
-                        const int cols = 5;
-                        for (int i = 0; i < num_cameras; ++i) {
-                            std::string label =
-                                cameras_params[i].camera_name + ": " +
-                                std::to_string(
-                                    cameras_select[i].pictures_counter) +
-                                "##calibration_save";
-                            if (ImGui::Selectable(label.c_str(), false,
-                                                  ImGuiSelectableFlags_None,
-                                                  ImVec2(150, 50))) {
-                                cameras_select[i].pictures_counter = 0;
-                            }
-
-                            // Keep items on the same line until end of row
-                            if ((i + 1) % cols != 0)
-                                ImGui::SameLine();
-                        }
-
-                        if (!save_image_all_ready) {
-                            ImGui::BeginDisabled();
-                        }
-
-                        ImGui::NewLine();
-                        if (ImGui::Button("Save pictures all")) {
-                            make_folder(picture_save_folder);
-                            std::string frame_save_name =
-                                get_current_time_milliseconds();
-                            for (int i = 0; i < num_cameras; i++) {
-                                cameras_select[i].frame_save_name =
-                                    frame_save_name;
-                                cameras_select[i].picture_save_folder =
-                                    picture_save_folder;
-                                cameras_select[i].frame_save_state =
-                                    State_Copy_New_Frame;
-                            }
-                        }
-
-                        // order important
-                        if (save_image_all_ready &&
-                            calib_state == CalibSavePictures) {
-                            save_pics_counter = 0;
-                            // if network, then need to send to peers to reset
-                            // counter, once replied all 0, then send to indigo
-                            send_message_to_indigo(
-                                ctx.sender, ctx.peers, "indigo",
-                                FetchGame::SignalType_CalibrationNextPose);
-                            calib_state = CalibNextPose;
-                        }
-
-                        if (calib_state == CalibPoseReached) {
+                    // if indigo connected
+                    if (ctx.peers.get_pid_by_name("indigo")) {
+                        if (ImGui::Button("Start Calibration")) {
+                            // make folder, and send to servers
+                            std::string calib_save_folder =
+                                recording_root_dir_str + "/exp/calibration/" +
+                                get_current_date_time();
                             make_folder(calib_save_folder);
-                            for (int i = 0; i < num_cameras; i++) {
-                                cameras_select[i].frame_save_name =
-                                    std::to_string(
-                                        cameras_select[i].pictures_counter);
-                                cameras_select[i].picture_save_folder =
-                                    calib_save_folder;
-                                cameras_select[i].frame_save_state.store(
-                                    State_Copy_New_Frame);
-                            }
-                            calib_state = CalibSavePictures;
+                            send_start_calib(ctx.sender, ctx.peers,
+                                             server_names, calib_save_folder);
+                        }
+                    }
+
+                    if (save_pics_counter == num_cameras) {
+                        save_image_all_ready = true;
+                    }
+
+                    ImGui::Text("Reset counter: ");
+                    const int cols = 5;
+                    for (int i = 0; i < num_cameras; ++i) {
+                        std::string label =
+                            cameras_params[i].camera_name + ": " +
+                            std::to_string(cameras_select[i].pictures_counter) +
+                            "##calibration_save";
+                        if (ImGui::Selectable(label.c_str(), false,
+                                              ImGuiSelectableFlags_None,
+                                              ImVec2(150, 50))) {
+                            cameras_select[i].pictures_counter = 0;
                         }
 
-                        if (ImGui::Button("Calib save images with counter")) {
-                            make_folder(calib_save_folder);
-                            for (int i = 0; i < num_cameras; i++) {
-                                cameras_select[i].frame_save_name =
-                                    std::to_string(
-                                        cameras_select[i].pictures_counter);
-                                cameras_select[i].picture_save_folder =
-                                    calib_save_folder;
-                                cameras_select[i].frame_save_state.store(
-                                    State_Copy_New_Frame);
-                            }
-                        }
+                        // Keep items on the same line until end of row
+                        if ((i + 1) % cols != 0)
+                            ImGui::SameLine();
+                    }
 
-                        if (!save_image_all_ready) {
-                            ImGui::EndDisabled();
-                        }
+                    if (!save_image_all_ready) {
+                        ImGui::BeginDisabled();
+                    }
 
-                        ImGui::TreePop();
+                    ImGui::NewLine();
+                    if (ImGui::Button("Reset counters all")) {
+                        for (int i = 0; i < num_cameras; i++) {
+                            cameras_select[i].pictures_counter = 0;
+                        }
+                    }
+
+                    // order important
+                    if (save_image_all_ready &&
+                        calib_state == CalibSavePictures) {
+                        save_pics_counter = 0;
+                        send_message_to_indigo(
+                            ctx.sender, ctx.peers, "indigo",
+                            FetchGame::SignalType_CalibrationNextPose);
+                        calib_state = CalibNextPose;
+                    }
+
+                    if (calib_state == CalibPoseReached) {
+                        make_folder(calib_save_folder);
+                        for (int i = 0; i < num_cameras; i++) {
+                            cameras_select[i].frame_save_name = std::to_string(
+                                cameras_select[i].pictures_counter);
+                            cameras_select[i].picture_save_folder =
+                                calib_save_folder;
+                            cameras_select[i].frame_save_state.store(
+                                State_Copy_New_Frame);
+                        }
+                        calib_state = CalibSavePictures;
+                    }
+
+                    if (ImGui::Button("Calib save images with counter")) {
+                        make_folder(calib_save_folder);
+                        for (int i = 0; i < num_cameras; i++) {
+                            cameras_select[i].frame_save_name = std::to_string(
+                                cameras_select[i].pictures_counter);
+                            cameras_select[i].picture_save_folder =
+                                calib_save_folder;
+                            cameras_select[i].frame_save_state.store(
+                                State_Copy_New_Frame);
+                        }
+                    }
+
+                    if (!save_image_all_ready) {
+                        ImGui::EndDisabled();
                     }
                 }
             }

@@ -3,6 +3,7 @@ namespace FetchGame;
 enum ServerControl : byte {
     IDLE,
     OPENCAMERA,
+    STARTCALIB,
     STARTTHREAD,
     STARTRECORDING,
     STOPRECORDING,
@@ -45,6 +46,7 @@ table Server {
     server_mesg:bring_up_message;
     config_folder:string;
     record_folder:string;
+    calib_folder:string;
     encoder_setup:string;
     ptp_global_time:ulong;
     server_state:ManagerState = IDLE;

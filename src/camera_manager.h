@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <filesystem>
 #include <functional>
+#include <memory> // unique_ptr
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -25,12 +26,12 @@ struct OpenArgs {
     std::string config_folder;
     int num_cameras = 0;
     GigEVisionDeviceInfo *device_info =
-        nullptr; // lifetime owned by caller OR copy it in
+        nullptr; // caller-owned or copied inside
 };
 
 struct StartArgs {
     RecordingSetup rec;
-    PTPParams *ptp = nullptr; // or value-copy if that’s easier
+    PTPParams *ptp = nullptr; // managed by caller (or make value-owned)
 };
 
 enum class ManagerCmdType {
@@ -44,10 +45,9 @@ enum class ManagerCmdType {
 
 struct ManagerCmd {
     ManagerCmdType type;
-    // Only one of the following is used depending on type.
-    OpenArgs open{};
-    StartArgs start{};
-    uint64_t ptp_time = 0; // for StartRecording/StopRecording
+    OpenArgs open{};       // used for OpenCameras
+    StartArgs start{};     // used for StartThreads
+    uint64_t ptp_time = 0; // used for StartRecording/StopRecording
 };
 
 struct ManagerEvent {
@@ -58,7 +58,7 @@ class CameraManager {
   public:
     using EventCallback = std::function<void(const ManagerEvent &)>;
 
-    explicit CameraManager(EventCallback cb);
+    explicit CameraManager(AppContext &ctx, EventCallback cb);
     ~CameraManager();
 
     // thread-safe command API
@@ -80,11 +80,16 @@ class CameraManager {
     void emit(FetchGame::ManagerState s);
 
   private:
-    // owned by manager thread
-    std::vector<CameraEmergent> ecams_;
-    std::vector<CameraParams> cameras_params_;
-    std::vector<CameraEachSelect> cameras_select_;
-    std::vector<std::thread> camera_threads_;
+    // --- owned by manager thread ---
+    AppContext &ctx_;
+
+    // Contiguous, non-movable buffers for camera structures
+    std::unique_ptr<CameraEmergent[]> ecams_;
+    std::unique_ptr<CameraParams[]> cameras_params_;
+    std::unique_ptr<CameraEachSelect[]> cameras_select_;
+    size_t cam_n_ = 0;
+
+    std::vector<std::thread> camera_threads_; // threads can live in a vector
     GigEVisionDeviceInfo unsorted_[max_cameras]{};
     GigEVisionDeviceInfo sorted_[max_cameras]{};
     int cam_count_ = 0;
@@ -93,7 +98,7 @@ class CameraManager {
     PTPParams *ptp_ = nullptr; // managed by caller (or make value-owned)
     RecordingSetup rec_{};
 
-    // infra
+    // --- infra ---
     EventCallback cb_;
     std::thread th_;
     std::mutex m_;

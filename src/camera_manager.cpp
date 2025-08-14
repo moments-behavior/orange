@@ -3,12 +3,17 @@
 #include <chrono>
 #include <cstring>
 #include <errno.h>
+#include <filesystem>
 #include <iostream>
 #include <system_error>
 
-CameraManager::CameraManager(EventCallback cb) : cb_(std::move(cb)) {
+// NOTE: camera arrays are now unique_ptr<T[]> so we never move/copy them.
+
+CameraManager::CameraManager(AppContext &ctx, EventCallback cb)
+    : ctx_(ctx), cb_(std::move(cb)) {
     th_ = std::thread(&CameraManager::run, this);
 }
+
 CameraManager::~CameraManager() {
     post({ManagerCmdType::Shutdown});
     if (th_.joinable())
@@ -68,10 +73,11 @@ void CameraManager::do_connect_scan() {
 }
 
 void CameraManager::do_open(const OpenArgs &args) {
-    // prepare vectors sized to camera count
-    ecams_.assign(args.num_cameras, {});
-    cameras_params_.assign(args.num_cameras, {});
-    cameras_select_.assign(args.num_cameras, {});
+    // Allocate contiguous, non-moving arrays.
+    cam_n_ = static_cast<size_t>(args.num_cameras);
+    ecams_ = std::make_unique<CameraEmergent[]>(cam_n_);
+    cameras_params_ = std::make_unique<CameraParams[]>(cam_n_);
+    cameras_select_ = std::make_unique<CameraEachSelect[]>(cam_n_);
 
     // load configs & open
     std::vector<std::string> camera_config_files;
@@ -81,6 +87,7 @@ void CameraManager::do_open(const OpenArgs &args) {
         set_camera_params(&cameras_params_[i], &cameras_select_[i],
                           &args.device_info[i], camera_config_files, i,
                           args.num_cameras);
+
         open_camera_with_params(&ecams_[i].camera,
                                 &args.device_info[cameras_params_[i].camera_id],
                                 &cameras_params_[i]);
@@ -92,9 +99,9 @@ void CameraManager::do_start_threads(const StartArgs &args) {
     rec_ = args.rec;
     ptp_ = args.ptp;
 
-    // buffers
-    allocate_camera_frame_buffers(ecams_.data(), cameras_params_.data(),
-                                  evt_buffer_size, (int)ecams_.size());
+    // buffers (contiguous pointers)
+    allocate_camera_frame_buffers(ecams_.get(), cameras_params_.get(),
+                                  evt_buffer_size, static_cast<int>(cam_n_));
 
     // mkdirs
     std::error_code ec;
@@ -110,26 +117,24 @@ void CameraManager::do_start_threads(const StartArgs &args) {
     camera_control_.sync_camera = true;
 
     // sync setup
-    for (size_t i = 0; i < ecams_.size(); ++i)
+    for (size_t i = 0; i < cam_n_; ++i)
         ptp_camera_sync(&ecams_[i].camera, &cameras_params_[i]);
 
     // ensure select flags are off
-    for (size_t i = 0; i < cameras_select_.size(); ++i)
+    for (size_t i = 0; i < cam_n_; ++i)
         cameras_select_[i].stream_on = false;
 
     // launch threads
-    camera_threads_.reserve(ecams_.size());
-    for (size_t i = 0; i < ecams_.size(); ++i) {
+    camera_threads_.reserve(cam_n_);
+    for (size_t i = 0; i < cam_n_; ++i) {
         camera_threads_.emplace_back(
             &acquire_frames, &ecams_[i], &cameras_params_[i],
             &cameras_select_[i], &camera_control_, nullptr,
-            rec_.encoder_basic_setup, rec_.record_folder, ptp_,
-            std::ref(*get_app_context()) // or pass in via ctor
-        );
+            rec_.encoder_basic_setup, rec_.record_folder, ptp_, std::ref(ctx_));
     }
 
     // wait for all cameras ready (convert to CV if you can signal from threads)
-    while (ptp_->ptp_counter != (int)ecams_.size()) {
+    while (ptp_->ptp_counter != static_cast<int>(cam_n_)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
@@ -165,7 +170,7 @@ void CameraManager::do_stop_recording(uint64_t ptp_time) {
     camera_threads_.clear();
 
     // turn off sync + cleanup
-    for (size_t i = 0; i < ecams_.size(); ++i) {
+    for (size_t i = 0; i < cam_n_; ++i) {
         ptp_sync_off(&ecams_[i].camera, &cameras_params_[i]);
         destroy_frame_buffer(&ecams_[i].camera, ecams_[i].evt_frame,
                              evt_buffer_size, &cameras_params_[i]);
@@ -174,9 +179,12 @@ void CameraManager::do_stop_recording(uint64_t ptp_time) {
                             cameras_params_[i].camera_serial.c_str());
         close_camera(&ecams_[i].camera, &cameras_params_[i]);
     }
-    ecams_.clear();
-    cameras_params_.clear();
-    cameras_select_.clear();
+
+    // release arrays (no moves/copies)
+    ecams_.reset();
+    cameras_params_.reset();
+    cameras_select_.reset();
+    cam_n_ = 0;
 
     // reset PTP flags
     *ptp_ = PTPParams{0, 0, 0, 0, true, false, false, false};

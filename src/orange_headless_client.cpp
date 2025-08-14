@@ -17,7 +17,7 @@ int main() try {
         return 1;
 
     // Create manager with event callback that notifies client
-    CameraManager mgr([&](const ManagerEvent &ev) {
+    CameraManager mgr(ctx, [&](const ManagerEvent &ev) {
         // translate to your FB messages
         auto pid = ctx.peers.get_pid_by_name("orange");
         send_client_state_update_message(ctx.sender, pid, ev.state);

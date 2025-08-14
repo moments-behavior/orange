@@ -77,7 +77,6 @@ struct CameraEachSelect {
     std::string frame_save_format;
     std::string frame_save_name;
     int pictures_counter = 0;
-    bool selected_to_save = false;
     std::string picture_save_folder;
     std::string yolo_model;
     DetectMode detect_mode = Detect_OFF;

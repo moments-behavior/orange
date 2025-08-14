@@ -94,13 +94,13 @@ int main(int argc, char **args) {
     std::string picture_save_folder =
         orange_root_dir_str + "/pictures/" + get_current_date();
     std::string calib_save_folder =
-        orange_root_dir_str + "/exp/calibration/" + get_current_date_time();
+        recording_root_dir_str + "/exp/calibration/" + get_current_date_time();
 
     int local_config_select = 0;
     bool select_all_cameras = false;
     char *temp_string = (char *)malloc(64);
     *temp_string = '\0';
-    bool save_image_all_ready = true;
+    bool save_image_all_ready{false};
 
     std::vector<std::string> color_temps = {"CT_Off",   "CT_2800K", "CT_3000K",
                                             "CT_4000K", "CT_5000K", "CT_6500K",
@@ -145,6 +145,8 @@ int main(int argc, char **args) {
             }
 
             draw_peers_window(ctx.net, ctx.peers);
+            ImGui::Text("Calibration: %s",
+                        enum_names_calib_state()[calib_state]);
 
             std::string selected_cfg_folder =
                 network_config_folders[network_config_select];
@@ -732,26 +734,12 @@ int main(int argc, char **args) {
                             picture_format_items[current_picture_format]);
                     }
 
-                    if (ImGui::TreeNode("Save pictures from capturing")) {
-                        save_image_all_ready = true;
-                        for (int i = 0; i < num_cameras; i++) {
-                            if (cameras_select[i].frame_save_state.load() !=
-                                State_Frame_Idle) {
-                                save_image_all_ready = false;
-                                break;
-                            }
+                    if (ImGui::TreeNode("Save pictures")) {
+                        if (save_pics_counter == num_cameras) {
+                            save_image_all_ready = true;
                         }
 
-                        // for (int i = 0; i < num_cameras; i++) {
-                        //     ImGui::Checkbox(cameras_params[i].camera_name.c_str(),
-                        //                     &cameras_select[i].selected_to_save);
-                        //     ImGui::SameLine();
-                        //     ImGui::TextColored(ImVec4{1.0, 0.0f,
-                        //     0, 1.0f},
-                        //     "%d", cameras_select[i].pictures_counter);
-                        //     ImGui::SameLine();
-                        // }
-
+                        ImGui::Text("Reset counter: ");
                         const int cols = 5;
                         for (int i = 0; i < num_cameras; ++i) {
                             std::string label =
@@ -759,13 +747,10 @@ int main(int argc, char **args) {
                                 std::to_string(
                                     cameras_select[i].pictures_counter) +
                                 "##calibration_save";
-                            if (ImGui::Selectable(
-                                    label.c_str(),
-                                    cameras_select[i].selected_to_save,
-                                    ImGuiSelectableFlags_None,
-                                    ImVec2(150, 50))) {
-                                cameras_select[i].selected_to_save =
-                                    !cameras_select[i].selected_to_save;
+                            if (ImGui::Selectable(label.c_str(), false,
+                                                  ImGuiSelectableFlags_None,
+                                                  ImVec2(150, 50))) {
+                                cameras_select[i].pictures_counter = 0;
                             }
 
                             // Keep items on the same line until end of row
@@ -778,23 +763,6 @@ int main(int argc, char **args) {
                         }
 
                         ImGui::NewLine();
-                        if (ImGui::Button("Save selected")) {
-                            make_folder(picture_save_folder);
-                            std::string frame_save_name =
-                                get_current_time_milliseconds();
-                            for (int i = 0; i < num_cameras; i++) {
-                                cameras_select[i].frame_save_name =
-                                    frame_save_name;
-                                cameras_select[i].picture_save_folder =
-                                    picture_save_folder;
-                                if (cameras_select[i].selected_to_save) {
-                                    cameras_select[i].frame_save_state.store(
-                                        State_Copy_New_Frame);
-                                }
-                            }
-                        }
-                        ImGui::SameLine();
-
                         if (ImGui::Button("Save pictures all")) {
                             make_folder(picture_save_folder);
                             std::string frame_save_name =
@@ -812,6 +780,9 @@ int main(int argc, char **args) {
                         // order important
                         if (save_image_all_ready &&
                             calib_state == CalibSavePictures) {
+                            save_pics_counter = 0;
+                            // if network, then need to send to peers to reset
+                            // counter, once replied all 0, then send to indigo
                             send_message_to_indigo(
                                 ctx.sender, ctx.peers, "indigo",
                                 FetchGame::SignalType_CalibrationNextPose);

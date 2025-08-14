@@ -1,4 +1,5 @@
 #include "FrameSaver.h"
+#include "global.h"
 #include "image_processing.h"
 #include "kernel.cuh"
 #include "utils.h"
@@ -108,5 +109,6 @@ void FrameSaver::thread_loop() {
 
         camera_select->pictures_counter++;
         camera_select->frame_save_state.store(State_Frame_Idle);
+        sync_fetch_and_add(&save_pics_counter, 1);
     }
 }

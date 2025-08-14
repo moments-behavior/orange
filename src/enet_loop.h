@@ -2,6 +2,7 @@
 #include "enet_fb_helpers.h"
 #include "enet_utils.h"
 #include "fetch_generated.h"
+#include "global.h"
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -49,10 +50,12 @@ inline void run_enet_loop(AppContext &ctx, std::atomic<bool> &stop) {
                 break;
             }
             case FetchGame::SignalType_CalibrationPoseReached:
+                calib_state = CalibPoseReached;
                 std::puts("[ENet] Calibration pose reached.");
                 break;
 
             case FetchGame::SignalType_CalibrationDone:
+                calib_state = CalibIdle;
                 std::puts("[ENet] Calibration done.");
                 break;
 

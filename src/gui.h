@@ -451,6 +451,11 @@ inline void gui_plot_world_coordinates(CameraCalibResults *cvp,
 
         ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
         ImPlot::SetNextLineStyle(my_color, 3.0);
+
+        if (edge == 0) {
+            // Only call once for the first series with this label
+            ImPlot::HideNextItem(true);
+        }
         ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
     }
 }

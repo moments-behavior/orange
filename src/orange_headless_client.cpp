@@ -32,19 +32,19 @@ int main() try {
         case FetchGame::ManagerState_CAMERAOPENED:
             // You previously flipped to WAITTHREAD and sent it.
             send_client_state_update_message(
-                ctx.sender, pid, FetchGame::ManagerState_WAITTHREAD);
+                ctx.sender, pid, FetchGame::ManagerState_CAMERAOPENED);
             break;
 
         case FetchGame::ManagerState_THREADREADY:
             // You previously flipped to WAITSTART and sent it.
-            send_client_state_update_message(ctx.sender, pid,
-                                             FetchGame::ManagerState_WAITSTART);
+            send_client_state_update_message(
+                ctx.sender, pid, FetchGame::ManagerState_THREADREADY);
             break;
 
         case FetchGame::ManagerState_RECORDINGSTARTED:
             // You previously flipped to WAITSTART and sent it.
-            send_client_state_update_message(ctx.sender, pid,
-                                             FetchGame::ManagerState_WAITSTOP);
+            send_client_state_update_message(
+                ctx.sender, pid, FetchGame::ManagerState_RECORDINGSTARTED);
             break;
         case FetchGame::ManagerState_CALIBFOLDER:
             // You previously flipped back to IDLE and sent it.

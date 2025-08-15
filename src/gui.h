@@ -512,7 +512,7 @@ inline void draw_boxes(std::vector<cv::Rect_<float>> bboxes, int frame_height,
     }
 }
 
-inline bool open_selected_cameras(const std::vector<bool> &check, int cam_count,
+inline void open_selected_cameras(const std::vector<bool> &check, int cam_count,
                                   GigEVisionDeviceInfo *device_info,
                                   std::vector<std::string> &camera_config_files,
                                   int &num_cameras,

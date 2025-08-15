@@ -512,13 +512,15 @@ inline void draw_boxes(std::vector<cv::Rect_<float>> bboxes, int frame_height,
     }
 }
 
-inline void open_camera(int &num_cameras, std::vector<bool> &check,
-                        int cam_count, CameraParams *cameras_params,
-                        GigEVisionDeviceInfo *device_info,
-                        CameraEachSelect *cameras_select,
-                        std::vector<std::string> &camera_config_files,
-                        CameraEmergent *ecams,
-                        ScrollingBuffer *realtime_plot_data) {
+inline bool open_selected_cameras(const std::vector<bool> &check, int cam_count,
+                                  GigEVisionDeviceInfo *device_info,
+                                  std::vector<std::string> &camera_config_files,
+                                  int &num_cameras,
+                                  CameraParams *&cameras_params,
+                                  CameraEachSelect *&cameras_select,
+                                  CameraEmergent *&ecams,
+                                  ScrollingBuffer *&realtime_plot_data) {
+
     num_cameras = 0;
     for (int i = 0; i < cam_count; i++) {
         if (check[i]) {

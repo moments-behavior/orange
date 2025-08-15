@@ -172,42 +172,43 @@ int main(int argc, char **args) {
                             camera_config_files, device_info, check, cam_count);
                         send_open_cameras_to(ctx.sender, ctx.peers,
                                              server_names, "calib");
-                        open_camera(num_cameras, check, cam_count,
-                                    cameras_params, device_info, cameras_select,
-                                    camera_config_files, ecams,
-                                    realtime_plot_data);
+                        open_selected_cameras(check, cam_count, device_info,
+                                              camera_config_files, num_cameras,
+                                              cameras_params, cameras_select,
+                                              ecams, realtime_plot_data);
                         camera_control->open = true;
                     }
+                } break;
                 }
-                }
-                break;
-            }
 
-            const bool can_open = (!camera_control->open) &&
-                                  all_connected(ctx, server_names) &&
-                                  all_in_state(server_names, ctx.peers,
-                                               FetchGame::ManagerState_IDLE) &&
-                                  !selected_cfg_folder.empty();
+                const bool can_open =
+                    (!camera_control->open) &&
+                    all_connected(ctx, server_names) &&
+                    all_in_state(server_names, ctx.peers,
+                                 FetchGame::ManagerState_IDLE) &&
+                    !selected_cfg_folder.empty();
 
-            if (can_open) {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                      ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                      ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
+                if (can_open) {
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                          ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                          ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
 
-                if (ImGui::Button("Open Cameras")) {
-                    update_camera_configs(
-                        camera_config_files,
-                        network_config_folders[network_config_select]);
-                    select_cameras_have_configs(camera_config_files,
-                                                device_info, check, cam_count);
-                    send_open_cameras_to(ctx.sender, ctx.peers, server_names,
-                                         selected_cfg_folder);
-                    open_camera(num_cameras, check, cam_count, cameras_params,
-                                device_info, cameras_select,
-                                camera_config_files, ecams, realtime_plot_data);
+                    if (ImGui::Button("Open Cameras")) {
+                        update_camera_configs(
+                            camera_config_files,
+                            network_config_folders[network_config_select]);
+                        select_cameras_have_configs(
+                            camera_config_files, device_info, check, cam_count);
+                        send_open_cameras_to(ctx.sender, ctx.peers,
+                                             server_names, selected_cfg_folder);
+                        open_selected_cameras(check, cam_count, device_info,
+                                              camera_config_files, num_cameras,
+                                              cameras_params, cameras_select,
+                                              ecams, realtime_plot_data);
+                    }
                     camera_control->open = true;
                 }
                 ImGui::PopStyleColor(3);

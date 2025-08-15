@@ -83,6 +83,26 @@ inline void send_open_cameras_to(FBMessageSender &sender,
     }
 }
 
+inline void send_open_cameras_calib(FBMessageSender &sender,
+                                    const PeerRegistry &reg,
+                                    const std::vector<std::string> &names,
+                                    const std::string &config_folder) {
+    auto build = [&](flatbuffers::FlatBufferBuilder &b) {
+        b.Clear();
+        auto cfg = b.CreateString(config_folder);
+        FetchGame::ServerBuilder sb(b);
+        sb.add_config_folder(cfg);
+        sb.add_control(FetchGame::ServerControl_CALIBOPENCAMERA);
+        auto root = sb.Finish();
+        b.Finish(root);
+    };
+    for (const auto &n : names) {
+        if (uint32_t pid = reg.get_pid_by_name(n)) {
+            sender.to_peer(pid, build);
+        }
+    }
+}
+
 inline void send_start_threads_to(FBMessageSender &sender,
                                   const PeerRegistry &reg,
                                   const std::vector<std::string> &names,

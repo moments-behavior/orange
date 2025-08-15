@@ -24,36 +24,39 @@ struct ServerBuilder;
 enum ServerControl : int8_t {
   ServerControl_IDLE = 0,
   ServerControl_OPENCAMERA = 1,
-  ServerControl_STARTCALIB = 2,
-  ServerControl_STARTTHREAD = 3,
-  ServerControl_STARTRECORDING = 4,
-  ServerControl_STOPRECORDING = 5,
-  ServerControl_QUIT = 6,
+  ServerControl_STARTTHREAD = 2,
+  ServerControl_STARTRECORDING = 3,
+  ServerControl_STOPRECORDING = 4,
+  ServerControl_STARTCALIB = 5,
+  ServerControl_CALIBOPENCAMERA = 6,
+  ServerControl_QUIT = 7,
   ServerControl_MIN = ServerControl_IDLE,
   ServerControl_MAX = ServerControl_QUIT
 };
 
-inline const ServerControl (&EnumValuesServerControl())[7] {
+inline const ServerControl (&EnumValuesServerControl())[8] {
   static const ServerControl values[] = {
     ServerControl_IDLE,
     ServerControl_OPENCAMERA,
-    ServerControl_STARTCALIB,
     ServerControl_STARTTHREAD,
     ServerControl_STARTRECORDING,
     ServerControl_STOPRECORDING,
+    ServerControl_STARTCALIB,
+    ServerControl_CALIBOPENCAMERA,
     ServerControl_QUIT
   };
   return values;
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[8] = {
+  static const char * const names[9] = {
     "IDLE",
     "OPENCAMERA",
-    "STARTCALIB",
     "STARTTHREAD",
     "STARTRECORDING",
     "STOPRECORDING",
+    "STARTCALIB",
+    "CALIBOPENCAMERA",
     "QUIT",
     nullptr
   };
@@ -113,66 +116,51 @@ inline const char *EnumNameSignalType(SignalType e) {
 
 enum ManagerState : int8_t {
   ManagerState_IDLE = 0,
-  ManagerState_CONNECT = 1,
-  ManagerState_CONNECTED = 2,
-  ManagerState_OPENCAMERA = 3,
-  ManagerState_CAMERAOPENED = 4,
-  ManagerState_ERROR = 5,
-  ManagerState_STARTCAMTHREAD = 6,
-  ManagerState_THREADREADY = 7,
-  ManagerState_RECORDSTOPPED = 8,
-  ManagerState_WAITTHREAD = 9,
-  ManagerState_WAITSTART = 10,
-  ManagerState_WAITSTOP = 11,
-  ManagerState_RECORDINGSTARTED = 12,
-  ManagerState_CALIBFOLDER = 13,
+  ManagerState_CONNECTED = 1,
+  ManagerState_CAMERAOPENED = 2,
+  ManagerState_ERROR = 3,
+  ManagerState_THREADREADY = 4,
+  ManagerState_RECORDSTOPPED = 5,
+  ManagerState_RECORDINGSTARTED = 6,
+  ManagerState_CALIBFOLDER = 7,
+  ManagerState_CALIBCAMERAOPENED = 8,
   ManagerState_MIN = ManagerState_IDLE,
-  ManagerState_MAX = ManagerState_CALIBFOLDER
+  ManagerState_MAX = ManagerState_CALIBCAMERAOPENED
 };
 
-inline const ManagerState (&EnumValuesManagerState())[14] {
+inline const ManagerState (&EnumValuesManagerState())[9] {
   static const ManagerState values[] = {
     ManagerState_IDLE,
-    ManagerState_CONNECT,
     ManagerState_CONNECTED,
-    ManagerState_OPENCAMERA,
     ManagerState_CAMERAOPENED,
     ManagerState_ERROR,
-    ManagerState_STARTCAMTHREAD,
     ManagerState_THREADREADY,
     ManagerState_RECORDSTOPPED,
-    ManagerState_WAITTHREAD,
-    ManagerState_WAITSTART,
-    ManagerState_WAITSTOP,
     ManagerState_RECORDINGSTARTED,
-    ManagerState_CALIBFOLDER
+    ManagerState_CALIBFOLDER,
+    ManagerState_CALIBCAMERAOPENED
   };
   return values;
 }
 
 inline const char * const *EnumNamesManagerState() {
-  static const char * const names[15] = {
+  static const char * const names[10] = {
     "IDLE",
-    "CONNECT",
     "CONNECTED",
-    "OPENCAMERA",
     "CAMERAOPENED",
     "ERROR",
-    "STARTCAMTHREAD",
     "THREADREADY",
     "RECORDSTOPPED",
-    "WAITTHREAD",
-    "WAITSTART",
-    "WAITSTOP",
     "RECORDINGSTARTED",
     "CALIBFOLDER",
+    "CALIBCAMERAOPENED",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameManagerState(ManagerState e) {
-  if (::flatbuffers::IsOutRange(e, ManagerState_IDLE, ManagerState_CALIBFOLDER)) return "";
+  if (::flatbuffers::IsOutRange(e, ManagerState_IDLE, ManagerState_CALIBCAMERAOPENED)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesManagerState()[index];
 }

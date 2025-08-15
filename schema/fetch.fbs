@@ -3,10 +3,11 @@ namespace FetchGame;
 enum ServerControl : byte {
     IDLE,
     OPENCAMERA,
-    STARTCALIB,
     STARTTHREAD,
     STARTRECORDING,
     STOPRECORDING,
+    STARTCALIB,
+    CALIBOPENCAMERA,
     QUIT
 }
 
@@ -22,19 +23,14 @@ enum SignalType: byte {
 
 enum ManagerState: byte {
     IDLE,
-    CONNECT,
     CONNECTED,
-    OPENCAMERA,
     CAMERAOPENED,
     ERROR,
-    STARTCAMTHREAD,
     THREADREADY,
     RECORDSTOPPED,
-    WAITTHREAD,
-    WAITSTART,
-    WAITSTOP,
     RECORDINGSTARTED,
     CALIBFOLDER,
+    CALIBCAMERAOPENED
 }
 
 table bring_up_message {

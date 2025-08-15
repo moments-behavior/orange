@@ -1,6 +1,7 @@
 #include "camera.h"
 #include "enet_fb_helpers.h"
 #include "enet_loop.h"
+#include "enet_utils.h"
 #include "fetch_game.h"
 #include "global.h"
 #include "gui.h"
@@ -170,13 +171,14 @@ int main(int argc, char **args) {
                         update_camera_configs(camera_config_files, "calib");
                         select_cameras_have_configs(
                             camera_config_files, device_info, check, cam_count);
-                        send_open_cameras_to(ctx.sender, ctx.peers,
-                                             server_names, "calib");
+                        send_open_cameras_calib(ctx.sender, ctx.peers,
+                                                server_names, "calib");
                         open_selected_cameras(check, cam_count, device_info,
                                               camera_config_files, num_cameras,
                                               cameras_params, cameras_select,
                                               ecams, realtime_plot_data);
                         camera_control->open = true;
+                        calib_state.store(CalibOpenCamera);
                     }
                 } break;
                 }

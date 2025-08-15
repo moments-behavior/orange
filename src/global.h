@@ -20,6 +20,7 @@ bool try_stop_timer();
 enum CalibState {
     CalibIdle,
     CalibStart,
+    CalibOpenCamera,
     CalibNextPose,
     CalibPoseReached,
     CalibSavePictures

@@ -49,7 +49,7 @@ void CameraManager::run() {
             do_connect_scan();
             break;
         case ManagerCmdType::OpenCameras:
-            do_open(cmd.open);
+            do_open(cmd.open, false);
             break;
         case ManagerCmdType::StartThreads:
             do_start_threads(cmd.start);
@@ -62,6 +62,9 @@ void CameraManager::run() {
             break;
         case ManagerCmdType::StartCalib:
             do_start_calib(cmd.open);
+        case ManagerCmdType::CalibOpenCameras:
+            do_open(cmd.open, true);
+            break;
         case ManagerCmdType::Shutdown:
             do_shutdown();
             return;
@@ -75,7 +78,7 @@ void CameraManager::do_connect_scan() {
     emit(FetchGame::ManagerState_CONNECTED);
 }
 
-void CameraManager::do_open(const OpenArgs &args) {
+void CameraManager::do_open(const OpenArgs &args, bool calib) {
     if (cam_count_ <= 0) {
         // Safety net: we expect do_connect_scan() already ran.
         emit(FetchGame::ManagerState_ERROR);
@@ -99,8 +102,11 @@ void CameraManager::do_open(const OpenArgs &args) {
                                 &sorted_[cameras_params_[i].camera_id],
                                 &cameras_params_[i]);
     }
-
-    emit(FetchGame::ManagerState_CAMERAOPENED);
+    if (calib) {
+        emit(FetchGame::ManagerState_CALIBCAMERAOPENED);
+    } else {
+        emit(FetchGame::ManagerState_CAMERAOPENED);
+    }
 }
 
 void CameraManager::do_start_calib(const OpenArgs &args) {

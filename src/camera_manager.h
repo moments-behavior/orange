@@ -38,7 +38,8 @@ enum class ManagerCmdType {
     StartRecording,
     StopRecording,
     Shutdown,
-    StartCalib
+    StartCalib,
+    CalibOpenCameras
 };
 
 struct ManagerCmd {
@@ -69,7 +70,7 @@ class CameraManager {
 
     // impl steps (called only on manager thread)
     void do_connect_scan();
-    void do_open(const OpenArgs &args);
+    void do_open(const OpenArgs &args, bool calib);
     void do_start_threads(const StartArgs &args);
     void do_start_recording(uint64_t ptp_time);
     void do_stop_recording(uint64_t ptp_time);

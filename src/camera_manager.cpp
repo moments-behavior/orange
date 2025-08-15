@@ -60,6 +60,8 @@ void CameraManager::run() {
         case ManagerCmdType::StopRecording:
             do_stop_recording(cmd.ptp_time);
             break;
+        case ManagerCmdType::StartCalib:
+            do_start_calib(cmd.open);
         case ManagerCmdType::Shutdown:
             do_shutdown();
             return;
@@ -86,7 +88,7 @@ void CameraManager::do_open(const OpenArgs &args) {
     cameras_select_ = std::make_unique<CameraEachSelect[]>(cam_n_);
 
     std::vector<std::string> camera_config_files;
-    update_camera_configs(camera_config_files, args.config_folder);
+    update_camera_configs(camera_config_files, args.folder);
 
     for (int i = 0; i < cam_count_; ++i) {
         // use cached sorted_ as the authoritative device list
@@ -99,6 +101,12 @@ void CameraManager::do_open(const OpenArgs &args) {
     }
 
     emit(FetchGame::ManagerState_CAMERAOPENED);
+}
+
+void CameraManager::do_start_calib(const OpenArgs &args) {
+    calib_folder_ = args.folder;
+    make_folder(calib_folder_);
+    emit(FetchGame::ManagerState_CALIBFOLDER);
 }
 
 void CameraManager::do_start_threads(const StartArgs &args) {

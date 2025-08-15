@@ -46,6 +46,11 @@ int main() try {
             send_client_state_update_message(ctx.sender, pid,
                                              FetchGame::ManagerState_WAITSTOP);
             break;
+        case FetchGame::ManagerState_CALIBFOLDER:
+            // You previously flipped back to IDLE and sent it.
+            send_client_state_update_message(
+                ctx.sender, pid, FetchGame::ManagerState_CALIBFOLDER);
+            break;
         case FetchGame::ManagerState_RECORDSTOPPED:
             // You previously flipped back to IDLE and sent it.
             send_client_state_update_message(ctx.sender, pid,
@@ -81,7 +86,7 @@ int main() try {
                 switch (msg->control()) {
                 case FetchGame::ServerControl_OPENCAMERA: {
                     OpenArgs o{};
-                    o.config_folder = msg->config_folder()->str();
+                    o.folder = msg->config_folder()->str();
                     mgr.post(ManagerCmd{ManagerCmdType::OpenCameras, o});
                 } break;
                 case FetchGame::ServerControl_STARTTHREAD: {
@@ -98,6 +103,11 @@ int main() try {
                                         {},
                                         msg->ptp_global_time()});
                     break;
+                case FetchGame::ServerControl_STARTCALIB: {
+                    OpenArgs o{};
+                    o.folder = msg->calib_folder()->str();
+                    mgr.post(ManagerCmd{ManagerCmdType::StartCalib, o});
+                } break;
                 case FetchGame::ServerControl_STOPRECORDING:
                     mgr.post(ManagerCmd{ManagerCmdType::StopRecording,
                                         {},

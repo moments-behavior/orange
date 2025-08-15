@@ -150,14 +150,41 @@ int main(int argc, char **args) {
             std::string selected_cfg_folder =
                 network_config_folders[network_config_select];
 
-            auto all_connected = [&]() {
-                for (const auto &name : server_names)
-                    if (ctx.peers.get_pid_by_name(name) == 0)
-                        return false;
-                return true;
-            };
+            // if indigo connected
+            if (ctx.peers.get_pid_by_name("indigo")) {
+                switch (calib_state.load()) {
+                case CalibIdle: {
+                    if (ImGui::Button("Start Calibration")) {
+                        // make folder, and send to servers
+                        std::string calib_save_folder = recording_root_dir_str +
+                                                        "/exp/calibration/" +
+                                                        get_current_date_time();
+                        make_folder(calib_save_folder);
+                        send_start_calib(ctx.sender, ctx.peers, server_names,
+                                         calib_save_folder);
+                        calib_state.store(CalibStart);
+                    }
+                } break;
+                case CalibStart: {
+                    if (ImGui::Button("Open Cameras")) {
+                        update_camera_configs(camera_config_files, "calib");
+                        select_cameras_have_configs(
+                            camera_config_files, device_info, check, cam_count);
+                        send_open_cameras_to(ctx.sender, ctx.peers,
+                                             server_names, "calib");
+                        open_camera(num_cameras, check, cam_count,
+                                    cameras_params, device_info, cameras_select,
+                                    camera_config_files, ecams,
+                                    realtime_plot_data);
+                        camera_control->open = true;
+                    }
+                }
+                }
+                break;
+            }
 
-            const bool can_open = (!camera_control->open) && all_connected() &&
+            const bool can_open = (!camera_control->open) &&
+                                  all_connected(ctx, server_names) &&
                                   all_in_state(server_names, ctx.peers,
                                                FetchGame::ManagerState_IDLE) &&
                                   !selected_cfg_folder.empty();
@@ -178,54 +205,9 @@ int main(int argc, char **args) {
                                                 device_info, check, cam_count);
                     send_open_cameras_to(ctx.sender, ctx.peers, server_names,
                                          selected_cfg_folder);
-
-                    // open cameras
-                    num_cameras = 0;
-                    for (int i = 0; i < cam_count; i++) {
-                        if (check[i]) {
-                            num_cameras++;
-                        }
-                    }
-                    if (num_cameras > 0) {
-                        cameras_params = new CameraParams[num_cameras]();
-                        cameras_select = new CameraEachSelect[num_cameras]();
-
-                        std::vector<int> selected_cameras;
-                        for (int i = 0; i < cam_count; i++) {
-                            if (check[i]) {
-                                selected_cameras.push_back(i);
-                            }
-                        }
-                        for (int i = 0; i < num_cameras; i++) {
-                            set_camera_params(&cameras_params[i],
-                                              &cameras_select[i],
-                                              &device_info[selected_cameras[i]],
-                                              camera_config_files,
-                                              selected_cameras[i], num_cameras);
-                        }
-
-                        for (int i = 0; i < num_cameras; i++) {
-                            cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name == "Cam16") {
-                                cameras_select[i].stream_on = true;
-                                cameras_select[i].detect_mode =
-                                    Detect2D_GLThread;
-                            }
-                            if (cameras_params[i].camera_name == "shelter") {
-                                cameras_select[i].stream_on = true;
-                            }
-                        }
-
-                        ecams = new CameraEmergent[num_cameras];
-                        for (int i = 0; i < num_cameras; i++) {
-                            open_camera_with_params(
-                                &ecams[i].camera,
-                                &device_info[cameras_params[i].camera_id],
-                                &cameras_params[i]);
-                        }
-
-                        realtime_plot_data = new ScrollingBuffer[num_cameras];
-                    }
+                    open_camera(num_cameras, check, cam_count, cameras_params,
+                                device_info, cameras_select,
+                                camera_config_files, ecams, realtime_plot_data);
                     camera_control->open = true;
                 }
                 ImGui::PopStyleColor(3);
@@ -257,7 +239,8 @@ int main(int argc, char **args) {
             }
 
             const bool can_start_thread =
-                (!camera_control->subscribe) && all_connected() &&
+                (!camera_control->subscribe) &&
+                all_connected(ctx, server_names) &&
                 all_in_state(server_names, ctx.peers,
                              FetchGame::ManagerState_WAITTHREAD);
             if (can_start_thread) {
@@ -317,8 +300,8 @@ int main(int argc, char **args) {
                                           ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
 
                     if (ImGui::Button("Start Recording")) {
-                        // get the host ready, and then set global ptp time to
-                        // start recording
+                        // get the host ready, and then set global ptp time
+                        // to start recording
                         unsigned long long ptp_time =
                             get_current_PTP_time(&ecams[0].camera);
                         int delay_in_second = 3;
@@ -728,19 +711,6 @@ int main(int argc, char **args) {
                     for (int i = 0; i < num_cameras; i++) {
                         cameras_select[i].frame_save_format = std::string(
                             picture_format_items[current_picture_format]);
-                    }
-
-                    // if indigo connected
-                    if (ctx.peers.get_pid_by_name("indigo")) {
-                        if (ImGui::Button("Start Calibration")) {
-                            // make folder, and send to servers
-                            std::string calib_save_folder =
-                                recording_root_dir_str + "/exp/calibration/" +
-                                get_current_date_time();
-                            make_folder(calib_save_folder);
-                            send_start_calib(ctx.sender, ctx.peers,
-                                             server_names, calib_save_folder);
-                        }
                     }
 
                     if (save_pics_counter == num_cameras) {

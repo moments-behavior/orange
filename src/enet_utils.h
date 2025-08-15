@@ -55,6 +55,14 @@ inline bool all_in_state(const std::vector<std::string> &server_names,
     return true;
 }
 
+inline bool all_connected(const AppContext &ctx,
+                          const std::vector<std::string> &server_names) {
+    for (const auto &name : server_names)
+        if (ctx.peers.get_pid_by_name(name) == 0)
+            return false;
+    return true;
+}
+
 inline void send_open_cameras_to(FBMessageSender &sender,
                                  const PeerRegistry &reg,
                                  const std::vector<std::string> &names,

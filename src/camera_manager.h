@@ -23,7 +23,7 @@ struct RecordingSetup {
 };
 
 struct OpenArgs {
-    std::string config_folder;
+    std::string folder;
 };
 
 struct StartArgs {
@@ -37,7 +37,8 @@ enum class ManagerCmdType {
     StartThreads,
     StartRecording,
     StopRecording,
-    Shutdown
+    Shutdown,
+    StartCalib
 };
 
 struct ManagerCmd {
@@ -73,6 +74,7 @@ class CameraManager {
     void do_start_recording(uint64_t ptp_time);
     void do_stop_recording(uint64_t ptp_time);
     void do_shutdown();
+    void do_start_calib(const OpenArgs &args);
 
     // helpers
     void emit(FetchGame::ManagerState s);
@@ -80,7 +82,7 @@ class CameraManager {
   private:
     // --- owned by manager thread ---
     AppContext &ctx_;
-
+    std::string calib_folder_;
     // Contiguous, non-movable buffers for camera structures
     std::unique_ptr<CameraEmergent[]> ecams_;
     std::unique_ptr<CameraParams[]> cameras_params_;

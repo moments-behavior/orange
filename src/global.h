@@ -19,6 +19,7 @@ bool try_stop_timer();
 // Calibration state enumeration
 enum CalibState {
     CalibIdle,
+    CalibStart,
     CalibNextPose,
     CalibPoseReached,
     CalibSavePictures

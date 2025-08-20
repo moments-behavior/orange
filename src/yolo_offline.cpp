@@ -65,14 +65,21 @@ int main(int argc, char **argv) {
 
     cv::Mat view;
     cv::Mat final_view;
-    while (cap.read(image)) {
 
+    for (;;) {
         auto start = std::chrono::high_resolution_clock::now();
+        if (!cap.read(image))
+            break; // <- the op you’re timing
+        auto stop = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> elapsed = stop - start;
+        std::cout << "read image:  " << elapsed.count() << " ms" << std::endl;
+
+        start = std::chrono::high_resolution_clock::now();
         CHECK(cudaMemcpy(d_frame, (uint8_t *)image.data, frame_size,
                          cudaMemcpyHostToDevice));
         cudaDeviceSynchronize();
-        auto stop = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> elapsed = stop - start;
+        stop = std::chrono::high_resolution_clock::now();
+        elapsed = stop - start;
         std::cout << "copy frame from cpu to gpu:  " << elapsed.count() << " ms"
                   << std::endl;
 

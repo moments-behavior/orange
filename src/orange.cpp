@@ -673,7 +673,7 @@ int main(int argc, char **args) {
                             if (current_index != 0 &&
                                 cameras_select[i].yolo_model.empty()) {
                                 current_index = 0;
-                                error_message = "Speciy YOLO model first in "
+                                error_message = "Specify YOLO model first in "
                                                 "Camera Property.";
                                 show_error = true;
                             }

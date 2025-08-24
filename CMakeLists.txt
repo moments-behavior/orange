@@ -111,7 +111,7 @@ if(BUILD_ORANGE)
         ${FILEDIALOG_SOURCES}
         ${CUDA_SOURCES}
     )
-    target_compile_definitions(orange PRIVATE)
+    target_compile_definitions(orange PRIVATE ENET_RUNTIME_THREADED)
     # GUI-only deps
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GLFW3 REQUIRED glfw3)

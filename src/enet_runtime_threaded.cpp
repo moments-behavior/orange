@@ -149,3 +149,23 @@ void EnetRuntimeThreaded::io_loop() {
             enet_host_flush(host_);
     }
 }
+
+bool EnetRuntimeThreaded::start_client(size_t channels, enet_uint32 in_bw,
+                                       enet_uint32 out_bw) {
+    if (running_.load(std::memory_order_acquire))
+        return true; // already running
+
+    if (!host_) {
+        // nullptr => client host
+        host_ = enet_host_create(/*address*/ nullptr,
+                                 /*max peers*/ 64,
+                                 /*channels*/ static_cast<size_t>(channels),
+                                 /*inBW*/ in_bw,
+                                 /*outBW*/ out_bw);
+        if (!host_)
+            return false;
+    }
+    running_.store(true, std::memory_order_release);
+    io_thread_ = std::thread(&EnetRuntimeThreaded::io_loop, this);
+    return true;
+}

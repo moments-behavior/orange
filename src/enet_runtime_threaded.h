@@ -15,6 +15,9 @@ class EnetRuntimeThreaded {
                       size_t channels = 2, enet_uint32 in_bw = 0,
                       enet_uint32 out_bw = 0);
 
+    bool start_client(size_t channels = 2, enet_uint32 in_bw = 0,
+                      enet_uint32 out_bw = 0);
+
     // Client connect (io thread will dial out)
     void connect(ConnectReq req) { connect_reqs_.push(std::move(req)); }
 

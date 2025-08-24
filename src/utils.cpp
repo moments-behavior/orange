@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+
 simplelogger::Logger *logger =
     simplelogger::LoggerFactory::CreateConsoleLogger();
 

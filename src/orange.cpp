@@ -5,9 +5,11 @@
 #include "global.h"
 #include "gui.h"
 #include "host_client_imgui_procedural.h"
+#include "host_ctx.h"
 #include "imgui.h"
 #include "implot.h"
 #include "network_gui.h"
+#include "plot_buffers.h"
 #include "realtime_tool.h"
 #include "utils.h"
 #include "video_capture.h"
@@ -72,6 +74,7 @@ int main(int argc, char **args) {
     AppContext ctx; // ENetGuard constructed here (enet_initialize)
     std::vector<std::pair<std::string, int>> cams = {{"127.0.0.1", 34001},
                                                      {"127.0.0.1", 34002}};
+    HostClient_StartNetThread(ctx); // start dispatcher thread
     HostClient_Init(ctx, cams);
 
     std::vector<std::string> network_config_folders;
@@ -106,10 +109,60 @@ int main(int argc, char **args) {
     std::thread detection3d_thread;
     bool show_error = false;
     std::string error_message;
+
+    HostOpenCtx open_ctx{&camera_config_files,
+                         &network_config_folders,
+                         &network_config_select,
+                         device_info,
+                         &cam_count,
+                         &check,
+                         &num_cameras,
+                         &cameras_params,
+                         &cameras_select,
+                         &ecams,
+                         &realtime_plot_data,
+                         camera_control};
+    HostClient_SetOpenCtx(&open_ctx);
+
     while (!glfwWindowShouldClose(window->render_target)) {
         HostClient_Tick();
-
         create_new_frame();
+
+        if (ImGui::Begin("Network")) {
+            if (network_config_select < 0 ||
+                network_config_select >= (int)network_config_folders.size()) {
+                int idx = find_cfg_index(network_config_folders, "rig_new");
+                network_config_select =
+                    (idx >= 0 ? idx
+                              : (network_config_folders.empty() ? -1 : 0));
+            }
+
+            ImGuiStyle &style = ImGui::GetStyle();
+            const int n = (int)network_config_folders.size();
+            for (int i = 0; i < n; ++i) {
+                if (i > 0)
+                    ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
+
+                std::string label =
+                    std::filesystem::path(network_config_folders[i])
+                        .filename()
+                        .string();
+
+                const bool is_rig_new = (label == "rig_new");
+                if (is_rig_new)
+                    ImGui::PushStyleColor(ImGuiCol_Text,
+                                          ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
+
+                ImGui::RadioButton(
+                    (label + "##cfg" + std::to_string(i)).c_str(),
+                    &network_config_select, i);
+
+                if (is_rig_new)
+                    ImGui::PopStyleColor();
+            }
+        }
+        ImGui::End();
+
         HostClient_DrawImGui(); // shows the “Advance Phase” button & logs
 
         if (ImGui::Begin("Orange", nullptr)) {
@@ -1020,6 +1073,7 @@ int main(int argc, char **args) {
         delete[] cameras_select;
     }
 
+    HostClient_StopNetThread();
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();

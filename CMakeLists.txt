@@ -53,7 +53,7 @@ if(BUILD_ORANGE)
         ${DIR_NVENCODER}/*.cpp
     )
     list(REMOVE_ITEM ORANGE_SOURCES
-        ${SRC_DIR}/cam_servers.cpp
+        ${SRC_DIR}/cam_server.cpp
         ${SRC_DIR}/yolo_offline.cpp
     )
 
@@ -135,7 +135,7 @@ if(BUILD_CAM_SERVER)
         ${CAM_SERVER_SOURCES}
         ${CUDA_SOURCES}
     )
-    target_compile_definitions(cam_server PRIVATE HEADLESS)
+    target_compile_definitions(cam_server PRIVATE HEADLESS ENET_RUNTIME_THREADED)
     target_link_libraries(cam_server
         EmergentCamera EmergentGenICam EmergentGigEVision
         pthread enet

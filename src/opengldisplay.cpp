@@ -1,4 +1,3 @@
-#include "fetch_game.h"
 #include "image_processing.h"
 #include "video_capture.h"
 #if defined(__GNUC__)

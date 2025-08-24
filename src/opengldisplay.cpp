@@ -165,9 +165,9 @@ void COpenGLDisplay::ThreadRunning() {
                     if (objs[0].rect.x < 2800.0 &&
                         objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
-                        send_message_to_indigo(
-                            ctx_.sender, ctx_.peers, "indigo",
-                            FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
+                        // send_message_to_indigo(
+                        //     ctx_.sender, ctx_.peers, "indigo",
+                        //     FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
                     }
                     objs_last_frame.push_back(objs[0]);
                 } else {

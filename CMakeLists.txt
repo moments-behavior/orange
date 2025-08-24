@@ -6,7 +6,7 @@ set(CMAKE_CUDA_ARCHITECTURES 80)
 
 # ---- Options ---------------------------------------------------------------
 option(BUILD_ORANGE         "Build GUI 'orange' app"        ON)
-option(BUILD_ORANGE_CLIENT  "Build headless orange_client"  ON)
+option(BUILD_CAM_SERVER     "Build cam_server"  ON)
 option(BUILD_YOLO_OFFLINE   "Build yolo_offline tool"       ON)
 
 # ---- Dirs ------------------------------------------------------------------
@@ -53,7 +53,7 @@ if(BUILD_ORANGE)
         ${DIR_NVENCODER}/*.cpp
     )
     list(REMOVE_ITEM ORANGE_SOURCES
-        ${SRC_DIR}/orange_headless_client.cpp
+        ${SRC_DIR}/cam_servers.cpp
         ${SRC_DIR}/yolo_offline.cpp
     )
 
@@ -75,13 +75,13 @@ if(BUILD_ORANGE)
     set(FILEDIALOG_SOURCES ${DIR_FILEBROWSER}/ImGuiFileDialog.cpp)
 endif()
 
-# orange_client sources
-if(BUILD_ORANGE_CLIENT)
-    file(GLOB ORANGE_CLIENT_SOURCES
+# cam_server sources
+if(BUILD_CAM_SERVER)
+    file(GLOB CAM_SERVER_SOURCES
         ${SRC_DIR}/*.cpp
         ${DIR_NVENCODER}/*.cpp
     )
-    list(REMOVE_ITEM ORANGE_CLIENT_SOURCES
+    list(REMOVE_ITEM CAM_SERVER_SOURCES
         ${SRC_DIR}/orange.cpp
         ${SRC_DIR}/yolo_offline.cpp
         ${SRC_DIR}/yolov8_det.cpp
@@ -89,6 +89,7 @@ if(BUILD_ORANGE_CLIENT)
         ${SRC_DIR}/FrameDetector.cpp
         ${SRC_DIR}/realtime_tool.cpp
         ${SRC_DIR}/detect3d.cpp
+        ${SRC_DIR}/host_client_imgui_procedural.cpp
     )
 endif()
 
@@ -110,7 +111,7 @@ if(BUILD_ORANGE)
         ${FILEDIALOG_SOURCES}
         ${CUDA_SOURCES}
     )
-    target_compile_definitions(orange PRIVATE ENET_RUNTIME_THREADED)
+    target_compile_definitions(orange PRIVATE)
     # GUI-only deps
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GLFW3 REQUIRED glfw3)
@@ -129,13 +130,13 @@ if(BUILD_ORANGE)
     )
 endif()
 
-if(BUILD_ORANGE_CLIENT)
-    add_executable(orange_client
-        ${ORANGE_CLIENT_SOURCES}
+if(BUILD_CAM_SERVER)
+    add_executable(cam_server
+        ${CAM_SERVER_SOURCES}
         ${CUDA_SOURCES}
     )
-    target_compile_definitions(orange_client PRIVATE HEADLESS)
-    target_link_libraries(orange_client
+    target_compile_definitions(cam_server PRIVATE HEADLESS)
+    target_link_libraries(cam_server
         EmergentCamera EmergentGenICam EmergentGigEVision
         pthread enet
         cudart cuda nppicc nppidei nvidia-encode nppc

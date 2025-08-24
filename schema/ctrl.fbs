@@ -1,0 +1,66 @@
+namespace camnet.v1;
+
+enum Kind : ubyte { KindCommand, KindReply }
+
+enum ServerControl : ubyte {
+  NONE,
+  PREPARE,
+  OPENCAMERA,
+  STARTTHREAD,
+  STARTRECORDING,
+  STOPRECORDING,
+  TEARDOWN
+}
+
+enum ManagerState : ubyte {
+  IDLE,
+  CONNECTED,
+  CAMERAOPENED,
+  ERROR,
+  THREADREADY,
+  RECORDSTOPPED,
+  RECORDINGSTARTED
+}
+
+table BringupMessage {
+  server_name:string;
+  num_cameras:uint16;
+}
+
+// ---- Command payloads ----
+table PrepareArgs      { calib_folder:string; record_root:string; }
+table OpenArgs         { config_folder:string; }
+table StartThreadsArgs { record_folder:string; encoder_setup:string; }
+table StartArgs        { ptp_time:ulong; }
+table StopArgs         { ptp_time:ulong; }
+
+union CommandBody { PrepareArgs, OpenArgs, StartThreadsArgs, StartArgs, StopArgs }
+
+// ---- Reply payload ----
+table ReplyInfo {
+  state:ManagerState = IDLE;
+  ok:bool = true;
+  code:int = 0;
+  detail:string;
+  bringup:BringupMessage;  // present on initial bringup
+  cam_count:uint16 = 0;
+  server_id:string;
+}
+
+// ---- Envelope ----
+table Server {
+  kind:Kind = KindCommand;
+  control:ServerControl = NONE;
+
+  // idempotency / retries
+  job_id:string;
+  epoch:uint = 0;
+  seq:uint = 0;
+
+  // Only one of the following is set depending on kind:
+  command_body:CommandBody; // for KindCommand
+  reply:ReplyInfo;          // for KindReply
+}
+
+root_type Server;
+

@@ -1,10 +1,10 @@
 #include "camera.h"
 #include "enet_fb_helpers.h"
-#include "enet_loop.h"
 #include "enet_utils.h"
 #include "fetch_game.h"
 #include "global.h"
 #include "gui.h"
+#include "host_client_imgui_procedural.h"
 #include "imgui.h"
 #include "implot.h"
 #include "network_gui.h"
@@ -42,7 +42,6 @@ int main(int argc, char **args) {
         "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
     std::string recording_root_dir_str = "/data0";
-    // std::string input_folder = orange_root_dir_str + "/exp/unsorted";
     std::string input_folder = recording_root_dir_str + "/exp/unsorted";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
 
@@ -71,11 +70,9 @@ int main(int argc, char **args) {
     bool ptp_stream_sync = false;
 
     AppContext ctx; // ENetGuard constructed here (enet_initialize)
-    if (!ctx.net.start_server(3333))
-        return 1;
-
-    std::atomic<bool> quit_enet{false};
-    std::thread enet_thread([&] { run_enet_loop(ctx, quit_enet); });
+    std::vector<std::pair<std::string, int>> cams = {{"127.0.0.1", 34001},
+                                                     {"127.0.0.1", 34002}};
+    HostClient_Init(ctx, cams);
 
     std::vector<std::string> network_config_folders;
     int network_config_select = -1;
@@ -110,300 +107,10 @@ int main(int argc, char **args) {
     bool show_error = false;
     std::string error_message;
     while (!glfwWindowShouldClose(window->render_target)) {
+        HostClient_Tick();
+
         create_new_frame();
-        if (ImGui::Begin("Network")) {
-            if (network_config_select < 0 ||
-                network_config_select >= (int)network_config_folders.size()) {
-                int idx = find_cfg_index(network_config_folders, "rig_new");
-                network_config_select =
-                    (idx >= 0 ? idx
-                              : (network_config_folders.empty() ? -1 : 0));
-            }
-
-            ImGuiStyle &style = ImGui::GetStyle();
-            const int n = (int)network_config_folders.size();
-            for (int i = 0; i < n; ++i) {
-                if (i > 0)
-                    ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-
-                std::string label =
-                    std::filesystem::path(network_config_folders[i])
-                        .filename()
-                        .string();
-
-                const bool is_rig_new = (label == "rig_new");
-                if (is_rig_new)
-                    ImGui::PushStyleColor(ImGuiCol_Text,
-                                          ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
-
-                ImGui::RadioButton(
-                    (label + "##cfg" + std::to_string(i)).c_str(),
-                    &network_config_select, i);
-
-                if (is_rig_new)
-                    ImGui::PopStyleColor();
-            }
-
-            draw_peers_window(ctx.net, ctx.peers);
-            ImGui::Text("Calibration: %s",
-                        enum_names_calib_state()[calib_state]);
-
-            std::string selected_cfg_folder =
-                network_config_folders[network_config_select];
-
-            // if indigo connected
-            if (ctx.peers.get_pid_by_name("indigo")) {
-                switch (calib_state.load()) {
-                case CalibIdle: {
-                    if (ImGui::Button("Start Calibration")) {
-                        // make folder, and send to servers
-                        std::string calib_save_folder = recording_root_dir_str +
-                                                        "/exp/calibration/" +
-                                                        get_current_date_time();
-                        make_folder(calib_save_folder);
-                        send_start_calib(ctx.sender, ctx.peers, server_names,
-                                         calib_save_folder);
-                        calib_state.store(CalibStart);
-                    }
-                } break;
-                case CalibStart: {
-                    if (ImGui::Button("Open Cameras")) {
-                        update_camera_configs(camera_config_files, "calib");
-                        select_cameras_have_configs(
-                            camera_config_files, device_info, check, cam_count);
-                        send_open_cameras_calib(ctx.sender, ctx.peers,
-                                                server_names, "calib");
-                        open_selected_cameras(check, cam_count, device_info,
-                                              camera_config_files, num_cameras,
-                                              cameras_params, cameras_select,
-                                              ecams, realtime_plot_data);
-                        camera_control->open = true;
-                        calib_state.store(CalibOpenCamera);
-                    }
-                } break;
-                }
-            }
-
-            const bool can_open = (!camera_control->open) &&
-                                  all_connected(ctx, server_names) &&
-                                  all_in_state(server_names, ctx.peers,
-                                               FetchGame::ManagerState_IDLE) &&
-                                  !selected_cfg_folder.empty();
-
-            if (can_open) {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                      ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                      ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
-
-                if (ImGui::Button("Open Cameras")) {
-                    update_camera_configs(
-                        camera_config_files,
-                        network_config_folders[network_config_select]);
-                    select_cameras_have_configs(camera_config_files,
-                                                device_info, check, cam_count);
-                    send_open_cameras_to(ctx.sender, ctx.peers, server_names,
-                                         selected_cfg_folder);
-                    open_selected_cameras(check, cam_count, device_info,
-                                          camera_config_files, num_cameras,
-                                          cameras_params, cameras_select, ecams,
-                                          realtime_plot_data);
-
-                    camera_control->open = true;
-                }
-                ImGui::PopStyleColor(3);
-
-                ImGui::SameLine();
-
-                // Save to…
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4(0.5f, 0.0f, 0.7f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                      ImVec4(0.7f, 0.2f, 0.9f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                      ImVec4(0.4f, 0.0f, 0.6f, 1.0f));
-                if (ImGui::Button("Save to")) {
-                    IGFD::FileDialogConfig cfg;
-                    cfg.countSelectionMax = 1;
-                    cfg.path = input_folder;
-                    cfg.flags = ImGuiFileDialogFlags_Modal;
-                    ImGuiFileDialog::Instance()->OpenDialog(
-                        "ChooseRecordingDir", "Choose a Directory", nullptr,
-                        cfg);
-                }
-                ImGui::PopStyleColor(3);
-
-                ImGui::SameLine();
-                ImGui::SetWindowFontScale(1.5f);
-                ImGui::Text("%s", input_folder.c_str());
-                ImGui::SetWindowFontScale(1.0f);
-            }
-
-            const bool can_start_thread =
-                (!camera_control->subscribe) &&
-                all_connected(ctx, server_names) &&
-                all_in_state(server_names, ctx.peers,
-                             FetchGame::ManagerState_CAMERAOPENED);
-            if (can_start_thread) {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                      ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                      ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
-
-                if (ImGui::Button("Clients start camera threads")) {
-                    std::string encoder_setup =
-                        "-codec " + encoder_config->encoder_codec +
-                        " -preset " + encoder_config->encoder_preset;
-                    encoder_config->folder_name =
-                        input_folder + "/" + get_current_date_time();
-                    make_folder(encoder_config->folder_name);
-                    ptp_params->network_sync = true;
-                    send_start_threads_to(ctx.sender, ctx.peers, server_names,
-                                          encoder_config->folder_name,
-                                          encoder_setup);
-                    camera_control->record_video = true;
-                    cudaSetDevice(display_gpu_id);
-                    tex_gl = new GL_Texture[num_cameras];
-                    for (int i = 0; i < num_cameras; i++) {
-                        if (cameras_select[i].stream_on) {
-                            int camera_width =
-                                int(cameras_params[i].width /
-                                    cameras_select[i].downsample);
-                            int camera_height =
-                                int(cameras_params[i].height /
-                                    cameras_select[i].downsample);
-                            setup_texture(tex_gl[i], camera_width,
-                                          camera_height);
-                        }
-                    }
-                    start_camera_streaming(
-                        camera_threads, camera_control, ecams, cameras_params,
-                        cameras_select, tex_gl, num_cameras, evt_buffer_size,
-                        true, encoder_setup, encoder_config->folder_name,
-                        ptp_params, calib_yaml_folder, detection3d_thread, ctx);
-                    camera_control->subscribe = true;
-                }
-                ImGui::PopStyleColor(3);
-            }
-
-            const bool can_start_record = all_in_state(
-                server_names, ctx.peers, FetchGame::ManagerState_THREADREADY);
-            if (can_start_record) {
-                // check network servers are ready as well as local computer
-                if (ptp_params->ptp_counter == num_cameras) {
-                    ImGui::PushStyleColor(ImGuiCol_Button,
-                                          ImVec4{0.0f, 0.5f, 0.0f, 1.0f});
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                          ImVec4{0.2f, 0.8f, 0.2f, 1.0f});
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                          ImVec4{0.1f, 0.6f, 0.1f, 1.0f});
-
-                    if (ImGui::Button("Start Recording")) {
-                        // get the host ready, and then set global ptp time
-                        // to start recording
-                        unsigned long long ptp_time =
-                            get_current_PTP_time(&ecams[0].camera);
-                        int delay_in_second = 3;
-                        ptp_params->ptp_global_time =
-                            ((unsigned long long)delay_in_second) * 1000000000 +
-                            ptp_time;
-                        send_set_start_ptp_to(ctx.sender, ctx.peers,
-                                              server_names,
-                                              ptp_params->ptp_global_time);
-                        ptp_params->network_set_start_ptp = true;
-                    }
-                    ImGui::PopStyleColor(3);
-                }
-            }
-
-            const bool can_stop_record =
-                all_in_state(server_names, ctx.peers,
-                             FetchGame::ManagerState_RECORDINGSTARTED) &&
-                !ptp_params->network_set_stop_ptp &&
-                ptp_params->ptp_start_reached;
-
-            if (can_stop_record) {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ImVec4{0.5f, 0.0f, 0.0f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                      ImVec4{0.8f, 0.2f, 0.2f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                      ImVec4{0.6f, 0.1f, 0.1f, 1.0f});
-                if (ImGui::Button("Stop Recording")) {
-                    unsigned long long ptp_time =
-                        get_current_PTP_time(&ecams[0].camera);
-                    int delay_in_second = 3;
-                    ptp_params->ptp_stop_time =
-                        ((unsigned long long)delay_in_second) * 1000000000 +
-                        ptp_time;
-                    std::cout << ptp_params->ptp_stop_time << std::endl;
-                    send_set_stop_ptp_to(ctx.sender, ctx.peers, server_names,
-                                         ptp_params->ptp_stop_time);
-
-                    ptp_params->network_set_stop_ptp = true;
-                }
-                ImGui::PopStyleColor(3);
-            }
-        }
-        ImGui::End();
-
-        if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
-            ptp_params->network_set_stop_ptp = false;
-
-            for (int i = 0; i < num_cameras; i++) {
-                if (cameras_select[i].stream_on) {
-                    int camera_width = int(cameras_params[i].width /
-                                           cameras_select[i].downsample);
-                    int camera_height = int(cameras_params[i].height /
-                                            cameras_select[i].downsample);
-                    clear_upload_and_cleanup(tex_gl[i], camera_width,
-                                             camera_height);
-                }
-            }
-            delete[] tex_gl;
-            tex_gl = nullptr;
-
-            for (auto &t : camera_threads)
-                t.join();
-
-            camera_threads.clear();
-            for (int i = 0; i < num_cameras; i++) {
-                destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,
-                                     evt_buffer_size, &cameras_params[i]);
-                delete[] ecams[i].evt_frame;
-                check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera),
-                                    cameras_params[i].camera_serial.c_str());
-            }
-
-            for (int i = 0; i < num_cameras; i++) {
-                ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
-            }
-            camera_control->sync_camera = false;
-            camera_control->record_video = false;
-
-            ptp_params->ptp_global_time = 0;
-            ptp_params->ptp_stop_time = 0;
-            ptp_params->ptp_counter = 0;
-            ptp_params->ptp_stop_counter = 0;
-            ptp_params->network_sync = false;
-            ptp_params->network_set_start_ptp = false;
-            ptp_params->ptp_stop_reached = false;
-            ptp_params->ptp_start_reached = false;
-
-            for (int i = 0; i < num_cameras; i++) {
-                close_camera(&ecams[i].camera, &cameras_params[i]);
-            }
-
-            camera_control->open = false;
-
-            for (int i = 0; i < cam_count; i++) {
-                check[i] = 0;
-            }
-        }
+        HostClient_DrawImGui(); // shows the “Advance Phase” button & logs
 
         if (ImGui::Begin("Orange", nullptr)) {
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
@@ -749,15 +456,15 @@ int main(int argc, char **args) {
                         }
                     }
 
-                    // order important
-                    if (save_image_all_ready &&
-                        calib_state == CalibSavePictures) {
-                        save_pics_counter = 0;
-                        send_message_to_indigo(
-                            ctx.sender, ctx.peers, "indigo",
-                            FetchGame::SignalType_CalibrationNextPose);
-                        calib_state = CalibNextPose;
-                    }
+                    // // order important
+                    // if (save_image_all_ready &&
+                    //     calib_state == CalibSavePictures) {
+                    //     save_pics_counter = 0;
+                    //     send_message_to_indigo(
+                    //         ctx.sender, ctx.peers, "indigo",
+                    //         FetchGame::SignalType_CalibrationNextPose);
+                    //     calib_state = CalibNextPose;
+                    // }
 
                     if (calib_state == CalibPoseReached) {
                         make_folder(calib_save_folder);
@@ -1313,8 +1020,6 @@ int main(int argc, char **args) {
         delete[] cameras_select;
     }
 
-    quit_enet.store(true);
-    enet_thread.join();
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();

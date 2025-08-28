@@ -197,7 +197,8 @@ void COpenGLDisplay::ThreadRunning()
                     {   
                         is_detected = 1;
                         trigger_count++;
-                        if(trigger_count==trigger_count_threshold)
+                        if(is_detected)
+                        // if(trigger_count==trigger_count_threshold)
                         {
                             
                             std::cout << "trigger reward" << std::endl;                        
@@ -214,6 +215,11 @@ void COpenGLDisplay::ThreadRunning()
                         is_detected = 0;
                     }
 
+                }
+                else
+                {
+                    is_detected = 0;
+                    
                 }
                                                                     
                 // draw objects

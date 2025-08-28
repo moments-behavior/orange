@@ -44,8 +44,8 @@ int main(int argc, char **args) {
     prepare_application_folders(orange_root_dir_str);
     std::string input_folder = orange_root_dir_str + "/exp/orma";
 
-    std::string yolo_model_folder = orange_root_dir_str + "/detect";
-    std::string yolo_model = yolo_model_folder + "/mouse_ball_bbox_ir.engine";
+    std::string yolo_model_folder = orange_root_dir_str + "/models";
+    std::string yolo_model = yolo_model_folder + "/bbox_mouse_ball_ir/best.engine";
 
     bool check[cam_count]{0};
     CameraParams *cameras_params;

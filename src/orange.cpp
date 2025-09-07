@@ -123,9 +123,10 @@ int main(int argc, char **args) {
     bool quite_enet = false;
     auto record_start_time = std::chrono::steady_clock::now();
     std::string elapsed_time;
+    bool cbot_trigger_stop_recording = false;
 
     std::thread enet_thread = std::thread(&create_enet_thread, &server, my_servers, &indigo_signal_builder,
-                                          &quite_enet);
+                                          &quite_enet, &cbot_trigger_stop_recording);
 
     while (!glfwWindowShouldClose(window->render_target)) {
         create_new_frame();
@@ -353,7 +354,8 @@ int main(int argc, char **args) {
             if (!ptp_params->network_set_stop_ptp && ptp_params->ptp_start_reached && my_servers[0].server_state ==
                 FetchGame::ManagerState_WAITSTOP && my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0, 0.5f, 0, 1.0f});
-                if (ImGui::Button("Stop Recording")) {
+                if (ImGui::Button("Stop Recording") || cbot_trigger_stop_recording) {
+                    cbot_trigger_stop_recording = false;
                     unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
                     int delay_in_second = 3;
                     ptp_params->ptp_stop_time = ((unsigned long long) delay_in_second) * 1000000000 + ptp_time;

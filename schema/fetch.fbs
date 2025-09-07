@@ -6,6 +6,7 @@ enum ServerControl : byte {
     STARTTHREAD,
     STARTRECORDING,
     STOPRECORDING,
+    STOPRECORDING_EXTERN,
     QUIT
 }
 
@@ -15,6 +16,7 @@ enum SignalType: byte {
     INDIGO,
     INDIGO_TRIAL_TRIGGER,
     INDIGO_TRIAL_SUCCESS,
+    INDIGO_STOP_RECORD,
     CalibrationNextPose,
     CalibrationPoseReached,
     CalibrationDone

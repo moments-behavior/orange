@@ -27,30 +27,33 @@ enum ServerControl : int8_t {
   ServerControl_STARTTHREAD = 2,
   ServerControl_STARTRECORDING = 3,
   ServerControl_STOPRECORDING = 4,
-  ServerControl_QUIT = 5,
+  ServerControl_STOPRECORDING_EXTERN = 5,
+  ServerControl_QUIT = 6,
   ServerControl_MIN = ServerControl_IDLE,
   ServerControl_MAX = ServerControl_QUIT
 };
 
-inline const ServerControl (&EnumValuesServerControl())[6] {
+inline const ServerControl (&EnumValuesServerControl())[7] {
   static const ServerControl values[] = {
     ServerControl_IDLE,
     ServerControl_OPENCAMERA,
     ServerControl_STARTTHREAD,
     ServerControl_STARTRECORDING,
     ServerControl_STOPRECORDING,
+    ServerControl_STOPRECORDING_EXTERN,
     ServerControl_QUIT
   };
   return values;
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[7] = {
+  static const char * const names[8] = {
     "IDLE",
     "OPENCAMERA",
     "STARTTHREAD",
     "STARTRECORDING",
     "STOPRECORDING",
+    "STOPRECORDING_EXTERN",
     "QUIT",
     nullptr
   };
@@ -69,20 +72,22 @@ enum SignalType : int8_t {
   SignalType_INDIGO = 2,
   SignalType_INDIGO_TRIAL_TRIGGER = 3,
   SignalType_INDIGO_TRIAL_SUCCESS = 4,
-  SignalType_CalibrationNextPose = 5,
-  SignalType_CalibrationPoseReached = 6,
-  SignalType_CalibrationDone = 7,
+  SignalType_INDIGO_STOP_RECORD = 5,
+  SignalType_CalibrationNextPose = 6,
+  SignalType_CalibrationPoseReached = 7,
+  SignalType_CalibrationDone = 8,
   SignalType_MIN = SignalType_ClientBringup,
   SignalType_MAX = SignalType_CalibrationDone
 };
 
-inline const SignalType (&EnumValuesSignalType())[8] {
+inline const SignalType (&EnumValuesSignalType())[9] {
   static const SignalType values[] = {
     SignalType_ClientBringup,
     SignalType_ClientStateUpdate,
     SignalType_INDIGO,
     SignalType_INDIGO_TRIAL_TRIGGER,
     SignalType_INDIGO_TRIAL_SUCCESS,
+    SignalType_INDIGO_STOP_RECORD,
     SignalType_CalibrationNextPose,
     SignalType_CalibrationPoseReached,
     SignalType_CalibrationDone
@@ -91,12 +96,13 @@ inline const SignalType (&EnumValuesSignalType())[8] {
 }
 
 inline const char * const *EnumNamesSignalType() {
-  static const char * const names[9] = {
+  static const char * const names[10] = {
     "ClientBringup",
     "ClientStateUpdate",
     "INDIGO",
     "INDIGO_TRIAL_TRIGGER",
     "INDIGO_TRIAL_SUCCESS",
+    "INDIGO_STOP_RECORD",
     "CalibrationNextPose",
     "CalibrationPoseReached",
     "CalibrationDone",
@@ -428,6 +434,10 @@ inline bool VerifyServerBuffer(
 inline bool VerifySizePrefixedServerBuffer(
     ::flatbuffers::Verifier &verifier) {
   return verifier.VerifySizePrefixedBuffer<FetchGame::Server>(nullptr);
+}
+
+inline const char *ServerExtension() {
+  return "bfbs";
 }
 
 inline void FinishServerBuffer(

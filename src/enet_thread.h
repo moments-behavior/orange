@@ -3,7 +3,7 @@
 #include "imgui.h"
 #include "global.h"
 
-void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, bool* quit_enet)
+void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, bool* quit_enet, bool* cbot_trigger_stop_recording)
 {
     while(!(*quit_enet)) {
         service_network(server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -37,7 +37,11 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                     } else if (server_control->signal_type() == FetchGame::SignalType_CalibrationDone) {
                         std::cout << "From Indigo: Calibration done." << std::endl;
                         calib_state = CalibIdle;
+                    } else if (server_control->signal_type() == FetchGame::SignalType_INDIGO_STOP_RECORD) {
+                        std::cout << "From Indigo: <Stop Recording> trigger received." << std::endl;
+                        *cbot_trigger_stop_recording = true;
                     }
+
                     else {
                         for (int i = 0; i < 2; i++) {
                             if (my_servers[i].peer == evnt.peer) {

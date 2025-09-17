@@ -1,0 +1,42 @@
+# General Configuration
+DATALOADER_NUM_WORKERS: 8
+DATASET:
+  DATASET_2D: /home/user/Videos/toymouse/mouse4skel/jarvis_dataset
+  DATASET_3D: /home/user/Videos/toymouse/mouse4skel/jarvis_dataset
+CENTERDETECT:
+  MODEL_SIZE: medium
+  BATCH_SIZE: 4
+  MAX_LEARNING_RATE: 0.003
+  NUM_EPOCHS: 50
+  CHECKPOINT_SAVE_INTERVAL: 10
+  IMAGE_SIZE: 320
+KEYPOINTDETECT:
+  MODEL_SIZE: medium
+  BATCH_SIZE: 4
+  MAX_LEARNING_RATE: 0.003
+  NUM_EPOCHS: 100
+  CHECKPOINT_SAVE_INTERVAL: 10
+  BOUNDING_BOX_SIZE: 192
+  NUM_JOINTS: 4
+HYBRIDNET:
+  BATCH_SIZE: 1
+  MAX_LEARNING_RATE: 0.003
+  NUM_EPOCHS: 30
+  CHECKPOINT_SAVE_INTERVAL: 10
+  NUM_CAMERAS: 4
+  ROI_CUBE_SIZE: 80
+  GRID_SPACING: 1
+KEYPOINT_NAMES:
+- Snout
+- EarL
+- EarR
+- Tail
+SKELETON:
+- - Snout
+  - EarL
+- - Snout
+  - EarR
+- - EarL
+  - Tail
+- - EarR
+  - Tail

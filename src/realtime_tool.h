@@ -43,12 +43,50 @@ struct Ball2d {
     Ball2d() : find_ball(false) {}
 };
 
+// Jarvis-Hybrid Net specific constants
+#define JARVIS_NUM_KEYPOINTS 4  // Snout, EarL, EarR, Tail
+#define JARVIS_NUM_CAMERAS 4    // Default number of cameras
+#define JARVIS_CENTER_IMG_SIZE 320
+#define JARVIS_KEYPOINT_IMG_SIZE 192
+
+// Jarvis keypoint names (from config)
+enum JarvisKeypoint {
+    SNOUT = 0,
+    EAR_L = 1, 
+    EAR_R = 2,
+    TAIL = 3
+};
+
+struct JarvisCenter2d {
+    std::atomic<bool> find_center;
+    cv::Point2f center;  // 2D center coordinates
+    float confidence;    // Detection confidence
+    cv::Point2f proj_center;  // Projected from 3D
+    
+    JarvisCenter2d() : find_center(false), confidence(0.0f) {}
+};
+
+struct JarvisKeypoints2d {
+    std::atomic<bool> find_keypoints;
+    cv::Point2f keypoints[JARVIS_NUM_KEYPOINTS];  // 2D keypoint coordinates
+    float confidence[JARVIS_NUM_KEYPOINTS];       // Confidence per keypoint
+    cv::Point2f proj_keypoints[JARVIS_NUM_KEYPOINTS]; // Projected from 3D
+    
+    JarvisKeypoints2d() : find_keypoints(false) {
+        for (int i = 0; i < JARVIS_NUM_KEYPOINTS; ++i) {
+            confidence[i] = 0.0f;
+        }
+    }
+};
+
 struct DetectionDataPerCam {
     bool has_calibration_results;
     std::string calibration_file;
     CameraCalibResults camera_calib;
     Aruco2d marker2d;
     Ball2d ball2d;
+    JarvisCenter2d jarvis_center;      // NEW: Jarvis center detection
+    JarvisKeypoints2d jarvis_keypoints; // NEW: Jarvis keypoint detection
 };
 
 struct Aruco3d {
@@ -65,9 +103,32 @@ struct Ball3d {
     std::atomic_bool new_detection;
 };
 
+
+struct JarvisCenter3d {
+    cv::Point3f center;           // 3D center coordinates (x, y, z)
+    float confidence;             // Detection confidence
+    std::atomic_bool new_detection;
+    
+    JarvisCenter3d() : confidence(0.0f), new_detection(false) {}
+};
+
+struct JarvisPose3d {
+    cv::Point3f keypoints[JARVIS_NUM_KEYPOINTS];  // 3D keypoint coordinates
+    float confidence[JARVIS_NUM_KEYPOINTS];       // Confidence per keypoint
+    std::atomic_bool new_detection;
+    
+    JarvisPose3d() : new_detection(false) {
+        for (int i = 0; i < JARVIS_NUM_KEYPOINTS; ++i) {
+            confidence[i] = 0.0f;
+        }
+    }
+};
+
 struct Detection3d {
     Aruco3d marker3d;
     Ball3d ball3d;
+    JarvisCenter3d jarvis_center;  // NEW: Jarvis 3D center results
+    JarvisPose3d jarvis_pose;      // NEW: Jarvis 3D pose results
 };
 
 void print_calibration_results(CameraCalibResults *calib_results);

@@ -24,10 +24,11 @@ enum DetectMode {
     Detect_OFF,
     Detect2D_GLThread,
     Detect2D_Standoff,
-    Detect3D_Standoff
+    Detect3D_Standoff,
+    Detect3D_Pose  // NEW: 3D pose detection mode
 };
 constexpr const char *DetectModeNames[] = {"OFF", "2DGLThread", "2DStandoff",
-                                           "3DStandoff"};
+                                           "3DStandoff", "3DPose"};
 struct CameraEachSelect {
     bool stream_on = true;
     bool record = true;
@@ -39,6 +40,7 @@ struct CameraEachSelect {
     bool selected_to_save = false;
     std::string picture_save_folder;
     std::string yolo_model;
+    std::string jarvis_model_dir;  // NEW: Path to Jarvis model directory
     DetectMode detect_mode = Detect_OFF;
     int idx2d = 0;
     int idx3d = 0;

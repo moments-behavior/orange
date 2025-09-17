@@ -29,26 +29,146 @@ g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot.
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot_items.o $DIR_IMPLOT/implot_items.cpp
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
 
+# Compile main source files
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/orange.o src/orange.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/project.o src/project.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/FrameSaver.o src/FrameSaver.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/FrameDetector.o src/FrameDetector.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/JarvisFrameDetector.o src/JarvisFrameDetector.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/jarvis_pose_det.o src/jarvis_pose_det.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/realtime_tool.o src/realtime_tool.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/detect3d.o src/detect3d.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/network_base.o src/network_base.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/global.o src/global.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/FFmpegWriter.o src/FFmpegWriter.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/camera.o src/camera.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/video_capture.o src/video_capture.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/offthreadmachine.o src/offthreadmachine.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/opengldisplay.o src/opengldisplay.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/threadworker.o src/threadworker.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/gpu_video_encoder.o src/gpu_video_encoder.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/yolov8_det.o src/yolov8_det.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/ImGuiFileDialog.o $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+# Compile NvEncoder files
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/NvEncoder.o ./src/NvEncoder/NvEncoder.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/NvEncoderCuda.o ./src/NvEncoder/NvEncoderCuda.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+g++ -Ofast -ffast-math -std=c++17 -c -o $targets_folder/NvEncoderOutputInVidMemCuda.o ./src/NvEncoder/NvEncoderOutputInVidMemCuda.cpp \
+    -I$DIR_IMGUI -I$DIR_IMGUI_BACKEND -I$DIR_IMPLOT -I$DIR_FILEBROWSER -I$DIR_ICONFONT \
+    -I./src/NvEncoder/ -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
+    -I./third_party/flatbuffers/include -I/usr/local/include/ -I$DIR_FFMPEG/build/include/ \
+    -I/usr/local/include/opencv4 -I$DIR_TENSORRT/include
+
+# Link everything together
 g++ -Ofast -ffast-math -std=c++17 $targets_folder/*.o \
-    -o $targets_folder/orange -I ./src/ src/orange.cpp src/project.cpp src/FrameSaver.cpp src/FrameDetector.cpp src/realtime_tool.cpp src/detect3d.cpp src/network_base.cpp src/global.cpp src/FFmpegWriter.cpp src/camera.cpp src/video_capture.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
-    -I$DIR_IMGUI \
-    -I$DIR_IMGUI_BACKEND \
-    -I$DIR_IMPLOT \
-    -I$DIR_FILEBROWSER \
-    -I$DIR_ICONFONT \
-    -I./src/NvEncoder/ ./src/NvEncoder/*.cpp \
-    -I./nvenc_api/include -I/opt/EVT/eSDK/include/ -I/usr/local/cuda/include \
-    -L/opt/EVT/eSDK/lib/ -lEmergentCamera  -lEmergentGenICam  -lEmergentGigEVision \
-    -lm \
-    -lpthread \
-    -I./third_party/flatbuffers/include \
-    -lenet -I/usr/local/include/ \
-    -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc -lnppig -lnppial \
-    -lGLEW -lGL \
-    -I$DIR_FFMPEG/build/include/ \
-    -L$DIR_FFMPEG/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
-    -I/usr/local/include/opencv4 \
+    -o $targets_folder/orange \
+    -L/opt/EVT/eSDK/lib/ -lEmergentCamera -lEmergentGenICam -lEmergentGigEVision \
+    -lm -lpthread -lenet -L/usr/local/cuda/lib64/ -lcudart -lcuda -lnppicc -lnppidei -lnvidia-encode -lnppc -lnppig -lnppial \
+    -lGLEW -lGL -L$DIR_FFMPEG/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     -lopencv_sfm -lopencv_core -lopencv_imgcodecs -lopencv_imgproc -lopencv_calib3d \
-    -I$DIR_TENSORRT/include \
     -L$DIR_TENSORRT/lib/ -lnvinfer -lnvinfer_plugin \
     `pkg-config --static --libs glfw3`

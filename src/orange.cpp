@@ -121,6 +121,7 @@ int main(int argc, char **args) {
                                             "CT_Custom"};
 
     std::thread detection3d_thread;
+    std::thread jarvis_3d_thread;
     bool show_error = false;
     std::string error_message;
     while (!glfwWindowShouldClose(window->render_target)) {
@@ -343,12 +344,13 @@ int main(int argc, char **args) {
                         }
                     }
 
+                    std::thread jarvis_3d_thread;
                     start_camera_streaming(
                         camera_threads, camera_control, ecams, cameras_params,
                         cameras_select, tex_gl, num_cameras, evt_buffer_size,
                         true, encoder_setup, encoder_config->folder_name,
                         ptp_params, &indigo_signal_builder, calib_yaml_folder,
-                        detection3d_thread);
+                        detection3d_thread, jarvis_3d_thread);
                     camera_control->subscribe = true;
                 }
                 ImGui::PopStyleColor(1);
@@ -730,7 +732,15 @@ int main(int argc, char **args) {
                             if (current_index != 0 &&
                                 cameras_select[i].yolo_model.empty()) {
                                 current_index = 0;
-                                error_message = "Speciy YOLO model first in "
+                                error_message = "Specify YOLO model first in "
+                                                "Camera Property.";
+                                show_error = true;
+                            }
+                            // NEW: Check for Jarvis model directory for 3D pose detection
+                            if (current_index == Detect3D_Pose &&
+                                cameras_select[i].jarvis_model_dir.empty()) {
+                                current_index = 0;
+                                error_message = "Specify Jarvis model directory first in "
                                                 "Camera Property.";
                                 show_error = true;
                             }
@@ -1067,18 +1077,19 @@ int main(int argc, char **args) {
                                               camera_height);
                             }
                         }
+                        std::thread jarvis_3d_thread;
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, "",
                             encoder_config->folder_name, ptp_params,
                             &indigo_signal_builder, calib_yaml_folder,
-                            detection3d_thread);
+                            detection3d_thread, jarvis_3d_thread);
                     } else {
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, num_cameras,
-                            evt_buffer_size, ptp_params, detection3d_thread);
+                            evt_buffer_size, ptp_params, detection3d_thread, jarvis_3d_thread);
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =
@@ -1113,11 +1124,11 @@ int main(int argc, char **args) {
                     if (camera_control->stop_record) {
                         if (camera_control->subscribe) {
                             camera_control->subscribe = false;
-                            stop_camera_streaming(
-                                camera_threads, camera_control, ecams,
-                                cameras_params, cameras_select, num_cameras,
-                                evt_buffer_size, ptp_params,
-                                detection3d_thread);
+                        stop_camera_streaming(
+                            camera_threads, camera_control, ecams,
+                            cameras_params, cameras_select, num_cameras,
+                            evt_buffer_size, ptp_params,
+                            detection3d_thread, jarvis_3d_thread);
                             for (int i = 0; i < num_cameras; i++) {
                                 if (cameras_select[i].stream_on) {
                                     int camera_width =
@@ -1163,19 +1174,20 @@ int main(int argc, char **args) {
                             }
                         }
 
+                        std::thread jarvis_3d_thread;
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
                             encoder_config->folder_name, ptp_params,
                             &indigo_signal_builder, calib_yaml_folder,
-                            detection3d_thread);
+                            detection3d_thread, jarvis_3d_thread);
                     } else {
                         camera_control->subscribe = false;
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, num_cameras,
-                            evt_buffer_size, ptp_params, detection3d_thread);
+                            evt_buffer_size, ptp_params, detection3d_thread, jarvis_3d_thread);
                         ptp_stream_sync = false;
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
@@ -1360,6 +1372,40 @@ int main(int argc, char **args) {
                                         (ImVec4)ImColor::HSV(0.55, 0.7f, 1.0f),
                                         ball_proj_name, ImPlotMarker_Cross,
                                         8.0);
+                                }
+                                
+                                // NEW: Jarvis 3D pose visualization
+                                if (cameras_select[i].detect_mode == Detect3D_Pose) {
+                                    // Draw 3D center projection
+                                    if (detection3d.jarvis_center.new_detection.load()) {
+                                        std::string jarvis_center_name =
+                                            "jarvis_center##" + std::to_string(i);
+                                        draw_ball_center(
+                                            detection2d[i].jarvis_center.proj_center,
+                                            cameras_params[i].height,
+                                            (ImVec4)ImColor::HSV(0.8f, 0.9f, 1.0f), // Purple color
+                                            jarvis_center_name, ImPlotMarker_Circle,
+                                            10.0);
+                                    }
+                                    
+                                    // Draw 3D keypoint projections
+                                    if (detection3d.jarvis_pose.new_detection.load()) {
+                                        const char* keypoint_names[] = {"Snout", "EarL", "EarR", "Tail"};
+                                        const float keypoint_colors[] = {0.0f, 0.2f, 0.4f, 0.6f}; // Different hues
+                                        
+                                        for (int k = 0; k < JARVIS_NUM_KEYPOINTS; k++) {
+                                            if (detection2d[i].jarvis_keypoints.confidence[k] > 0.5f) {
+                                                std::string keypoint_name = 
+                                                    std::string(keypoint_names[k]) + "##" + std::to_string(i);
+                                                draw_ball_center(
+                                                    detection2d[i].jarvis_keypoints.proj_keypoints[k],
+                                                    cameras_params[i].height,
+                                                    (ImVec4)ImColor::HSV(keypoint_colors[k], 0.8f, 1.0f),
+                                                    keypoint_name, ImPlotMarker_Diamond,
+                                                    8.0);
+                                            }
+                                        }
+                                    }
                                 }
                             }
 

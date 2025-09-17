@@ -6,6 +6,7 @@
 #include "utils.h"
 #ifndef HEADLESS
 #include "FrameDetector.h"
+#include "JarvisFrameDetector.h"
 #include "opengldisplay.h"
 #endif
 
@@ -140,7 +141,7 @@ inline void get_one_frame(CameraState *camera_state,
                           CameraControl *camera_control, CameraEmergent *ecam,
                           CameraParams *camera_params, PTPState *ptp_state,
                           void *openGLDisplay, GPUVideoEncoder *gpu_encoder,
-                          FrameSaver *frame_saver, void *frame_detector) {
+                          FrameSaver *frame_saver, void *frame_detector, void *jarvis_detector) {
     if (camera_control->trigger_mode) {
         std::cout << "trigger" << std::endl;
         check_camera_errors(
@@ -199,6 +200,13 @@ inline void get_one_frame(CameraState *camera_state,
             camera_select->frame_detect_state.load() == State_Copy_New_Frame) {
             detector->notify_frame_ready(ecam->frame_recv.imagePtr, 0);
         }
+        
+        // NEW: Notify Jarvis detector
+        JarvisFrameDetector *jarvis_det = static_cast<JarvisFrameDetector *>(jarvis_detector);
+        if (jarvis_det &&
+            camera_select->frame_detect_state.load() == State_Copy_New_Frame) {
+            jarvis_det->notify_frame_ready(ecam->frame_recv.imagePtr, 0);
+        }
 #endif
 
         if (camera_select->frame_save_state.load() == State_Copy_New_Frame) {
@@ -246,6 +254,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
 
 #ifndef HEADLESS
     FrameDetector *frame_detector = nullptr;
+    JarvisFrameDetector *jarvis_detector = nullptr;
+    
     if (camera_select->detect_mode == Detect3D_Standoff ||
         camera_select->detect_mode == Detect2D_Standoff) {
         frame_detector = new FrameDetector(camera_params, camera_select);
@@ -255,6 +265,18 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                camera_select->total_standoff_detector) {
             // printf(".");
             // fflush(stdout);
+            usleep(10);
+        }
+        camera_select->frame_detect_state.store(State_Copy_New_Frame);
+    }
+    
+    // NEW: Initialize Jarvis detector for 3D pose detection
+    if (camera_select->detect_mode == Detect3D_Pose) {
+        jarvis_detector = new JarvisFrameDetector(camera_params, camera_select);
+        jarvis_detector->start();
+
+        while (detector_counter.load() !=
+               camera_select->total_standoff_detector) {
             usleep(10);
         }
         camera_select->frame_detect_state.store(State_Copy_New_Frame);
@@ -313,11 +335,11 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
 #ifndef HEADLESS
         get_one_frame(&camera_state, camera_select, camera_control, ecam,
                       camera_params, &ptp_state, openGLDisplay, gpu_encoder,
-                      &frame_saver, frame_detector);
+                      &frame_saver, frame_detector, jarvis_detector);
 #else
         get_one_frame(&camera_state, camera_select, camera_control, ecam,
                       camera_params, &ptp_state, nullptr, gpu_encoder,
-                      &frame_saver, nullptr);
+                      &frame_saver, nullptr, nullptr);
 #endif
         if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
             if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {
@@ -362,6 +384,12 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
         camera_select->detect_mode == Detect2D_Standoff) {
         frame_detector->stop();
         delete frame_detector;
+    }
+    
+    // NEW: Cleanup Jarvis detector
+    if (camera_select->detect_mode == Detect3D_Pose) {
+        jarvis_detector->stop();
+        delete jarvis_detector;
     }
 #endif
 

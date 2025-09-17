@@ -92,7 +92,7 @@ inline void start_camera_streaming(
     int evt_buffer_size, bool ptp_stream_sync, const std::string &encoder_setup,
     const std::string &folder_name, PTPParams *ptp_params,
     INDIGOSignalBuilder *indigo_signal_builder, std::string calib_yaml_folder,
-    std::thread &detection3d_thread) {
+    std::thread &detection3d_thread, std::thread &jarvis_3d_thread) {
 
     detection2d = new DetectionDataPerCam[num_cameras];
     int idx3d = 0;
@@ -125,6 +125,19 @@ inline void start_camera_streaming(
     if (idx3d >= 2) {
         detection3d_thread = std::thread(&detection3d_proc, camera_control,
                                          cameras_select, num_cameras);
+    }
+    
+    // NEW: Start Jarvis 3D pose processing if any cameras have it enabled
+    int jarvis_3d_count = 0;
+    for (int i = 0; i < num_cameras; i++) {
+        if (cameras_select[i].detect_mode == Detect3D_Pose) {
+            jarvis_3d_count++;
+        }
+    }
+    
+    if (jarvis_3d_count >= 2) {
+        jarvis_3d_thread = std::thread(&jarvis_3d_pose_proc, camera_control,
+                                       cameras_select, num_cameras);
     }
 
     for (int i = 0; i < num_cameras; i++) {
@@ -166,7 +179,7 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
                       CameraParams *cameras_params,
                       CameraEachSelect *cameras_select, const int num_cameras,
                       const int evt_buffer_size, PTPParams *ptp_params,
-                      std::thread &detection3d_thread) {
+                      std::thread &detection3d_thread, std::thread &jarvis_3d_thread) {
     for (auto &t : camera_threads)
         t.join();
 
@@ -195,6 +208,11 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
 
     if (detection3d_thread.joinable()) {
         detection3d_thread.join();
+    }
+    
+    // NEW: Cleanup Jarvis 3D thread
+    if (jarvis_3d_thread.joinable()) {
+        jarvis_3d_thread.join();
     }
     delete[] detection2d;
     detection2d = nullptr;
@@ -268,6 +286,7 @@ inline void set_camera_properties(CameraEmergent *ecams,
                    "Default is set to 1 second.");
 
         input_text("YOLO", cameras_select->yolo_model);
+        input_text("Jarvis Model Dir", cameras_select->jarvis_model_dir);
         ImGui::Checkbox("GPU Direct",
                         &cameras_params[selected_camera].gpu_direct);
         ImGui::Checkbox("Color", &cameras_params[selected_camera].color);

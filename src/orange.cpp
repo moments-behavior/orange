@@ -63,20 +63,20 @@ int main(int argc, char **args) {
         new PTPParams{0, 0, 0, 0, false, false, false, false};
 
     EncoderConfig *encoder_config = new EncoderConfig{"h264", 1, "p1"};
-    std::vector<std::string> camera_config_files;
 
     ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
 
     AppContext ctx; // ENetGuard constructed here (enet_initialize)
-    std::vector<std::pair<std::string, int>> cams = {{"127.0.0.1", 34001},
-                                                     {"127.0.0.1", 34002}};
+    std::vector<std::pair<std::string, int>> cams = {{"192.168.20.60", 34001},
+                                                     {"192.168.20.61", 34001}};
     HostClient_StartNetThread(ctx); // start dispatcher thread
     HostClient_Init(ctx, cams);
 
     std::vector<std::string> network_config_folders;
     int network_config_select = -1;
+    std::string selected_network_folder = "rig_new";
     std::string network_start_folder_name =
         orange_root_dir_str + "/config/network";
     for (const auto &entry :
@@ -108,9 +108,7 @@ int main(int argc, char **args) {
     bool show_error = false;
     std::string error_message;
 
-    HostOpenCtx open_ctx{&camera_config_files,
-                         &network_config_folders,
-                         &network_config_select,
+    HostOpenCtx open_ctx{&selected_network_folder,
                          device_info,
                          &cam_count,
                          &check,
@@ -129,10 +127,13 @@ int main(int argc, char **args) {
         if (ImGui::Begin("Network")) {
             if (network_config_select < 0 ||
                 network_config_select >= (int)network_config_folders.size()) {
-                int idx = find_cfg_index(network_config_folders, "rig_new");
+                int idx = find_cfg_index(network_config_folders,
+                                         selected_network_folder);
                 network_config_select =
                     (idx >= 0 ? idx
                               : (network_config_folders.empty() ? -1 : 0));
+                selected_network_folder =
+                    network_config_folders[network_config_select];
             }
 
             ImGuiStyle &style = ImGui::GetStyle();
@@ -151,9 +152,12 @@ int main(int argc, char **args) {
                     ImGui::PushStyleColor(ImGuiCol_Text,
                                           ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
 
-                ImGui::RadioButton(
-                    (label + "##cfg" + std::to_string(i)).c_str(),
-                    &network_config_select, i);
+                if (ImGui::RadioButton(
+                        (label + "##cfg" + std::to_string(i)).c_str(),
+                        &network_config_select, i)) {
+                    selected_network_folder =
+                        network_config_folders[network_config_select];
+                }
 
                 if (is_rig_new)
                     ImGui::PopStyleColor();
@@ -602,6 +606,7 @@ int main(int argc, char **args) {
             if (ImGui::Button(camera_control->open ? "Close Camera"
                                                    : "Open camera")) {
                 if (!camera_control->open) {
+                    std::vector<std::string> camera_config_files;
                     if (local_config_select < local_config_folders.size()) {
                         update_camera_configs(
                             camera_config_files,

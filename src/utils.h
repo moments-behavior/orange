@@ -34,7 +34,7 @@ inline float tick() {
 }
 
 inline int find_cfg_index(const std::vector<std::string> &folders,
-                          const char *base) {
+                          std::string base) {
     for (int i = 0; i < (int)folders.size(); ++i) {
         if (std::filesystem::path(folders[i]).filename() == base)
             return i;

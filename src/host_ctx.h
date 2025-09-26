@@ -9,10 +9,7 @@
 // Pointers-to-pointers are used where your code allocates and assigns new
 // arrays.
 struct HostOpenCtx {
-    // high-level config selection
-    std::vector<std::string> *camera_config_files = nullptr;
-    std::vector<std::string> *network_config_folders = nullptr;
-    int *network_config_select = nullptr;
+    std::string *selected_network_folder = nullptr;
 
     // camera inventory + selection
     GigEVisionDeviceInfo *device_info = nullptr; // array base (owned elsewhere)

@@ -35,9 +35,7 @@ static void OnOpenPhaseStart() {
     if (!g_openctx)
         return;
 
-    auto &cfg_files = *g_openctx->camera_config_files;
-    auto &folders = *g_openctx->network_config_folders;
-    int sel = *g_openctx->network_config_select;
+    auto &selected_folder = *g_openctx->selected_network_folder;
     auto *devs = g_openctx->device_info;
     int &cam_count = *g_openctx->cam_count;
     auto &check = *g_openctx->check;
@@ -49,7 +47,8 @@ static void OnOpenPhaseStart() {
     ScrollingBuffer *&plots = *g_openctx->realtime_plot_data;
     CameraControl *ctrl = g_openctx->camera_control;
 
-    update_camera_configs(cfg_files, folders[sel]);
+    std::vector<std::string> cfg_files;
+    update_camera_configs(cfg_files, selected_folder);
     select_cameras_have_configs(cfg_files, devs, check, cam_count);
     open_selected_cameras(check, cam_count, devs, cfg_files, num_cams, params,
                           select, ecams, plots);
@@ -157,7 +156,7 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
 }
 
 // ============================================================================
-// Global host client state (procedural)
+// Global host client state
 // ============================================================================
 static AppContext *g_ctxp = nullptr;
 
@@ -316,13 +315,15 @@ static void broadcast_current_phase() {
 
     std::vector<uint8_t> bytes;
     switch (g_phase) {
-    case Phase_Open:
+    case Phase_Open: {
+        bytes = build_cmd_open(g_jid, g_epoch, g_seq,
+                               *g_openctx->selected_network_folder);
         if (!g_open_started) {
             OnOpenPhaseStart();
             g_open_started = true;
         }
-        bytes = build_cmd_open(g_jid, g_epoch, g_seq, "calib");
         break;
+    }
     case Phase_Threads:
         bytes = build_cmd_startthreads(g_jid, g_epoch, g_seq, "out/session-1",
                                        "h264");
@@ -518,7 +519,7 @@ void HostClient_Tick() {
 }
 
 void HostClient_DrawImGui() {
-    ImGui::Begin("Host Client (procedural)");
+    ImGui::Begin("Host Client");
 
     if (ImGui::CollapsingHeader("Endpoints", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (const auto &ep : g_endpoints) {
@@ -526,7 +527,8 @@ void HostClient_DrawImGui() {
         }
     }
 
-    if (ImGui::CollapsingHeader("Cameras", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("Camera Servers",
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
         auto info = g_ctxp->peers.snapshot_info();
         ImGui::Text("Known peers: %d", (int)info.size());
         for (const auto &pi : info) {

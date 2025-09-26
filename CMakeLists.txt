@@ -89,7 +89,7 @@ if(BUILD_CAM_SERVER)
         ${SRC_DIR}/FrameDetector.cpp
         ${SRC_DIR}/realtime_tool.cpp
         ${SRC_DIR}/detect3d.cpp
-        ${SRC_DIR}/host_client_imgui_procedural.cpp
+        ${SRC_DIR}/host_client_imgui.cpp
     )
 endif()
 

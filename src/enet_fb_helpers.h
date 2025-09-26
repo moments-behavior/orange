@@ -52,16 +52,6 @@ class PeerRegistry {
         state_known_.insert(pid);
     }
 
-    // ---- INDIGO: name only; cameras/state unknown ----
-    void set_indigo(uint32_t pid, const std::string &name) {
-        std::lock_guard<std::mutex> lk(m_);
-        set_name_unlocked(pid, name);
-        pid2cams_.erase(pid);
-        cams_known_.erase(pid);
-        pid2state_.erase(pid);
-        state_known_.erase(pid);
-    }
-
     // Optional incremental updates:
     void set_cameras(uint32_t pid, int cameras) {
         std::lock_guard<std::mutex> lk(m_);

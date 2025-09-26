@@ -3,7 +3,7 @@
 #include "enet_utils.h"
 #include "global.h"
 #include "gui.h"
-#include "host_client_imgui_procedural.h"
+#include "host_client_imgui.h"
 #include "host_ctx.h"
 #include "imgui.h"
 #include "implot.h"

@@ -21,8 +21,6 @@ class PeerRegistry {
         }
         pid2cams_.erase(pid);
         cams_known_.erase(pid);
-        pid2state_.erase(pid);
-        state_known_.erase(pid);
     }
 
     // ---- Name management ----
@@ -42,14 +40,11 @@ class PeerRegistry {
     }
 
     // ---- Bringup for full servers (name + cameras + state are known) ----
-    void set_bringup(uint32_t pid, const std::string &name, int cameras,
-                     int server_state) {
+    void set_bringup(uint32_t pid, const std::string &name, int cameras) {
         std::lock_guard<std::mutex> lk(m_);
         set_name_unlocked(pid, name);
         pid2cams_[pid] = cameras;
         cams_known_.insert(pid);
-        pid2state_[pid] = server_state;
-        state_known_.insert(pid);
     }
 
     // Optional incremental updates:
@@ -63,16 +58,6 @@ class PeerRegistry {
         pid2cams_.erase(pid);
         cams_known_.erase(pid);
     }
-    void set_server_state(uint32_t pid, int state) {
-        std::lock_guard<std::mutex> lk(m_);
-        pid2state_[pid] = state;
-        state_known_.insert(pid);
-    }
-    void clear_server_state(uint32_t pid) {
-        std::lock_guard<std::mutex> lk(m_);
-        pid2state_.erase(pid);
-        state_known_.erase(pid);
-    }
 
     // Queries for GUI
     bool cameras_known(uint32_t pid, int *out = nullptr) const {
@@ -83,22 +68,12 @@ class PeerRegistry {
             *out = pid2cams_.at(pid);
         return true;
     }
-    bool state_known(uint32_t pid, int *out = nullptr) const {
-        std::lock_guard<std::mutex> lk(m_);
-        if (state_known_.count(pid) == 0)
-            return false;
-        if (out)
-            *out = pid2state_.at(pid);
-        return true;
-    }
 
     struct PeerInfo {
         uint32_t peer_id;
         std::string name;
         bool camsK;
         int cams;
-        bool stateK;
-        int state;
     };
     std::vector<PeerInfo> snapshot_info() const {
         std::lock_guard<std::mutex> lk(m_);
@@ -107,10 +82,9 @@ class PeerRegistry {
         for (auto pid : peers_) {
             auto n = pid2name_.find(pid);
             bool ck = cams_known_.count(pid) != 0;
-            bool sk = state_known_.count(pid) != 0;
-            out.push_back(
-                {pid, n == pid2name_.end() ? std::string() : n->second, ck,
-                 ck ? pid2cams_.at(pid) : 0, sk, sk ? pid2state_.at(pid) : 0});
+            out.push_back({pid,
+                           n == pid2name_.end() ? std::string() : n->second, ck,
+                           ck ? pid2cams_.at(pid) : 0});
         }
         return out;
     }
@@ -135,9 +109,7 @@ class PeerRegistry {
     std::unordered_map<std::string, uint32_t> name2pid_;
 
     std::unordered_map<uint32_t, int> pid2cams_;
-    std::unordered_map<uint32_t, int> pid2state_;
     std::unordered_set<uint32_t> cams_known_;
-    std::unordered_set<uint32_t> state_known_;
 };
 
 // FlatBuffers build-and-send helpers (work with either runtime alias)

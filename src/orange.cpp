@@ -69,8 +69,8 @@ int main(int argc, char **args) {
     bool ptp_stream_sync = false;
 
     AppContext ctx; // ENetGuard constructed here (enet_initialize)
-    std::vector<std::pair<std::string, int>> cams = {{"192.168.20.60", 34001},
-                                                     {"192.168.20.61", 34001}};
+    std::vector<std::pair<std::string, int>> cams = {{"127.0.0.1", 34001},
+                                                     {"127.0.0.1", 34002}};
     HostClient_StartNetThread(ctx); // start dispatcher thread
     HostClient_Init(ctx, cams);
 

@@ -184,7 +184,6 @@ struct ReplyEvent {
     camnet::v1::ServerControl ctrl{};
     std::string server_id;
     bool ok{};
-    camnet::v1::ManagerState state{};
     std::string job_id;
     uint32_t epoch{};
     uint32_t seq{};
@@ -338,7 +337,7 @@ static void broadcast_current_phase() {
         break;
     }
 
-    logf("→ %s (job=%s epoch=%u seq=%u)", ctrl_name(current_ctrl()),
+    logf("-> %s (job=%s epoch=%u seq=%u)", ctrl_name(current_ctrl()),
          g_jid.c_str(), g_epoch, g_seq);
     for (const auto &name : g_servers) {
         uint32_t pid = g_ctxp->peers.get_pid_by_name(name);
@@ -376,10 +375,9 @@ static void host_on_event(const Incoming &evt) {
         if (auto br = rep->bringup()) {
             const std::string name =
                 br->server_name() ? br->server_name()->str() : "";
-            g_ctxp->peers.set_bringup(evt.peer_id, name, br->num_cameras(),
-                                      rep->state());
-            logf("bringup from %s cams=%d state=%d (pid=%u)", name.c_str(),
-                 br->num_cameras(), (int)rep->state(), evt.peer_id);
+            g_ctxp->peers.set_bringup(evt.peer_id, name, br->num_cameras());
+            logf("bringup from %s cams=%d (pid=%u)", name.c_str(),
+                 br->num_cameras(), evt.peer_id);
         }
 
         // phase reply -> queue
@@ -387,7 +385,6 @@ static void host_on_event(const Incoming &evt) {
         e.ctrl = msg->control();
         e.server_id = rep->server_id() ? rep->server_id()->str() : "";
         e.ok = rep->ok();
-        e.state = rep->state();
         e.job_id = msg->job_id() ? msg->job_id()->str() : "";
         e.epoch = msg->epoch();
         e.seq = msg->seq();
@@ -475,8 +472,8 @@ void HostClient_Tick() {
                 continue;
             if (e.ctrl != current_ctrl())
                 continue;
-            logf("%s reply from %s ok=%d state=%d", ctrl_name(e.ctrl),
-                 e.server_id.c_str(), (int)e.ok, (int)e.state);
+            logf("%s reply from %s ok=%d", ctrl_name(e.ctrl),
+                 e.server_id.c_str(), (int)e.ok);
             if (e.ok)
                 g_ack_by[e.server_id] = true;
         }
@@ -532,10 +529,8 @@ void HostClient_DrawImGui() {
         auto info = g_ctxp->peers.snapshot_info();
         ImGui::Text("Known peers: %d", (int)info.size());
         for (const auto &pi : info) {
-            ImGui::BulletText(
-                "pid=%u name=%s camsK=%d cams=%d stateK=%d state=%d",
-                pi.peer_id, pi.name.c_str(), (int)pi.camsK, pi.cams,
-                (int)pi.stateK, pi.state);
+            ImGui::BulletText("pid=%u name=%s camsK=%d cams=%d", pi.peer_id,
+                              pi.name.c_str(), (int)pi.camsK, pi.cams);
         }
     }
 
@@ -548,7 +543,7 @@ void HostClient_DrawImGui() {
         ImGui::Indent();
         for (const auto &name : g_servers) {
             bool got = g_ack_by.count(name) ? g_ack_by[name] : false;
-            ImGui::BulletText("%s  [%s]", name.c_str(), got ? "OK" : "…");
+            ImGui::BulletText("%s  [%s]", name.c_str(), got ? "OK" : "...");
         }
         ImGui::Unindent();
     }

@@ -44,42 +44,6 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
     }
 }
 
-static const char *state_name(camnet::v1::ManagerState s) {
-    switch (s) {
-    case camnet::v1::ManagerState_IDLE:
-        return "IDLE";
-    case camnet::v1::ManagerState_CONNECTED:
-        return "CONNECTED";
-    case camnet::v1::ManagerState_CAMERAOPENED:
-        return "CAMERAOPENED";
-    case camnet::v1::ManagerState_THREADREADY:
-        return "THREADREADY";
-    case camnet::v1::ManagerState_RECORDINGSTARTED:
-        return "RECORDINGSTARTED";
-    case camnet::v1::ManagerState_RECORDSTOPPED:
-        return "RECORDSTOPPED";
-    case camnet::v1::ManagerState_ERROR:
-        return "ERROR";
-    default:
-        return "?";
-    }
-}
-
-static camnet::v1::ManagerState state_after(camnet::v1::ServerControl c) {
-    switch (c) {
-    case camnet::v1::ServerControl_OPENCAMERA:
-        return camnet::v1::ManagerState_CAMERAOPENED;
-    case camnet::v1::ServerControl_STARTTHREAD:
-        return camnet::v1::ManagerState_THREADREADY;
-    case camnet::v1::ServerControl_STARTRECORDING:
-        return camnet::v1::ManagerState_RECORDINGSTARTED;
-    case camnet::v1::ServerControl_STOPRECORDING:
-        return camnet::v1::ManagerState_RECORDSTOPPED;
-    default:
-        return camnet::v1::ManagerState_ERROR;
-    }
-}
-
 static void send_bytes(uint32_t pid, const std::vector<uint8_t> &buf) {
     Outgoing o;
     o.peer_id = pid;
@@ -98,12 +62,10 @@ static std::vector<uint8_t> build_bringup_reply(const std::string &name,
     auto br = CreateBringupMessage(b, sid, cam_count);
 
     auto rep = CreateReplyInfo(b,
-                               ManagerState_CONNECTED,  // initial state
                                true,                    // ok
                                0,                       // code
                                b.CreateString("hello"), // detail
                                br,                      // bringup
-                               cam_count,               // num_cameras
                                sid                      // server_id
     );
 
@@ -114,17 +76,18 @@ static std::vector<uint8_t> build_bringup_reply(const std::string &name,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
-static std::vector<uint8_t>
-build_phase_reply(const camnet::v1::Server *cmd, const std::string &name,
-                  uint16_t cam_count, camnet::v1::ManagerState st,
-                  bool ok = true, int code = 0, const char *detail = "ok") {
+static std::vector<uint8_t> build_phase_reply(const camnet::v1::Server *cmd,
+                                              const std::string &name,
+                                              uint16_t cam_count,
+                                              bool ok = true, int code = 0,
+                                              const char *detail = "ok") {
     using namespace camnet::v1;
     flatbuffers::FlatBufferBuilder b(256);
     auto sid = b.CreateString(name);
     auto det = b.CreateString(detail ? detail : "");
 
-    auto rep = CreateReplyInfo(b, st, ok, code, det,
-                               /*bringup*/ 0, cam_count, sid);
+    auto rep = CreateReplyInfo(b, ok, code, det,
+                               /*bringup*/ 0, sid);
 
     // Preserve job/epoch/seq from command (if present)
     flatbuffers::Offset<flatbuffers::String> jid =
@@ -185,23 +148,18 @@ static void server_on_event(const Incoming &evt) {
 
         // Idempotent: if we already completed this or a later phase, ack again
         if (ctrl <= g_last_done) {
-            auto st = state_after(ctrl);
-            auto bytes =
-                build_phase_reply(cmd, g_name, 2, st, true, 0, "already");
+            auto bytes = build_phase_reply(cmd, g_name, 2, true, 0, "already");
             send_bytes(evt.peer_id, bytes);
-            std::printf("[SRV %s] %s (duplicate) -> %s\n", g_name.c_str(),
-                        ctrl_name(ctrl), state_name(st));
+            std::printf("[SRV %s] %s (duplicate)\n", g_name.c_str(),
+                        ctrl_name(ctrl));
             break;
         }
 
         // COMM ONLY: pretend success immediately; integrate real work here
-        auto st = state_after(ctrl);
-        auto bytes =
-            build_phase_reply(cmd, g_name, cam_count, st, true, 0, "ok");
+        auto bytes = build_phase_reply(cmd, g_name, cam_count, true, 0, "ok");
         send_bytes(evt.peer_id, bytes);
         g_last_done = ctrl;
-        std::printf("[SRV %s] %s -> %s\n", g_name.c_str(), ctrl_name(ctrl),
-                    state_name(st));
+        std::printf("[SRV %s] %s\n", g_name.c_str(), ctrl_name(ctrl));
         break;
     }
     case Incoming::Disconnect:

@@ -8,9 +8,9 @@
 
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
-              FLATBUFFERS_VERSION_MINOR == 5 &&
-              FLATBUFFERS_VERSION_REVISION == 26,
+static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
+              FLATBUFFERS_VERSION_MINOR == 9 &&
+              FLATBUFFERS_VERSION_REVISION == 23,
              "Non-compatible flatbuffers version included");
 
 namespace camnet {
@@ -18,9 +18,6 @@ namespace v1 {
 
 struct BringupMessage;
 struct BringupMessageBuilder;
-
-struct PrepareArgs;
-struct PrepareArgsBuilder;
 
 struct OpenArgs;
 struct OpenArgsBuilder;
@@ -115,66 +112,19 @@ inline const char *EnumNameServerControl(ServerControl e) {
   return EnumNamesServerControl()[index];
 }
 
-enum ManagerState : uint8_t {
-  ManagerState_IDLE = 0,
-  ManagerState_CONNECTED = 1,
-  ManagerState_CAMERAOPENED = 2,
-  ManagerState_ERROR = 3,
-  ManagerState_THREADREADY = 4,
-  ManagerState_RECORDSTOPPED = 5,
-  ManagerState_RECORDINGSTARTED = 6,
-  ManagerState_MIN = ManagerState_IDLE,
-  ManagerState_MAX = ManagerState_RECORDINGSTARTED
-};
-
-inline const ManagerState (&EnumValuesManagerState())[7] {
-  static const ManagerState values[] = {
-    ManagerState_IDLE,
-    ManagerState_CONNECTED,
-    ManagerState_CAMERAOPENED,
-    ManagerState_ERROR,
-    ManagerState_THREADREADY,
-    ManagerState_RECORDSTOPPED,
-    ManagerState_RECORDINGSTARTED
-  };
-  return values;
-}
-
-inline const char * const *EnumNamesManagerState() {
-  static const char * const names[8] = {
-    "IDLE",
-    "CONNECTED",
-    "CAMERAOPENED",
-    "ERROR",
-    "THREADREADY",
-    "RECORDSTOPPED",
-    "RECORDINGSTARTED",
-    nullptr
-  };
-  return names;
-}
-
-inline const char *EnumNameManagerState(ManagerState e) {
-  if (::flatbuffers::IsOutRange(e, ManagerState_IDLE, ManagerState_RECORDINGSTARTED)) return "";
-  const size_t index = static_cast<size_t>(e);
-  return EnumNamesManagerState()[index];
-}
-
 enum CommandBody : uint8_t {
   CommandBody_NONE = 0,
-  CommandBody_PrepareArgs = 1,
-  CommandBody_OpenArgs = 2,
-  CommandBody_StartThreadsArgs = 3,
-  CommandBody_StartArgs = 4,
-  CommandBody_StopArgs = 5,
+  CommandBody_OpenArgs = 1,
+  CommandBody_StartThreadsArgs = 2,
+  CommandBody_StartArgs = 3,
+  CommandBody_StopArgs = 4,
   CommandBody_MIN = CommandBody_NONE,
   CommandBody_MAX = CommandBody_StopArgs
 };
 
-inline const CommandBody (&EnumValuesCommandBody())[6] {
+inline const CommandBody (&EnumValuesCommandBody())[5] {
   static const CommandBody values[] = {
     CommandBody_NONE,
-    CommandBody_PrepareArgs,
     CommandBody_OpenArgs,
     CommandBody_StartThreadsArgs,
     CommandBody_StartArgs,
@@ -184,9 +134,8 @@ inline const CommandBody (&EnumValuesCommandBody())[6] {
 }
 
 inline const char * const *EnumNamesCommandBody() {
-  static const char * const names[7] = {
+  static const char * const names[6] = {
     "NONE",
-    "PrepareArgs",
     "OpenArgs",
     "StartThreadsArgs",
     "StartArgs",
@@ -204,10 +153,6 @@ inline const char *EnumNameCommandBody(CommandBody e) {
 
 template<typename T> struct CommandBodyTraits {
   static const CommandBody enum_value = CommandBody_NONE;
-};
-
-template<> struct CommandBodyTraits<camnet::v1::PrepareArgs> {
-  static const CommandBody enum_value = CommandBody_PrepareArgs;
 };
 
 template<> struct CommandBodyTraits<camnet::v1::OpenArgs> {
@@ -290,71 +235,6 @@ inline ::flatbuffers::Offset<BringupMessage> CreateBringupMessageDirect(
       _fbb,
       server_name__,
       num_cameras);
-}
-
-struct PrepareArgs FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef PrepareArgsBuilder Builder;
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_CALIB_FOLDER = 4,
-    VT_RECORD_ROOT = 6
-  };
-  const ::flatbuffers::String *calib_folder() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_CALIB_FOLDER);
-  }
-  const ::flatbuffers::String *record_root() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_RECORD_ROOT);
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_CALIB_FOLDER) &&
-           verifier.VerifyString(calib_folder()) &&
-           VerifyOffset(verifier, VT_RECORD_ROOT) &&
-           verifier.VerifyString(record_root()) &&
-           verifier.EndTable();
-  }
-};
-
-struct PrepareArgsBuilder {
-  typedef PrepareArgs Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_calib_folder(::flatbuffers::Offset<::flatbuffers::String> calib_folder) {
-    fbb_.AddOffset(PrepareArgs::VT_CALIB_FOLDER, calib_folder);
-  }
-  void add_record_root(::flatbuffers::Offset<::flatbuffers::String> record_root) {
-    fbb_.AddOffset(PrepareArgs::VT_RECORD_ROOT, record_root);
-  }
-  explicit PrepareArgsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<PrepareArgs> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<PrepareArgs>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<PrepareArgs> CreatePrepareArgs(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> calib_folder = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> record_root = 0) {
-  PrepareArgsBuilder builder_(_fbb);
-  builder_.add_record_root(record_root);
-  builder_.add_calib_folder(calib_folder);
-  return builder_.Finish();
-}
-
-inline ::flatbuffers::Offset<PrepareArgs> CreatePrepareArgsDirect(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *calib_folder = nullptr,
-    const char *record_root = nullptr) {
-  auto calib_folder__ = calib_folder ? _fbb.CreateString(calib_folder) : 0;
-  auto record_root__ = record_root ? _fbb.CreateString(record_root) : 0;
-  return camnet::v1::CreatePrepareArgs(
-      _fbb,
-      calib_folder__,
-      record_root__);
 }
 
 struct OpenArgs FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -558,17 +438,12 @@ inline ::flatbuffers::Offset<StopArgs> CreateStopArgs(
 struct ReplyInfo FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ReplyInfoBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_STATE = 4,
-    VT_OK = 6,
-    VT_CODE = 8,
-    VT_DETAIL = 10,
-    VT_BRINGUP = 12,
-    VT_CAM_COUNT = 14,
-    VT_SERVER_ID = 16
+    VT_OK = 4,
+    VT_CODE = 6,
+    VT_DETAIL = 8,
+    VT_BRINGUP = 10,
+    VT_SERVER_ID = 12
   };
-  camnet::v1::ManagerState state() const {
-    return static_cast<camnet::v1::ManagerState>(GetField<uint8_t>(VT_STATE, 0));
-  }
   bool ok() const {
     return GetField<uint8_t>(VT_OK, 1) != 0;
   }
@@ -581,22 +456,17 @@ struct ReplyInfo FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const camnet::v1::BringupMessage *bringup() const {
     return GetPointer<const camnet::v1::BringupMessage *>(VT_BRINGUP);
   }
-  uint16_t cam_count() const {
-    return GetField<uint16_t>(VT_CAM_COUNT, 0);
-  }
   const ::flatbuffers::String *server_id() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SERVER_ID);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_STATE, 1) &&
            VerifyField<uint8_t>(verifier, VT_OK, 1) &&
            VerifyField<int32_t>(verifier, VT_CODE, 4) &&
            VerifyOffset(verifier, VT_DETAIL) &&
            verifier.VerifyString(detail()) &&
            VerifyOffset(verifier, VT_BRINGUP) &&
            verifier.VerifyTable(bringup()) &&
-           VerifyField<uint16_t>(verifier, VT_CAM_COUNT, 2) &&
            VerifyOffset(verifier, VT_SERVER_ID) &&
            verifier.VerifyString(server_id()) &&
            verifier.EndTable();
@@ -607,9 +477,6 @@ struct ReplyInfoBuilder {
   typedef ReplyInfo Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_state(camnet::v1::ManagerState state) {
-    fbb_.AddElement<uint8_t>(ReplyInfo::VT_STATE, static_cast<uint8_t>(state), 0);
-  }
   void add_ok(bool ok) {
     fbb_.AddElement<uint8_t>(ReplyInfo::VT_OK, static_cast<uint8_t>(ok), 1);
   }
@@ -621,9 +488,6 @@ struct ReplyInfoBuilder {
   }
   void add_bringup(::flatbuffers::Offset<camnet::v1::BringupMessage> bringup) {
     fbb_.AddOffset(ReplyInfo::VT_BRINGUP, bringup);
-  }
-  void add_cam_count(uint16_t cam_count) {
-    fbb_.AddElement<uint16_t>(ReplyInfo::VT_CAM_COUNT, cam_count, 0);
   }
   void add_server_id(::flatbuffers::Offset<::flatbuffers::String> server_id) {
     fbb_.AddOffset(ReplyInfo::VT_SERVER_ID, server_id);
@@ -641,43 +505,35 @@ struct ReplyInfoBuilder {
 
 inline ::flatbuffers::Offset<ReplyInfo> CreateReplyInfo(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    camnet::v1::ManagerState state = camnet::v1::ManagerState_IDLE,
     bool ok = true,
     int32_t code = 0,
     ::flatbuffers::Offset<::flatbuffers::String> detail = 0,
     ::flatbuffers::Offset<camnet::v1::BringupMessage> bringup = 0,
-    uint16_t cam_count = 0,
     ::flatbuffers::Offset<::flatbuffers::String> server_id = 0) {
   ReplyInfoBuilder builder_(_fbb);
   builder_.add_server_id(server_id);
   builder_.add_bringup(bringup);
   builder_.add_detail(detail);
   builder_.add_code(code);
-  builder_.add_cam_count(cam_count);
   builder_.add_ok(ok);
-  builder_.add_state(state);
   return builder_.Finish();
 }
 
 inline ::flatbuffers::Offset<ReplyInfo> CreateReplyInfoDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    camnet::v1::ManagerState state = camnet::v1::ManagerState_IDLE,
     bool ok = true,
     int32_t code = 0,
     const char *detail = nullptr,
     ::flatbuffers::Offset<camnet::v1::BringupMessage> bringup = 0,
-    uint16_t cam_count = 0,
     const char *server_id = nullptr) {
   auto detail__ = detail ? _fbb.CreateString(detail) : 0;
   auto server_id__ = server_id ? _fbb.CreateString(server_id) : 0;
   return camnet::v1::CreateReplyInfo(
       _fbb,
-      state,
       ok,
       code,
       detail__,
       bringup,
-      cam_count,
       server_id__);
 }
 
@@ -715,9 +571,6 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return GetPointer<const void *>(VT_COMMAND_BODY);
   }
   template<typename T> const T *command_body_as() const;
-  const camnet::v1::PrepareArgs *command_body_as_PrepareArgs() const {
-    return command_body_type() == camnet::v1::CommandBody_PrepareArgs ? static_cast<const camnet::v1::PrepareArgs *>(command_body()) : nullptr;
-  }
   const camnet::v1::OpenArgs *command_body_as_OpenArgs() const {
     return command_body_type() == camnet::v1::CommandBody_OpenArgs ? static_cast<const camnet::v1::OpenArgs *>(command_body()) : nullptr;
   }
@@ -749,10 +602,6 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.EndTable();
   }
 };
-
-template<> inline const camnet::v1::PrepareArgs *Server::command_body_as<camnet::v1::PrepareArgs>() const {
-  return command_body_as_PrepareArgs();
-}
 
 template<> inline const camnet::v1::OpenArgs *Server::command_body_as<camnet::v1::OpenArgs>() const {
   return command_body_as_OpenArgs();
@@ -858,10 +707,6 @@ inline bool VerifyCommandBody(::flatbuffers::Verifier &verifier, const void *obj
   switch (type) {
     case CommandBody_NONE: {
       return true;
-    }
-    case CommandBody_PrepareArgs: {
-      auto ptr = reinterpret_cast<const camnet::v1::PrepareArgs *>(obj);
-      return verifier.VerifyTable(ptr);
     }
     case CommandBody_OpenArgs: {
       auto ptr = reinterpret_cast<const camnet::v1::OpenArgs *>(obj);

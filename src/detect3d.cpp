@@ -1,12 +1,12 @@
 #include "detect3d.h"
 #include "global.h"
 #include "realtime_tool.h"
-#include "video_capture.h"
 #include "shaman.h"
+#include "video_capture.h"
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
-        if (cameras_select[idx].frame_detect_state.load() !=
+        if (cameras_select[idx].sigs->frame_detect_state.load() !=
             State_Frame_Detection_Ready) {
             return false;
         }
@@ -69,7 +69,8 @@ void detection3d_proc(CameraControl *camera_control,
 
         // reset the 3d camera states
         for (int idx : cam3d_idx) {
-            cameras_select[idx].frame_detect_state.store(State_Copy_New_Frame);
+            cameras_select[idx].sigs->frame_detect_state.store(
+                State_Copy_New_Frame);
         }
 
         detection3d.ball3d.new_detection.store(
@@ -79,7 +80,9 @@ void detection3d_proc(CameraControl *camera_control,
         if (detection3d.ball3d.new_detection.load()) {
             shaman::Object obj;
             std::vector<shaman::Object> center_vec;
-            obj.data = {detection3d.ball3d.center.x, detection3d.ball3d.center.y, detection3d.ball3d.center.z, 0, 0};
+            obj.data = {detection3d.ball3d.center.x,
+                        detection3d.ball3d.center.y,
+                        detection3d.ball3d.center.z, 0, 0};
             center_vec.reserve(1);
             center_vec.push_back(obj);
             writer.push(center_vec);

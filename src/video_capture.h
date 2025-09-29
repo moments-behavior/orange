@@ -69,27 +69,27 @@ enum DetectMode {
 };
 constexpr const char *DetectModeNames[] = {"OFF", "2DGLThread", "2DStandoff",
                                            "3DStandoff"};
+
+struct CameraSignals {
+    std::atomic<PictureState> frame_save_state{State_Frame_Idle};
+    std::atomic<PictureState> frame_detect_state{State_Frame_Idle};
+};
+
 struct CameraEachSelect {
+    // copyable/movable config & UI-ish state
     bool stream_on = true;
     bool record = true;
     int downsample = 1;
-    std::atomic<PictureState> frame_save_state;
-    std::string frame_save_format;
-    std::string frame_save_name;
+    std::string frame_save_format, frame_save_name;
     int pictures_counter = 0;
-    std::string picture_save_folder;
-    std::string yolo_model;
+    std::string picture_save_folder, yolo_model;
     DetectMode detect_mode = Detect_OFF;
-    int idx2d = 0;
-    int idx3d = 0;
-    int total_standoff_detector = 0;
-    std::atomic<PictureState> frame_detect_state;
-    FPSEstimator encoder_fps_estimator;
-    FPSEstimator capture_fps_estimator;
+    int idx2d = 0, idx3d = 0, total_standoff_detector = 0;
     int dropped_frames = 0;
-    CameraEachSelect()
-        : frame_save_state(State_Frame_Idle),
-          frame_detect_state(State_Frame_Idle) {}
+    FPSEstimator encoder_fps_estimator, capture_fps_estimator;
+
+    // runtime shared between threads
+    std::unique_ptr<CameraSignals> sigs = std::make_unique<CameraSignals>();
 };
 
 struct CameraState {

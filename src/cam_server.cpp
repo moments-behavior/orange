@@ -9,6 +9,9 @@
 #include "enet_fb_helpers.h"
 #include "enet_runtime_unified.h" // unified wrapper
 #include "enet_utils.h"
+#include "utils.h"
+#include "video_capture.h"
+#include <variant>
 
 using namespace std::chrono_literals;
 
@@ -119,9 +122,83 @@ static bool accept_session(const camnet::v1::Server *cmd) {
     return true;
 }
 
-static GigEVisionDeviceInfo unsorted_device_info[20];
-static GigEVisionDeviceInfo device_info[20];
+static std::vector<GigEVisionDeviceInfo> unsorted_devices;
+static std::vector<GigEVisionDeviceInfo> sorted_devices;
+static int max_cameras = 10;
 static int cam_count;
+static std::vector<CameraEmergent> ecams;
+static std::vector<CameraParams> cameras_params;
+static std::vector<CameraEachSelect> cameras_select;
+static CameraControl camera_control;
+
+static bool open_cameras(std::vector<CameraParams> &cameras_params,
+                         std::vector<CameraEmergent> &ecams,
+                         std::vector<CameraEachSelect> &cameras_select,
+                         std::vector<GigEVisionDeviceInfo> &device_info,
+                         const std::string &config_folder) {
+    const size_t n = cameras_params.size();
+    if (ecams.size() != n || cameras_select.size() != n)
+        return false;
+    if (device_info.size() < n)
+        return false;
+
+    std::vector<std::string> camera_config_files;
+    update_camera_configs(camera_config_files, config_folder);
+
+    for (size_t i = 0; i < n; ++i) {
+        set_camera_params(&cameras_params[i], &cameras_select[i],
+                          &device_info[i], camera_config_files,
+                          static_cast<int>(i), static_cast<int>(n));
+
+        open_camera_with_params(&ecams[i].camera,
+                                &device_info[cameras_params[i].camera_id],
+                                &cameras_params[i]);
+    }
+    return true;
+}
+
+static bool ctrl_action(camnet::v1::ServerControl c,
+                        const camnet::v1::Server *msg) {
+    switch (c) {
+    case camnet::v1::ServerControl_OPENCAMERA: {
+        const camnet::v1::OpenArgs *oa = msg->command_body_as_OpenArgs();
+        if (!oa)
+            return false; // union wasn't OpenArgs
+
+        const auto *s =
+            oa->config_folder(); // flatbuffers::String* (may be null)
+        if (!s)
+            return false;
+
+        std::string config_folder = s->str(); // std::string copy
+
+        cameras_params.resize(cam_count);
+        ecams.resize(cam_count);
+        cameras_select.resize(cam_count);
+
+        return open_cameras(cameras_params, ecams, cameras_select,
+                            sorted_devices, config_folder);
+    }
+
+    case camnet::v1::ServerControl_STARTTHREAD: {
+        return true;
+        // start_thread(a->thread_id); // implement this
+    }
+
+    case camnet::v1::ServerControl_STARTRECORDING: {
+        return true;
+        // start_recording(a->filename); // implement this
+    }
+
+    case camnet::v1::ServerControl_STOPRECORDING:
+        return true;
+        // stop_recording(); // implement this
+
+    default:
+        return false;
+    }
+}
+
 // ---------- event handler ----------
 static void server_on_event(const Incoming &evt) {
     switch (evt.type) {
@@ -129,8 +206,14 @@ static void server_on_event(const Incoming &evt) {
         std::printf("[SRV %s] host connected (pid=%u) → sending bringup\n",
                     g_name.c_str(), evt.peer_id);
 
-        cam_count = scan_cameras(20, unsorted_device_info);
-        sort_cameras_ip(unsorted_device_info, device_info, cam_count);
+        unsorted_devices.clear();
+        sorted_devices.clear();
+        unsorted_devices.resize(max_cameras);
+        sorted_devices.resize(max_cameras);
+
+        cam_count = scan_cameras(max_cameras, unsorted_devices.data());
+        sort_cameras_ip(unsorted_devices.data(), sorted_devices.data(),
+                        cam_count);
         auto bytes = build_bringup_reply(g_name, /*cams*/ cam_count);
         send_bytes(evt.peer_id, bytes);
         break;
@@ -155,7 +238,8 @@ static void server_on_event(const Incoming &evt) {
             break;
         }
 
-        // COMM ONLY: pretend success immediately; integrate real work here
+        bool is_success = ctrl_action(ctrl, cmd);
+        // do we send reply if it is failure?
         auto bytes = build_phase_reply(cmd, g_name, cam_count, true, 0, "ok");
         send_bytes(evt.peer_id, bytes);
         g_last_done = ctrl;

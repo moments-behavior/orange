@@ -280,13 +280,14 @@ inline void get_one_frame(CameraState *camera_state,
                 camera_state->frame_count);
         }
         FrameDetector *detector = static_cast<FrameDetector *>(frame_detector);
-        if (detector &&
-            camera_select->frame_detect_state.load() == State_Copy_New_Frame) {
+        if (detector && camera_select->sigs->frame_detect_state.load() ==
+                            State_Copy_New_Frame) {
             detector->notify_frame_ready(ecam->frame_recv.imagePtr, 0);
         }
 #endif
 
-        if (camera_select->frame_save_state.load() == State_Copy_New_Frame) {
+        if (camera_select->sigs->frame_save_state.load() ==
+            State_Copy_New_Frame) {
             frame_saver->notify_frame_ready(ecam->frame_recv.imagePtr);
         }
 
@@ -342,7 +343,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
             // fflush(stdout);
             usleep(10);
         }
-        camera_select->frame_detect_state.store(State_Copy_New_Frame);
+        camera_select->sigs->frame_detect_state.store(State_Copy_New_Frame);
     }
 
     COpenGLDisplay *openGLDisplay = nullptr;

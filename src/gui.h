@@ -200,7 +200,7 @@ stop_camera_streaming(std::vector<std::thread> &camera_threads,
     detection2d = nullptr;
 
     for (int i = 0; i < num_cameras; i++) {
-        cameras_select[i].frame_detect_state.store(State_Frame_Idle);
+        cameras_select[i].sigs->frame_detect_state.store(State_Frame_Idle);
         cameras_select[i].total_standoff_detector = 0;
         cameras_select[i].idx2d = 0;
         cameras_select[i].idx3d = 0;

@@ -69,20 +69,18 @@ inline const char *EnumNameKind(Kind e) {
 
 enum ServerControl : uint8_t {
   ServerControl_NONE = 0,
-  ServerControl_PREPARE = 1,
-  ServerControl_OPENCAMERA = 2,
-  ServerControl_STARTTHREAD = 3,
-  ServerControl_STARTRECORDING = 4,
-  ServerControl_STOPRECORDING = 5,
-  ServerControl_TEARDOWN = 6,
+  ServerControl_OPENCAMERA = 1,
+  ServerControl_STARTTHREAD = 2,
+  ServerControl_STARTRECORDING = 3,
+  ServerControl_STOPRECORDING = 4,
+  ServerControl_TEARDOWN = 5,
   ServerControl_MIN = ServerControl_NONE,
   ServerControl_MAX = ServerControl_TEARDOWN
 };
 
-inline const ServerControl (&EnumValuesServerControl())[7] {
+inline const ServerControl (&EnumValuesServerControl())[6] {
   static const ServerControl values[] = {
     ServerControl_NONE,
-    ServerControl_PREPARE,
     ServerControl_OPENCAMERA,
     ServerControl_STARTTHREAD,
     ServerControl_STARTRECORDING,
@@ -93,9 +91,8 @@ inline const ServerControl (&EnumValuesServerControl())[7] {
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[8] = {
+  static const char * const names[7] = {
     "NONE",
-    "PREPARE",
     "OPENCAMERA",
     "STARTTHREAD",
     "STARTRECORDING",

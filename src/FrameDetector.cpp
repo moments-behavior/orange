@@ -55,7 +55,7 @@ void FrameDetector::notify_frame_ready(void *device_image_ptr,
     }
     nvtxRangePop();
     cudaEventRecord(copy_done_event, copy_stream); // mark when copy is done
-    camera_select->frame_detect_state.store(State_Frame_Copy_Done);
+    camera_select->sigs->frame_detect_state.store(State_Frame_Copy_Done);
     cv.notify_one();
 }
 
@@ -100,7 +100,7 @@ void FrameDetector::thread_loop() {
 
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [&] {
-            return camera_select->frame_detect_state.load() ==
+            return camera_select->sigs->frame_detect_state.load() ==
                        State_Frame_Copy_Done ||
                    !running.load();
         });
@@ -154,12 +154,12 @@ void FrameDetector::thread_loop() {
 
         // running detection
         if (camera_select->detect_mode == Detect3D_Standoff) {
-            camera_select->frame_detect_state.store(
+            camera_select->sigs->frame_detect_state.store(
                 State_Frame_Detection_Ready);
             std::lock_guard<std::mutex> lock(mtx3d);
             cv3d.notify_one();
         } else {
-            camera_select->frame_detect_state.store(State_Copy_New_Frame);
+            camera_select->sigs->frame_detect_state.store(State_Copy_New_Frame);
         }
         count++;
         detection2d[camera_select->idx2d].fps_estimator.update();

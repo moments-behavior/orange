@@ -69,8 +69,10 @@ int main(int argc, char **args) {
     bool ptp_stream_sync = false;
 
     AppContext ctx; // ENetGuard constructed here (enet_initialize)
-    std::vector<std::pair<std::string, int>> cams = {{"127.0.0.1", 34001},
-                                                     {"127.0.0.1", 34002}};
+    // std::vector<std::pair<std::string, int>> cams = {{"127.0.0.1", 34001},
+    //                                                  {"127.0.0.1", 34002}};
+    std::vector<std::pair<std::string, int>> cams = {{"192.168.20.60", 34001},
+                                                     {"192.168.20.61", 34001}};
     HostClient_StartNetThread(ctx); // start dispatcher thread
     HostClient_Init(ctx, cams);
 
@@ -528,7 +530,7 @@ int main(int argc, char **args) {
                                 cameras_select[i].pictures_counter);
                             cameras_select[i].picture_save_folder =
                                 calib_save_folder;
-                            cameras_select[i].frame_save_state.store(
+                            cameras_select[i].sigs->frame_save_state.store(
                                 State_Copy_New_Frame);
                         }
                         calib_state = CalibSavePictures;
@@ -541,7 +543,7 @@ int main(int argc, char **args) {
                                 cameras_select[i].pictures_counter);
                             cameras_select[i].picture_save_folder =
                                 calib_save_folder;
-                            cameras_select[i].frame_save_state.store(
+                            cameras_select[i].sigs->frame_save_state.store(
                                 State_Copy_New_Frame);
                         }
                     }

@@ -4,7 +4,6 @@ enum Kind : ubyte { KindCommand, KindReply }
 
 enum ServerControl : ubyte {
   NONE,
-  PREPARE,
   OPENCAMERA,
   STARTTHREAD,
   STARTRECORDING,

@@ -731,7 +731,7 @@ int main(int argc, char **args) {
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, "",
                             encoder_config->folder_name, ptp_params,
-                            calib_yaml_folder, detection3d_thread, ctx);
+                            calib_yaml_folder, detection3d_thread);
                     } else {
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
@@ -834,7 +834,7 @@ int main(int argc, char **args) {
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
                             encoder_config->folder_name, ptp_params,
-                            calib_yaml_folder, detection3d_thread, ctx);
+                            calib_yaml_folder, detection3d_thread);
                     } else {
                         camera_control->subscribe = false;
                         stop_camera_streaming(

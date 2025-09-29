@@ -136,8 +136,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraEachSelect *camera_select,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
-                    std::string folder_name, PTPParams *ptp_params,
-                    AppContext &ctx);
+                    std::string folder_name, PTPParams *ptp_params);
 
 void load_camera_json_config_files(std::string file_name,
                                    CameraParams *camera_params,

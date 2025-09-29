@@ -15,9 +15,9 @@
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
-                               unsigned char *display_buffer, AppContext &ctx)
+                               unsigned char *display_buffer)
     : CThreadWorker(name), camera_params(camera_params),
-      camera_select(camera_select), display_buffer(display_buffer), ctx_(ctx) {
+      camera_select(camera_select), display_buffer(display_buffer) {
     input_image_size.width = camera_params->width;
     input_image_size.height = camera_params->height;
     input_image_roi.x = 0;

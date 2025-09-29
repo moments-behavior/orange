@@ -10,7 +10,7 @@ class COpenGLDisplay : public CThreadWorker {
   public:
     COpenGLDisplay(const char *name, CameraParams *camera_params,
                    CameraEachSelect *camera_select,
-                   unsigned char *display_buffer, AppContext &ctx);
+                   unsigned char *display_buffer);
     ~COpenGLDisplay();
 
     bool PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height,
@@ -26,7 +26,6 @@ class COpenGLDisplay : public CThreadWorker {
     Debayer debayer;
     unsigned char *d_convert;
     YOLOv8 *yolov8;
-    AppContext &ctx_;
     FrameCPU frame_cpu;
     NppiSize input_image_size;
     NppiRect input_image_roi;

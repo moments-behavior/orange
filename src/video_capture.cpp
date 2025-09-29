@@ -323,8 +323,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraEachSelect *camera_select,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
-                    std::string folder_name, PTPParams *ptp_params,
-                    AppContext &ctx) {
+                    std::string folder_name, PTPParams *ptp_params) {
     CHECK(cudaSetDevice(camera_params->gpu_id));
     CameraState camera_state;
     PTPState ptp_state;
@@ -349,7 +348,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     COpenGLDisplay *openGLDisplay = nullptr;
     if (camera_select->stream_on) {
         openGLDisplay = new COpenGLDisplay("gl", camera_params, camera_select,
-                                           display_buffer, ctx);
+                                           display_buffer);
         openGLDisplay->StartThread();
     }
 #endif

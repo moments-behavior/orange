@@ -53,7 +53,7 @@ int main(int argc, char **args) {
     CameraEachSelect *cameras_select;
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
-    GL_Texture *tex_gl;
+    GL_Texture *tex_gl = nullptr;
     int num_cameras = 0;
     CameraControl *camera_control =
         new CameraControl{false, false, false, false, false};
@@ -62,7 +62,8 @@ int main(int argc, char **args) {
     PTPParams *ptp_params =
         new PTPParams{0, 0, 0, 0, false, false, false, false};
 
-    EncoderConfig *encoder_config = new EncoderConfig{"h264", 1, "p1"};
+    std::string encoder_codec = "h264";
+    std::string encoder_preset = "p1";
 
     ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
@@ -98,7 +99,7 @@ int main(int argc, char **args) {
 
     int local_config_select = 0;
     bool select_all_cameras = false;
-    char *temp_string = (char *)malloc(64);
+    char *temp_string = (char *)malloc(128);
     *temp_string = '\0';
     bool save_image_all_ready{false};
 
@@ -121,6 +122,23 @@ int main(int argc, char **args) {
                          &realtime_plot_data,
                          camera_control};
     HostClient_SetOpenCtx(&open_ctx);
+    HostStartThreadCtx startthread_ctx{&detection3d_thread,
+                                       &calib_yaml_folder,
+                                       &ptp_stream_sync,
+                                       &input_folder,
+                                       &camera_threads,
+                                       ptp_params,
+                                       camera_control,
+                                       &encoder_codec,
+                                       &encoder_preset,
+                                       &num_cameras,
+                                       &evt_buffer_size,
+                                       &display_gpu_id,
+                                       &tex_gl,
+                                       &cameras_params,
+                                       &cameras_select,
+                                       &ecams};
+    HostClient_SetStartThreadCtx(&startthread_ctx);
 
     while (!glfwWindowShouldClose(window->render_target)) {
         HostClient_Tick();
@@ -254,7 +272,7 @@ int main(int argc, char **args) {
 
                 if (codec_current == -1) {
                     for (int i = 0; i < IM_ARRAYSIZE(codecs); ++i) {
-                        if (encoder_config->encoder_codec == codecs[i]) {
+                        if (encoder_codec == codecs[i]) {
                             codec_current = i;
                             break;
                         }
@@ -263,7 +281,7 @@ int main(int argc, char **args) {
 
                 if (ImGui::Combo("Codec", &codec_current, codecs,
                                  IM_ARRAYSIZE(codecs))) {
-                    encoder_config->encoder_codec = codecs[codec_current];
+                    encoder_codec = codecs[codec_current];
                 }
             }
 
@@ -273,7 +291,7 @@ int main(int argc, char **args) {
 
                 if (preset_current == -1) {
                     for (int i = 0; i < IM_ARRAYSIZE(presets); ++i) {
-                        if (encoder_config->encoder_preset == presets[i]) {
+                        if (encoder_preset == presets[i]) {
                             preset_current = i;
                             break;
                         }
@@ -282,7 +300,7 @@ int main(int argc, char **args) {
 
                 if (ImGui::Combo("Preset", &preset_current, presets,
                                  IM_ARRAYSIZE(presets))) {
-                    encoder_config->encoder_preset = presets[preset_current];
+                    encoder_preset = presets[preset_current];
                 }
             }
 
@@ -309,7 +327,7 @@ int main(int argc, char **args) {
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
                 set_camera_properties(ecams, cameras_params, cameras_select,
-                                      num_cameras, color_temps, encoder_config);
+                                      num_cameras, color_temps);
 
                 if (camera_control->record_video) {
                     ImGui::EndDisabled();
@@ -729,9 +747,8 @@ int main(int argc, char **args) {
                         start_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex_gl, num_cameras,
-                            evt_buffer_size, ptp_stream_sync, "",
-                            encoder_config->folder_name, ptp_params,
-                            calib_yaml_folder, detection3d_thread);
+                            evt_buffer_size, ptp_stream_sync, "", "",
+                            ptp_params, calib_yaml_folder, detection3d_thread);
                     } else {
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
@@ -801,13 +818,13 @@ int main(int argc, char **args) {
                         }
 
                         camera_control->subscribe = true;
-                        std::string encoder_setup =
-                            "-codec " + encoder_config->encoder_codec +
-                            " -preset " + encoder_config->encoder_preset;
+                        std::string encoder_setup = "-codec " + encoder_codec +
+                                                    " -preset " +
+                                                    encoder_preset;
                         camera_control->record_video = true;
-                        encoder_config->folder_name =
+                        std::string folder_name =
                             input_folder + "/" + get_current_date_time();
-                        make_folder(encoder_config->folder_name);
+                        make_folder(folder_name);
                         if (num_cameras > 1) {
                             ptp_stream_sync = true;
                         } else {
@@ -833,8 +850,8 @@ int main(int argc, char **args) {
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
-                            encoder_config->folder_name, ptp_params,
-                            calib_yaml_folder, detection3d_thread);
+                            folder_name, ptp_params, calib_yaml_folder,
+                            detection3d_thread);
                     } else {
                         camera_control->subscribe = false;
                         stop_camera_streaming(

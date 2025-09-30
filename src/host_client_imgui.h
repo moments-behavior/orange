@@ -12,5 +12,5 @@ void HostClient_Init(AppContext &ctx,
                      const std::vector<std::pair<std::string, int>> &endpoints);
 void HostClient_Tick();
 void HostClient_DrawImGui();
-void HostClient_SetOpenCtx(
-    HostOpenCtx *ctx); // if you use the open-phase context
+void HostClient_SetOpenCtx(HostOpenCtx *ctx);
+void HostClient_SetStartThreadCtx(HostStartThreadCtx *ctx);

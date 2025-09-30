@@ -132,7 +132,7 @@ static std::vector<CameraParams> cameras_params;
 static std::vector<CameraEachSelect> cameras_select;
 static CameraControl camera_control;
 static std::vector<std::thread> camera_threads;
-static PTPParams ptp_params{0, 0, 0, 0, false, false, false, false};
+static PTPParams ptp_params{0, 0, 0, 0, true, false, false, false};
 
 static bool open_cameras(const std::string &config_folder) {
     const size_t n = cameras_params.size();

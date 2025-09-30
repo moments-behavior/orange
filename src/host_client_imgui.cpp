@@ -567,20 +567,20 @@ void HostClient_Tick() {
         }
     }
 
-    if (g_waiting) {
-        auto now = std::chrono::steady_clock::now();
-        if (now - g_last_send > std::chrono::milliseconds(g_timeout_ms)) {
-            for (const auto &name : g_servers) {
-                if (!g_ack_by.count(name) || !g_ack_by[name]) {
-                    logf("waiting for %s on %s …", name.c_str(),
-                         ctrl_name(current_ctrl()));
-                }
-            }
-            broadcast_current_phase();
-            g_last_send = std::chrono::steady_clock::now();
-            logf("timeout → re-send %s", ctrl_name(current_ctrl()));
-        }
-    }
+    // if (g_waiting) {
+    //     auto now = std::chrono::steady_clock::now();
+    //     if (now - g_last_send > std::chrono::milliseconds(g_timeout_ms)) {
+    //         for (const auto &name : g_servers) {
+    //             if (!g_ack_by.count(name) || !g_ack_by[name]) {
+    //                 logf("waiting for %s on %s …", name.c_str(),
+    //                      ctrl_name(current_ctrl()));
+    //             }
+    //         }
+    //         broadcast_current_phase();
+    //         g_last_send = std::chrono::steady_clock::now();
+    //         logf("timeout → re-send %s", ctrl_name(current_ctrl()));
+    //     }
+    // }
 }
 
 void HostClient_DrawImGui() {

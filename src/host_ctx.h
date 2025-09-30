@@ -19,9 +19,8 @@ struct HostOpenCtx {
 };
 
 struct HostStartThreadCtx {
-    std::thread *detection3d_thread;
+    std::thread *detection3d_thread = nullptr;
     std::string *calib_yaml_folder = nullptr;
-    bool *ptp_stream_sync = nullptr;
     std::string *input_folder = nullptr;
     std::vector<std::thread> *camera_threads = nullptr;
     PTPParams *ptp_params = nullptr;

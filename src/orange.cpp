@@ -122,22 +122,12 @@ int main(int argc, char **args) {
                          &realtime_plot_data,
                          camera_control};
     HostClient_SetOpenCtx(&open_ctx);
-    HostStartThreadCtx startthread_ctx{&detection3d_thread,
-                                       &calib_yaml_folder,
-                                       &ptp_stream_sync,
-                                       &input_folder,
-                                       &camera_threads,
-                                       ptp_params,
-                                       camera_control,
-                                       &encoder_codec,
-                                       &encoder_preset,
-                                       &num_cameras,
-                                       &evt_buffer_size,
-                                       &display_gpu_id,
-                                       &tex_gl,
-                                       &cameras_params,
-                                       &cameras_select,
-                                       &ecams};
+    HostStartThreadCtx startthread_ctx{
+        &detection3d_thread, &calib_yaml_folder, &input_folder,
+        &camera_threads,     ptp_params,         camera_control,
+        &encoder_codec,      &encoder_preset,    &num_cameras,
+        &evt_buffer_size,    &display_gpu_id,    &tex_gl,
+        &cameras_params,     &cameras_select,    &ecams};
     HostClient_SetStartThreadCtx(&startthread_ctx);
 
     while (!glfwWindowShouldClose(window->render_target)) {

@@ -11,8 +11,8 @@
 #include "enet_utils.h"
 #include "utils.h"
 #include "video_capture.h"
+#include <iostream>
 #include <variant>
-
 using namespace std::chrono_literals;
 
 static AppContext *g_ctx = nullptr;
@@ -187,6 +187,7 @@ static bool start_camera_thread(std::string record_folder,
         }
 
     } catch (...) {
+        std::cout << "Error allocating camera frame buffers." << std::endl;
         return false;
     }
 
@@ -195,6 +196,7 @@ static bool start_camera_thread(std::string record_folder,
     camera_control.sync_camera = true;
 
     if (!make_folder(record_folder)) {
+        std::cout << "Error creating recording folder." << std::endl;
         return false;
     }
 
@@ -213,6 +215,7 @@ static bool start_camera_thread(std::string record_folder,
                             encoder_basic_setup, record_folder, &ptp_params));
         }
     } catch (...) {
+        std::cout << "Error creating camera thread." << std::endl;
         return false;
     }
 
@@ -264,6 +267,8 @@ static bool ctrl_action(camnet::v1::ServerControl c,
             return false;
         std::string record_folder = sta->record_folder()->str();
         std::string encoder_setup = sta->encoder_setup()->str();
+        std::cout << record_folder << std::endl;
+        std::cout << encoder_setup << std::endl;
         return start_camera_thread(record_folder, encoder_setup);
     }
 

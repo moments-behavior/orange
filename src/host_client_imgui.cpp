@@ -75,7 +75,6 @@ static void OnStartThreadStart(std::string encoder_setup,
     std::thread &detection3d_thread = *g_startthreadctx->detection3d_thread;
     std::string &calib_yaml_folder = *g_startthreadctx->calib_yaml_folder;
     PTPParams *ptp_params = g_startthreadctx->ptp_params;
-    bool &ptp_stream_sync = *g_startthreadctx->ptp_stream_sync;
     int &num_cameras = *g_startthreadctx->num_cameras;
     int &evt_buffer_size = *g_startthreadctx->evt_buffer_size;
     int &display_gpu_id = *g_startthreadctx->display_gpu_id;
@@ -84,6 +83,7 @@ static void OnStartThreadStart(std::string encoder_setup,
     CameraEachSelect *&cameras_select = *g_startthreadctx->cameras_select;
     CameraEmergent *&ecams = *g_startthreadctx->ecams;
     std::vector<std::thread> *camera_threads = g_startthreadctx->camera_threads;
+
     // functionality
     make_folder(folder_name);
     ptp_params->network_sync = true;
@@ -103,10 +103,10 @@ static void OnStartThreadStart(std::string encoder_setup,
         }
     }
 
-    start_camera_streaming(
-        *camera_threads, camera_control, ecams, cameras_params, cameras_select,
-        tex_gl, num_cameras, evt_buffer_size, ptp_stream_sync, encoder_setup,
-        folder_name, ptp_params, calib_yaml_folder, detection3d_thread);
+    start_camera_streaming(*camera_threads, camera_control, ecams,
+                           cameras_params, cameras_select, tex_gl, num_cameras,
+                           evt_buffer_size, true, encoder_setup, folder_name,
+                           ptp_params, calib_yaml_folder, detection3d_thread);
 }
 
 // ============================================================================

@@ -257,14 +257,20 @@ void init_7MP_camera_params_mono(CameraParams *camera_params, int camera_id,
     camera_params->iris = 0;
 }
 
-bool make_folder(std::string folder_name) {
-    if (!std::filesystem::exists(folder_name)) {
-        if (!std::filesystem::create_directories(folder_name)) {
-            std::cerr << "Error creating folder: " << folder_name << std::endl;
-        }
-        return false;
-    }
-    return true;
+bool make_folder(std::string folder) {
+    namespace fs = std::filesystem;
+    fs::path p(folder); // construct a path from the string
+    std::error_code ec;
+
+    if (fs::create_directories(p, ec)) // created (including parents)
+        return true;
+
+    if (!ec && fs::is_directory(p)) // already exists as a directory
+        return true;
+
+    std::cerr << "Error creating folder '" << p.string()
+              << "': " << ec.message() << '\n';
+    return false;
 }
 
 void update_camera_configs(std::vector<std::string> &camera_config_files,

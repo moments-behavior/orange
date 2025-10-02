@@ -110,6 +110,77 @@ static void on_stoprecord_phase_start(unsigned long long ptp_global_time) {
     ptp_params->network_set_stop_ptp = true;
 }
 
+static void cleanup_host_client_resources() {
+    PTPParams *ptp_params = g_clientctx->ptp_params;
+    if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
+
+        auto &check = *g_clientctx->check;
+        int &cam_count = *g_clientctx->cam_count;
+        int &num_cameras = *g_clientctx->num_cameras;
+        CameraEachSelect *&cameras_select = *g_clientctx->cameras_select;
+        CameraParams *&cameras_params = *g_clientctx->cameras_params;
+        std::vector<std::thread> *camera_threads = g_clientctx->camera_threads;
+        GL_Texture *&tex_gl = *g_clientctx->tex_gl;
+        CameraControl *camera_control = g_clientctx->camera_control;
+        int &evt_buffer_size = *g_clientctx->evt_buffer_size;
+        CameraEmergent *&ecams = *g_clientctx->ecams;
+
+        ptp_params->network_set_stop_ptp = false;
+
+        for (int i = 0; i < num_cameras; i++) {
+            if (cameras_select[i].stream_on) {
+                int camera_width =
+                    int(cameras_params[i].width / cameras_select[i].downsample);
+                int camera_height = int(cameras_params[i].height /
+                                        cameras_select[i].downsample);
+                clear_upload_and_cleanup(tex_gl[i], camera_width,
+                                         camera_height);
+            }
+        }
+        delete[] tex_gl;
+        tex_gl = nullptr;
+
+        for (auto &t : *camera_threads)
+            t.join();
+
+        for (int i = 0; i < num_cameras; i++) {
+            camera_threads->pop_back();
+        }
+        for (int i = 0; i < num_cameras; i++) {
+            destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,
+                                 evt_buffer_size, &cameras_params[i]);
+            delete[] ecams[i].evt_frame;
+            check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera),
+                                cameras_params[i].camera_serial.c_str());
+        }
+
+        for (int i = 0; i < num_cameras; i++) {
+            ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
+        }
+        camera_control->sync_camera = false;
+        camera_control->record_video = false;
+
+        ptp_params->ptp_global_time = 0;
+        ptp_params->ptp_stop_time = 0;
+        ptp_params->ptp_counter = 0;
+        ptp_params->ptp_stop_counter = 0;
+        ptp_params->network_sync = false;
+        ptp_params->network_set_start_ptp = false;
+        ptp_params->ptp_stop_reached = false;
+        ptp_params->ptp_start_reached = false;
+
+        for (int i = 0; i < num_cameras; i++) {
+            close_camera(&ecams[i].camera, &cameras_params[i]);
+        }
+
+        camera_control->open = false;
+
+        for (int i = 0; i < cam_count; i++) {
+            check[i] = 0;
+        }
+    }
+}
+
 // ============================================================================
 // FlatBuffers parse helper
 // ============================================================================
@@ -592,6 +663,7 @@ void host_client_tick() {
         }
     }
 
+    cleanup_host_client_resources();
     // if (g_waiting) {
     //     auto now = std::chrono::steady_clock::now();
     //     if (now - g_last_send > std::chrono::milliseconds(g_timeout_ms)) {

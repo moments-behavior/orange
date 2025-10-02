@@ -152,18 +152,37 @@ void load_camera_json_config_files(std::string file_name,
     }
     
     // Load OBB configuration fields (all optional, defaults used if missing)
+    std::cout << "=== OBB Config Loading Debug ===" << std::endl;
+    std::cout << "Config file: " << file_name << std::endl;
+    
     if (camera_config.contains("enable_obb")) {
         camera_select->enable_obb = camera_config["enable_obb"];
+        std::cout << "OBB enabled: " << camera_select->enable_obb << std::endl;
+    } else {
+        std::cout << "OBB enable_obb not found in config, using default: " << camera_select->enable_obb << std::endl;
     }
+    
     if (camera_config.contains("obb_csv_path")) {
         camera_select->obb_csv_path = camera_config["obb_csv_path"];
+        std::cout << "OBB CSV path: " << camera_select->obb_csv_path << std::endl;
+    } else {
+        std::cout << "OBB obb_csv_path not found in config, using default: " << camera_select->obb_csv_path << std::endl;
     }
+    
     if (camera_config.contains("obb_threshold")) {
         camera_select->obb_threshold = camera_config["obb_threshold"];
+        std::cout << "OBB threshold: " << camera_select->obb_threshold << std::endl;
+    } else {
+        std::cout << "OBB obb_threshold not found in config, using default: " << camera_select->obb_threshold << std::endl;
     }
+    
     if (camera_config.contains("obb_bg_frames")) {
         camera_select->obb_bg_frames = camera_config["obb_bg_frames"];
+        std::cout << "OBB background frames: " << camera_select->obb_bg_frames << std::endl;
+    } else {
+        std::cout << "OBB obb_bg_frames not found in config, using default: " << camera_select->obb_bg_frames << std::endl;
     }
+    std::cout << "=== End OBB Config Loading Debug ===" << std::endl;
 }
 
 std::string get_current_time_milliseconds() {

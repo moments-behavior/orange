@@ -29,8 +29,10 @@ g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot.
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot_items.o $DIR_IMPLOT/implot_items.cpp
 g++ -std=c++17 -I$DIR_IMPLOT -I$DIR_IMGUI -g -Wall -c -o $targets_folder/implot_demo.o $DIR_IMPLOT/implot_demo.cpp
 
+g++ -std=c++17 -I$DIR_FILEBROWSER -I$DIR_IMGUI -g -Wall -c -o $targets_folder/ImGuiFileDialog.o $DIR_FILEBROWSER/ImGuiFileDialog.cpp
+
 g++ -Ofast -ffast-math -std=c++17 $targets_folder/*.o \
-    -o $targets_folder/orange -I ./src/ src/orange.cpp src/project.cpp src/FrameSaver.cpp src/FrameDetector.cpp src/realtime_tool.cpp src/detect3d.cpp src/network_base.cpp src/global.cpp src/FFmpegWriter.cpp src/camera.cpp src/video_capture.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp src/obb_detector.cpp $DIR_FILEBROWSER/ImGuiFileDialog.cpp \
+    -o $targets_folder/orange -I ./src/ src/orange.cpp src/project.cpp src/FrameSaver.cpp src/FrameDetector.cpp src/realtime_tool.cpp src/detect3d.cpp src/network_base.cpp src/global.cpp src/FFmpegWriter.cpp src/camera.cpp src/video_capture.cpp src/offthreadmachine.cpp src/opengldisplay.cpp src/threadworker.cpp src/gpu_video_encoder.cpp src/yolov8_det.cpp src/obb_detector.cpp \
     -I$DIR_IMGUI \
     -I$DIR_IMGUI_BACKEND \
     -I$DIR_IMPLOT \

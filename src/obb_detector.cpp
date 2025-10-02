@@ -141,16 +141,35 @@ void OBBDetector::thread_loop() {
             continue;
         }
         
-        // Initialize background if not done
+        // Build background model from first few frames
         if (!background_initialized) {
-            background_model = frame.clone();
-            background_initialized = true;
-            std::cout << "Background model initialized" << std::endl;
+            if (frames_processed == 0) {
+                // Initialize background with first frame
+                frame.convertTo(background_model, CV_32F);
+                std::cout << "OBB: Started background building, frame size: " << frame.cols << "x" << frame.rows 
+                          << ", channels: " << frame.channels() << ", type: " << frame.type() << std::endl;
+            } else if (frames_processed < params.bg_frames) {
+                // Accumulate frames for background model
+                cv::Mat frame_f32;
+                frame.convertTo(frame_f32, CV_32F);
+                double alpha = 1.0 / (frames_processed + 1);
+                cv::accumulateWeighted(frame_f32, background_model, alpha);
+                std::cout << "OBB: Background building progress: " << (frames_processed + 1) << "/" << params.bg_frames << std::endl;
+            } else {
+                // Background building complete
+                background_initialized = true;
+                std::cout << "OBB: Background model completed after " << params.bg_frames << " frames" << std::endl;
+            }
+            frames_processed++;
             continue;
         }
         
+        // Convert background model back to CV_8U for detection
+        cv::Mat background_u8;
+        background_model.convertTo(background_u8, CV_8U);
+        
         // Detect candidates
-        auto candidates = detect_candidates(frame, background_model);
+        auto candidates = detect_candidates(frame, background_u8);
         
         // Debug output every 100 frames
         if (frames_processed % 100 == 0) {

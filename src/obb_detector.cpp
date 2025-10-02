@@ -616,12 +616,16 @@ std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
         if (frames_processed < params.bg_frames) {
             // Add frame to background building
             if (frames_processed == 0) {
-                background_model = frame.clone();
-                std::cout << "OBB: Started background building, frame size: " << frame.cols << "x" << frame.rows << std::endl;
+                // Ensure background_model has same type and channels as input frame
+                frame.convertTo(background_model, CV_32F);
+                std::cout << "OBB: Started background building, frame size: " << frame.cols << "x" << frame.rows 
+                          << ", channels: " << frame.channels() << ", type: " << frame.type() << std::endl;
             } else {
-                // Running average for background
+                // Running average for background - convert frame to float32 first
+                cv::Mat frame_f32;
+                frame.convertTo(frame_f32, CV_32F);
                 double alpha = 1.0 / (frames_processed + 1);
-                cv::accumulateWeighted(frame, background_model, alpha);
+                cv::accumulateWeighted(frame_f32, background_model, alpha);
             }
             frames_processed++;
             
@@ -636,7 +640,10 @@ std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
     }
     
     // Detect candidates (returns contour points)
-    auto candidates = detect_candidates(frame, background_model);
+    // Convert background_model back to CV_8U for detection
+    cv::Mat background_u8;
+    background_model.convertTo(background_u8, CV_8U);
+    auto candidates = detect_candidates(frame, background_u8);
     std::cout << "OBB: Found " << candidates.size() << " motion candidates" << std::endl;
     
     // Classify candidates against learned priors

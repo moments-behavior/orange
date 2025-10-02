@@ -276,6 +276,7 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         if (record_start)
             return false;
         unsigned long long ptp_global_time = record_start->ptp_time();
+        std::cout << ptp_global_time << std::endl;
         ptp_params.ptp_global_time = ptp_global_time;
         ptp_params.network_set_start_ptp = true;
         return true;
@@ -286,6 +287,7 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         if (record_stop)
             return false;
         unsigned long long ptp_stop_time = record_stop->ptp_time();
+        std::cout << ptp_stop_time << std::endl;
         ptp_params.ptp_stop_time = ptp_stop_time;
         ptp_params.network_set_stop_ptp = true;
         return true;

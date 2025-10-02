@@ -118,6 +118,7 @@ private:
     
     // Background modeling
     bool build_background(cv::VideoCapture& cap, cv::Mat& background);
+    cv::Mat compute_median_background(const std::vector<cv::Mat>& frames);
     
     // Motion detection and OBB generation
     cv::Mat create_disk_kernel(int radius);
@@ -139,6 +140,7 @@ private:
     // Background model
     cv::Mat background_model;
     bool background_initialized;
+    std::vector<cv::Mat> background_frames;
     
     // Threading
     std::atomic<bool> running;

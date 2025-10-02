@@ -141,24 +141,29 @@ void OBBDetector::thread_loop() {
             continue;
         }
         
-        // Build background model from first few frames
+        // Build background model from first few frames (true median like Python)
         if (!background_initialized) {
             if (frames_processed == 0) {
-                // Initialize background with first frame
-                frame.convertTo(background_model, CV_32F);
+                // Initialize background frames collection
+                background_frames.clear();
                 std::cout << "OBB: Started background building, frame size: " << frame.cols << "x" << frame.rows 
                           << ", channels: " << frame.channels() << ", type: " << frame.type() << std::endl;
-            } else if (frames_processed < params.bg_frames) {
-                // Accumulate frames for background model
-                cv::Mat frame_f32;
-                frame.convertTo(frame_f32, CV_32F);
-                double alpha = 1.0 / (frames_processed + 1);
-                cv::accumulateWeighted(frame_f32, background_model, alpha);
+            }
+            
+            if (frames_processed < params.bg_frames) {
+                // Collect frames for median background
+                background_frames.push_back(frame.clone());
                 std::cout << "OBB: Background building progress: " << (frames_processed + 1) << "/" << params.bg_frames << std::endl;
             } else {
-                // Background building complete
-                background_initialized = true;
-                std::cout << "OBB: Background model completed after " << params.bg_frames << " frames" << std::endl;
+                // Compute true median background (like Python)
+                if (!background_frames.empty()) {
+                    background_model = compute_median_background(background_frames);
+                    background_initialized = true;
+                    std::cout << "OBB: Background model completed after " << params.bg_frames << " frames (true median)" << std::endl;
+                } else {
+                    std::cerr << "OBB: No background frames collected!" << std::endl;
+                    background_initialized = true; // Continue anyway
+                }
             }
             frames_processed++;
             continue;
@@ -174,6 +179,10 @@ void OBBDetector::thread_loop() {
         // Debug output every 100 frames
         if (frames_processed % 100 == 0) {
             std::cout << "OBB: Frame " << frames_processed << " - Found " << candidates.size() << " motion candidates" << std::endl;
+            if (candidates.size() > 0) {
+                auto wh = rect_wh_from_pts(candidates[0]);
+                std::cout << "OBB: First candidate size: " << wh.first << "x" << wh.second << " (area: " << (wh.first * wh.second) << ")" << std::endl;
+            }
         }
         
         // Classify candidates
@@ -472,6 +481,41 @@ bool OBBDetector::build_background(cv::VideoCapture& cap, cv::Mat& background) {
     }
     
     return false;
+}
+
+cv::Mat OBBDetector::compute_median_background(const std::vector<cv::Mat>& frames) {
+    if (frames.empty()) {
+        return cv::Mat();
+    }
+    
+    // Convert all frames to float32
+    std::vector<cv::Mat> float_frames;
+    for (const auto& frame : frames) {
+        cv::Mat float_frame;
+        frame.convertTo(float_frame, CV_32F);
+        float_frames.push_back(float_frame);
+    }
+    
+    // Compute median pixel-wise (like Python: np.median(np.stack(imgs,0), axis=0))
+    cv::Mat median_result = cv::Mat::zeros(frames[0].size(), CV_32F);
+    
+    for (int r = 0; r < frames[0].rows; r++) {
+        for (int c = 0; c < frames[0].cols; c++) {
+            for (int ch = 0; ch < frames[0].channels(); ch++) {
+                std::vector<float> values;
+                for (const auto& frame : float_frames) {
+                    values.push_back(frame.at<cv::Vec3f>(r, c)[ch]);
+                }
+                std::sort(values.begin(), values.end());
+                median_result.at<cv::Vec3f>(r, c)[ch] = values[values.size() / 2];
+            }
+        }
+    }
+    
+    // Convert back to uint8
+    cv::Mat result;
+    median_result.convertTo(result, CV_8U);
+    return result;
 }
 
 std::vector<std::vector<cv::Point2f>> OBBDetector::detect_candidates(const cv::Mat& frame, const cv::Mat& background) {

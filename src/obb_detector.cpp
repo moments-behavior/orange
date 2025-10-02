@@ -87,14 +87,16 @@ void OBBDetector::stop() {
 void OBBDetector::notify_frame_ready(void* device_image_ptr, cudaStream_t copy_stream) {
     if (camera_params->gpu_direct) {
         CUDA_CHECK(cudaMemcpy2DAsync(
-            d_frame_original, camera_params->width,
-            device_image_ptr, camera_params->width, camera_params->width,
-            camera_params->height, cudaMemcpyDeviceToDevice, copy_stream));
+            d_frame_original, camera_params->width * 3,  // 3 channels for RGB
+            device_image_ptr, camera_params->width * 3,
+            camera_params->width * 3, camera_params->height,
+            cudaMemcpyDeviceToDevice, copy_stream));
     } else {
         CUDA_CHECK(cudaMemcpy2DAsync(
-            d_frame_original, camera_params->width,
-            device_image_ptr, camera_params->width, camera_params->width,
-            camera_params->height, cudaMemcpyHostToDevice, copy_stream));
+            d_frame_original, camera_params->width * 3,  // 3 channels for RGB
+            device_image_ptr, camera_params->width * 3,
+            camera_params->width * 3, camera_params->height,
+            cudaMemcpyHostToDevice, copy_stream));
     }
     
     cudaEventRecord(copy_done_event, copy_stream);
@@ -107,7 +109,7 @@ void OBBDetector::thread_loop() {
     CUDA_CHECK(cudaStreamCreate(&stream));
     
     // Allocate GPU memory
-    size_t frame_size = camera_params->width * camera_params->height * sizeof(unsigned char);
+    size_t frame_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);  // RGB
     size_t debayer_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
     size_t cpu_frame_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
     
@@ -149,6 +151,11 @@ void OBBDetector::thread_loop() {
         
         // Detect candidates
         auto candidates = detect_candidates(frame, background_model);
+        
+        // Debug output every 100 frames
+        if (frames_processed % 100 == 0) {
+            std::cout << "OBB: Frame " << frames_processed << " - Found " << candidates.size() << " motion candidates" << std::endl;
+        }
         
         // Classify candidates
         std::vector<OBB> detections;
@@ -588,20 +595,20 @@ float OBBDetector::compute_classification_score(const std::vector<cv::Point2f>& 
 }
 
 void OBBDetector::copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame) {
-    // For now, just copy the raw frame data to CPU
-    // In a real implementation, you would do proper debayering here
-    CUDA_CHECK(cudaMemcpy2DAsync(h_frame_cpu, camera_params->width,
-                                 d_frame_original, camera_params->width,
-                                 camera_params->width, camera_params->height,
+    // Copy the debayered RGB frame from GPU to CPU
+    // The frame is already debayered and in RGB format
+    CUDA_CHECK(cudaMemcpy2DAsync(h_frame_cpu, camera_params->width * 3,  // 3 channels for RGB
+                                 d_frame_original, camera_params->width * 3,
+                                 camera_params->width * 3, camera_params->height,
                                  cudaMemcpyDeviceToHost, stream));
     
     CUDA_CHECK(cudaStreamSynchronize(stream));
     
-    // Create OpenCV Mat from CPU frame (assuming grayscale for now)
-    cpu_frame = cv::Mat(camera_params->height, camera_params->width, CV_8UC1, h_frame_cpu).clone();
+    // Create OpenCV Mat from CPU frame (RGB format)
+    cpu_frame = cv::Mat(camera_params->height, camera_params->width, CV_8UC3, h_frame_cpu).clone();
     
-    // Convert to BGR for compatibility
-    cv::cvtColor(cpu_frame, cpu_frame, cv::COLOR_GRAY2BGR);
+    // Convert RGB to BGR for OpenCV compatibility
+    cv::cvtColor(cpu_frame, cpu_frame, cv::COLOR_RGB2BGR);
 }
 
 std::vector<OBB> OBBDetector::get_latest_detections() {

@@ -20,8 +20,8 @@ table BringupMessage {
 // ---- Command payloads ----
 table OpenArgs         { config_folder:string; }
 table StartThreadsArgs { record_folder:string; encoder_setup:string; }
-table StartArgs        { ptp_time:ulong; }
-table StopArgs         { ptp_time:ulong; }
+table StartArgs        { ptp_time:uint64; }
+table StopArgs         { ptp_time:uint64; }
 
 union CommandBody { OpenArgs, StartThreadsArgs, StartArgs, StopArgs }
 

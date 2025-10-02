@@ -231,22 +231,31 @@ bool OBBDetector::parse_labels_csv(const std::string& csv_path,
 }
 
 void OBBDetector::learn_priors_from_csvs() {
+    std::cout << "=== OBB CSV Learning Debug ===" << std::endl;
+    std::cout << "Number of CSV files to process: " << csv_paths.size() << std::endl;
+    
     std::map<int, std::vector<std::vector<cv::Point2f>>> class_samples;
     
     for (const auto& csv_path : csv_paths) {
+        std::cout << "Processing CSV file: " << csv_path << std::endl;
         std::vector<std::pair<int, std::vector<cv::Point2f>>> labels;
         if (parse_labels_csv(csv_path, labels)) {
+            std::cout << "Successfully parsed " << labels.size() << " labels from " << csv_path << std::endl;
             for (const auto& label : labels) {
                 class_samples[label.first].push_back(label.second);
             }
+        } else {
+            std::cout << "Failed to parse CSV file: " << csv_path << std::endl;
         }
     }
     
+    std::cout << "Total classes found: " << class_samples.size() << std::endl;
     for (const auto& class_data : class_samples) {
         priors[class_data.first] = compute_class_prior(class_data.second);
         std::cout << "Learned priors for class " << class_data.first 
                   << " from " << class_data.second.size() << " samples" << std::endl;
     }
+    std::cout << "=== End CSV Learning Debug ===" << std::endl;
 }
 
 ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Point2f>>& class_samples) {
@@ -598,6 +607,7 @@ std::vector<OBB> OBBDetector::get_latest_detections() {
 
 std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
     if (frame.empty()) {
+        std::cout << "OBB: Empty frame received" << std::endl;
         return std::vector<OBB>();
     }
     
@@ -607,6 +617,7 @@ std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
             // Add frame to background building
             if (frames_processed == 0) {
                 background_model = frame.clone();
+                std::cout << "OBB: Started background building, frame size: " << frame.cols << "x" << frame.rows << std::endl;
             } else {
                 // Running average for background
                 double alpha = 1.0 / (frames_processed + 1);
@@ -614,9 +625,11 @@ std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
             }
             frames_processed++;
             
+            std::cout << "OBB: Background building progress: " << frames_processed << "/" << params.bg_frames << std::endl;
+            
             if (frames_processed >= params.bg_frames) {
                 background_initialized = true;
-                std::cout << "OBB background ready after " << frames_processed << " frames" << std::endl;
+                std::cout << "OBB: Background ready after " << frames_processed << " frames" << std::endl;
             }
         }
         return std::vector<OBB>();
@@ -624,19 +637,26 @@ std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
     
     // Detect candidates (returns contour points)
     auto candidates = detect_candidates(frame, background_model);
+    std::cout << "OBB: Found " << candidates.size() << " motion candidates" << std::endl;
     
     // Classify candidates against learned priors
     std::vector<OBB> detections;
-    for (const auto& candidate : candidates) {
+    for (size_t i = 0; i < candidates.size(); i++) {
+        const auto& candidate = candidates[i];
         int class_id = classify_with_priors(candidate);
+        std::cout << "OBB: Candidate " << i << " classified as class " << class_id << std::endl;
+        
         if (class_id >= 0) {
             // Convert contour points to OBB structure
             OBB obb(candidate[0].x, candidate[0].y, candidate[1].x, candidate[1].y,
                    candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
                    class_id, 1.0f);
             detections.push_back(obb);
+            std::cout << "OBB: Added detection at (" << obb.x1 << "," << obb.y1 << ") to (" << obb.x3 << "," << obb.y3 << ")" << std::endl;
         }
     }
+    
+    std::cout << "OBB: Total detections: " << detections.size() << std::endl;
     
     // Update latest detections (thread-safe)
     {

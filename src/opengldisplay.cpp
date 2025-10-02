@@ -44,6 +44,12 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
     
     // Initialize OBB detector if enabled
     if (camera_select->enable_obb) {
+        std::cout << "=== OBB Detector Initialization ===" << std::endl;
+        std::cout << "OBB enabled for camera: " << camera_params->camera_serial << std::endl;
+        std::cout << "CSV path: " << camera_select->obb_csv_path << std::endl;
+        std::cout << "Threshold: " << camera_select->obb_threshold << std::endl;
+        std::cout << "Background frames: " << camera_select->obb_bg_frames << std::endl;
+        
         // Set up OBB detector parameters
         OBBDetectorParams obb_params;
         obb_params.threshold = camera_select->obb_threshold;
@@ -66,6 +72,9 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
             
             // No need to start thread - we'll process synchronously
         }
+        std::cout << "=== End OBB Initialization ===" << std::endl;
+    } else {
+        std::cout << "OBB detection disabled for camera: " << camera_params->camera_serial << std::endl;
     }
 }
 
@@ -211,6 +220,13 @@ void COpenGLDisplay::ThreadRunning() {
             
             // OBB Detection (new code)
             if (camera_select->enable_obb && obb_detector) {
+                static int frame_count = 0;
+                frame_count++;
+                
+                if (frame_count % 30 == 0) {  // Print every 30 frames to avoid spam
+                    std::cout << "OBB: Processing frame " << frame_count << std::endl;
+                }
+                
                 // Copy frame to CPU for OBB processing (at original resolution)
                 cv::Mat cpu_frame = cv::Mat(camera_params->height, camera_params->width, CV_8UC4);
                 CHECK(cudaMemcpy2D(cpu_frame.data, camera_params->width * 4,

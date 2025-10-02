@@ -153,7 +153,8 @@ void OBBDetector::thread_loop() {
             if (frames_processed < params.bg_frames) {
                 // Collect frames for median background
                 background_frames.push_back(frame.clone());
-                std::cout << "OBB: Background building progress: " << (frames_processed + 1) << "/" << params.bg_frames << std::endl;
+                std::cout << "OBB: Background building progress: " << (frames_processed + 1) << "/" << params.bg_frames 
+                          << " (frame size: " << frame.cols << "x" << frame.rows << ", channels: " << frame.channels() << ")" << std::endl;
             } else {
                 // Compute true median background (like Python)
                 if (!background_frames.empty()) {
@@ -488,6 +489,19 @@ cv::Mat OBBDetector::compute_median_background(const std::vector<cv::Mat>& frame
         return cv::Mat();
     }
     
+    // Validate all frames have the same size
+    cv::Size frame_size = frames[0].size();
+    int frame_channels = frames[0].channels();
+    
+    for (const auto& frame : frames) {
+        if (frame.size() != frame_size || frame.channels() != frame_channels) {
+            std::cerr << "OBB: Frame size mismatch! Expected " << frame_size.width << "x" << frame_size.height 
+                      << " channels=" << frame_channels << ", got " << frame.size().width << "x" << frame.size().height 
+                      << " channels=" << frame.channels() << std::endl;
+            return cv::Mat();
+        }
+    }
+    
     // Convert all frames to float32
     std::vector<cv::Mat> float_frames;
     for (const auto& frame : frames) {
@@ -497,11 +511,11 @@ cv::Mat OBBDetector::compute_median_background(const std::vector<cv::Mat>& frame
     }
     
     // Compute median pixel-wise (like Python: np.median(np.stack(imgs,0), axis=0))
-    cv::Mat median_result = cv::Mat::zeros(frames[0].size(), CV_32F);
+    cv::Mat median_result = cv::Mat::zeros(frame_size, CV_32FC3);
     
-    for (int r = 0; r < frames[0].rows; r++) {
-        for (int c = 0; c < frames[0].cols; c++) {
-            for (int ch = 0; ch < frames[0].channels(); ch++) {
+    for (int r = 0; r < frame_size.height; r++) {
+        for (int c = 0; c < frame_size.width; c++) {
+            for (int ch = 0; ch < frame_channels; ch++) {
                 std::vector<float> values;
                 for (const auto& frame : float_frames) {
                     values.push_back(frame.at<cv::Vec3f>(r, c)[ch]);
@@ -514,7 +528,7 @@ cv::Mat OBBDetector::compute_median_background(const std::vector<cv::Mat>& frame
     
     // Convert back to uint8
     cv::Mat result;
-    median_result.convertTo(result, CV_8U);
+    median_result.convertTo(result, CV_8UC3);
     return result;
 }
 

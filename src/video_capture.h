@@ -44,6 +44,13 @@ struct CameraEachSelect {
     int idx3d = 0;
     int total_standoff_detector = 0;
     std::atomic<PictureState> frame_detect_state;
+    
+    // OBB Detection Configuration
+    bool enable_obb = false;
+    std::string obb_csv_path = "";
+    float obb_threshold = 30.0f;
+    int obb_bg_frames = 10;
+    
     CameraEachSelect()
         : frame_save_state(State_Frame_Idle),
           frame_detect_state(State_Frame_Idle) {}

@@ -10,6 +10,7 @@
 #include <nvToolsExt.h>
 #include <stdio.h>
 #include <string.h>
+#include <iomanip>
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
@@ -40,6 +41,32 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
     for (int i = 0; i < workerEntriesFreeQueueCount; i++) {
         workerEntriesFreeQueue[i] = &workerEntries[i];
     }
+    
+    // Initialize OBB detector if enabled
+    if (camera_select->enable_obb) {
+        // Set up OBB detector parameters
+        OBBDetectorParams obb_params;
+        obb_params.threshold = camera_select->obb_threshold;
+        obb_params.bg_frames = camera_select->obb_bg_frames;
+        
+        // Create CSV paths vector
+        std::vector<std::string> csv_paths = {camera_select->obb_csv_path};
+        
+        // Create OBB detector with proper parameters
+        obb_detector = new OBBDetector(camera_params, csv_paths, obb_params);
+        
+        // Initialize the detector (learn priors from CSV files)
+        if (!obb_detector->initialize()) {
+            std::cout << "Failed to initialize OBB detector with CSV: " 
+                      << camera_select->obb_csv_path << std::endl;
+            delete obb_detector;
+            obb_detector = nullptr;
+        } else {
+            std::cout << "OBB detector initialized successfully (synchronous mode)" << std::endl;
+            
+            // No need to start thread - we'll process synchronously
+        }
+    }
 }
 
 COpenGLDisplay::~COpenGLDisplay() {
@@ -47,6 +74,16 @@ COpenGLDisplay::~COpenGLDisplay() {
     cudaFree(debayer.d_debayer);
     if (camera_select->detect_mode == Detect2D_GLThread) {
         delete yolov8;
+    }
+    
+    if (obb_detector) {
+        delete obb_detector;
+        obb_detector = nullptr;
+    }
+    
+    if (d_obb_points) {
+        cudaFree(d_obb_points);
+        d_obb_points = nullptr;
     }
 }
 
@@ -82,11 +119,19 @@ void COpenGLDisplay::ThreadRunning() {
         CHECK(cudaMemcpy(d_skeleton, skeleton, sizeof(unsigned int) * 8,
                          cudaMemcpyHostToDevice));
     }
+    
+    // Allocate OBB GPU resources if needed
+    if (camera_select->enable_obb && obb_detector) {
+        cudaMalloc((void **)&d_obb_points, sizeof(float) * 8 * 10); // Support up to 10 OBBs
+    }
 
     std::vector<Bbox> objs;
     std::vector<Bbox> objs_last_frame;
+    std::vector<OBB> obb_detections;  // Add OBB results
 
     using clock = std::chrono::steady_clock;
+    
+    // OBB Background Building
 
     int frameCount = 0;
     auto lastFPSUpdate = clock::now();
@@ -161,6 +206,55 @@ void COpenGLDisplay::ThreadRunning() {
                     objs_last_frame.push_back(objs[0]);
                 } else {
                     objs_last_frame.clear();
+                }
+            }
+            
+            // OBB Detection (new code)
+            if (camera_select->enable_obb && obb_detector) {
+                // Copy frame to CPU for OBB processing (at original resolution)
+                cv::Mat cpu_frame = cv::Mat(camera_params->height, camera_params->width, CV_8UC4);
+                CHECK(cudaMemcpy2D(cpu_frame.data, camera_params->width * 4,
+                                   debayer.d_debayer, camera_params->width * 4,
+                                   camera_params->width * 4, camera_params->height,
+                                   cudaMemcpyDeviceToHost));
+                cv::cvtColor(cpu_frame, cpu_frame, cv::COLOR_BGRA2RGB);
+                
+                // Process frame synchronously (non-blocking, lightweight)
+                std::vector<OBB> obb_detections = obb_detector->process_frame_sync(cpu_frame);
+                
+                // Draw OBB overlays on GPU and print debug info
+                if (obb_detections.size() > 0) {
+                    std::cout << "OBB Detection Results: " << obb_detections.size() << " objects detected" << std::endl;
+                    
+                    for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
+                        const OBB& obb = obb_detections[i];
+                        
+                        // Debug print for each object
+                        std::cout << "  Object " << i << ": Class=" << obb.class_id 
+                                  << ", Confidence=" << std::fixed << std::setprecision(3) << obb.confidence
+                                  << ", Corners=(" << obb.x1 << "," << obb.y1 << ") (" 
+                                  << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 
+                                  << ") (" << obb.x4 << "," << obb.y4 << ")" << std::endl;
+                        
+                        // Copy OBB corners to GPU (use original coordinates, resize will handle scaling)
+                        float obb_points[8] = {
+                            obb.x1, obb.y1,  // Top-left
+                            obb.x2, obb.y2,  // Top-right  
+                            obb.x3, obb.y3,  // Bottom-right
+                            obb.x4, obb.y4   // Bottom-left
+                        };
+                        
+                        CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
+                                             sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
+                        
+                        // Draw OBB on original buffer (will be resized later if needed)
+                        gpu_draw_obb(debayer.d_debayer, camera_params->width, 
+                                    camera_params->height, d_obb_points + i * 8, 
+                                    obb.class_id, 0);
+                    }
+                } else {
+                    // Optional: print when no objects detected (can be commented out for less noise)
+                    // std::cout << "OBB Detection: No objects detected" << std::endl;
                 }
             }
 

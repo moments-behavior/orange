@@ -596,6 +596,57 @@ std::vector<OBB> OBBDetector::get_latest_detections() {
     return latest_detections;
 }
 
+std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
+    if (frame.empty()) {
+        return std::vector<OBB>();
+    }
+    
+    // Build background from first N frames if not ready
+    if (!background_initialized) {
+        if (frames_processed < params.bg_frames) {
+            // Add frame to background building
+            if (frames_processed == 0) {
+                background_model = frame.clone();
+            } else {
+                // Running average for background
+                double alpha = 1.0 / (frames_processed + 1);
+                cv::accumulateWeighted(frame, background_model, alpha);
+            }
+            frames_processed++;
+            
+            if (frames_processed >= params.bg_frames) {
+                background_initialized = true;
+                std::cout << "OBB background ready after " << frames_processed << " frames" << std::endl;
+            }
+        }
+        return std::vector<OBB>();
+    }
+    
+    // Detect candidates (returns contour points)
+    auto candidates = detect_candidates(frame, background_model);
+    
+    // Classify candidates against learned priors
+    std::vector<OBB> detections;
+    for (const auto& candidate : candidates) {
+        int class_id = classify_with_priors(candidate);
+        if (class_id >= 0) {
+            // Convert contour points to OBB structure
+            OBB obb(candidate[0].x, candidate[0].y, candidate[1].x, candidate[1].y,
+                   candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
+                   class_id, 1.0f);
+            detections.push_back(obb);
+        }
+    }
+    
+    // Update latest detections (thread-safe)
+    {
+        std::lock_guard<std::mutex> lock(detections_mtx);
+        latest_detections = detections;
+    }
+    
+    return detections;
+}
+
 void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
                                    const std::vector<OBB>& obbs,
                                    const std::vector<std::string>& class_names,
@@ -669,3 +720,4 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
         }
     }
 }
+

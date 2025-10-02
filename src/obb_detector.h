@@ -71,6 +71,9 @@ public:
     // Get the latest detection results
     std::vector<OBB> get_latest_detections();
     
+    // Synchronous processing method (for direct use in display thread)
+    std::vector<OBB> process_frame_sync(const cv::Mat& frame);
+    
     // Check if detector is running
     bool is_running() const { return running.load(); }
     

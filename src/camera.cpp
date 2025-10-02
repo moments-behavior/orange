@@ -848,3 +848,4 @@ int order_for_test_rig(int max_cameras, GigEVisionDeviceInfo *device_info,
         return count;
     }
 }
+

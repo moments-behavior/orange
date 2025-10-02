@@ -150,6 +150,20 @@ void load_camera_json_config_files(std::string file_name,
     if (camera_config.contains("yolo")) {
         camera_select->yolo_model = camera_config["yolo"];
     }
+    
+    // Load OBB configuration fields (all optional, defaults used if missing)
+    if (camera_config.contains("enable_obb")) {
+        camera_select->enable_obb = camera_config["enable_obb"];
+    }
+    if (camera_config.contains("obb_csv_path")) {
+        camera_select->obb_csv_path = camera_config["obb_csv_path"];
+    }
+    if (camera_config.contains("obb_threshold")) {
+        camera_select->obb_threshold = camera_config["obb_threshold"];
+    }
+    if (camera_config.contains("obb_bg_frames")) {
+        camera_select->obb_bg_frames = camera_config["obb_bg_frames"];
+    }
 }
 
 std::string get_current_time_milliseconds() {
@@ -402,6 +416,7 @@ bool set_camera_params(CameraParams *camera_params,
                                       camera_params, camera_select, camera_idx,
                                       num_cameras);
     }
+    
     return true;
 }
 

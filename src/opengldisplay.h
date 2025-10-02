@@ -2,6 +2,7 @@
 #include "image_processing.h"
 #include "threadworker.h"
 #include "yolov8_det.h"
+#include "obb_detector.h"
 #include <nppi.h>
 #define WORK_ENTRIES_MAX 2
 
@@ -35,6 +36,10 @@ class COpenGLDisplay : public CThreadWorker {
     float *d_points;
     unsigned int *d_skeleton;
     unsigned int *d_resize;
+    
+    // OBB Detection
+    OBBDetector *obb_detector = nullptr;
+    float *d_obb_points;  // GPU buffer for OBB corner points
 
   private:
     virtual void

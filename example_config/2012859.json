@@ -1,0 +1,17 @@
+{
+    "name": "2012859_cam1",
+    "width": 1936,
+    "height": 1464,
+    "frame_rate": 240,
+    "gain": 600,
+    "focus": 345,
+    "iris": 0,
+    "exposure": 100,
+    "pixel_format": "BayerRG8",
+    "gpu_id": 3,
+    "color_temp": "CT_5000K",
+    "gpu_direct": true,
+    "color": true,
+    "yolo": "/home/user/Quan/toymouse.engine",
+    "yolo_mode": "detect"
+}

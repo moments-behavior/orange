@@ -24,7 +24,8 @@ using namespace std::chrono_literals;
 
 // persistent to handle missing messages
 static std::string g_folder_name;
-static unsigned long long g_ptp_global_time;
+static unsigned long long g_ptp_start_time;
+static unsigned long long g_ptp_stop_time;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -101,6 +102,12 @@ static void on_startrecord_phase_start(unsigned long long ptp_global_time) {
     PTPParams *ptp_params = g_clientctx->ptp_params;
     ptp_params->ptp_global_time = ptp_global_time;
     ptp_params->network_set_start_ptp = true;
+}
+
+static void on_stoprecord_phase_start(unsigned long long ptp_global_time) {
+    PTPParams *ptp_params = g_clientctx->ptp_params;
+    ptp_params->ptp_stop_time = ptp_global_time;
+    ptp_params->network_set_stop_ptp = true;
 }
 
 // ============================================================================
@@ -337,7 +344,8 @@ static void reset_session() {
     }
     g_phase_started = false;
     g_folder_name = "";
-    g_ptp_global_time = 0;
+    g_ptp_start_time = 0;
+    g_ptp_stop_time = 0;
     logf("session reset");
 }
 
@@ -385,22 +393,38 @@ static void broadcast_current_phase() {
         break;
     }
     case Phase_Start: {
-        CameraEmergent *&ecams = *g_clientctx->ecams;
-        unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
-        int delay_in_second = 3;
-        g_ptp_global_time =
-            ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
-        bytes = build_cmd_start(g_jid, g_epoch, g_seq, g_ptp_global_time);
+        if (!g_phase_started) {
+            CameraEmergent *&ecams = *g_clientctx->ecams;
+            unsigned long long ptp_time =
+                get_current_PTP_time(&ecams[0].camera);
+            int delay_in_second = 3;
+            g_ptp_start_time =
+                ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+        }
+        bytes = build_cmd_start(g_jid, g_epoch, g_seq, g_ptp_start_time);
 
         if (!g_phase_started) {
-            on_startrecord_phase_start(g_ptp_global_time);
+            on_startrecord_phase_start(g_ptp_start_time);
             g_phase_started = true;
         }
 
         break;
     }
     case Phase_Stop:
-        bytes = build_cmd_stop(g_jid, g_epoch, g_seq, 123457789ULL);
+        if (!g_phase_started) {
+            CameraEmergent *&ecams = *g_clientctx->ecams;
+            unsigned long long ptp_time =
+                get_current_PTP_time(&ecams[0].camera);
+            int delay_in_second = 3;
+            g_ptp_stop_time =
+                ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+        }
+
+        bytes = build_cmd_stop(g_jid, g_epoch, g_seq, g_ptp_stop_time);
+        if (!g_phase_started) {
+            on_stoprecord_phase_start(g_ptp_stop_time);
+            g_phase_started = true;
+        }
         break;
     default:
         break;

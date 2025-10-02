@@ -242,7 +242,7 @@ static bool ctrl_action(camnet::v1::ServerControl c,
                         const camnet::v1::Server *msg) {
     switch (c) {
     case camnet::v1::ServerControl_OPENCAMERA: {
-        const camnet::v1::OpenArgs *oa = msg->command_body_as_OpenArgs();
+        auto *oa = msg->command_body_as_OpenArgs();
         if (!oa)
             return false; // union wasn't OpenArgs
 
@@ -261,8 +261,7 @@ static bool ctrl_action(camnet::v1::ServerControl c,
     }
 
     case camnet::v1::ServerControl_STARTTHREAD: {
-        const camnet::v1::StartThreadsArgs *sta =
-            msg->command_body_as_StartThreadsArgs();
+        auto *sta = msg->command_body_as_StartThreadsArgs();
         if (!sta)
             return false;
         std::string record_folder = sta->record_folder()->str();
@@ -273,8 +272,7 @@ static bool ctrl_action(camnet::v1::ServerControl c,
     }
 
     case camnet::v1::ServerControl_STARTRECORDING: {
-        const camnet::v1::StartArgs *record_start =
-            msg->command_body_as_StartArgs();
+        auto *record_start = msg->command_body_as_StartArgs();
         if (record_start)
             return false;
         unsigned long long ptp_global_time = record_start->ptp_time();
@@ -283,9 +281,15 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         return true;
     }
 
-    case camnet::v1::ServerControl_STOPRECORDING:
+    case camnet::v1::ServerControl_STOPRECORDING: {
+        auto *record_stop = msg->command_body_as_StopArgs();
+        if (record_stop)
+            return false;
+        unsigned long long ptp_stop_time = record_stop->ptp_time();
+        ptp_params.ptp_stop_time = ptp_stop_time;
+        ptp_params.network_set_stop_ptp = true;
         return true;
-        // stop_recording(); // implement this
+    }
 
     default:
         return false;

@@ -4,7 +4,6 @@
 #include "global.h"
 #include "gui.h"
 #include "host_client_imgui.h"
-#include "host_ctx.h"
 #include "imgui.h"
 #include "implot.h"
 #include "plot_buffers.h"
@@ -74,7 +73,7 @@ int main(int argc, char **args) {
     //                                                  {"127.0.0.1", 34002}};
     std::vector<std::pair<std::string, int>> cams = {{"192.168.20.60", 34001},
                                                      {"192.168.20.61", 34001}};
-    HostClient_StartNetThread(ctx); // start dispatcher thread
+    host_client_start_net_thread(ctx); // start dispatcher thread
     HostClient_Init(ctx, cams);
 
     std::vector<std::string> network_config_folders;
@@ -111,24 +110,29 @@ int main(int argc, char **args) {
     bool show_error = false;
     std::string error_message;
 
-    HostOpenCtx open_ctx{&selected_network_folder,
-                         device_info,
-                         &cam_count,
-                         &check,
-                         &num_cameras,
-                         &cameras_params,
-                         &cameras_select,
-                         &ecams,
-                         &realtime_plot_data,
-                         camera_control};
-    HostClient_SetOpenCtx(&open_ctx);
-    HostStartThreadCtx startthread_ctx{
-        &detection3d_thread, &calib_yaml_folder, &input_folder,
-        &camera_threads,     ptp_params,         camera_control,
-        &encoder_codec,      &encoder_preset,    &num_cameras,
-        &evt_buffer_size,    &display_gpu_id,    &tex_gl,
-        &cameras_params,     &cameras_select,    &ecams};
-    HostClient_SetStartThreadCtx(&startthread_ctx);
+    HostClientCtx client_ctx{&selected_network_folder,
+                             device_info,
+                             &cam_count,
+                             &check,
+                             &num_cameras,
+                             &cameras_params,
+                             &cameras_select,
+                             &ecams,
+                             &realtime_plot_data,
+                             camera_control,
+
+                             &detection3d_thread,
+                             &calib_yaml_folder,
+                             &input_folder,
+                             &camera_threads,
+                             ptp_params,
+                             &encoder_codec,
+                             &encoder_preset,
+                             &evt_buffer_size,
+                             &display_gpu_id,
+                             &tex_gl};
+
+    set_host_client_ctx(&client_ctx);
 
     while (!glfwWindowShouldClose(window->render_target)) {
         HostClient_Tick();

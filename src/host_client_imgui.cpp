@@ -17,42 +17,33 @@
 #include "enet_fb_helpers.h"      // optional FB parse helpers
 #include "enet_runtime_unified.h" // <-- unified wrapper (connect/dispatch/start)
 #include "enet_utils.h"           // AppContext, Incoming/Outgoing, PeerRegistry
-#include "global.h"
 #include "gui.h"
-#include "host_ctx.h" // HostOpenCtx
 #include "imgui.h"
 #include "utils.h"
 using namespace std::chrono_literals;
 
-// ============================================================================
-// Host-side OPEN phase context binding
-// ============================================================================
-static HostOpenCtx *g_openctx = nullptr;
-void HostClient_SetOpenCtx(HostOpenCtx *ctx) { g_openctx = ctx; }
+// persistent to handle missing messages
+static std::string g_folder_name;
+static unsigned long long g_ptp_global_time;
 
-static HostStartThreadCtx *g_startthreadctx = nullptr;
-void HostClient_SetStartThreadCtx(HostStartThreadCtx *ctx) {
-    g_startthreadctx = ctx;
-}
+static HostClientCtx *g_clientctx = nullptr;
+void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
 
 // ============================================================================
 // Phase hooks
 // ============================================================================
-static void OnOpenPhaseStart() {
-    if (!g_openctx)
-        return;
+static void on_open_phase_start() {
+    std::string &selected_folder = *g_clientctx->selected_network_folder;
+    auto *devs = g_clientctx->device_info;
+    int &cam_count = *g_clientctx->cam_count;
+    auto &check = *g_clientctx->check;
 
-    std::string &selected_folder = *g_openctx->selected_network_folder;
-    auto *devs = g_openctx->device_info;
-    int &cam_count = *g_openctx->cam_count;
-    auto &check = *g_openctx->check;
-
-    int &num_cams = *g_openctx->num_cameras;
-    CameraParams *&params = *g_openctx->cameras_params;
-    CameraEachSelect *&select = *g_openctx->cameras_select;
-    CameraEmergent *&ecams = *g_openctx->ecams;
-    ScrollingBuffer *&plots = *g_openctx->realtime_plot_data;
-    CameraControl *camera_control = g_openctx->camera_control;
+    int &num_cams = *g_clientctx->num_cameras;
+    CameraParams *&params = *g_clientctx->cameras_params;
+    CameraEachSelect *&select = *g_clientctx->cameras_select;
+    CameraEmergent *&ecams = *g_clientctx->ecams;
+    ScrollingBuffer *&plots = *g_clientctx->realtime_plot_data;
+    CameraControl *camera_control = g_clientctx->camera_control;
 
     std::vector<std::string> cfg_files;
     update_camera_configs(cfg_files, selected_folder);
@@ -62,32 +53,29 @@ static void OnOpenPhaseStart() {
     camera_control->open = true;
 }
 
-static void OnOpenPhaseComplete() {
+static void on_open_phase_complete() {
     // Optional: persist metadata, update UI, etc.
 }
 
-static void OnStartThreadStart(std::string encoder_setup,
-                               std::string folder_name) {
-    if (!g_startthreadctx)
-        return;
-
+static void on_startthread_phase_start(std::string encoder_setup,
+                                       std::string folder_name) {
     // unpack
-    std::thread &detection3d_thread = *g_startthreadctx->detection3d_thread;
-    std::string &calib_yaml_folder = *g_startthreadctx->calib_yaml_folder;
-    PTPParams *ptp_params = g_startthreadctx->ptp_params;
-    int &num_cameras = *g_startthreadctx->num_cameras;
-    int &evt_buffer_size = *g_startthreadctx->evt_buffer_size;
-    int &display_gpu_id = *g_startthreadctx->display_gpu_id;
-    GL_Texture *&tex_gl = *g_startthreadctx->tex_gl;
-    CameraParams *&cameras_params = *g_startthreadctx->cameras_params;
-    CameraEachSelect *&cameras_select = *g_startthreadctx->cameras_select;
-    CameraEmergent *&ecams = *g_startthreadctx->ecams;
-    std::vector<std::thread> *camera_threads = g_startthreadctx->camera_threads;
+    std::thread &detection3d_thread = *g_clientctx->detection3d_thread;
+    std::string &calib_yaml_folder = *g_clientctx->calib_yaml_folder;
+    PTPParams *ptp_params = g_clientctx->ptp_params;
+    int &num_cameras = *g_clientctx->num_cameras;
+    int &evt_buffer_size = *g_clientctx->evt_buffer_size;
+    int &display_gpu_id = *g_clientctx->display_gpu_id;
+    GL_Texture *&tex_gl = *g_clientctx->tex_gl;
+    CameraParams *&cameras_params = *g_clientctx->cameras_params;
+    CameraEachSelect *&cameras_select = *g_clientctx->cameras_select;
+    CameraEmergent *&ecams = *g_clientctx->ecams;
+    std::vector<std::thread> *camera_threads = g_clientctx->camera_threads;
 
     // functionality
     make_folder(folder_name);
     ptp_params->network_sync = true;
-    CameraControl *camera_control = g_openctx->camera_control;
+    CameraControl *camera_control = g_clientctx->camera_control;
     camera_control->record_video = true;
     camera_control->subscribe = true;
 
@@ -107,6 +95,12 @@ static void OnStartThreadStart(std::string encoder_setup,
                            cameras_params, cameras_select, tex_gl, num_cameras,
                            evt_buffer_size, true, encoder_setup, folder_name,
                            ptp_params, calib_yaml_folder, detection3d_thread);
+}
+
+static void on_startrecord_phase_start(unsigned long long ptp_global_time) {
+    PTPParams *ptp_params = g_clientctx->ptp_params;
+    ptp_params->ptp_global_time = ptp_global_time;
+    ptp_params->network_set_start_ptp = true;
 }
 
 // ============================================================================
@@ -262,8 +256,7 @@ static void logf(const char *fmt, ...) {
     g_logs.emplace_back(buf);
 }
 
-static bool g_open_started = false;
-static bool g_startthread_started = false;
+static bool g_phase_started = false;
 
 // ============================================================================
 // Utilities
@@ -342,8 +335,9 @@ static void reset_session() {
         std::lock_guard<std::mutex> lk(g_logs_m);
         g_logs.clear();
     }
-    g_open_started = false;
-    g_startthread_started = false;
+    g_phase_started = false;
+    g_folder_name = "";
+    g_ptp_global_time = 0;
     logf("session reset");
 }
 
@@ -359,7 +353,6 @@ static void send_bytes(uint32_t pid, const std::vector<uint8_t> &buf) {
     g_ctxp->net.send(o);
 }
 
-static std::string g_folder_name; // persistent to handle missing messages
 static void broadcast_current_phase() {
     if (g_phase == Phase_Done || g_servers.empty())
         return;
@@ -368,33 +361,44 @@ static void broadcast_current_phase() {
     switch (g_phase) {
     case Phase_Open: {
         bytes = build_cmd_open(g_jid, g_epoch, g_seq,
-                               *g_openctx->selected_network_folder);
-        if (!g_open_started) {
-            OnOpenPhaseStart();
-            g_open_started = true;
+                               *g_clientctx->selected_network_folder);
+        if (!g_phase_started) {
+            on_open_phase_start();
+            g_phase_started = true;
         }
         break;
     }
     case Phase_Threads: {
-        std::string encoder_setup =
-            "-codec " + *g_startthreadctx->encoder_codec + " -preset " +
-            *g_startthreadctx->encoder_preset;
+        std::string encoder_setup = "-codec " + *g_clientctx->encoder_codec +
+                                    " -preset " + *g_clientctx->encoder_preset;
 
-        if (!g_startthread_started) {
+        if (!g_phase_started) {
             g_folder_name =
-                *g_startthreadctx->input_folder + "/" + get_current_date_time();
+                *g_clientctx->input_folder + "/" + get_current_date_time();
         }
         bytes = build_cmd_startthreads(g_jid, g_epoch, g_seq, g_folder_name,
                                        encoder_setup);
-        if (!g_startthread_started) {
-            OnStartThreadStart(encoder_setup, g_folder_name);
-            g_startthread_started = true;
+        if (!g_phase_started) {
+            on_startthread_phase_start(encoder_setup, g_folder_name);
+            g_phase_started = true;
         }
         break;
     }
-    case Phase_Start:
-        bytes = build_cmd_start(g_jid, g_epoch, g_seq, 123456789ULL);
+    case Phase_Start: {
+        CameraEmergent *&ecams = *g_clientctx->ecams;
+        unsigned long long ptp_time = get_current_PTP_time(&ecams[0].camera);
+        int delay_in_second = 3;
+        g_ptp_global_time =
+            ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+        bytes = build_cmd_start(g_jid, g_epoch, g_seq, g_ptp_global_time);
+
+        if (!g_phase_started) {
+            on_startrecord_phase_start(g_ptp_global_time);
+            g_phase_started = true;
+        }
+
         break;
+    }
     case Phase_Stop:
         bytes = build_cmd_stop(g_jid, g_epoch, g_seq, 123457789ULL);
         break;
@@ -479,7 +483,7 @@ static void HostClient_NetThreadMain(AppContext *ctxptr) {
     }
 }
 
-void HostClient_StartNetThread(AppContext &ctx) {
+void host_client_start_net_thread(AppContext &ctx) {
     if (g_net_run.exchange(true))
         return;
     g_net_thr = std::thread(HostClient_NetThreadMain, &ctx);
@@ -554,12 +558,9 @@ void HostClient_Tick() {
             if (all) {
                 logf("barrier OK for %s", ctrl_name(current_ctrl()));
                 if (current_ctrl() == camnet::v1::ServerControl_OPENCAMERA) {
-                    OnOpenPhaseComplete();
-                    g_open_started = false;
-                } else if (current_ctrl() ==
-                           camnet::v1::ServerControl_STARTTHREAD) {
-                    g_startthread_started = false;
+                    on_open_phase_complete();
                 }
+                g_phase_started = false;
                 g_waiting = false;
                 ++g_seq;
                 advance_phase();

@@ -489,7 +489,7 @@ void host_client_start_net_thread(AppContext &ctx) {
     g_net_thr = std::thread(HostClient_NetThreadMain, &ctx);
 }
 
-void HostClient_StopNetThread() {
+void host_client_stop_net_thread() {
     if (!g_net_run.exchange(false))
         return;
     if (g_net_thr.joinable())
@@ -499,9 +499,9 @@ void HostClient_StopNetThread() {
 // ============================================================================
 // Public API
 // ============================================================================
-void HostClient_SetStepInTick(bool v) { g_step_net_in_tick = v; }
+void host_client_set_step_in_tick(bool v) { g_step_net_in_tick = v; }
 
-void HostClient_Init(
+void host_client_init(
     AppContext &ctx,
     const std::vector<std::pair<std::string, int>> &endpoints) {
     g_ctxp = &ctx;
@@ -526,7 +526,7 @@ void HostClient_Init(
     g_last_send = std::chrono::steady_clock::now();
 }
 
-void HostClient_Tick() {
+void host_client_tick() {
     if (g_step_net_in_tick) {
         (void)enet_dispatch_drain(g_ctxp->net, host_on_event);
     }
@@ -584,7 +584,7 @@ void HostClient_Tick() {
     // }
 }
 
-void HostClient_DrawImGui() {
+void host_client_draw_gui() {
     ImGui::Begin("Host Client");
 
     if (ImGui::CollapsingHeader("Endpoints", ImGuiTreeNodeFlags_DefaultOpen)) {

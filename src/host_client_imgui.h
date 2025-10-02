@@ -32,11 +32,11 @@ struct HostClientCtx {
 };
 
 void host_client_start_net_thread(AppContext &ctx); // starts dispatcher thread
-void HostClient_StopNetThread();                    // joins thread on shutdown
+void host_client_stop_net_thread();                 // joins thread on shutdown
 
-void HostClient_SetStepInTick(bool v); // optional mode switch
-void HostClient_Init(AppContext &ctx,
-                     const std::vector<std::pair<std::string, int>> &endpoints);
-void HostClient_Tick();
-void HostClient_DrawImGui();
+void host_client_set_step_in_tick(bool v); // optional mode switch
+void host_client_init(
+    AppContext &ctx, const std::vector<std::pair<std::string, int>> &endpoints);
+void host_client_tick();
+void host_client_draw_gui();
 void set_host_client_ctx(HostClientCtx *ctx);

@@ -74,7 +74,7 @@ int main(int argc, char **args) {
     std::vector<std::pair<std::string, int>> cams = {{"192.168.20.60", 34001},
                                                      {"192.168.20.61", 34001}};
     host_client_start_net_thread(ctx); // start dispatcher thread
-    HostClient_Init(ctx, cams);
+    host_client_init(ctx, cams);
 
     std::vector<std::string> network_config_folders;
     int network_config_select = -1;
@@ -135,7 +135,7 @@ int main(int argc, char **args) {
     set_host_client_ctx(&client_ctx);
 
     while (!glfwWindowShouldClose(window->render_target)) {
-        HostClient_Tick();
+        host_client_tick();
         create_new_frame();
 
         if (ImGui::Begin("Network")) {
@@ -179,7 +179,7 @@ int main(int argc, char **args) {
         }
         ImGui::End();
 
-        HostClient_DrawImGui(); // shows the “Advance Phase” button & logs
+        host_client_draw_gui(); // shows the “Advance Phase” button & logs
 
         if (ImGui::Begin("Orange", nullptr)) {
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
@@ -1089,7 +1089,7 @@ int main(int argc, char **args) {
         delete[] cameras_select;
     }
 
-    HostClient_StopNetThread();
+    host_client_stop_net_thread();
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();

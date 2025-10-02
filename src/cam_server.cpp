@@ -273,8 +273,14 @@ static bool ctrl_action(camnet::v1::ServerControl c,
     }
 
     case camnet::v1::ServerControl_STARTRECORDING: {
+        const camnet::v1::StartArgs *record_start =
+            msg->command_body_as_StartArgs();
+        if (record_start)
+            return false;
+        unsigned long long ptp_global_time = record_start->ptp_time();
+        ptp_params.ptp_global_time = ptp_global_time;
+        ptp_params.network_set_start_ptp = true;
         return true;
-        // start_recording(a->filename); // implement this
     }
 
     case camnet::v1::ServerControl_STOPRECORDING:

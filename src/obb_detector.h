@@ -142,6 +142,7 @@ private:
     
     // Threading
     std::atomic<bool> running;
+    std::atomic<bool> frame_ready;
     std::mutex mtx;
     std::condition_variable cv;
     std::thread worker_thread;

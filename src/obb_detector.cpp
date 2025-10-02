@@ -18,7 +18,7 @@
 OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& csv_paths, 
                          const OBBDetectorParams& detector_params)
     : camera_params(params), csv_paths(csv_paths), params(detector_params),
-      background_initialized(false), running(false), frames_processed(0), detections_found(0),
+      background_initialized(false), running(false), frame_ready(false), frames_processed(0), detections_found(0),
       d_frame_original(nullptr), d_debayer(nullptr), h_frame_cpu(nullptr) {
     
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
@@ -98,6 +98,7 @@ void OBBDetector::notify_frame_ready(void* device_image_ptr, cudaStream_t copy_s
     }
     
     cudaEventRecord(copy_done_event, copy_stream);
+    frame_ready = true;
     cv.notify_one();
 }
 
@@ -118,9 +119,12 @@ void OBBDetector::thread_loop() {
     
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);
-        cv.wait(lock, [&] { return !running.load(); });
+        cv.wait(lock, [&] { return !running.load() || frame_ready; });
         
         if (!running.load()) break;
+        
+        // Reset frame ready flag
+        frame_ready = false;
         lock.unlock();
         
         // Wait for frame copy to complete

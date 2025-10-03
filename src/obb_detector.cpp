@@ -34,8 +34,9 @@ OBBDetector::~OBBDetector() {
     }
     cudaEventDestroy(copy_done_event);
     if (stream) {
-        CUDA_CHECK(cudaStreamSynchronize(stream));
-        CUDA_CHECK(cudaStreamDestroy(stream));
+        // Don't use CUDA_CHECK in destructor to avoid std::terminate
+        cudaStreamSynchronize(stream);
+        cudaStreamDestroy(stream);
     }
 }
 
@@ -80,6 +81,11 @@ void OBBDetector::stop() {
 }
 
 void OBBDetector::notify_frame_ready(void* device_image_ptr, cudaStream_t copy_stream) {
+    // Safety check: don't process if we're shutting down
+    if (!running.load()) {
+        return;
+    }
+    
     // Store the device pointer directly - no need to copy since we'll copy to CPU later
     d_frame_original = device_image_ptr;
     
@@ -110,6 +116,11 @@ void OBBDetector::thread_loop() {
         
         // Wait for frame copy to complete
         cudaStreamWaitEvent(stream, copy_done_event, 0);
+        
+        // Safety check: don't process if we're shutting down or d_frame_original is invalid
+        if (!running.load() || !d_frame_original) {
+            continue;
+        }
         
         // Process frame
         cv::Mat frame;
@@ -699,31 +710,50 @@ float OBBDetector::compute_classification_score(const std::vector<cv::Point2f>& 
 }
 
 void OBBDetector::copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame) {
+    // Safety check: don't process if we're shutting down or device_ptr is invalid
+    if (!running.load() || !device_ptr || !h_frame_cpu) {
+        return;
+    }
+    
     // Use the same GPU-to-CPU conversion pattern as the working branch
     // First convert RGBA to BGR on GPU, then copy to CPU
     
     // Allocate temporary GPU buffer for BGR conversion
     unsigned char* d_convert;
-    CUDA_CHECK(cudaMalloc(&d_convert, camera_params->width * camera_params->height * 3));
+    cudaError_t err = cudaMalloc(&d_convert, camera_params->width * camera_params->height * 3);
+    if (err != cudaSuccess) {
+        std::cerr << "OBBDetector: Failed to allocate GPU memory: " << cudaGetErrorString(err) << std::endl;
+        return;
+    }
     
     // Convert RGBA to BGR on GPU (like the working branch)
     rgba2bgr_convert(d_convert, (unsigned char*)device_ptr, camera_params->width, camera_params->height, 0);
     
     // Copy BGR frame from GPU to CPU (async)
-    CUDA_CHECK(cudaMemcpy2DAsync(
+    err = cudaMemcpy2DAsync(
         h_frame_cpu, camera_params->width * 3,  // 3 bytes per pixel (BGR)
         d_convert, camera_params->width * 3,    // same pitch on device
         camera_params->width * 3, camera_params->height,
-        cudaMemcpyDeviceToHost, stream));
+        cudaMemcpyDeviceToHost, stream);
+    if (err != cudaSuccess) {
+        std::cerr << "OBBDetector: Failed to copy frame to CPU: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_convert);
+        return;
+    }
     
-    CUDA_CHECK(cudaStreamSynchronize(stream));
+    err = cudaStreamSynchronize(stream);
+    if (err != cudaSuccess) {
+        std::cerr << "OBBDetector: Failed to synchronize stream: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_convert);
+        return;
+    }
     
     // Create OpenCV Mat from CPU frame (BGR format) - same as working branch
     cpu_frame = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, h_frame_cpu)
                 .reshape(3, camera_params->height).clone();
     
     // Clean up temporary GPU buffer
-    CUDA_CHECK(cudaFree(d_convert));
+    cudaFree(d_convert);
 }
 
 std::vector<OBB> OBBDetector::get_latest_detections() {

@@ -261,10 +261,10 @@ void COpenGLDisplay::ThreadRunning() {
                             CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
                                                  sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                             
-                            // Draw axis-aligned bounding box
+                            // Draw axis-aligned bounding box in green color for flickering objects
                             gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                         camera_params->height, d_obb_points + i * 8, 
-                                        obb.class_id, 0);
+                                        obb.class_id, 0, 0, 255, 0);  // Green color for flickering
                         } else {
                             // Draw oriented bounding box for stable objects
                             float obb_points[8] = {

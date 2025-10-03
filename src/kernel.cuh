@@ -14,5 +14,7 @@ void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, cu
 void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, int label_id, cudaStream_t stream);
 void gpu_draw_obb(unsigned char* src, int width, int height, float* d_points, 
                   int label_id, cudaStream_t stream);
+void gpu_draw_obb(unsigned char* src, int width, int height, float* d_points, 
+                  int label_id, cudaStream_t stream, unsigned char r, unsigned char g, unsigned char b);
 void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_points, unsigned int* d_skeleton, cudaStream_t stream, int num_channels);
 #endif // KERNEL_H

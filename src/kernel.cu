@@ -299,6 +299,43 @@ __global__ void gpu_draw_obb_kernel(unsigned char* src, const int width, const i
     }
 }
 
+__global__ void gpu_draw_obb_custom_color_kernel(unsigned char* src, const int width, const int height, 
+                            float* d_points, unsigned char r, unsigned char g, unsigned char b) {
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if ((x < width) && (y < height)) {
+        // Draw 4 connected lines for OBB
+        for (int i = 0; i < 4; i++) {
+            int idx0 = i;
+            int idx1 = (i + 1) % 4; 
+
+            float x0 = d_points[idx0 * 2];
+            float y0 = d_points[idx0 * 2 + 1];
+            float x1 = d_points[idx1 * 2];
+            float y1 = d_points[idx1 * 2 + 1];
+
+            // Calculate distance from pixel to line segment
+            float length_squared = (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0);
+            if (length_squared < 0.001f) continue; // Skip degenerate lines
+            
+            float dot_product = (x - x0) * (x1 - x0) + (y - y0) * (y1 - y0);
+            float t = fmaxf(0.0f, fminf(1.0f, dot_product / length_squared));
+            float proj_x = x0 + t * (x1 - x0);
+            float proj_y = y0 + t * (y1 - y0);
+            float distance_squared = (x - proj_x) * (x - proj_x) + (y - proj_y) * (y - proj_y);
+
+            // Draw line with thickness using custom color
+            if (distance_squared < 16.0f) { // 4 pixel thickness
+                *(src + ((y * width * 4) + (x * 4))) = r;
+                *(src + ((y * width * 4) + (x * 4)) + 1) = g;
+                *(src + ((y * width * 4) + (x * 4)) + 2) = b;
+                *(src + ((y * width * 4) + (x * 4)) + 3) = 255;
+            }
+        }
+    }
+}
+
 void gpu_draw_obb(unsigned char* src, int width, int height, float* d_points, 
                   int label_id, cudaStream_t stream) {
     dim3 threads_per_block(32, 32);
@@ -307,6 +344,15 @@ void gpu_draw_obb(unsigned char* src, int width, int height, float* d_points,
     double current_time = (double)(std::chrono::system_clock::now().time_since_epoch()).count();
     gpu_draw_obb_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
         src, width, height, d_points, label_id, current_time);
+}
+
+void gpu_draw_obb(unsigned char* src, int width, int height, float* d_points, 
+                  int label_id, cudaStream_t stream, unsigned char r, unsigned char g, unsigned char b) {
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x - 1) / threads_per_block.x, 
+                    (height + threads_per_block.y - 1) / threads_per_block.y);
+    gpu_draw_obb_custom_color_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
+        src, width, height, d_points, r, g, b);
 }
 
 

@@ -1,4 +1,5 @@
 #include "obb_detector.h"
+#include "kernel.cuh"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -91,7 +92,7 @@ void OBBDetector::thread_loop() {
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     CUDA_CHECK(cudaStreamCreate(&stream));
     
-    // Allocate CPU memory for frame copy
+    // Allocate CPU memory for frame copy (3 bytes per pixel - BGR)
     size_t cpu_frame_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
     CUDA_CHECK(cudaMallocHost(&h_frame_cpu, cpu_frame_size));
     
@@ -698,20 +699,31 @@ float OBBDetector::compute_classification_score(const std::vector<cv::Point2f>& 
 }
 
 void OBBDetector::copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame) {
-    // Copy the debayered RGB frame from GPU to CPU
-    // The frame is already debayered and in RGB format (3 channels)
-    CUDA_CHECK(cudaMemcpy2DAsync(h_frame_cpu, camera_params->width * 3,  // 3 channels for RGB
-                                 device_ptr, camera_params->width * 3,
-                                 camera_params->width * 3, camera_params->height,
-                                 cudaMemcpyDeviceToHost, stream));
+    // Use the same GPU-to-CPU conversion pattern as the working branch
+    // First convert RGBA to BGR on GPU, then copy to CPU
+    
+    // Allocate temporary GPU buffer for BGR conversion
+    unsigned char* d_convert;
+    CUDA_CHECK(cudaMalloc(&d_convert, camera_params->width * camera_params->height * 3));
+    
+    // Convert RGBA to BGR on GPU (like the working branch)
+    rgba2bgr_convert(d_convert, (unsigned char*)device_ptr, camera_params->width, camera_params->height, 0);
+    
+    // Copy BGR frame from GPU to CPU (async)
+    CUDA_CHECK(cudaMemcpy2DAsync(
+        h_frame_cpu, camera_params->width * 3,  // 3 bytes per pixel (BGR)
+        d_convert, camera_params->width * 3,    // same pitch on device
+        camera_params->width * 3, camera_params->height,
+        cudaMemcpyDeviceToHost, stream));
     
     CUDA_CHECK(cudaStreamSynchronize(stream));
     
-    // Create OpenCV Mat from CPU frame (RGB format)
-    cpu_frame = cv::Mat(camera_params->height, camera_params->width, CV_8UC3, h_frame_cpu).clone();
+    // Create OpenCV Mat from CPU frame (BGR format) - same as working branch
+    cpu_frame = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, h_frame_cpu)
+                .reshape(3, camera_params->height).clone();
     
-    // Convert RGB to BGR for OpenCV compatibility
-    cv::cvtColor(cpu_frame, cpu_frame, cv::COLOR_RGB2BGR);
+    // Clean up temporary GPU buffer
+    CUDA_CHECK(cudaFree(d_convert));
 }
 
 std::vector<OBB> OBBDetector::get_latest_detections() {

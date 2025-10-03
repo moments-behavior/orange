@@ -230,15 +230,14 @@ void COpenGLDisplay::ThreadRunning() {
                 
                 // Draw OBB overlays on GPU (lightweight, non-blocking)
                 if (obb_detections.size() > 0) {
-                    static int detection_count = 0;
-                    detection_count++;
-                    
-                    if (detection_count % 30 == 0) {  // Print every 30 detections to avoid spam
-                        std::cout << "OBB Detection Results: " << obb_detections.size() << " objects detected" << std::endl;
-                    }
-                    
                     for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
                         const OBB& obb = obb_detections[i];
+                        
+                        // Print detection coordinates in xywhr format (synchronized with drawing)
+                        auto xywhr = obb_detector->obb_to_xywhr(obb);
+                        std::cout << "OBB: Object detected - Class " << obb.class_id 
+                                  << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
+                                  << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
                         
                         // Copy OBB corners to GPU (use original coordinates, resize will handle scaling)
                         float obb_points[8] = {

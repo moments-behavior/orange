@@ -176,12 +176,6 @@ void OBBDetector::thread_loop() {
                        candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
                        class_id, 1.0f);
                 detections.push_back(obb);
-                
-                // Print detection in xywhr format
-                auto xywhr = obb_to_xywhr(obb);
-                std::cout << "OBB: Object detected - Class " << class_id 
-                          << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
-                          << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
             }
         }
         

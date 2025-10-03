@@ -98,6 +98,12 @@ public:
     // Public detection function for testing
     std::vector<std::vector<cv::Point2f>> detect_candidates(const cv::Mat& frame, const cv::Mat& background);
     
+    // Convert OBB to xywhr format (center x, center y, width, height, rotation)
+    struct XYWHR {
+        float x, y, w, h, r;  // center x, center y, width, height, rotation (degrees)
+    };
+    XYWHR obb_to_xywhr(const OBB& obb);
+    
     // Debug function to print learned priors
     void print_priors();
     

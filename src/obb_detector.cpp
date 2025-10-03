@@ -136,21 +136,21 @@ void OBBDetector::thread_loop() {
             if (frames_processed == 0) {
                 // Initialize background frames collection
                 background_frames.clear();
-                std::cout << "OBB: Started background building, frame size: " << frame.cols << "x" << frame.rows 
-                          << ", channels: " << frame.channels() << ", type: " << frame.type() << std::endl;
+                std::cout << "OBB: Building background from " << params.bg_frames << " frames..." << std::endl;
             }
             
             if (frames_processed < params.bg_frames) {
                 // Collect frames for median background
                 background_frames.push_back(frame.clone());
-                std::cout << "OBB: Background building progress: " << (frames_processed + 1) << "/" << params.bg_frames 
-                          << " (frame size: " << frame.cols << "x" << frame.rows << ", channels: " << frame.channels() << ")" << std::endl;
+                if ((frames_processed + 1) % 10 == 0 || frames_processed == params.bg_frames - 1) {
+                    std::cout << "OBB: Background progress: " << (frames_processed + 1) << "/" << params.bg_frames << std::endl;
+                }
             } else {
                 // Compute true median background (like Python)
                 if (!background_frames.empty()) {
                     background_model = compute_median_background(background_frames);
                     background_initialized = true;
-                    std::cout << "OBB: Background model completed after " << params.bg_frames << " frames (true median)" << std::endl;
+                    std::cout << "OBB: Background ready - detection can start" << std::endl;
                 } else {
                     std::cerr << "OBB: No background frames collected!" << std::endl;
                     background_initialized = true; // Continue anyway
@@ -167,15 +167,6 @@ void OBBDetector::thread_loop() {
         // Detect candidates
         auto candidates = detect_candidates(frame, background_u8);
         
-        // Debug output every 100 frames
-        if (frames_processed % 100 == 0) {
-            std::cout << "OBB: Frame " << frames_processed << " - Found " << candidates.size() << " motion candidates" << std::endl;
-            if (candidates.size() > 0) {
-                auto wh = rect_wh_from_pts(candidates[0]);
-                std::cout << "OBB: First candidate size: " << wh.first << "x" << wh.second << " (area: " << (wh.first * wh.second) << ")" << std::endl;
-            }
-        }
-        
         // Classify candidates
         std::vector<OBB> detections;
         for (const auto& candidate : candidates) {
@@ -185,6 +176,12 @@ void OBBDetector::thread_loop() {
                        candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
                        class_id, 1.0f);
                 detections.push_back(obb);
+                
+                // Print detection in xywhr format
+                auto xywhr = obb_to_xywhr(obb);
+                std::cout << "OBB: Object detected - Class " << class_id 
+                          << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
+                          << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
             }
         }
         
@@ -196,11 +193,6 @@ void OBBDetector::thread_loop() {
         
         frames_processed++;
         detections_found += detections.size();
-        
-        if (frames_processed % 100 == 0) {
-            std::cout << "OBBDetector processed " << frames_processed << " frames, found " 
-                      << detections_found << " detections" << std::endl;
-        }
     }
     
     std::cout << "OBBDetector thread finished. Total frames: " << frames_processed 
@@ -423,6 +415,27 @@ float OBBDetector::circular_diff(float a, float b) {
     return std::min(diff, 180.0f - diff);
 }
 
+OBBDetector::XYWHR OBBDetector::obb_to_xywhr(const OBB& obb) {
+    // Convert 4 corner points to center, width, height, and rotation
+    std::vector<cv::Point2f> points = {
+        cv::Point2f(obb.x1, obb.y1),
+        cv::Point2f(obb.x2, obb.y2),
+        cv::Point2f(obb.x3, obb.y3),
+        cv::Point2f(obb.x4, obb.y4)
+    };
+    
+    // Compute center point
+    cv::Point2f center = compute_centroid(points);
+    
+    // Compute width and height
+    auto wh = rect_wh_from_pts(points);
+    
+    // Compute rotation angle
+    float angle = long_axis_angle_deg(points);
+    
+    return {center.x, center.y, wh.first, wh.second, angle};
+}
+
 bool OBBDetector::build_background(cv::VideoCapture& cap, cv::Mat& background) {
     if (params.bg_mode == "first") {
         cap.set(cv::CAP_PROP_POS_FRAMES, 0);
@@ -536,23 +549,14 @@ std::vector<std::vector<cv::Point2f>> OBBDetector::detect_candidates(const cv::M
     cv::split(diff, channels);
     cv::Mat green_channel = channels[1];
     
-    // Debug: Check green channel statistics
-    cv::Scalar mean_val, std_val;
-    cv::meanStdDev(green_channel, mean_val, std_val);
-    
-    // Threshold - try adaptive thresholding if standard threshold fails
+    // Threshold for motion detection
     cv::Mat mask;
     cv::threshold(green_channel, mask, params.threshold, 255, cv::THRESH_BINARY);
     
     // If no motion detected, try lower threshold
     if (cv::countNonZero(mask) == 0) {
         cv::threshold(green_channel, mask, params.threshold * 0.5, 255, cv::THRESH_BINARY);
-        std::cout << "OBB: No motion with threshold " << params.threshold 
-                  << ", trying lower threshold " << (params.threshold * 0.5) << std::endl;
     }
-    
-    // Debug: Check mask statistics
-    int non_zero_pixels = cv::countNonZero(mask);
     
     // Morphological operations - use smaller kernels to avoid removing all motion
     cv::Mat kernel = create_disk_kernel(1);  // Smaller erosion kernel
@@ -561,43 +565,15 @@ std::vector<std::vector<cv::Point2f>> OBBDetector::detect_candidates(const cv::M
     kernel = create_disk_kernel(3);  // Smaller dilation kernel
     cv::dilate(mask, mask, kernel, cv::Point(-1, -1), 1);
     
-    // Debug: Check mask after morphological ops
-    int non_zero_after_morph = cv::countNonZero(mask);
-    
-    // Debug counter for output frequency
-    static int debug_counter = 0;
-    
     // If morphological operations removed all pixels, try without them
-    if (non_zero_after_morph == 0 && non_zero_pixels > 0) {
+    if (cv::countNonZero(mask) == 0) {
         // Re-threshold and skip morphological operations
         cv::threshold(green_channel, mask, params.threshold, 255, cv::THRESH_BINARY);
-        non_zero_after_morph = cv::countNonZero(mask);
-        if (debug_counter % 100 == 0) {
-            std::cout << "OBB: Morphological ops removed all pixels, using raw threshold mask" << std::endl;
-        }
     }
     
     // Find contours
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-    
-    // Debug output every 100 frames
-    if (debug_counter % 100 == 0) {
-        std::cout << "OBB Motion Debug: green_mean=" << mean_val[0] << ", green_std=" << std_val[0] 
-                  << ", threshold=" << params.threshold << ", mask_pixels=" << non_zero_pixels 
-                  << ", after_morph=" << non_zero_after_morph << ", contours=" << contours.size() << std::endl;
-        
-        // Save debug images every 1000 frames
-        if (debug_counter % 1000 == 0) {
-            cv::imwrite("debug_frame.jpg", frame);
-            cv::imwrite("debug_background.jpg", background);
-            cv::imwrite("debug_diff.jpg", diff);
-            cv::imwrite("debug_green.jpg", green_channel);
-            cv::imwrite("debug_mask.jpg", mask);
-            std::cout << "OBB: Saved debug images (frame, background, diff, green, mask)" << std::endl;
-        }
-    }
-    debug_counter++;
     
     // Convert to oriented bounding boxes
     for (const auto& contour : contours) {
@@ -640,28 +616,22 @@ int OBBDetector::classify_with_priors(const std::vector<cv::Point2f>& points) {
         int class_id = prior_pair.first;
         const ClassPrior& prior = prior_pair.second;
         
-        // Check gates with debugging
+        // Check gates
         float area_lo_bound = prior.area_lo * params.area_lo_gate;
         float area_hi_bound = prior.area_hi * params.area_hi_gate;
         if (area < area_lo_bound || area > area_hi_bound) {
-            std::cout << "    Class " << class_id << " rejected: area " << area 
-                      << " not in [" << area_lo_bound << ", " << area_hi_bound << "]" << std::endl;
             continue;
         }
         
         float aspect_lo_bound = prior.aspect_lo * params.aspect_lo_gate;
         float aspect_hi_bound = prior.aspect_hi * params.aspect_hi_gate;
         if (aspect < aspect_lo_bound || aspect > aspect_hi_bound) {
-            std::cout << "    Class " << class_id << " rejected: aspect " << aspect 
-                      << " not in [" << aspect_lo_bound << ", " << aspect_hi_bound << "]" << std::endl;
             continue;
         }
         
         float ang_dev = circular_diff(angle, prior.angle_median);
         float ang_threshold = params.angle_k_gate * std::max(prior.angle_iqr, 5.0f);
         if (ang_dev > ang_threshold) {
-            std::cout << "    Class " << class_id << " rejected: angle deviation " << ang_dev 
-                      << " > threshold " << ang_threshold << std::endl;
             continue;
         }
         

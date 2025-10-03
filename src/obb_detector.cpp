@@ -546,9 +546,23 @@ std::vector<std::vector<cv::Point2f>> OBBDetector::detect_candidates(const cv::M
     cv::split(diff, channels);
     cv::Mat green_channel = channels[1];
     
-    // Threshold
+    // Debug: Check green channel statistics
+    cv::Scalar mean_val, std_val;
+    cv::meanStdDev(green_channel, mean_val, std_val);
+    
+    // Threshold - try adaptive thresholding if standard threshold fails
     cv::Mat mask;
     cv::threshold(green_channel, mask, params.threshold, 255, cv::THRESH_BINARY);
+    
+    // If no motion detected, try lower threshold
+    if (cv::countNonZero(mask) == 0) {
+        cv::threshold(green_channel, mask, params.threshold * 0.5, 255, cv::THRESH_BINARY);
+        std::cout << "OBB: No motion with threshold " << params.threshold 
+                  << ", trying lower threshold " << (params.threshold * 0.5) << std::endl;
+    }
+    
+    // Debug: Check mask statistics
+    int non_zero_pixels = cv::countNonZero(mask);
     
     // Morphological operations
     cv::Mat kernel = create_disk_kernel(2);
@@ -557,9 +571,31 @@ std::vector<std::vector<cv::Point2f>> OBBDetector::detect_candidates(const cv::M
     kernel = create_disk_kernel(5);
     cv::dilate(mask, mask, kernel, cv::Point(-1, -1), 1);
     
+    // Debug: Check mask after morphological ops
+    int non_zero_after_morph = cv::countNonZero(mask);
+    
     // Find contours
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    
+    // Debug output every 100 frames
+    static int debug_counter = 0;
+    if (debug_counter % 100 == 0) {
+        std::cout << "OBB Motion Debug: green_mean=" << mean_val[0] << ", green_std=" << std_val[0] 
+                  << ", threshold=" << params.threshold << ", mask_pixels=" << non_zero_pixels 
+                  << ", after_morph=" << non_zero_after_morph << ", contours=" << contours.size() << std::endl;
+        
+        // Save debug images every 1000 frames
+        if (debug_counter % 1000 == 0) {
+            cv::imwrite("debug_frame.jpg", frame);
+            cv::imwrite("debug_background.jpg", background);
+            cv::imwrite("debug_diff.jpg", diff);
+            cv::imwrite("debug_green.jpg", green_channel);
+            cv::imwrite("debug_mask.jpg", mask);
+            std::cout << "OBB: Saved debug images (frame, background, diff, green, mask)" << std::endl;
+        }
+    }
+    debug_counter++;
     
     // Convert to oriented bounding boxes
     for (const auto& contour : contours) {

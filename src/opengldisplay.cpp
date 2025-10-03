@@ -235,25 +235,53 @@ void COpenGLDisplay::ThreadRunning() {
                         
                         // Print detection coordinates in xywhr format (synchronized with drawing)
                         auto xywhr = obb_detector->obb_to_xywhr(obb);
-                        std::cout << "OBB: Object detected - Class " << obb.class_id 
+                        std::cout << "OBB: Object " << obb.object_id << " detected - Class " << obb.class_id 
                                   << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
                                   << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
                         
-                        // Copy OBB corners to GPU (use original coordinates, resize will handle scaling)
-                        float obb_points[8] = {
-                            obb.x1, obb.y1,  // Top-left
-                            obb.x2, obb.y2,  // Top-right  
-                            obb.x3, obb.y3,  // Bottom-right
-                            obb.x4, obb.y4   // Bottom-left
-                        };
+                        // Check if object is flickering between classes
+                        bool is_flickering = obb_detector->is_object_flickering(obb.object_id);
                         
-                        CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
-                                             sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
-                        
-                        // Draw OBB on original buffer (will be resized later if needed)
-                        gpu_draw_obb(debayer.d_debayer, camera_params->width, 
-                                    camera_params->height, d_obb_points + i * 8, 
-                                    obb.class_id, 0);
+                        if (is_flickering) {
+                            // Draw non-oriented bounding box for flickering objects
+                            // Convert OBB to axis-aligned bounding box
+                            float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
+                            float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
+                            float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
+                            float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
+                            
+                            // Create axis-aligned bounding box points
+                            float aabb_points[8] = {
+                                min_x, min_y,  // Top-left
+                                max_x, min_y,  // Top-right
+                                max_x, max_y,  // Bottom-right
+                                min_x, max_y   // Bottom-left
+                            };
+                            
+                            CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
+                                                 sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
+                            
+                            // Draw axis-aligned bounding box
+                            gpu_draw_obb(debayer.d_debayer, camera_params->width, 
+                                        camera_params->height, d_obb_points + i * 8, 
+                                        obb.class_id, 0);
+                        } else {
+                            // Draw oriented bounding box for stable objects
+                            float obb_points[8] = {
+                                obb.x1, obb.y1,  // Top-left
+                                obb.x2, obb.y2,  // Top-right  
+                                obb.x3, obb.y3,  // Bottom-right
+                                obb.x4, obb.y4   // Bottom-left
+                            };
+                            
+                            CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
+                                                 sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
+                            
+                            // Draw OBB on original buffer (will be resized later if needed)
+                            gpu_draw_obb(debayer.d_debayer, camera_params->width, 
+                                        camera_params->height, d_obb_points + i * 8, 
+                                        obb.class_id, 0);
+                        }
                     }
                 }
             }

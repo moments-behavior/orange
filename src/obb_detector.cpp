@@ -20,7 +20,7 @@ OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& c
                          const OBBDetectorParams& detector_params)
     : camera_params(params), csv_paths(csv_paths), params(detector_params),
       background_initialized(false), running(false), frame_ready(false), frames_processed(0), detections_found(0),
-      d_frame_original(nullptr), h_frame_cpu(nullptr) {
+      d_frame_original(nullptr), h_frame_cpu(nullptr), next_object_id(1) {
     
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
@@ -178,6 +178,9 @@ void OBBDetector::thread_loop() {
                 detections.push_back(obb);
             }
         }
+        
+        // Assign object IDs and handle class flickering
+        detections = assign_object_ids_and_handle_flickering(detections);
         
         // Update results
         {
@@ -866,5 +869,145 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
             cv::circle(res, pt, 3, color, -1);
         }
     }
+}
+
+std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections) {
+    std::vector<OBB> tracked_detections;
+    
+    for (const auto& detection : detections) {
+        // Compute center point for tracking
+        cv::Point2f center = compute_centroid({
+            cv::Point2f(detection.x1, detection.y1),
+            cv::Point2f(detection.x2, detection.y2),
+            cv::Point2f(detection.x3, detection.y3),
+            cv::Point2f(detection.x4, detection.y4)
+        });
+        
+        // Find closest existing object
+        int best_object_id = -1;
+        float best_distance = TRACKING_DISTANCE_THRESHOLD;
+        
+        for (const auto& [object_id, last_center] : object_centers) {
+            float distance = cv::norm(center - last_center);
+            if (distance < best_distance) {
+                best_distance = distance;
+                best_object_id = object_id;
+            }
+        }
+        
+        // Assign object ID
+        int object_id;
+        if (best_object_id == -1) {
+            // New object
+            object_id = next_object_id++;
+            object_class_history[object_id] = std::vector<int>();
+        } else {
+            // Existing object
+            object_id = best_object_id;
+        }
+        
+        // Update object center
+        object_centers[object_id] = center;
+        
+        // Add current classification to history
+        object_class_history[object_id].push_back(detection.class_id);
+        if (object_class_history[object_id].size() > MAX_CLASS_HISTORY) {
+            object_class_history[object_id].erase(object_class_history[object_id].begin());
+        }
+        
+        // Get stable class (handle flickering)
+        int stable_class = get_stable_class_for_object(object_id);
+        
+        // Create tracked detection
+        OBB tracked_detection = detection;
+        tracked_detection.object_id = object_id;
+        tracked_detection.class_id = stable_class;
+        
+        tracked_detections.push_back(tracked_detection);
+    }
+    
+    // Clean up old objects (remove objects not seen in recent detections)
+    std::set<int> current_object_ids;
+    for (const auto& detection : tracked_detections) {
+        current_object_ids.insert(detection.object_id);
+    }
+    
+    // Remove old objects from tracking maps
+    auto it = object_centers.begin();
+    while (it != object_centers.end()) {
+        if (current_object_ids.find(it->first) == current_object_ids.end()) {
+            object_class_history.erase(it->first);
+            it = object_centers.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    
+    return tracked_detections;
+}
+
+int OBBDetector::get_stable_class_for_object(int object_id) {
+    auto it = object_class_history.find(object_id);
+    if (it == object_class_history.end() || it->second.empty()) {
+        return -1;
+    }
+    
+    const auto& history = it->second;
+    
+    // If we have enough history and there's flickering, return the most common class
+    if (history.size() >= 3) {
+        std::map<int, int> class_counts;
+        for (int class_id : history) {
+            class_counts[class_id]++;
+        }
+        
+        // Find the most common class
+        int most_common_class = -1;
+        int max_count = 0;
+        for (const auto& [class_id, count] : class_counts) {
+            if (count > max_count) {
+                max_count = count;
+                most_common_class = class_id;
+            }
+        }
+        
+        // If there's significant flickering (multiple classes), return the most common
+        if (class_counts.size() > 1 && max_count >= 2) {
+            return most_common_class;
+        }
+    }
+    
+    // Otherwise, return the most recent classification
+    return history.back();
+}
+
+bool OBBDetector::is_object_flickering(int object_id) {
+    auto it = object_class_history.find(object_id);
+    if (it == object_class_history.end() || it->second.size() < 3) {
+        return false;
+    }
+    
+    const auto& history = it->second;
+    
+    // Count unique classes in recent history
+    std::set<int> unique_classes(history.begin(), history.end());
+    
+    // If there are multiple classes and the most common class appears at least twice,
+    // consider it flickering
+    if (unique_classes.size() > 1) {
+        std::map<int, int> class_counts;
+        for (int class_id : history) {
+            class_counts[class_id]++;
+        }
+        
+        int max_count = 0;
+        for (const auto& [class_id, count] : class_counts) {
+            max_count = std::max(max_count, count);
+        }
+        
+        return max_count >= 2;  // At least one class appears multiple times
+    }
+    
+    return false;
 }
 

@@ -19,10 +19,11 @@ struct OBB {
     float x1, y1, x2, y2, x3, y3, x4, y4;
     int class_id;
     float confidence;
+    int object_id;  // Unique ID for tracking objects over time
     
-    OBB() : x1(0), y1(0), x2(0), y2(0), x3(0), y3(0), x4(0), y4(0), class_id(-1), confidence(0.0f) {}
-    OBB(float x1_, float y1_, float x2_, float y2_, float x3_, float y3_, float x4_, float y4_, int cls, float conf)
-        : x1(x1_), y1(y1_), x2(x2_), y2(y2_), x3(x3_), y3(y3_), x4(x4_), y4(y4_), class_id(cls), confidence(conf) {}
+    OBB() : x1(0), y1(0), x2(0), y2(0), x3(0), y3(0), x4(0), y4(0), class_id(-1), confidence(0.0f), object_id(-1) {}
+    OBB(float x1_, float y1_, float x2_, float y2_, float x3_, float y3_, float x4_, float y4_, int cls, float conf, int obj_id = -1)
+        : x1(x1_), y1(y1_), x2(x2_), y2(y2_), x3(x3_), y3(y3_), x4(x4_), y4(y4_), class_id(cls), confidence(conf), object_id(obj_id) {}
 };
 
 // Structure to hold prior statistics for each class
@@ -104,6 +105,11 @@ public:
     };
     XYWHR obb_to_xywhr(const OBB& obb);
     
+    // Object tracking and class flickering handling
+    std::vector<OBB> assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections);
+    int get_stable_class_for_object(int object_id);
+    bool is_object_flickering(int object_id);
+    
     // Debug function to print learned priors
     void print_priors();
     
@@ -170,6 +176,13 @@ private:
     // Statistics
     std::atomic<uint64_t> frames_processed;
     std::atomic<uint64_t> detections_found;
+    
+    // Object tracking
+    int next_object_id;
+    std::map<int, std::vector<int>> object_class_history;  // object_id -> list of recent class_ids
+    std::map<int, cv::Point2f> object_centers;  // object_id -> last known center
+    static constexpr int MAX_CLASS_HISTORY = 5;  // Keep last 5 classifications
+    static constexpr float TRACKING_DISTANCE_THRESHOLD = 50.0f;  // Max distance to associate objects
 };
 
 #endif // ORANGE_OBB_DETECTOR

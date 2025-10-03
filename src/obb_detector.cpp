@@ -19,7 +19,7 @@ OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& c
                          const OBBDetectorParams& detector_params)
     : camera_params(params), csv_paths(csv_paths), params(detector_params),
       background_initialized(false), running(false), frame_ready(false), frames_processed(0), detections_found(0),
-      d_frame_original(nullptr), d_debayer(nullptr), h_frame_cpu(nullptr) {
+      d_frame_original(nullptr), h_frame_cpu(nullptr) {
     
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
@@ -28,12 +28,6 @@ OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& c
 
 OBBDetector::~OBBDetector() {
     stop();
-    if (d_frame_original) {
-        cudaFreeAsync(d_frame_original, stream);
-    }
-    if (d_debayer) {
-        cudaFreeAsync(d_debayer, stream);
-    }
     if (h_frame_cpu) {
         cudaFreeHost(h_frame_cpu);
     }
@@ -85,19 +79,8 @@ void OBBDetector::stop() {
 }
 
 void OBBDetector::notify_frame_ready(void* device_image_ptr, cudaStream_t copy_stream) {
-    if (camera_params->gpu_direct) {
-        CUDA_CHECK(cudaMemcpy2DAsync(
-            d_frame_original, camera_params->width * 3,  // 3 channels for RGB
-            device_image_ptr, camera_params->width * 3,
-            camera_params->width * 3, camera_params->height,
-            cudaMemcpyDeviceToDevice, copy_stream));
-    } else {
-        CUDA_CHECK(cudaMemcpy2DAsync(
-            d_frame_original, camera_params->width * 3,  // 3 channels for RGB
-            device_image_ptr, camera_params->width * 3,
-            camera_params->width * 3, camera_params->height,
-            cudaMemcpyHostToDevice, copy_stream));
-    }
+    // Store the device pointer directly - no need to copy since we'll copy to CPU later
+    d_frame_original = device_image_ptr;
     
     cudaEventRecord(copy_done_event, copy_stream);
     frame_ready = true;
@@ -108,13 +91,8 @@ void OBBDetector::thread_loop() {
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     CUDA_CHECK(cudaStreamCreate(&stream));
     
-    // Allocate GPU memory
-    size_t frame_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);  // RGB
-    size_t debayer_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
+    // Allocate CPU memory for frame copy
     size_t cpu_frame_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
-    
-    CUDA_CHECK(cudaMallocAsync(&d_frame_original, frame_size, stream));
-    CUDA_CHECK(cudaMallocAsync(&d_debayer, debayer_size, stream));
     CUDA_CHECK(cudaMallocHost(&h_frame_cpu, cpu_frame_size));
     
     std::cout << "OBBDetector thread started for camera: " << camera_params->camera_serial << std::endl;
@@ -564,22 +542,34 @@ std::vector<std::vector<cv::Point2f>> OBBDetector::detect_candidates(const cv::M
     // Debug: Check mask statistics
     int non_zero_pixels = cv::countNonZero(mask);
     
-    // Morphological operations
-    cv::Mat kernel = create_disk_kernel(2);
+    // Morphological operations - use smaller kernels to avoid removing all motion
+    cv::Mat kernel = create_disk_kernel(1);  // Smaller erosion kernel
     cv::erode(mask, mask, kernel, cv::Point(-1, -1), 1);
     
-    kernel = create_disk_kernel(5);
+    kernel = create_disk_kernel(3);  // Smaller dilation kernel
     cv::dilate(mask, mask, kernel, cv::Point(-1, -1), 1);
     
     // Debug: Check mask after morphological ops
     int non_zero_after_morph = cv::countNonZero(mask);
+    
+    // Debug counter for output frequency
+    static int debug_counter = 0;
+    
+    // If morphological operations removed all pixels, try without them
+    if (non_zero_after_morph == 0 && non_zero_pixels > 0) {
+        // Re-threshold and skip morphological operations
+        cv::threshold(green_channel, mask, params.threshold, 255, cv::THRESH_BINARY);
+        non_zero_after_morph = cv::countNonZero(mask);
+        if (debug_counter % 100 == 0) {
+            std::cout << "OBB: Morphological ops removed all pixels, using raw threshold mask" << std::endl;
+        }
+    }
     
     // Find contours
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
     // Debug output every 100 frames
-    static int debug_counter = 0;
     if (debug_counter % 100 == 0) {
         std::cout << "OBB Motion Debug: green_mean=" << mean_val[0] << ", green_std=" << std_val[0] 
                   << ", threshold=" << params.threshold << ", mask_pixels=" << non_zero_pixels 
@@ -709,9 +699,9 @@ float OBBDetector::compute_classification_score(const std::vector<cv::Point2f>& 
 
 void OBBDetector::copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame) {
     // Copy the debayered RGB frame from GPU to CPU
-    // The frame is already debayered and in RGB format
+    // The frame is already debayered and in RGB format (3 channels)
     CUDA_CHECK(cudaMemcpy2DAsync(h_frame_cpu, camera_params->width * 3,  // 3 channels for RGB
-                                 d_frame_original, camera_params->width * 3,
+                                 device_ptr, camera_params->width * 3,
                                  camera_params->width * 3, camera_params->height,
                                  cudaMemcpyDeviceToHost, stream));
     

@@ -154,8 +154,7 @@ private:
     cudaEvent_t copy_done_event;
     
     // Frame processing (simplified)
-    unsigned char* d_frame_original;
-    unsigned char* d_debayer;
+    void* d_frame_original;  // Points to debayered frame from OpenGL display
     unsigned char* h_frame_cpu;
     
     // Detection results

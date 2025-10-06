@@ -1,4 +1,5 @@
 #include "network_base.h"
+#include "obj_generated.h"
 
 bool enet_initialize(EnetContext* enet_context, uint16_t external_port_number, size_t max_peers)
 {
@@ -139,4 +140,22 @@ void send_indigo_message(EnetContext* enet_context, flatbuffers::FlatBufferBuild
     ENetPacket* enet_packet = enet_packet_create(server_buffer, server_buf_size, 0);
 
     enet_peer_send(indigo_connection, 0, enet_packet);
+}
+
+
+void send_cbot_obj_pos2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection)
+{
+    uint8_t *pose_msg_buffer = builder->GetBufferPointer();
+    int pose_msg_buf_size = builder->GetSize();
+    ENetPacket* enet_packet = enet_packet_create(pose_msg_buffer, pose_msg_buf_size, 0);
+    enet_peer_send(cbot_connection, 0, enet_packet);
+     
+}
+
+void initialize_obj_pose_message(flatbuffers::FlatBufferBuilder* builder)
+{
+    auto obj_a = Obj::Createobb(*builder, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+    auto obj_b = Obj::Createobb(*builder, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+    auto obj_obb_msg = Obj::Createobj_msg(*builder, obj_a, obj_b);
+    builder->Finish(obj_obb_msg);    
 }

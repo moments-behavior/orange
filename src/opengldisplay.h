@@ -40,6 +40,11 @@ class COpenGLDisplay : public CThreadWorker {
     // OBB Detection
     OBBDetector *obb_detector = nullptr;
     float *d_obb_points;  // GPU buffer for OBB corner points
+    // Stable slot assignment for two objects across frames based on centroid proximity
+    int obb_slot_valid[2] = {0, 0};
+    float obb_slot_cx[2] = {0.0f, 0.0f};
+    float obb_slot_cy[2] = {0.0f, 0.0f};
+    static constexpr float OBB_SLOT_ASSIGN_DISTANCE = 150.0f; // pixels
 
   private:
     virtual void

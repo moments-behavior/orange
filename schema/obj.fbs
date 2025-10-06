@@ -1,0 +1,17 @@
+namespace Obj;
+
+table obb {
+    cx:float;
+    cy:float;
+    w:float;
+    h:float;
+    theta:float;
+    label:float;
+}
+
+table obj_msg {
+  cylinder1:obb;
+  cylinder2:obb;
+}
+
+root_type obj_msg;

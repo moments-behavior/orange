@@ -39,4 +39,16 @@ void enqueue_packet(EnetContext* enet_context, ENetPeer* peer, PacketTransportTy
 void service_network(EnetContext* enet_context, float dt, std::function<void(const ENetEvent&)> callback);
 void send_indigo_message(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder,
                         ENetPeer* indigo_connection, FetchGame::SignalType signal_type);
+
+struct CBOTSignalBuilder {    
+    flatbuffers::FlatBufferBuilder* builder;    
+    EnetContext* server;
+    ENetPeer* cbot_connection;    
+};
+                        
+  
+void initialize_obj_pose_message(flatbuffers::FlatBufferBuilder* builder);
+void send_cbot_obj_pos2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection);
+                      
+
 #endif

@@ -6,6 +6,7 @@
 #include "kernel.cuh"
 #include "opengldisplay.h"
 #include "utils.h"
+#include "obj_generated.h"
 #include <cuda_runtime_api.h>
 #include <nvToolsExt.h>
 #include <stdio.h>
@@ -227,9 +228,19 @@ void COpenGLDisplay::ThreadRunning() {
                 
                 // Get latest detections (non-blocking, returns immediately)
                 std::vector<OBB> obb_detections = obb_detector->get_latest_detections();
-                
-                // Draw OBB overlays on GPU (lightweight, non-blocking)
+                                    
+                // Draw OBB overlays on GPU (lightweight, non-blocking) and populate flatbuffer message
                 if (obb_detections.size() > 0) {
+                    // Prepare flatbuffer message with up to 2 objects
+                    flatbuffers::FlatBufferBuilder* fb = indigo_signal_builder->builder;
+                    fb->Clear();
+
+                    // Hold up to two object offsets
+                    ::flatbuffers::Offset<Obj::obb> fb_obj_a{};
+                    ::flatbuffers::Offset<Obj::obb> fb_obj_b{};
+
+                    // If there are no detections, clear slots
+
                     for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
                         const OBB& obb = obb_detections[i];
                         
@@ -241,7 +252,33 @@ void COpenGLDisplay::ThreadRunning() {
                         
                         // Check if object is flickering between classes
                         bool is_flickering = obb_detector->is_object_flickering(obb.object_id);
+                        // Map label: 0 = stable (oriented), 1 = flickering (green AABB)
+                        float fb_label = is_flickering ? 1.0f : 0.0f;
                         
+                        // Decide which slot (0 or 1) this object should occupy based on centroid proximity
+                        auto center = obb_detector->obb_to_xywhr(obb);
+                        float cx = center.x;
+                        float cy = center.y;
+                        int assigned_slot = -1;
+                        if (obb_slot_valid[0] && !obb_slot_valid[1]) {
+                            float d0 = std::hypot(cx - obb_slot_cx[0], cy - obb_slot_cy[0]);
+                            assigned_slot = (d0 <= OBB_SLOT_ASSIGN_DISTANCE) ? 0 : -1;
+                        } else if (!obb_slot_valid[0] && obb_slot_valid[1]) {
+                            float d1 = std::hypot(cx - obb_slot_cx[1], cy - obb_slot_cy[1]);
+                            assigned_slot = (d1 <= OBB_SLOT_ASSIGN_DISTANCE) ? 1 : -1;
+                        } else if (obb_slot_valid[0] && obb_slot_valid[1]) {
+                            float d0 = std::hypot(cx - obb_slot_cx[0], cy - obb_slot_cy[0]);
+                            float d1 = std::hypot(cx - obb_slot_cx[1], cy - obb_slot_cy[1]);
+                            if (d0 <= d1 && d0 <= OBB_SLOT_ASSIGN_DISTANCE) assigned_slot = 0;
+                            else if (d1 < d0 && d1 <= OBB_SLOT_ASSIGN_DISTANCE) assigned_slot = 1;
+                            else assigned_slot = -1;
+                        }
+                        // If no valid slot found, occupy a free slot if any
+                        if (assigned_slot == -1) {
+                            if (!obb_slot_valid[0]) assigned_slot = 0;
+                            else if (!obb_slot_valid[1]) assigned_slot = 1;
+                        }
+
                         if (is_flickering) {
                             // Draw non-oriented bounding box for flickering objects
                             // Convert OBB to axis-aligned bounding box
@@ -265,11 +302,23 @@ void COpenGLDisplay::ThreadRunning() {
                             gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                         camera_params->height, d_obb_points + i * 8, 
                                         obb.class_id, 0, 0, 255, 0);  // Green color for flickering
+
+                            // Populate flatbuffer with AABB (theta = 0)
+                            if (assigned_slot != -1) {
+                                float cx = 0.5f * (min_x + max_x);
+                                float cy = 0.5f * (min_y + max_y);
+                                float w = (max_x - min_x);
+                                float h = (max_y - min_y);
+                                float theta = 0.0f;
+                                auto fb_obj = Obj::Createobb(*fb, cx, cy, w, h, theta, fb_label);
+                                if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = cx; obb_slot_cy[0] = cy; }
+                                else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = cx; obb_slot_cy[1] = cy; }
+                            }
                         } else {
                             // Draw oriented bounding box for stable objects
                             float obb_points[8] = {
                                 obb.x1, obb.y1,  // Top-left
-                                obb.x2, obb.y2,  // Top-right  
+                                obb.x2, obb.y2,  // Top-right
                                 obb.x3, obb.y3,  // Bottom-right
                                 obb.x4, obb.y4   // Bottom-left
                             };
@@ -281,11 +330,32 @@ void COpenGLDisplay::ThreadRunning() {
                             gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                         camera_params->height, d_obb_points + i * 8, 
                                         obb.class_id, 0);
+
+                            // Populate flatbuffer with oriented OBB (theta from xywhr)
+                            if (assigned_slot != -1) {
+                                auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
+                                if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
+                                else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
+                            }
                         }
                     }
+
+                    // Ensure both objects exist in message (use zero object if not filled)
+                    if (!fb_obj_a.o) {
+                        fb_obj_a = Obj::Createobb(*fb, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+                        obb_slot_valid[0] = 0;
+                    }
+                    if (!fb_obj_b.o) {
+                        fb_obj_b = Obj::Createobb(*fb, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+                        obb_slot_valid[1] = 0;
+                    }
+
+                    auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
+                    fb->Finish(obj_msg);
                 }
             }
-
+            //send message to cbot (uses CBOTSignalBuilder elsewhere; here we only have INDIGOSignalBuilder, so send via indigo_connection)
+            send_cbot_obj_pos2d(indigo_signal_builder->server, indigo_signal_builder->builder, indigo_signal_builder->indigo_connection);
             // nvtxRangePush("display_gl_copy_to_interop_buffer");
             if (camera_select->downsample != 1) {
                 const NppStatus npp_result = nppiResize_8u_C4R(

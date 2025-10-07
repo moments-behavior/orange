@@ -110,7 +110,9 @@ int main(int argc, char **args) {
     bool show_error = false;
     std::string error_message;
 
-    HostClientCtx client_ctx{&selected_network_folder,
+    HostClientCtx client_ctx{&network_config_select,
+                             &network_config_folders,
+                             &selected_network_folder,
                              device_info,
                              &cam_count,
                              &check,
@@ -138,48 +140,7 @@ int main(int argc, char **args) {
         host_client_tick();
         create_new_frame();
 
-        if (ImGui::Begin("Network")) {
-            if (network_config_select < 0 ||
-                network_config_select >= (int)network_config_folders.size()) {
-                int idx = find_cfg_index(network_config_folders,
-                                         selected_network_folder);
-                network_config_select =
-                    (idx >= 0 ? idx
-                              : (network_config_folders.empty() ? -1 : 0));
-                selected_network_folder =
-                    network_config_folders[network_config_select];
-            }
-
-            ImGuiStyle &style = ImGui::GetStyle();
-            const int n = (int)network_config_folders.size();
-            for (int i = 0; i < n; ++i) {
-                if (i > 0)
-                    ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-
-                std::string label =
-                    std::filesystem::path(network_config_folders[i])
-                        .filename()
-                        .string();
-
-                const bool is_rig_new = (label == "rig_new");
-                if (is_rig_new)
-                    ImGui::PushStyleColor(ImGuiCol_Text,
-                                          ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
-
-                if (ImGui::RadioButton(
-                        (label + "##cfg" + std::to_string(i)).c_str(),
-                        &network_config_select, i)) {
-                    selected_network_folder =
-                        network_config_folders[network_config_select];
-                }
-
-                if (is_rig_new)
-                    ImGui::PopStyleColor();
-            }
-        }
-        ImGui::End();
-
-        host_client_draw_gui(); // shows the “Advance Phase” button & logs
+        host_client_draw_gui();
 
         if (ImGui::Begin("Orange", nullptr)) {
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",

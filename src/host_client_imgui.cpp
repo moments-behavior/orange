@@ -602,9 +602,14 @@ void host_client_init(
     g_ctxp = &ctx;
     g_endpoints = endpoints;
 
-    // ensure client host/I-O thread in threaded mode; no-op for inline
-    if (!enet_start_client(g_ctxp->net, 2, 0, 0)) {
-        std::fprintf(stderr, "[HOST] failed to start client runtime\n");
+    const uint16_t listen_port = 3333;
+    const size_t max_clients = 5;
+    const size_t channels = 2;
+
+    if (!g_ctxp->net.start_server(listen_port, max_clients, channels,
+                                  /*in_bw=*/0, /*out_bw=*/0)) {
+        std::fprintf(stderr, "[HOST] failed to listen on :%u (UDP)\n",
+                     listen_port);
         return;
     }
 
@@ -681,7 +686,46 @@ void host_client_tick() {
 }
 
 void host_client_draw_gui() {
-    ImGui::Begin("Host Client");
+    ImGui::Begin("Network");
+
+    std::string &selected_network_folder =
+        *g_clientctx->selected_network_folder;
+    int &network_config_select = *g_clientctx->network_config_select;
+    auto &network_config_folders = *g_clientctx->network_config_folders;
+
+    if (network_config_select < 0 ||
+        network_config_select >= (int)network_config_folders.size()) {
+        int idx =
+            find_cfg_index(network_config_folders, selected_network_folder);
+        network_config_select =
+            (idx >= 0 ? idx : (network_config_folders.empty() ? -1 : 0));
+        selected_network_folder = network_config_folders[network_config_select];
+    }
+
+    ImGuiStyle &style = ImGui::GetStyle();
+    const int n = (int)network_config_folders.size();
+    for (int i = 0; i < n; ++i) {
+        if (i > 0)
+            ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
+
+        std::string label = std::filesystem::path(network_config_folders[i])
+                                .filename()
+                                .string();
+
+        const bool is_rig_new = (label == "rig_new");
+        if (is_rig_new)
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
+
+        if (ImGui::RadioButton((label + "##cfg" + std::to_string(i)).c_str(),
+                               &network_config_select, i)) {
+            selected_network_folder =
+                network_config_folders[network_config_select];
+        }
+
+        if (is_rig_new)
+            ImGui::PopStyleColor();
+    }
 
     if (ImGui::CollapsingHeader("Endpoints", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (const auto &ep : g_endpoints) {

@@ -8,7 +8,10 @@
 #include <vector>
 
 struct HostClientCtx {
+    int *network_config_select = nullptr;
+    std::vector<std::string> *network_config_folders = nullptr;
     std::string *selected_network_folder = nullptr;
+
     GigEVisionDeviceInfo *device_info = nullptr; // array base (owned elsewhere)
     int *cam_count = nullptr;
     std::vector<bool> *check = nullptr;

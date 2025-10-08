@@ -8,6 +8,7 @@
 #include <vector>
 
 struct HostClientCtx {
+    std::string *calib_save_folder = nullptr;
     int *network_config_select = nullptr;
     std::vector<std::string> *network_config_folders = nullptr;
     std::string *selected_network_folder = nullptr;

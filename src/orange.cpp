@@ -92,9 +92,8 @@ int main(int argc, char **args) {
          std::filesystem::directory_iterator(local_start_folder_name)) {
         local_config_folders.push_back(entry.path().string());
     }
-    std::string picture_save_folder =
-        orange_root_dir_str + "/pictures/" + get_current_date();
-    std::string calib_save_folder;
+    std::string picture_save_folder = orange_root_dir_str + "/pictures/";
+    std::string calib_save_folder = recording_root_dir_str + "/exp/calibration";
 
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -110,7 +109,8 @@ int main(int argc, char **args) {
     bool show_error = false;
     std::string error_message;
 
-    HostClientCtx client_ctx{&network_config_select,
+    HostClientCtx client_ctx{&calib_save_folder,
+                             &network_config_select,
                              &network_config_folders,
                              &selected_network_folder,
                              device_info,
@@ -122,7 +122,6 @@ int main(int argc, char **args) {
                              &ecams,
                              &realtime_plot_data,
                              camera_control,
-
                              &detection3d_thread,
                              &calib_yaml_folder,
                              &input_folder,

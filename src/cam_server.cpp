@@ -42,6 +42,8 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "STARTRECORDING";
     case camnet::v1::ServerControl_STOPRECORDING:
         return "STOPRECORDING";
+    case camnet::v1::ServerControl_STARTSTREAMING:
+        return "STARTSTREAMING";
     default:
         return "NONE";
     }
@@ -132,7 +134,7 @@ static std::vector<CameraParams> cameras_params;
 static std::vector<CameraEachSelect> cameras_select;
 static CameraControl camera_control;
 static std::vector<std::thread> camera_threads;
-static PTPParams ptp_params{0, 0, 0, 0, true, false, false, false};
+static PTPParams ptp_params{0, 0, 0, 0, false, false, false, false};
 
 static bool open_cameras(const std::string &config_folder) {
     const size_t n = cameras_params.size();
@@ -204,6 +206,8 @@ static bool start_camera_thread(std::string record_folder,
         ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
     }
 
+    ptp_params.network_sync = true;
+
     for (int i = 0; i < cam_count; i++) {
         cameras_select[i].stream_on = false;
     }
@@ -233,6 +237,69 @@ static bool start_camera_thread(std::string record_folder,
         std::this_thread::sleep_for(1ms);
     }
 
+    // success
+    guard.disarm = true;
+    return true;
+}
+
+static bool start_camera_streaming(std::string calib_folder) {
+
+    // RAII guard: if we exit false, join any threads we created.
+    struct Joiner {
+        std::vector<std::thread> &ts;
+        bool disarm{false};
+        ~Joiner() {
+            if (!disarm)
+                for (auto &t : ts)
+                    if (t.joinable())
+                        t.join();
+        }
+    } guard{camera_threads};
+
+    try {
+        // allocate frames
+        for (int i = 0; i < cam_count; i++) {
+            camera_open_stream(&ecams[i].camera, &cameras_params[i]);
+            ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
+            allocate_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,
+                                  &cameras_params[i], evt_buffer_size);
+            if (cameras_params[i].need_reorder &&
+                cameras_params[i].gpu_direct) {
+                allocate_frame_reorder_buffer(&ecams[i].camera,
+                                              &ecams[i].frame_reorder,
+                                              &cameras_params[i]);
+            }
+        }
+
+    } catch (...) {
+        std::cout << "Error allocating camera frame buffers." << std::endl;
+        return false;
+    }
+
+    camera_control.record_video = false;
+    camera_control.subscribe = true;
+    camera_control.sync_camera = false;
+    ptp_params.network_sync = false;
+
+    if (!make_folder(calib_folder)) {
+        std::cout << "Error creating calib_folder." << std::endl;
+        return false;
+    }
+
+    for (int i = 0; i < cam_count; i++) {
+        cameras_select[i].stream_on = false;
+    }
+    try {
+        for (int i = 0; i < cam_count; i++) {
+            camera_threads.push_back(
+                std::thread(&acquire_frames, &ecams[i], &cameras_params[i],
+                            &cameras_select[i], &camera_control, nullptr, "",
+                            "", &ptp_params));
+        }
+    } catch (...) {
+        std::cout << "Error creating camera thread." << std::endl;
+        return false;
+    }
     // success
     guard.disarm = true;
     return true;
@@ -291,6 +358,15 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         ptp_params.ptp_stop_time = ptp_stop_time;
         ptp_params.network_set_stop_ptp = true;
         return true;
+    }
+
+    case camnet::v1::ServerControl_STARTSTREAMING: {
+        auto *ssa = msg->command_body_as_StartStreamingArgs();
+        if (!ssa)
+            return false;
+        std::string calib_folder = ssa->calib_folder()->str();
+        std::cout << calib_folder << std::endl;
+        return start_camera_streaming(calib_folder);
     }
 
     default:
@@ -368,7 +444,7 @@ static void cleanup_host_server_resources() {
     ptp_params.ptp_stop_time = 0;
     ptp_params.ptp_counter = 0;
     ptp_params.ptp_stop_counter = 0;
-    ptp_params.network_sync = true;
+    ptp_params.network_sync = false;
     ptp_params.network_set_start_ptp = false;
     ptp_params.ptp_stop_reached = false;
     ptp_params.ptp_start_reached = false;

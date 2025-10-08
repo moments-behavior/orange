@@ -98,6 +98,45 @@ static void on_startthread_phase_start(std::string encoder_setup,
                            ptp_params, calib_yaml_folder, detection3d_thread);
 }
 
+static void on_startstreaming_phase_start(std::string folder_name) {
+    // unpack
+    std::thread &detection3d_thread = *g_clientctx->detection3d_thread;
+    std::string &calib_yaml_folder = *g_clientctx->calib_yaml_folder;
+    PTPParams *ptp_params = g_clientctx->ptp_params;
+    int &num_cameras = *g_clientctx->num_cameras;
+    int &evt_buffer_size = *g_clientctx->evt_buffer_size;
+    int &display_gpu_id = *g_clientctx->display_gpu_id;
+    GL_Texture *&tex_gl = *g_clientctx->tex_gl;
+    CameraParams *&cameras_params = *g_clientctx->cameras_params;
+    CameraEachSelect *&cameras_select = *g_clientctx->cameras_select;
+    CameraEmergent *&ecams = *g_clientctx->ecams;
+    std::vector<std::thread> *camera_threads = g_clientctx->camera_threads;
+
+    make_folder(folder_name);
+
+    ptp_params->network_sync = false;
+    CameraControl *camera_control = g_clientctx->camera_control;
+    camera_control->record_video = false;
+    camera_control->subscribe = true;
+
+    cudaSetDevice(display_gpu_id);
+    tex_gl = new GL_Texture[num_cameras];
+    for (int i = 0; i < num_cameras; i++) {
+        cameras_select[i].picture_save_folder = folder_name;
+        if (cameras_select[i].stream_on) {
+            int camera_width =
+                int(cameras_params[i].width / cameras_select[i].downsample);
+            int camera_height =
+                int(cameras_params[i].height / cameras_select[i].downsample);
+            setup_texture(tex_gl[i], camera_width, camera_height);
+        }
+    }
+    start_camera_streaming(*camera_threads, camera_control, ecams,
+                           cameras_params, cameras_select, tex_gl, num_cameras,
+                           evt_buffer_size, false, "", "", ptp_params,
+                           calib_yaml_folder, detection3d_thread);
+}
+
 static void on_startrecord_phase_start(unsigned long long ptp_global_time) {
     PTPParams *ptp_params = g_clientctx->ptp_params;
     ptp_params->ptp_global_time = ptp_global_time;
@@ -258,6 +297,21 @@ static std::vector<uint8_t> build_cmd_stop(const std::string &job_id,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+static std::vector<uint8_t>
+build_cmd_startstreaming(const std::string &job_id, uint32_t epoch,
+                         uint32_t seq, const std::string &calib_folder) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(256);
+    auto jid = b.CreateString(job_id);
+    auto calib = b.CreateString(calib_folder);
+    auto args = CreateStartStreamingArgs(b, calib);
+    auto msg =
+        CreateServer(b, Kind_KindCommand, ServerControl_STARTSTREAMING, jid,
+                     epoch, seq, CommandBody_StartThreadsArgs, args.Union(), 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 // ============================================================================
 // Names / log helpers
 // ============================================================================
@@ -281,13 +335,20 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
 // ============================================================================
 static AppContext *g_ctxp = nullptr;
 
-enum Phase { Phase_Open, Phase_Threads, Phase_Start, Phase_Stop, Phase_Done };
+enum Phase {
+    Phase_Open,
+    Phase_Threads,
+    Phase_Start,
+    Phase_Stop,
+    Phase_Done,
+    Phase_Streaming
+};
 
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
 static std::vector<std::string> g_servers; // server names via bringup
 static std::unordered_map<std::string, bool> g_ack_by;
 
-static std::string g_jid = "job-demo-001";
+static std::string g_jid = "recording";
 static uint32_t g_epoch = 1;
 static uint32_t g_seq = 1;
 static Phase g_phase = Phase_Open;
@@ -383,27 +444,48 @@ static const char *phase_name() {
     }
 }
 
-static void advance_phase() {
-    switch (g_phase) {
-    case Phase_Open:
-        g_phase = Phase_Threads;
-        break;
-    case Phase_Threads:
-        g_phase = Phase_Start;
-        break;
-    case Phase_Start:
-        g_phase = Phase_Stop;
-        break;
-    case Phase_Stop:
-        g_phase = Phase_Done;
-        break;
-    default:
-        break;
+static void advance_phase(std::string job_id) {
+
+    if (job_id == "recording") {
+        switch (g_phase) {
+        case Phase_Open:
+            g_phase = Phase_Threads;
+            break;
+        case Phase_Threads:
+            g_phase = Phase_Start;
+            break;
+        case Phase_Start:
+            g_phase = Phase_Stop;
+            break;
+        case Phase_Stop:
+            g_phase = Phase_Done;
+            break;
+        default:
+            break;
+        }
+    } else {
+        // calibration
+        switch (g_phase) {
+        case Phase_Open:
+            g_phase = Phase_Streaming;
+            break;
+        case Phase_Streaming:
+            g_phase = Phase_Start;
+            break;
+        case Phase_Start:
+            g_phase = Phase_Stop;
+            break;
+        case Phase_Stop:
+            g_phase = Phase_Done;
+            break;
+        default:
+            break;
+        }
     }
 }
 
 static void reset_session() {
-    g_jid = "job-demo-001";
+    g_jid = "recording";
     g_epoch = 1;
     g_seq = 1;
     g_phase = Phase_Open;
@@ -481,7 +563,7 @@ static void broadcast_current_phase() {
 
         break;
     }
-    case Phase_Stop:
+    case Phase_Stop: {
         if (!g_phase_started) {
             CameraEmergent *&ecams = *g_clientctx->ecams;
             unsigned long long ptp_time =
@@ -497,6 +579,20 @@ static void broadcast_current_phase() {
             g_phase_started = true;
         }
         break;
+    }
+    case Phase_Streaming: {
+        if (!g_phase_started) {
+            g_folder_name =
+                *g_clientctx->calib_save_folder + "/" + get_current_date_time();
+        }
+        bytes = build_cmd_startstreaming(g_jid, g_epoch, g_seq, g_folder_name);
+
+        if (!g_phase_started) {
+            on_startstreaming_phase_start(g_folder_name);
+            g_phase_started = true;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -663,7 +759,7 @@ void host_client_tick() {
                 g_phase_started = false;
                 g_waiting = false;
                 ++g_seq;
-                advance_phase();
+                advance_phase(g_jid);
             }
         }
     }
@@ -744,6 +840,24 @@ void host_client_draw_gui() {
     }
 
     ImGui::Separator();
+
+    const char *options[] = {"recording", "calibration"};
+    static int current = (g_jid == "recording") ? 0 : 1;
+    ImGui::SetNextItemWidth(120.0f);
+
+    if (ImGui::BeginCombo("Job Mode", options[current])) {
+        for (int n = 0; n < IM_ARRAYSIZE(options); n++) {
+            bool is_selected = (current == n);
+            if (ImGui::Selectable(options[n], is_selected)) {
+                current = n;
+                g_jid = options[n];
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
     ImGui::Text("Job: %s  epoch=%u  seq=%u", g_jid.c_str(), g_epoch, g_seq);
     ImGui::Text("Phase: %s", phase_name());
 

@@ -31,6 +31,9 @@ struct StartArgsBuilder;
 struct StopArgs;
 struct StopArgsBuilder;
 
+struct StartStreamingArgs;
+struct StartStreamingArgsBuilder;
+
 struct ReplyInfo;
 struct ReplyInfoBuilder;
 
@@ -74,37 +77,52 @@ enum ServerControl : uint8_t {
   ServerControl_STARTRECORDING = 3,
   ServerControl_STOPRECORDING = 4,
   ServerControl_TEARDOWN = 5,
+  ServerControl_STARTSTREAMING = 6,
+  ServerControl_BUMBLEBEEBOARD = 7,
+  ServerControl_GRIMLOCKBOARD = 8,
+  ServerControl_NEXTPOSE = 9,
+  ServerControl_TAKEPICTURE = 10,
   ServerControl_MIN = ServerControl_NONE,
-  ServerControl_MAX = ServerControl_TEARDOWN
+  ServerControl_MAX = ServerControl_TAKEPICTURE
 };
 
-inline const ServerControl (&EnumValuesServerControl())[6] {
+inline const ServerControl (&EnumValuesServerControl())[11] {
   static const ServerControl values[] = {
     ServerControl_NONE,
     ServerControl_OPENCAMERA,
     ServerControl_STARTTHREAD,
     ServerControl_STARTRECORDING,
     ServerControl_STOPRECORDING,
-    ServerControl_TEARDOWN
+    ServerControl_TEARDOWN,
+    ServerControl_STARTSTREAMING,
+    ServerControl_BUMBLEBEEBOARD,
+    ServerControl_GRIMLOCKBOARD,
+    ServerControl_NEXTPOSE,
+    ServerControl_TAKEPICTURE
   };
   return values;
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[7] = {
+  static const char * const names[12] = {
     "NONE",
     "OPENCAMERA",
     "STARTTHREAD",
     "STARTRECORDING",
     "STOPRECORDING",
     "TEARDOWN",
+    "STARTSTREAMING",
+    "BUMBLEBEEBOARD",
+    "GRIMLOCKBOARD",
+    "NEXTPOSE",
+    "TAKEPICTURE",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameServerControl(ServerControl e) {
-  if (::flatbuffers::IsOutRange(e, ServerControl_NONE, ServerControl_TEARDOWN)) return "";
+  if (::flatbuffers::IsOutRange(e, ServerControl_NONE, ServerControl_TAKEPICTURE)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesServerControl()[index];
 }
@@ -115,35 +133,38 @@ enum CommandBody : uint8_t {
   CommandBody_StartThreadsArgs = 2,
   CommandBody_StartArgs = 3,
   CommandBody_StopArgs = 4,
+  CommandBody_StartStreamingArgs = 5,
   CommandBody_MIN = CommandBody_NONE,
-  CommandBody_MAX = CommandBody_StopArgs
+  CommandBody_MAX = CommandBody_StartStreamingArgs
 };
 
-inline const CommandBody (&EnumValuesCommandBody())[5] {
+inline const CommandBody (&EnumValuesCommandBody())[6] {
   static const CommandBody values[] = {
     CommandBody_NONE,
     CommandBody_OpenArgs,
     CommandBody_StartThreadsArgs,
     CommandBody_StartArgs,
-    CommandBody_StopArgs
+    CommandBody_StopArgs,
+    CommandBody_StartStreamingArgs
   };
   return values;
 }
 
 inline const char * const *EnumNamesCommandBody() {
-  static const char * const names[6] = {
+  static const char * const names[7] = {
     "NONE",
     "OpenArgs",
     "StartThreadsArgs",
     "StartArgs",
     "StopArgs",
+    "StartStreamingArgs",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameCommandBody(CommandBody e) {
-  if (::flatbuffers::IsOutRange(e, CommandBody_NONE, CommandBody_StopArgs)) return "";
+  if (::flatbuffers::IsOutRange(e, CommandBody_NONE, CommandBody_StartStreamingArgs)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesCommandBody()[index];
 }
@@ -166,6 +187,10 @@ template<> struct CommandBodyTraits<camnet::v1::StartArgs> {
 
 template<> struct CommandBodyTraits<camnet::v1::StopArgs> {
   static const CommandBody enum_value = CommandBody_StopArgs;
+};
+
+template<> struct CommandBodyTraits<camnet::v1::StartStreamingArgs> {
+  static const CommandBody enum_value = CommandBody_StartStreamingArgs;
 };
 
 bool VerifyCommandBody(::flatbuffers::Verifier &verifier, const void *obj, CommandBody type);
@@ -432,6 +457,57 @@ inline ::flatbuffers::Offset<StopArgs> CreateStopArgs(
   return builder_.Finish();
 }
 
+struct StartStreamingArgs FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef StartStreamingArgsBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_CALIB_FOLDER = 4
+  };
+  const ::flatbuffers::String *calib_folder() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CALIB_FOLDER);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_CALIB_FOLDER) &&
+           verifier.VerifyString(calib_folder()) &&
+           verifier.EndTable();
+  }
+};
+
+struct StartStreamingArgsBuilder {
+  typedef StartStreamingArgs Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_calib_folder(::flatbuffers::Offset<::flatbuffers::String> calib_folder) {
+    fbb_.AddOffset(StartStreamingArgs::VT_CALIB_FOLDER, calib_folder);
+  }
+  explicit StartStreamingArgsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<StartStreamingArgs> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<StartStreamingArgs>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<StartStreamingArgs> CreateStartStreamingArgs(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> calib_folder = 0) {
+  StartStreamingArgsBuilder builder_(_fbb);
+  builder_.add_calib_folder(calib_folder);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<StartStreamingArgs> CreateStartStreamingArgsDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *calib_folder = nullptr) {
+  auto calib_folder__ = calib_folder ? _fbb.CreateString(calib_folder) : 0;
+  return camnet::v1::CreateStartStreamingArgs(
+      _fbb,
+      calib_folder__);
+}
+
 struct ReplyInfo FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ReplyInfoBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -580,6 +656,9 @@ struct Server FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const camnet::v1::StopArgs *command_body_as_StopArgs() const {
     return command_body_type() == camnet::v1::CommandBody_StopArgs ? static_cast<const camnet::v1::StopArgs *>(command_body()) : nullptr;
   }
+  const camnet::v1::StartStreamingArgs *command_body_as_StartStreamingArgs() const {
+    return command_body_type() == camnet::v1::CommandBody_StartStreamingArgs ? static_cast<const camnet::v1::StartStreamingArgs *>(command_body()) : nullptr;
+  }
   const camnet::v1::ReplyInfo *reply() const {
     return GetPointer<const camnet::v1::ReplyInfo *>(VT_REPLY);
   }
@@ -614,6 +693,10 @@ template<> inline const camnet::v1::StartArgs *Server::command_body_as<camnet::v
 
 template<> inline const camnet::v1::StopArgs *Server::command_body_as<camnet::v1::StopArgs>() const {
   return command_body_as_StopArgs();
+}
+
+template<> inline const camnet::v1::StartStreamingArgs *Server::command_body_as<camnet::v1::StartStreamingArgs>() const {
+  return command_body_as_StartStreamingArgs();
 }
 
 struct ServerBuilder {
@@ -719,6 +802,10 @@ inline bool VerifyCommandBody(::flatbuffers::Verifier &verifier, const void *obj
     }
     case CommandBody_StopArgs: {
       auto ptr = reinterpret_cast<const camnet::v1::StopArgs *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case CommandBody_StartStreamingArgs: {
+      auto ptr = reinterpret_cast<const camnet::v1::StartStreamingArgs *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

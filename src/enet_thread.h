@@ -18,8 +18,10 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                 {
                     uint8_t* buffer_pointer = evnt.packet->data;
                     auto server_control = FetchGame::GetServer(buffer_pointer);
+                    std::cout << "DEBUG: Received signal type: " << (int)server_control->signal_type() << std::endl;
                     
                     if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
+                        // Handle general client bring-up
                         for (int i = 0; i < 2; i++) {
                             if (my_servers[i].peer == evnt.peer) {
                                 auto server_name = server_control->server_mesg()->server_name()->c_str();
@@ -28,12 +30,14 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                                 my_servers[i].num_cameras = server_num_cameras;
                                 my_servers[i].server_state = server_state;
                             }                           
-                        }                        
-                    } else if (server_control->signal_type() == FetchGame::SignalType_INDIGO) {
+                        }
+                        
+                        // Also set this as potential CBOT connection for OBB messages
+                        std::cout << "DEBUG: Setting CBOT connection from ClientBringup signal" << std::endl;
                         indigo_signal_builder->indigo_connection = evnt.peer;
-                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
-                        // Check if this is from CBOT (could be from other clients too)
-                        // For now, treat any ClientBringup as potential CBOT connection
+                        
+                    } else if (server_control->signal_type() == FetchGame::SignalType_INDIGO) {
+                        std::cout << "DEBUG: Setting CBOT connection from INDIGO signal" << std::endl;
                         indigo_signal_builder->indigo_connection = evnt.peer;
                     } else if (server_control->signal_type() == FetchGame::SignalType_CalibrationPoseReached) {
                         std::cout << "From Indigo: Calibration pose reached." << std::endl;

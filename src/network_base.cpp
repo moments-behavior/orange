@@ -146,16 +146,7 @@ void send_indigo_message(EnetContext* enet_context, flatbuffers::FlatBufferBuild
 void send_cbot_obj_pos2d(EnetContext* enet_context, flatbuffers::FlatBufferBuilder* builder, ENetPeer *cbot_connection)
 {
     // Safety checks
-    if (!builder) {
-        std::cerr << "ERROR: send_cbot_obj_pos2d - builder is null" << std::endl;
-        return;
-    }
-    if (!cbot_connection) {
-        std::cerr << "ERROR: send_cbot_obj_pos2d - cbot_connection is null" << std::endl;
-        return;
-    }
-    if (!enet_context) {
-        std::cerr << "ERROR: send_cbot_obj_pos2d - enet_context is null" << std::endl;
+    if (!builder || !cbot_connection || !enet_context) {
         return;
     }
     
@@ -163,21 +154,13 @@ void send_cbot_obj_pos2d(EnetContext* enet_context, flatbuffers::FlatBufferBuild
     int pose_msg_buf_size = builder->GetSize();
     
     if (!pose_msg_buffer || pose_msg_buf_size <= 0) {
-        std::cerr << "ERROR: send_cbot_obj_pos2d - invalid buffer: ptr=" << (void*)pose_msg_buffer << " size=" << pose_msg_buf_size << std::endl;
         return;
     }
     
-    std::cout << "DEBUG: Creating ENet packet with size: " << pose_msg_buf_size << std::endl;
     ENetPacket* enet_packet = enet_packet_create(pose_msg_buffer, pose_msg_buf_size, 0);
-    
-    if (!enet_packet) {
-        std::cerr << "ERROR: send_cbot_obj_pos2d - failed to create ENet packet" << std::endl;
-        return;
+    if (enet_packet) {
+        enet_peer_send(cbot_connection, 0, enet_packet);
     }
-    
-    std::cout << "DEBUG: Sending packet to CBOT" << std::endl;
-    enet_peer_send(cbot_connection, 0, enet_packet);
-    std::cout << "DEBUG: Packet sent successfully" << std::endl;
 }
 
 void initialize_obj_pose_message(flatbuffers::FlatBufferBuilder* builder)

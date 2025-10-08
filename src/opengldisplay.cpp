@@ -351,11 +351,15 @@ void COpenGLDisplay::ThreadRunning() {
                     auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
                     std::cout << "DEBUG: Finishing FlatBuffer" << std::endl;
                     fb->Finish(obj_msg);
-                    std::cout << "DEBUG: Calling send_cbot_obj_pos2d" << std::endl;
                     
-                    //send message to cbot (uses CBOTSignalBuilder elsewhere; here we only have INDIGOSignalBuilder, so send via indigo_connection)
-                    send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
-                    std::cout << "DEBUG: send_cbot_obj_pos2d completed" << std::endl;
+                    // Only send message to CBOT if connected
+                    if (indigo_signal_builder->indigo_connection) {
+                        std::cout << "DEBUG: Sending OBB message to CBOT" << std::endl;
+                        send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
+                        std::cout << "DEBUG: OBB message sent successfully" << std::endl;
+                    } else {
+                        std::cout << "DEBUG: CBOT not connected, skipping OBB message" << std::endl;
+                    }
                 }
             }
             // nvtxRangePush("display_gl_copy_to_interop_buffer");

@@ -964,7 +964,7 @@ int OBBDetector::get_stable_class_for_object(int object_id) {
     const auto& history = it->second;
     
     // If we have enough history and there's flickering, return the most common class
-    if (history.size() >= 3) {
+    if (history.size() >= 2) {
         std::map<int, int> class_counts;
         for (int class_id : history) {
             class_counts[class_id]++;
@@ -981,7 +981,7 @@ int OBBDetector::get_stable_class_for_object(int object_id) {
         }
         
         // If there's significant flickering (multiple classes), return the most common
-        if (class_counts.size() > 1 && max_count >= 2) {
+        if (class_counts.size() > 1 && max_count >= 1) {
             return most_common_class;
         }
     }
@@ -992,7 +992,7 @@ int OBBDetector::get_stable_class_for_object(int object_id) {
 
 bool OBBDetector::is_object_flickering(int object_id) {
     auto it = object_class_history.find(object_id);
-    if (it == object_class_history.end() || it->second.size() < 3) {
+    if (it == object_class_history.end() || it->second.size() < 2) {
         return false;
     }
     
@@ -1014,7 +1014,7 @@ bool OBBDetector::is_object_flickering(int object_id) {
             max_count = std::max(max_count, count);
         }
         
-        return max_count >= 2;  // At least one class appears multiple times
+        return max_count >= 1;  // At least one class appears once (more sensitive)
     }
     
     return false;
@@ -1035,7 +1035,7 @@ OBB OBBDetector::smooth_obb_coordinates(int object_id, const OBB& current_obb) {
     
     // Compute smoothed coordinates using exponential moving average
     const auto& history = object_obb_history[object_id];
-    float alpha = 0.3f;  // Smoothing factor (0.3 = 30% new, 70% old)
+    float alpha = 0.7f;  // Smoothing factor (0.7 = 70% new, 30% old) - more responsive
     
     OBB smoothed_obb = current_obb;
     

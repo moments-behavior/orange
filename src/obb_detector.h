@@ -186,10 +186,10 @@ private:
     std::map<int, OBB> object_last_obb;  // Store last OBB for each object
     std::map<int, std::vector<OBB>> object_obb_history;  // History for smoothing
     std::map<int, int> object_frame_count;  // How many frames object has been seen
-    static constexpr int MAX_CLASS_HISTORY = 5;  // Keep last 5 classifications
-    static constexpr int MAX_OBB_HISTORY = 3;  // Keep last 3 OBBs for smoothing
-    static constexpr int MIN_FRAMES_FOR_STABLE = 3;  // Min frames before object is considered stable
-    static constexpr float TRACKING_DISTANCE_THRESHOLD = 50.0f;  // Max distance to associate objects
+    static constexpr int MAX_CLASS_HISTORY = 3;  // Keep last 3 classifications (reduced for faster response)
+    static constexpr int MAX_OBB_HISTORY = 2;  // Keep last 2 OBBs for smoothing (reduced for faster response)
+    static constexpr int MIN_FRAMES_FOR_STABLE = 1;  // Min frames before object is considered stable (reduced for faster response)
+    static constexpr float TRACKING_DISTANCE_THRESHOLD = 100.0f;  // Max distance to associate objects (increased for better tracking)
 };
 
 #endif // ORANGE_OBB_DETECTOR

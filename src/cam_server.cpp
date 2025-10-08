@@ -288,6 +288,7 @@ static bool start_camera_streaming(std::string calib_folder) {
 
     for (int i = 0; i < cam_count; i++) {
         cameras_select[i].stream_on = false;
+        cameras_select[i].picture_save_folder = calib_folder;
     }
     try {
         for (int i = 0; i < cam_count; i++) {
@@ -367,6 +368,10 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         std::string calib_folder = ssa->calib_folder()->str();
         std::cout << calib_folder << std::endl;
         return start_camera_streaming(calib_folder);
+    }
+
+    case camnet::v1::ServerControl_BUMBLEBEEBOARD: {
+        return true;
     }
 
     default:

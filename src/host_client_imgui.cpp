@@ -312,6 +312,19 @@ build_cmd_startstreaming(const std::string &job_id, uint32_t epoch,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+static std::vector<uint8_t> build_cmd_bumblebeeboard(const std::string &job_id,
+                                                     uint32_t epoch,
+                                                     uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(256);
+    auto jid = b.CreateString(job_id);
+    auto msg = CreateServer(b, Kind_KindCommand,
+                            camnet::v1::ServerControl_BUMBLEBEEBOARD, jid,
+                            epoch, seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 // ============================================================================
 // Names / log helpers
 // ============================================================================
@@ -327,6 +340,8 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "STOPRECORDING";
     case camnet::v1::ServerControl_STARTSTREAMING:
         return "STARTSTREAMING";
+    case camnet::v1::ServerControl_BUMBLEBEEBOARD:
+        return "BUMBLEBEEBOARD";
     default:
         return "NONE";
     }
@@ -343,7 +358,8 @@ enum Phase {
     Phase_Start,
     Phase_Stop,
     Phase_Done,
-    Phase_Streaming
+    Phase_Streaming,
+    Phase_BumblebeeBoard
 };
 
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
@@ -426,6 +442,8 @@ static camnet::v1::ServerControl current_ctrl() {
         return camnet::v1::ServerControl_STOPRECORDING;
     case Phase_Streaming:
         return camnet::v1::ServerControl_STARTSTREAMING;
+    case Phase_BumblebeeBoard:
+        return camnet::v1::ServerControl_BUMBLEBEEBOARD;
     default:
         return camnet::v1::ServerControl_NONE;
     }
@@ -445,6 +463,8 @@ static const char *phase_name() {
         return "DONE";
     case Phase_Streaming:
         return "STREAMING";
+    case Phase_BumblebeeBoard:
+        return "BUMBLEBEEBOARD";
     default:
         return "?";
     }
@@ -476,9 +496,9 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_Streaming;
             break;
         case Phase_Streaming:
-            g_phase = Phase_Start;
+            g_phase = Phase_BumblebeeBoard;
             break;
-        case Phase_Start:
+        case Phase_BumblebeeBoard:
             g_phase = Phase_Stop;
             break;
         case Phase_Stop:
@@ -595,6 +615,13 @@ static void broadcast_current_phase() {
 
         if (!g_phase_started) {
             on_startstreaming_phase_start(g_folder_name);
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_BumblebeeBoard: {
+        bytes = build_cmd_bumblebeeboard(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
             g_phase_started = true;
         }
         break;

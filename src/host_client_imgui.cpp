@@ -305,9 +305,9 @@ build_cmd_startstreaming(const std::string &job_id, uint32_t epoch,
     auto jid = b.CreateString(job_id);
     auto calib = b.CreateString(calib_folder);
     auto args = CreateStartStreamingArgs(b, calib);
-    auto msg =
-        CreateServer(b, Kind_KindCommand, ServerControl_STARTSTREAMING, jid,
-                     epoch, seq, CommandBody_StartThreadsArgs, args.Union(), 0);
+    auto msg = CreateServer(
+        b, Kind_KindCommand, ServerControl_STARTSTREAMING, jid, epoch, seq,
+        camnet::v1::CommandBody_StartStreamingArgs, args.Union(), 0);
     b.Finish(msg);
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
@@ -325,6 +325,8 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "STARTRECORDING";
     case camnet::v1::ServerControl_STOPRECORDING:
         return "STOPRECORDING";
+    case camnet::v1::ServerControl_STARTSTREAMING:
+        return "STARTSTREAMING";
     default:
         return "NONE";
     }
@@ -422,6 +424,8 @@ static camnet::v1::ServerControl current_ctrl() {
         return camnet::v1::ServerControl_STARTRECORDING;
     case Phase_Stop:
         return camnet::v1::ServerControl_STOPRECORDING;
+    case Phase_Streaming:
+        return camnet::v1::ServerControl_STARTSTREAMING;
     default:
         return camnet::v1::ServerControl_NONE;
     }

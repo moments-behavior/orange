@@ -443,6 +443,8 @@ static const char *phase_name() {
         return "STOPRECORDING";
     case Phase_Done:
         return "DONE";
+    case Phase_Streaming:
+        return "STREAMING";
     default:
         return "?";
     }

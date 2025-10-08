@@ -238,9 +238,6 @@ void COpenGLDisplay::ThreadRunning() {
                     // Hold up to two object offsets
                     ::flatbuffers::Offset<Obj::obb> fb_obj_a{};
                     ::flatbuffers::Offset<Obj::obb> fb_obj_b{};
-
-                    // If there are no detections, clear slots
-
                     for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
                         const OBB& obb = obb_detections[i];
                         
@@ -350,11 +347,15 @@ void COpenGLDisplay::ThreadRunning() {
                         obb_slot_valid[1] = 0;
                     }
 
+                    std::cout << "DEBUG: Creating obj_msg FlatBuffer" << std::endl;
                     auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
+                    std::cout << "DEBUG: Finishing FlatBuffer" << std::endl;
                     fb->Finish(obj_msg);
+                    std::cout << "DEBUG: Calling send_cbot_obj_pos2d" << std::endl;
                     
                     //send message to cbot (uses CBOTSignalBuilder elsewhere; here we only have INDIGOSignalBuilder, so send via indigo_connection)
                     send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
+                    std::cout << "DEBUG: send_cbot_obj_pos2d completed" << std::endl;
                 }
             }
             // nvtxRangePush("display_gl_copy_to_interop_buffer");

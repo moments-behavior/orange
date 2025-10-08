@@ -901,6 +901,8 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
             // New object
             object_id = next_object_id++;
             object_class_history[object_id] = std::vector<int>();
+            object_obb_history[object_id] = std::vector<OBB>();
+            object_frame_count[object_id] = 0;
         } else {
             // Existing object
             object_id = best_object_id;
@@ -908,6 +910,7 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
         
         // Update object center
         object_centers[object_id] = center;
+        object_frame_count[object_id]++;
         
         // Add current classification to history
         object_class_history[object_id].push_back(detection.class_id);
@@ -918,12 +921,15 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
         // Get stable class (handle flickering)
         int stable_class = get_stable_class_for_object(object_id);
         
-        // Create tracked detection
-        OBB tracked_detection = detection;
+        // Create tracked detection with smoothed coordinates
+        OBB tracked_detection = smooth_obb_coordinates(object_id, detection);
         tracked_detection.object_id = object_id;
         tracked_detection.class_id = stable_class;
         
-        tracked_detections.push_back(tracked_detection);
+        // Only include stable objects in results
+        if (is_object_stable(object_id)) {
+            tracked_detections.push_back(tracked_detection);
+        }
     }
     
     // Clean up old objects (remove objects not seen in recent detections)
@@ -937,6 +943,9 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
     while (it != object_centers.end()) {
         if (current_object_ids.find(it->first) == current_object_ids.end()) {
             object_class_history.erase(it->first);
+            object_obb_history.erase(it->first);
+            object_frame_count.erase(it->first);
+            object_last_obb.erase(it->first);
             it = object_centers.erase(it);
         } else {
             ++it;
@@ -1009,5 +1018,50 @@ bool OBBDetector::is_object_flickering(int object_id) {
     }
     
     return false;
+}
+
+OBB OBBDetector::smooth_obb_coordinates(int object_id, const OBB& current_obb) {
+    // Add current OBB to history
+    object_obb_history[object_id].push_back(current_obb);
+    if (object_obb_history[object_id].size() > MAX_OBB_HISTORY) {
+        object_obb_history[object_id].erase(object_obb_history[object_id].begin());
+    }
+    
+    // If we don't have enough history, return current OBB
+    if (object_obb_history[object_id].size() < 2) {
+        object_last_obb[object_id] = current_obb;
+        return current_obb;
+    }
+    
+    // Compute smoothed coordinates using exponential moving average
+    const auto& history = object_obb_history[object_id];
+    float alpha = 0.3f;  // Smoothing factor (0.3 = 30% new, 70% old)
+    
+    OBB smoothed_obb = current_obb;
+    
+    // Smooth each coordinate
+    smoothed_obb.x1 = alpha * current_obb.x1 + (1.0f - alpha) * object_last_obb[object_id].x1;
+    smoothed_obb.y1 = alpha * current_obb.y1 + (1.0f - alpha) * object_last_obb[object_id].y1;
+    smoothed_obb.x2 = alpha * current_obb.x2 + (1.0f - alpha) * object_last_obb[object_id].x2;
+    smoothed_obb.y2 = alpha * current_obb.y2 + (1.0f - alpha) * object_last_obb[object_id].y2;
+    smoothed_obb.x3 = alpha * current_obb.x3 + (1.0f - alpha) * object_last_obb[object_id].x3;
+    smoothed_obb.y3 = alpha * current_obb.y3 + (1.0f - alpha) * object_last_obb[object_id].y3;
+    smoothed_obb.x4 = alpha * current_obb.x4 + (1.0f - alpha) * object_last_obb[object_id].x4;
+    smoothed_obb.y4 = alpha * current_obb.y4 + (1.0f - alpha) * object_last_obb[object_id].y4;
+    
+    // Store smoothed OBB for next iteration
+    object_last_obb[object_id] = smoothed_obb;
+    
+    return smoothed_obb;
+}
+
+bool OBBDetector::is_object_stable(int object_id) {
+    auto it = object_frame_count.find(object_id);
+    if (it == object_frame_count.end()) {
+        return false;
+    }
+    
+    // Object must be seen for at least MIN_FRAMES_FOR_STABLE frames
+    return it->second >= MIN_FRAMES_FOR_STABLE;
 }
 

@@ -109,6 +109,8 @@ public:
     std::vector<OBB> assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections);
     int get_stable_class_for_object(int object_id);
     bool is_object_flickering(int object_id);
+    OBB smooth_obb_coordinates(int object_id, const OBB& current_obb);
+    bool is_object_stable(int object_id);
     
     // Debug function to print learned priors
     void print_priors();
@@ -181,7 +183,12 @@ private:
     int next_object_id;
     std::map<int, std::vector<int>> object_class_history;  // object_id -> list of recent class_ids
     std::map<int, cv::Point2f> object_centers;  // object_id -> last known center
+    std::map<int, OBB> object_last_obb;  // Store last OBB for each object
+    std::map<int, std::vector<OBB>> object_obb_history;  // History for smoothing
+    std::map<int, int> object_frame_count;  // How many frames object has been seen
     static constexpr int MAX_CLASS_HISTORY = 5;  // Keep last 5 classifications
+    static constexpr int MAX_OBB_HISTORY = 3;  // Keep last 3 OBBs for smoothing
+    static constexpr int MIN_FRAMES_FOR_STABLE = 3;  // Min frames before object is considered stable
     static constexpr float TRACKING_DISTANCE_THRESHOLD = 50.0f;  // Max distance to associate objects
 };
 

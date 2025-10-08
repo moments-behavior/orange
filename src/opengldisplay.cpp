@@ -243,9 +243,14 @@ void COpenGLDisplay::ThreadRunning() {
                         
                         // Print detection coordinates in xywhr format (synchronized with drawing)
                         auto xywhr = obb_detector->obb_to_xywhr(obb);
-                        std::cout << "OBB: Object " << obb.object_id << " detected - Class " << obb.class_id 
-                                  << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
-                                  << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
+                        // Only print every 30 frames to reduce noise
+                        static int frame_counter = 0;
+                        if (frame_counter % 30 == 0) {
+                            std::cout << "OBB: Object " << obb.object_id << " detected - Class " << obb.class_id 
+                                      << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
+                                      << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
+                        }
+                        frame_counter++;
                         
                         // Check if object is flickering between classes
                         bool is_flickering = obb_detector->is_object_flickering(obb.object_id);
@@ -347,16 +352,25 @@ void COpenGLDisplay::ThreadRunning() {
                         obb_slot_valid[1] = 0;
                     }
 
-                    std::cout << "DEBUG: Creating obj_msg FlatBuffer" << std::endl;
                     auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
-                    std::cout << "DEBUG: Finishing FlatBuffer" << std::endl;
                     fb->Finish(obj_msg);
                     
-                    // Only send message to CBOT if connected
+                    // Only send message to CBOT if connected and there are stable detections
                     if (indigo_signal_builder->indigo_connection) {
-                        std::cout << "DEBUG: Sending OBB message to CBOT" << std::endl;
-                        send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
-                        std::cout << "DEBUG: OBB message sent successfully" << std::endl;
+                        // Check if we should send update (throttle to reduce noise)
+                        static auto last_send_time = std::chrono::steady_clock::now();
+                        auto now = std::chrono::steady_clock::now();
+                        auto time_since_last_send = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_send_time);
+                        
+                        // Send update every 100ms or if this is the first detection
+                        if (time_since_last_send.count() >= 100 || obb_detections.size() > 0) {
+                            std::cout << "DEBUG: Sending OBB message to CBOT (stable detections: " << obb_detections.size() << ")" << std::endl;
+                            send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
+                            std::cout << "DEBUG: OBB message sent successfully" << std::endl;
+                            last_send_time = now;
+                        } else {
+                            std::cout << "DEBUG: Throttling OBB message (last sent " << time_since_last_send.count() << "ms ago)" << std::endl;
+                        }
                     } else {
                         std::cout << "DEBUG: CBOT not connected, skipping OBB message" << std::endl;
                     }

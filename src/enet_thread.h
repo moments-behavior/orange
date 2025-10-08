@@ -31,8 +31,9 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                         }                        
                     } else if (server_control->signal_type() == FetchGame::SignalType_INDIGO) {
                         indigo_signal_builder->indigo_connection = evnt.peer;
-                    } else if (server_control->signal_type() == FetchGame::SignalType_CBOT) {
-                        // Treat CBOT bringup as the connection to send object messages back to
+                    } else if (server_control->signal_type() == FetchGame::SignalType_ClientBringup) {
+                        // Check if this is from CBOT (could be from other clients too)
+                        // For now, treat any ClientBringup as potential CBOT connection
                         indigo_signal_builder->indigo_connection = evnt.peer;
                     } else if (server_control->signal_type() == FetchGame::SignalType_CalibrationPoseReached) {
                         std::cout << "From Indigo: Calibration pose reached." << std::endl;

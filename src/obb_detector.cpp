@@ -167,7 +167,7 @@ void OBBDetector::thread_loop() {
         // Detect candidates
         auto candidates = detect_candidates(frame, background_u8);
         
-        // Classify candidates
+        // Classify candidates with priors (existing method)
         std::vector<OBB> detections;
         for (const auto& candidate : candidates) {
             int class_id = classify_with_priors(candidate);
@@ -179,8 +179,8 @@ void OBBDetector::thread_loop() {
             }
         }
         
-        // Assign object IDs and handle class flickering
-        detections = assign_object_ids_and_handle_flickering(detections);
+        // Assign object IDs and verify shapes
+        detections = assign_object_ids_and_handle_flickering(detections, frame);
         
         // Update results
         {
@@ -871,7 +871,7 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
     }
 }
 
-std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections) {
+std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections, const cv::Mat& frame) {
     std::vector<OBB> tracked_detections;
     
     for (const auto& detection : detections) {
@@ -918,13 +918,14 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
             object_class_history[object_id].erase(object_class_history[object_id].begin());
         }
         
-        // Get stable class (handle flickering)
-        int stable_class = get_stable_class_for_object(object_id);
+        // Verify shape in the detected region
+        bool shape_verified = verify_shape_in_region(detection, frame);
         
         // Create tracked detection with smoothed coordinates
         OBB tracked_detection = smooth_obb_coordinates(object_id, detection);
         tracked_detection.object_id = object_id;
-        tracked_detection.class_id = stable_class;
+        tracked_detection.shape_verified = shape_verified;
+        // Keep the original class_id from prior-based classification
         
         // Only include stable objects in results
         if (is_object_stable(object_id)) {
@@ -955,70 +956,6 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
     return tracked_detections;
 }
 
-int OBBDetector::get_stable_class_for_object(int object_id) {
-    auto it = object_class_history.find(object_id);
-    if (it == object_class_history.end() || it->second.empty()) {
-        return -1;
-    }
-    
-    const auto& history = it->second;
-    
-    // If we have enough history and there's flickering, return the most common class
-    if (history.size() >= 2) {
-        std::map<int, int> class_counts;
-        for (int class_id : history) {
-            class_counts[class_id]++;
-        }
-        
-        // Find the most common class
-        int most_common_class = -1;
-        int max_count = 0;
-        for (const auto& [class_id, count] : class_counts) {
-            if (count > max_count) {
-                max_count = count;
-                most_common_class = class_id;
-            }
-        }
-        
-        // If there's significant flickering (multiple classes), return the most common
-        if (class_counts.size() > 1 && max_count >= 1) {
-            return most_common_class;
-        }
-    }
-    
-    // Otherwise, return the most recent classification
-    return history.back();
-}
-
-bool OBBDetector::is_object_flickering(int object_id) {
-    auto it = object_class_history.find(object_id);
-    if (it == object_class_history.end() || it->second.size() < 2) {
-        return false;
-    }
-    
-    const auto& history = it->second;
-    
-    // Count unique classes in recent history
-    std::set<int> unique_classes(history.begin(), history.end());
-    
-    // If there are multiple classes and the most common class appears at least twice,
-    // consider it flickering
-    if (unique_classes.size() > 1) {
-        std::map<int, int> class_counts;
-        for (int class_id : history) {
-            class_counts[class_id]++;
-        }
-        
-        int max_count = 0;
-        for (const auto& [class_id, count] : class_counts) {
-            max_count = std::max(max_count, count);
-        }
-        
-        return max_count >= 1;  // At least one class appears once (more sensitive)
-    }
-    
-    return false;
-}
 
 OBB OBBDetector::smooth_obb_coordinates(int object_id, const OBB& current_obb) {
     // Add current OBB to history
@@ -1063,5 +1000,113 @@ bool OBBDetector::is_object_stable(int object_id) {
     
     // Object must be seen for at least MIN_FRAMES_FOR_STABLE frames
     return it->second >= MIN_FRAMES_FOR_STABLE;
+}
+
+bool OBBDetector::verify_shape_in_region(const OBB& obb, const cv::Mat& frame) {
+    // Crop the region around the OBB
+    float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
+    float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
+    float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
+    float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
+    
+    // Add some padding around the region
+    float padding = 10.0f;
+    int x1 = std::max(0, (int)(min_x - padding));
+    int y1 = std::max(0, (int)(min_y - padding));
+    int x2 = std::min(frame.cols - 1, (int)(max_x + padding));
+    int y2 = std::min(frame.rows - 1, (int)(max_y + padding));
+    
+    if (x2 <= x1 || y2 <= y1) return false;
+    
+    // Crop the region
+    cv::Rect roi(x1, y1, x2 - x1, y2 - y1);
+    cv::Mat cropped_region = frame(roi);
+    
+    // Convert to grayscale if needed
+    cv::Mat gray_region;
+    if (cropped_region.channels() == 3) {
+        cv::cvtColor(cropped_region, gray_region, cv::COLOR_BGR2GRAY);
+    } else {
+        gray_region = cropped_region;
+    }
+    
+    // Apply threshold to get binary image
+    cv::Mat binary_region;
+    cv::threshold(gray_region, binary_region, 50, 255, cv::THRESH_BINARY);
+    
+    // Verify shape based on the classified class
+    if (obb.class_id == 0) {
+        // Class 0 (CylinderVertical) should be a circle
+        return is_circle_in_region(binary_region);
+    } else if (obb.class_id == 2) {
+        // Class 2 (CylinderSide) should be a square/rectangle
+        return is_square_in_region(binary_region);
+    }
+    
+    return true; // Unknown class, assume correct
+}
+
+bool OBBDetector::is_circle_in_region(const cv::Mat& cropped_region) {
+    // Find contours in the binary region
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(cropped_region, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    
+    if (contours.empty()) return false;
+    
+    // Find the largest contour
+    auto largest_contour = std::max_element(contours.begin(), contours.end(),
+        [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) {
+            return cv::contourArea(a) < cv::contourArea(b);
+        });
+    
+    if (largest_contour == contours.end()) return false;
+    
+    // Compute circularity: 4π*area/perimeter²
+    double area = cv::contourArea(*largest_contour);
+    double perimeter = cv::arcLength(*largest_contour, true);
+    
+    if (perimeter == 0) return false;
+    
+    double circularity = (4.0 * M_PI * area) / (perimeter * perimeter);
+    
+    // A perfect circle has circularity = 1.0
+    // Accept as circle if circularity > 0.7
+    return circularity > 0.7;
+}
+
+bool OBBDetector::is_square_in_region(const cv::Mat& cropped_region) {
+    // Find contours in the binary region
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(cropped_region, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    
+    if (contours.empty()) return false;
+    
+    // Find the largest contour
+    auto largest_contour = std::max_element(contours.begin(), contours.end(),
+        [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) {
+            return cv::contourArea(a) < cv::contourArea(b);
+        });
+    
+    if (largest_contour == contours.end()) return false;
+    
+    // Approximate the contour to a polygon
+    std::vector<cv::Point> approx;
+    cv::approxPolyDP(*largest_contour, approx, 0.02 * cv::arcLength(*largest_contour, true), true);
+    
+    // Check if it's roughly rectangular (4 corners)
+    if (approx.size() != 4) return false;
+    
+    // Compute rectangularity: contour_area / bounding_rect_area
+    double contour_area = cv::contourArea(*largest_contour);
+    cv::Rect bounding_rect = cv::boundingRect(*largest_contour);
+    double rect_area = bounding_rect.area();
+    
+    if (rect_area == 0) return false;
+    
+    double rectangularity = contour_area / rect_area;
+    
+    // A perfect rectangle has rectangularity = 1.0
+    // Accept as square/rectangle if rectangularity > 0.7
+    return rectangularity > 0.7;
 }
 

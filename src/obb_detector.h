@@ -20,10 +20,11 @@ struct OBB {
     int class_id;
     float confidence;
     int object_id;  // Unique ID for tracking objects over time
+    bool shape_verified;  // Whether shape verification passed
     
-    OBB() : x1(0), y1(0), x2(0), y2(0), x3(0), y3(0), x4(0), y4(0), class_id(-1), confidence(0.0f), object_id(-1) {}
-    OBB(float x1_, float y1_, float x2_, float y2_, float x3_, float y3_, float x4_, float y4_, int cls, float conf, int obj_id = -1)
-        : x1(x1_), y1(y1_), x2(x2_), y2(y2_), x3(x3_), y3(y3_), x4(x4_), y4(y4_), class_id(cls), confidence(conf), object_id(obj_id) {}
+    OBB() : x1(0), y1(0), x2(0), y2(0), x3(0), y3(0), x4(0), y4(0), class_id(-1), confidence(0.0f), object_id(-1), shape_verified(false) {}
+    OBB(float x1_, float y1_, float x2_, float y2_, float x3_, float y3_, float x4_, float y4_, int cls, float conf, int obj_id = -1, bool verified = false)
+        : x1(x1_), y1(y1_), x2(x2_), y2(y2_), x3(x3_), y3(y3_), x4(x4_), y4(y4_), class_id(cls), confidence(conf), object_id(obj_id), shape_verified(verified) {}
 };
 
 // Structure to hold prior statistics for each class
@@ -105,10 +106,11 @@ public:
     };
     XYWHR obb_to_xywhr(const OBB& obb);
     
-    // Object tracking and class flickering handling
-    std::vector<OBB> assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections);
-    int get_stable_class_for_object(int object_id);
-    bool is_object_flickering(int object_id);
+    // Object tracking and post-classification shape verification
+    std::vector<OBB> assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections, const cv::Mat& frame);
+    bool verify_shape_in_region(const OBB& obb, const cv::Mat& frame);
+    bool is_circle_in_region(const cv::Mat& cropped_region);
+    bool is_square_in_region(const cv::Mat& cropped_region);
     OBB smooth_obb_coordinates(int object_id, const OBB& current_obb);
     bool is_object_stable(int object_id);
     

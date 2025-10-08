@@ -252,10 +252,10 @@ void COpenGLDisplay::ThreadRunning() {
                         }
                         frame_counter++;
                         
-                        // Check if object is flickering between classes
-                        bool is_flickering = obb_detector->is_object_flickering(obb.object_id);
-                        // Map label: 0 = stable (oriented), 1 = flickering (green AABB)
-                        float fb_label = is_flickering ? 1.0f : 0.0f;
+                        // Use shape verification result from OBB detector
+                        bool shape_verified = obb.shape_verified;
+                        // Map label: 0 = shape verified (correct drawing), 1 = shape mismatch (fallback drawing)
+                        float fb_label = shape_verified ? 0.0f : 1.0f;
                         
                         // Decide which slot (0 or 1) this object should occupy based on centroid proximity
                         auto center = obb_detector->obb_to_xywhr(obb);
@@ -281,15 +281,72 @@ void COpenGLDisplay::ThreadRunning() {
                             else if (!obb_slot_valid[1]) assigned_slot = 1;
                         }
 
-                        if (is_flickering) {
-                            // Draw non-oriented bounding box for flickering objects
-                            // Convert OBB to axis-aligned bounding box
+                        if (shape_verified) {
+                            // Shape verification passed - draw according to class
+                            if (obb.class_id == 0) {
+                                // Class 0 (CylinderVertical) - draw non-oriented (axis-aligned) bounding box
+                                float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
+                                float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
+                                float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
+                                float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
+                                
+                                float aabb_points[8] = {
+                                    min_x, min_y,  // Top-left
+                                    max_x, min_y,  // Top-right
+                                    max_x, max_y,  // Bottom-right
+                                    min_x, max_y   // Bottom-left
+                                };
+                                
+                                CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
+                                                     sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
+                                
+                                // Draw axis-aligned bounding box
+                                gpu_draw_obb(debayer.d_debayer, camera_params->width, 
+                                            camera_params->height, d_obb_points + i * 8, 
+                                            obb.class_id, 0);
+                                
+                                // Populate flatbuffer with AABB (theta = 0)
+                                if (assigned_slot != -1) {
+                                    float cx = 0.5f * (min_x + max_x);
+                                    float cy = 0.5f * (min_y + max_y);
+                                    float w = (max_x - min_x);
+                                    float h = (max_y - min_y);
+                                    float theta = 0.0f;
+                                    auto fb_obj = Obj::Createobb(*fb, cx, cy, w, h, theta, fb_label);
+                                    if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = cx; obb_slot_cy[0] = cy; }
+                                    else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = cx; obb_slot_cy[1] = cy; }
+                                }
+                            } else {
+                                // Class 2 (CylinderSide) - draw oriented bounding box
+                                float obb_points[8] = {
+                                    obb.x1, obb.y1,  // Top-left
+                                    obb.x2, obb.y2,  // Top-right
+                                    obb.x3, obb.y3,  // Bottom-right
+                                    obb.x4, obb.y4   // Bottom-left
+                                };
+                                
+                                CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
+                                                     sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
+                                
+                                // Draw oriented bounding box
+                                gpu_draw_obb(debayer.d_debayer, camera_params->width, 
+                                            camera_params->height, d_obb_points + i * 8, 
+                                            obb.class_id, 0);
+                                
+                                // Populate flatbuffer with oriented OBB (theta from xywhr)
+                                if (assigned_slot != -1) {
+                                    auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
+                                    if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
+                                    else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
+                                }
+                            }
+                        } else {
+                            // Shape verification failed - draw fallback (axis-aligned) bounding box in green
                             float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
                             float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
                             float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
                             float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
                             
-                            // Create axis-aligned bounding box points
                             float aabb_points[8] = {
                                 min_x, min_y,  // Top-left
                                 max_x, min_y,  // Top-right
@@ -300,12 +357,12 @@ void COpenGLDisplay::ThreadRunning() {
                             CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
                                                  sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                             
-                            // Draw axis-aligned bounding box in green color for flickering objects
+                            // Draw axis-aligned bounding box in green for shape mismatch
                             gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                         camera_params->height, d_obb_points + i * 8, 
-                                        obb.class_id, 0, 0, 255, 0);  // Green color for flickering
-
-                            // Populate flatbuffer with AABB (theta = 0)
+                                        obb.class_id, 0, 0, 255, 0);  // Green color
+                            
+                            // Populate flatbuffer with AABB (theta = 0) and label = 1
                             if (assigned_slot != -1) {
                                 float cx = 0.5f * (min_x + max_x);
                                 float cy = 0.5f * (min_y + max_y);
@@ -315,29 +372,6 @@ void COpenGLDisplay::ThreadRunning() {
                                 auto fb_obj = Obj::Createobb(*fb, cx, cy, w, h, theta, fb_label);
                                 if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = cx; obb_slot_cy[0] = cy; }
                                 else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = cx; obb_slot_cy[1] = cy; }
-                            }
-                        } else {
-                            // Draw oriented bounding box for stable objects
-                            float obb_points[8] = {
-                                obb.x1, obb.y1,  // Top-left
-                                obb.x2, obb.y2,  // Top-right
-                                obb.x3, obb.y3,  // Bottom-right
-                                obb.x4, obb.y4   // Bottom-left
-                            };
-                            
-                            CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
-                                                 sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
-                            
-                            // Draw OBB on original buffer (will be resized later if needed)
-                            gpu_draw_obb(debayer.d_debayer, camera_params->width, 
-                                        camera_params->height, d_obb_points + i * 8, 
-                                        obb.class_id, 0);
-
-                            // Populate flatbuffer with oriented OBB (theta from xywhr)
-                            if (assigned_slot != -1) {
-                                auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
-                                if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
-                                else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
                             }
                         }
                     }

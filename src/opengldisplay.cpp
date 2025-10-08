@@ -352,10 +352,11 @@ void COpenGLDisplay::ThreadRunning() {
 
                     auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
                     fb->Finish(obj_msg);
+                    
+                    //send message to cbot (uses CBOTSignalBuilder elsewhere; here we only have INDIGOSignalBuilder, so send via indigo_connection)
+                    send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
                 }
             }
-            //send message to cbot (uses CBOTSignalBuilder elsewhere; here we only have INDIGOSignalBuilder, so send via indigo_connection)
-            send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
             // nvtxRangePush("display_gl_copy_to_interop_buffer");
             if (camera_select->downsample != 1) {
                 const NppStatus npp_result = nppiResize_8u_C4R(

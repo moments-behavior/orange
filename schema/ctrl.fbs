@@ -23,13 +23,14 @@ table BringupMessage {
 }
 
 // ---- Command payloads ----
-table OpenArgs         { config_folder:string;}
-table StartThreadsArgs { record_folder:string; encoder_setup:string;}
-table StartArgs        { ptp_time:uint64;}
-table StopArgs         { ptp_time:uint64;}
-table StartStreamingArgs {calib_folder:string;}
+table OpenArgs           { config_folder:string; }
+table StartThreadsArgs   { record_folder:string; encoder_setup:string; }
+table StartArgs          { ptp_time:uint64; }
+table StopArgs           { ptp_time:uint64; }
+table StartStreamingArgs { calib_folder:string; }
+table TakePictureArgs    { picture_id:uint; }
 
-union CommandBody { OpenArgs, StartThreadsArgs, StartArgs, StopArgs, StartStreamingArgs}
+union CommandBody { OpenArgs, StartThreadsArgs, StartArgs, StopArgs, StartStreamingArgs, TakePictureArgs }
 
 // ---- Reply payload ----
 table ReplyInfo {

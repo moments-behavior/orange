@@ -23,6 +23,7 @@
 using namespace std::chrono_literals;
 
 // persistent to handle missing messages
+static uint g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
@@ -147,6 +148,18 @@ static void on_stoprecord_phase_start(unsigned long long ptp_global_time) {
     PTPParams *ptp_params = g_clientctx->ptp_params;
     ptp_params->ptp_stop_time = ptp_global_time;
     ptp_params->network_set_stop_ptp = true;
+}
+
+static void on_takepicture_phase_start(uint picture_id) {
+    CameraEachSelect *&cameras_select = *g_clientctx->cameras_select;
+    int &num_cameras = *g_clientctx->num_cameras;
+
+    for (int i = 0; i < num_cameras; i++) {
+        cameras_select[i].pictures_counter = picture_id;
+        cameras_select[i].frame_save_name =
+            std::to_string(cameras_select[i].pictures_counter);
+        cameras_select[i].sigs->frame_save_state.store(State_Copy_New_Frame);
+    }
 }
 
 static void cleanup_host_client_resources() {
@@ -325,6 +338,20 @@ static std::vector<uint8_t> build_cmd_bumblebeeboard(const std::string &job_id,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+static std::vector<uint8_t> build_cmd_takepicture(const std::string &job_id,
+                                                  uint32_t epoch, uint32_t seq,
+                                                  uint picture_id) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto args = CreateTakePictureArgs(b, picture_id);
+    auto msg =
+        CreateServer(b, Kind_KindCommand, ServerControl_TAKEPICTURE, jid, epoch,
+                     seq, CommandBody_TakePictureArgs, args.Union(), 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 // ============================================================================
 // Names / log helpers
 // ============================================================================
@@ -342,6 +369,10 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "STARTSTREAMING";
     case camnet::v1::ServerControl_BUMBLEBEEBOARD:
         return "BUMBLEBEEBOARD";
+    case camnet::v1::ServerControl_TAKEPICTURE:
+        return "TAKEPICTURE";
+    case camnet::v1::ServerControl_NEXTPOSE:
+        return "NEXTPOSE";
     default:
         return "NONE";
     }
@@ -359,7 +390,9 @@ enum Phase {
     Phase_Stop,
     Phase_Done,
     Phase_Streaming,
-    Phase_BumblebeeBoard
+    Phase_BumblebeeBoard,
+    Phase_TakePicture,
+    Phase_NextPose
 };
 
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
@@ -444,6 +477,10 @@ static camnet::v1::ServerControl current_ctrl() {
         return camnet::v1::ServerControl_STARTSTREAMING;
     case Phase_BumblebeeBoard:
         return camnet::v1::ServerControl_BUMBLEBEEBOARD;
+    case Phase_TakePicture:
+        return camnet::v1::ServerControl_TAKEPICTURE;
+    case Phase_NextPose:
+        return camnet::v1::ServerControl_NEXTPOSE;
     default:
         return camnet::v1::ServerControl_NONE;
     }
@@ -465,6 +502,8 @@ static const char *phase_name() {
         return "STREAMING";
     case Phase_BumblebeeBoard:
         return "BUMBLEBEEBOARD";
+    case Phase_TakePicture:
+        return "TAKEPICTURE";
     default:
         return "?";
     }
@@ -499,10 +538,10 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_BumblebeeBoard;
             break;
         case Phase_BumblebeeBoard:
-            g_phase = Phase_Stop;
+            g_phase = Phase_TakePicture;
             break;
-        case Phase_Stop:
-            g_phase = Phase_Done;
+        case Phase_TakePicture:
+            g_phase = Phase_NextPose;
             break;
         default:
             break;
@@ -525,6 +564,7 @@ static void reset_session() {
     g_folder_name = "";
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
+    g_picture_id = 0;
     logf("session reset");
 }
 
@@ -558,7 +598,6 @@ static void broadcast_current_phase() {
     case Phase_Threads: {
         std::string encoder_setup = "-codec " + *g_clientctx->encoder_codec +
                                     " -preset " + *g_clientctx->encoder_preset;
-
         if (!g_phase_started) {
             g_folder_name =
                 *g_clientctx->input_folder + "/" + get_current_date_time();
@@ -620,8 +659,22 @@ static void broadcast_current_phase() {
         break;
     }
     case Phase_BumblebeeBoard: {
+        if (!g_phase_started) {
+            g_picture_id = 0;
+        }
         bytes = build_cmd_bumblebeeboard(g_jid, g_epoch, g_seq);
         if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_TakePicture: {
+        if (!g_phase_started) {
+            g_picture_id++;
+        }
+        bytes = build_cmd_takepicture(g_jid, g_epoch, g_seq, g_picture_id);
+        if (!g_phase_started) {
+            on_takepicture_phase_start(g_picture_id);
             g_phase_started = true;
         }
         break;
@@ -762,6 +815,18 @@ void host_client_tick() {
 
     update_servers_from_registry();
 
+    // check if this server is ready
+    bool this_server_ready = true;
+    if (g_phase == Phase_TakePicture) {
+        auto save_image_all_ready = *g_clientctx->save_image_all_ready;
+        if (save_image_all_ready) {
+            *g_clientctx->save_pics_counter = 0;
+            logf("This server ready.");
+        } else {
+            this_server_ready = false;
+        }
+    }
+
     std::vector<ReplyEvent> batch;
     drain_replies(batch);
     if (!batch.empty()) {
@@ -784,7 +849,7 @@ void host_client_tick() {
                     break;
                 }
             }
-            if (all) {
+            if (all && this_server_ready) {
                 logf("barrier OK for %s", ctrl_name(current_ctrl()));
                 if (current_ctrl() == camnet::v1::ServerControl_OPENCAMERA) {
                     on_open_phase_complete();

@@ -109,7 +109,9 @@ int main(int argc, char **args) {
     bool show_error = false;
     std::string error_message;
 
-    HostClientCtx client_ctx{&calib_save_folder,
+    HostClientCtx client_ctx{&save_image_all_ready,
+                             &save_pics_counter,
+                             &calib_save_folder,
                              &network_config_select,
                              &network_config_folders,
                              &selected_network_folder,
@@ -485,31 +487,7 @@ int main(int argc, char **args) {
                         }
                     }
 
-                    // // order important
-                    // if (save_image_all_ready &&
-                    //     calib_state == CalibSavePictures) {
-                    //     save_pics_counter = 0;
-                    //     send_message_to_indigo(
-                    //         ctx.sender, ctx.peers, "indigo",
-                    //         FetchGame::SignalType_CalibrationNextPose);
-                    //     calib_state = CalibNextPose;
-                    // }
-
-                    if (calib_state == CalibPoseReached) {
-                        make_folder(calib_save_folder);
-                        for (int i = 0; i < num_cameras; i++) {
-                            cameras_select[i].frame_save_name = std::to_string(
-                                cameras_select[i].pictures_counter);
-                            cameras_select[i].picture_save_folder =
-                                calib_save_folder;
-                            cameras_select[i].sigs->frame_save_state.store(
-                                State_Copy_New_Frame);
-                        }
-                        calib_state = CalibSavePictures;
-                    }
-
                     if (ImGui::Button("Calib save images with counter")) {
-                        make_folder(calib_save_folder);
                         for (int i = 0; i < num_cameras; i++) {
                             cameras_select[i].frame_save_name = std::to_string(
                                 cameras_select[i].pictures_counter);

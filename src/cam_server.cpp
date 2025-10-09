@@ -9,6 +9,7 @@
 #include "enet_fb_helpers.h"
 #include "enet_runtime_unified.h" // unified wrapper
 #include "enet_utils.h"
+#include "global.h"
 #include "utils.h"
 #include "video_capture.h"
 #include <iostream>
@@ -44,6 +45,10 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "STOPRECORDING";
     case camnet::v1::ServerControl_STARTSTREAMING:
         return "STARTSTREAMING";
+    case camnet::v1::ServerControl_BUMBLEBEEBOARD:
+        return "BUMBLEBEEBOARD";
+    case camnet::v1::ServerControl_TAKEPICTURE:
+        return "TAKEPICTURE";
     default:
         return "NONE";
     }
@@ -306,6 +311,29 @@ static bool start_camera_streaming(std::string calib_folder) {
     return true;
 }
 
+static bool take_picture(uint picture_id) {
+    for (int i = 0; i < cam_count; i++) {
+        cameras_select[i].pictures_counter = picture_id;
+        cameras_select[i].frame_save_name =
+            std::to_string(cameras_select[i].pictures_counter);
+        cameras_select[i].sigs->frame_save_state.store(State_Copy_New_Frame);
+    }
+
+    using namespace std::chrono;
+    auto t0 = steady_clock::now();
+    const auto timeout = 180s; // tune for your hardware
+    while (save_pics_counter != cam_count) {
+        if (steady_clock::now() - t0 > timeout) {
+            // give up gracefully: flip subscribe so threads can finish politely
+            camera_control.subscribe = false;
+            return false; // guard joins threads
+        }
+        // small sleep to avoid busy-spinning the core
+        std::this_thread::sleep_for(1ms);
+    }
+    save_pics_counter = 0;
+}
+
 static bool ctrl_action(camnet::v1::ServerControl c,
                         const camnet::v1::Server *msg) {
     switch (c) {
@@ -372,6 +400,14 @@ static bool ctrl_action(camnet::v1::ServerControl c,
 
     case camnet::v1::ServerControl_BUMBLEBEEBOARD: {
         return true;
+    }
+
+    case camnet::v1::ServerControl_TAKEPICTURE: {
+        auto *tpa = msg->command_body_as_TakePictureArgs();
+        if (!tpa)
+            return false;
+        uint picture_id = tpa->picture_id();
+        return take_picture(picture_id);
     }
 
     default:

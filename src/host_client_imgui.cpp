@@ -23,10 +23,11 @@
 using namespace std::chrono_literals;
 
 // persistent to handle missing messages
-static uint g_picture_id;
+static int g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
+static bool g_first_robot;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -342,6 +343,19 @@ static std::vector<uint8_t> build_cmd_bumblebeeboard(const std::string &job_id,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+static std::vector<uint8_t> build_cmd_grimlockboard(const std::string &job_id,
+                                                    uint32_t epoch,
+                                                    uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg = CreateServer(b, Kind_KindCommand,
+                            camnet::v1::ServerControl_GRIMLOCKBOARD, jid, epoch,
+                            seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 static std::vector<uint8_t> build_cmd_takepicture(const std::string &job_id,
                                                   uint32_t epoch, uint32_t seq,
                                                   uint picture_id) {
@@ -389,6 +403,8 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "TAKEPICTURE";
     case camnet::v1::ServerControl_NEXTPOSE:
         return "NEXTPOSE";
+    case camnet::v1::ServerControl_GRIMLOCKBOARD:
+        return "GRIMLOCKBOARD";
     default:
         return "NONE";
     }
@@ -407,6 +423,7 @@ enum Phase {
     Phase_Done,
     Phase_Streaming,
     Phase_BumblebeeBoard,
+    Phase_GrimlockBoard,
     Phase_TakePicture,
     Phase_NextPose
 };
@@ -497,6 +514,8 @@ static camnet::v1::ServerControl current_ctrl() {
         return camnet::v1::ServerControl_TAKEPICTURE;
     case Phase_NextPose:
         return camnet::v1::ServerControl_NEXTPOSE;
+    case Phase_GrimlockBoard:
+        return camnet::v1::ServerControl_GRIMLOCKBOARD;
     default:
         return camnet::v1::ServerControl_NONE;
     }
@@ -522,6 +541,8 @@ static const char *phase_name() {
         return "TAKEPICTURE";
     case Phase_NextPose:
         return "NEXTPOSE";
+    case Phase_GrimlockBoard:
+        return "GRIMLOCKBOARD";
     default:
         return "?";
     }
@@ -562,10 +583,24 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_TakePicture;
             break;
         case Phase_TakePicture:
-            g_phase = Phase_NextPose;
+            if (g_picture_id == 75) {
+                g_phase = Phase_TakePicture;
+            } else if (g_picture_id == 77) {
+                g_phase = Phase_Stop;
+            } else {
+                g_phase = Phase_NextPose;
+            }
             break;
-        case Phase_NextPose:
-            g_phase = Phase_TakePicture;
+        case Phase_NextPose: {
+            if (g_first_robot && g_picture_id == 41) {
+                g_phase = Phase_GrimlockBoard;
+            } else {
+                g_phase = Phase_TakePicture;
+            }
+            break;
+        }
+        case Phase_Done:
+            g_phase = Phase_Done;
             break;
         default:
             break;
@@ -588,7 +623,8 @@ static void reset_session() {
     g_folder_name = "";
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
-    g_picture_id = 0;
+    g_picture_id = -1;
+    g_first_robot = true;
     logf("session reset");
 }
 
@@ -685,10 +721,16 @@ static void broadcast_current_phase() {
         break;
     }
     case Phase_BumblebeeBoard: {
-        if (!g_phase_started) {
-            g_picture_id = 0;
-        }
+        g_picture_id = -1;
         bytes = build_cmd_bumblebeeboard(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_GrimlockBoard: {
+        g_first_robot = false;
+        bytes = build_cmd_grimlockboard(g_jid, g_epoch, g_seq);
         if (!g_phase_started) {
             g_phase_started = true;
         }

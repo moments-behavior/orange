@@ -51,6 +51,8 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "TAKEPICTURE";
     case camnet::v1::ServerControl_NEXTPOSE:
         return "NEXTPOSE";
+    case camnet::v1::ServerControl_GRIMLOCKBOARD:
+        return "GRIMLOCKBOARD";
     default:
         return "NONE";
     }
@@ -436,6 +438,10 @@ static bool ctrl_action(camnet::v1::ServerControl c,
     }
 
     case camnet::v1::ServerControl_NEXTPOSE: {
+        return true;
+    }
+
+    case camnet::v1::ServerControl_GRIMLOCKBOARD: {
         return true;
     }
 

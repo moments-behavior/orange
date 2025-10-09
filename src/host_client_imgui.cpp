@@ -333,7 +333,7 @@ static std::vector<uint8_t> build_cmd_bumblebeeboard(const std::string &job_id,
                                                      uint32_t epoch,
                                                      uint32_t seq) {
     using namespace camnet::v1;
-    flatbuffers::FlatBufferBuilder b(256);
+    flatbuffers::FlatBufferBuilder b(128);
     auto jid = b.CreateString(job_id);
     auto msg = CreateServer(b, Kind_KindCommand,
                             camnet::v1::ServerControl_BUMBLEBEEBOARD, jid,
@@ -352,6 +352,18 @@ static std::vector<uint8_t> build_cmd_takepicture(const std::string &job_id,
     auto msg =
         CreateServer(b, Kind_KindCommand, ServerControl_TAKEPICTURE, jid, epoch,
                      seq, CommandBody_TakePictureArgs, args.Union(), 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
+static std::vector<uint8_t> build_cmd_nextpose(const std::string &job_id,
+                                               uint32_t epoch, uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg =
+        CreateServer(b, Kind_KindCommand, camnet::v1::ServerControl_NEXTPOSE,
+                     jid, epoch, seq, camnet::v1::CommandBody_NONE, 0, 0);
     b.Finish(msg);
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
@@ -508,6 +520,8 @@ static const char *phase_name() {
         return "BUMBLEBEEBOARD";
     case Phase_TakePicture:
         return "TAKEPICTURE";
+    case Phase_NextPose:
+        return "NEXTPOSE";
     default:
         return "?";
     }
@@ -688,6 +702,13 @@ static void broadcast_current_phase() {
         }
         break;
     }
+    case Phase_NextPose: {
+        bytes = build_cmd_nextpose(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -830,7 +851,9 @@ void host_client_tick() {
         auto save_image_all_ready = *g_clientctx->save_image_all_ready;
         if (save_image_all_ready) {
             *g_clientctx->save_pics_counter = 0;
-            logf("This server ready.");
+            // TODO: put this to on_phase_complete(); or have a global
+            // this_server_ready flag
+            // logf("This server ready.");
         } else {
             this_server_ready = false;
         }

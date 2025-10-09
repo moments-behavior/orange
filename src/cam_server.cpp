@@ -314,6 +314,21 @@ static bool start_camera_streaming(std::string calib_folder,
         std::cout << "Error creating camera thread." << std::endl;
         return false;
     }
+
+    using namespace std::chrono;
+    auto t0 = steady_clock::now();
+    const auto timeout = 180s; // tune for your hardware
+
+    while (ptp_params.ptp_counter != cam_count) {
+        if (steady_clock::now() - t0 > timeout) {
+            // give up gracefully: flip subscribe so threads can finish politely
+            camera_control.subscribe = false;
+            return false; // guard joins threads
+        }
+        // small sleep to avoid busy-spinning the core
+        std::this_thread::sleep_for(1ms);
+    }
+
     // success
     guard.disarm = true;
     return true;

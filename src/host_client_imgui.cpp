@@ -99,7 +99,8 @@ static void on_startthread_phase_start(std::string encoder_setup,
                            ptp_params, calib_yaml_folder, detection3d_thread);
 }
 
-static void on_startstreaming_phase_start(std::string folder_name) {
+static void on_startstreaming_phase_start(std::string folder_name,
+                                          std::string save_format) {
     // unpack
     std::thread &detection3d_thread = *g_clientctx->detection3d_thread;
     std::string &calib_yaml_folder = *g_clientctx->calib_yaml_folder;
@@ -124,6 +125,7 @@ static void on_startstreaming_phase_start(std::string folder_name) {
     tex_gl = new GL_Texture[num_cameras];
     for (int i = 0; i < num_cameras; i++) {
         cameras_select[i].picture_save_folder = folder_name;
+        cameras_select[i].frame_save_format = save_format;
         if (cameras_select[i].stream_on) {
             int camera_width =
                 int(cameras_params[i].width / cameras_select[i].downsample);
@@ -660,7 +662,7 @@ static void broadcast_current_phase() {
                                          save_format);
 
         if (!g_phase_started) {
-            on_startstreaming_phase_start(g_folder_name);
+            on_startstreaming_phase_start(g_folder_name, save_format);
             g_phase_started = true;
         }
         break;

@@ -249,7 +249,8 @@ static bool start_camera_thread(std::string record_folder,
     return true;
 }
 
-static bool start_camera_streaming(std::string calib_folder) {
+static bool start_camera_streaming(std::string calib_folder,
+                                   std::string save_format) {
 
     // RAII guard: if we exit false, join any threads we created.
     struct Joiner {
@@ -296,7 +297,9 @@ static bool start_camera_streaming(std::string calib_folder) {
     for (int i = 0; i < cam_count; i++) {
         cameras_select[i].stream_on = false;
         cameras_select[i].picture_save_folder = calib_folder;
+        cameras_select[i].frame_save_format = save_format;
     }
+
     try {
         for (int i = 0; i < cam_count; i++) {
             camera_threads.push_back(
@@ -397,8 +400,9 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         if (!ssa)
             return false;
         std::string calib_folder = ssa->calib_folder()->str();
-        std::cout << calib_folder << std::endl;
-        return start_camera_streaming(calib_folder);
+        std::string save_format = ssa->save_format()->str();
+        std::cout << calib_folder << ", " << save_format << std::endl;
+        return start_camera_streaming(calib_folder, save_format);
     }
 
     case camnet::v1::ServerControl_BUMBLEBEEBOARD: {

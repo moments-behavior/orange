@@ -203,6 +203,7 @@ static bool start_camera_thread(std::string record_folder,
     camera_control.record_video = true;
     camera_control.subscribe = true;
     camera_control.sync_camera = true;
+    ptp_params.network_sync = true;
 
     if (!make_folder(record_folder)) {
         std::cout << "Error creating recording folder." << std::endl;
@@ -212,8 +213,6 @@ static bool start_camera_thread(std::string record_folder,
     for (int i = 0; i < cam_count; i++) {
         ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
     }
-
-    ptp_params.network_sync = true;
 
     for (int i = 0; i < cam_count; i++) {
         cameras_select[i].stream_on = false;
@@ -286,12 +285,16 @@ static bool start_camera_streaming(std::string calib_folder,
 
     camera_control.record_video = false;
     camera_control.subscribe = true;
-    camera_control.sync_camera = false;
-    ptp_params.network_sync = false;
+    camera_control.sync_camera = true;
+    ptp_params.network_sync = true;
 
     if (!make_folder(calib_folder)) {
         std::cout << "Error creating calib_folder." << std::endl;
         return false;
+    }
+
+    for (int i = 0; i < cam_count; i++) {
+        ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
     }
 
     for (int i = 0; i < cam_count; i++) {

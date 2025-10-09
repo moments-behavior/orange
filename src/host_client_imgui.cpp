@@ -116,7 +116,7 @@ static void on_startstreaming_phase_start(std::string folder_name,
 
     make_folder(folder_name);
 
-    ptp_params->network_sync = false;
+    ptp_params->network_sync = true;
     CameraControl *camera_control = g_clientctx->camera_control;
     camera_control->record_video = false;
     camera_control->subscribe = true;
@@ -136,7 +136,7 @@ static void on_startstreaming_phase_start(std::string folder_name,
     }
     start_camera_streaming(*camera_threads, camera_control, ecams,
                            cameras_params, cameras_select, tex_gl, num_cameras,
-                           evt_buffer_size, false, "", "", ptp_params,
+                           evt_buffer_size, true, "", "", ptp_params,
                            calib_yaml_folder, detection3d_thread);
 }
 
@@ -553,6 +553,9 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_Streaming;
             break;
         case Phase_Streaming:
+            g_phase = Phase_Start;
+            break;
+        case Phase_Start:
             g_phase = Phase_BumblebeeBoard;
             break;
         case Phase_BumblebeeBoard:

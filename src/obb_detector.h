@@ -108,6 +108,7 @@ public:
     
     // Object tracking and post-classification shape verification
     std::vector<OBB> assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections, const cv::Mat& frame);
+    int assign_stable_object_id(int object_id, const cv::Point2f& center);
     bool verify_shape_in_region(const OBB& obb, const cv::Mat& frame);
     bool is_circle_in_region(const cv::Mat& cropped_region);
     bool is_square_in_region(const cv::Mat& cropped_region);
@@ -188,6 +189,12 @@ private:
     std::map<int, OBB> object_last_obb;  // Store last OBB for each object
     std::map<int, std::vector<OBB>> object_obb_history;  // History for smoothing
     std::map<int, int> object_frame_count;  // How many frames object has been seen
+    
+    // Stable object identity tracking
+    std::map<int, int> object_stable_id;  // Maps internal object_id to stable_id
+    std::map<int, int> stable_id_to_object_id;  // Reverse mapping
+    int next_stable_id;
+    std::map<int, cv::Point2f> stable_object_last_center;  // Last known center for stable objects
     static constexpr int MAX_CLASS_HISTORY = 3;  // Keep last 3 classifications (reduced for faster response)
     static constexpr int MAX_OBB_HISTORY = 2;  // Keep last 2 OBBs for smoothing (reduced for faster response)
     static constexpr int MIN_FRAMES_FOR_STABLE = 1;  // Min frames before object is considered stable (reduced for faster response)

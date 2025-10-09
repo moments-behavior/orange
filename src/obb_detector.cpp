@@ -20,7 +20,7 @@ OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& c
                          const OBBDetectorParams& detector_params)
     : camera_params(params), csv_paths(csv_paths), params(detector_params),
       background_initialized(false), running(false), frame_ready(false), frames_processed(0), detections_found(0),
-      d_frame_original(nullptr), h_frame_cpu(nullptr), next_object_id(1) {
+      d_frame_original(nullptr), h_frame_cpu(nullptr), next_object_id(1), next_stable_id(1) {
     
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
@@ -918,12 +918,15 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
             object_class_history[object_id].erase(object_class_history[object_id].begin());
         }
         
+        // Assign stable object ID for consistent identity across frames
+        int stable_id = assign_stable_object_id(object_id, center);
+        
         // Verify shape in the detected region
         bool shape_verified = verify_shape_in_region(detection, frame);
         
         // Create tracked detection with smoothed coordinates
         OBB tracked_detection = smooth_obb_coordinates(object_id, detection);
-        tracked_detection.object_id = object_id;
+        tracked_detection.object_id = stable_id;  // Use stable_id instead of internal object_id
         tracked_detection.shape_verified = shape_verified;
         // Keep the original class_id from prior-based classification
         
@@ -943,10 +946,22 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
     auto it = object_centers.begin();
     while (it != object_centers.end()) {
         if (current_object_ids.find(it->first) == current_object_ids.end()) {
-            object_class_history.erase(it->first);
-            object_obb_history.erase(it->first);
-            object_frame_count.erase(it->first);
-            object_last_obb.erase(it->first);
+            int object_id = it->first;
+            
+            // Clean up stable object tracking
+            auto stable_it = object_stable_id.find(object_id);
+            if (stable_it != object_stable_id.end()) {
+                int stable_id = stable_it->second;
+                stable_id_to_object_id.erase(stable_id);
+                stable_object_last_center.erase(stable_id);
+                object_stable_id.erase(stable_it);
+            }
+            
+            // Clean up regular tracking
+            object_class_history.erase(object_id);
+            object_obb_history.erase(object_id);
+            object_frame_count.erase(object_id);
+            object_last_obb.erase(object_id);
             it = object_centers.erase(it);
         } else {
             ++it;
@@ -954,6 +969,36 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
     }
     
     return tracked_detections;
+}
+
+int OBBDetector::assign_stable_object_id(int object_id, const cv::Point2f& center) {
+    // Check if this object_id already has a stable_id
+    auto it = object_stable_id.find(object_id);
+    if (it != object_stable_id.end()) {
+        // Update the last known center for this stable object
+        stable_object_last_center[it->second] = center;
+        return it->second;
+    }
+    
+    // Check if this center is close to any existing stable object
+    for (const auto& [stable_id, last_center] : stable_object_last_center) {
+        float distance = cv::norm(center - last_center);
+        if (distance < TRACKING_DISTANCE_THRESHOLD) {
+            // This is likely the same physical object, assign the existing stable_id
+            object_stable_id[object_id] = stable_id;
+            stable_id_to_object_id[stable_id] = object_id;
+            stable_object_last_center[stable_id] = center;
+            return stable_id;
+        }
+    }
+    
+    // This is a new object, assign a new stable_id
+    int stable_id = next_stable_id++;
+    object_stable_id[object_id] = stable_id;
+    stable_id_to_object_id[stable_id] = object_id;
+    stable_object_last_center[stable_id] = center;
+    
+    return stable_id;
 }
 
 
@@ -1070,8 +1115,8 @@ bool OBBDetector::is_circle_in_region(const cv::Mat& cropped_region) {
     double circularity = (4.0 * M_PI * area) / (perimeter * perimeter);
     
     // A perfect circle has circularity = 1.0
-    // Accept as circle if circularity > 0.7
-    return circularity > 0.7;
+    // More stringent criteria: Accept as circle if circularity > 0.85
+    return circularity > 0.85;
 }
 
 bool OBBDetector::is_square_in_region(const cv::Mat& cropped_region) {
@@ -1106,7 +1151,7 @@ bool OBBDetector::is_square_in_region(const cv::Mat& cropped_region) {
     double rectangularity = contour_area / rect_area;
     
     // A perfect rectangle has rectangularity = 1.0
-    // Accept as square/rectangle if rectangularity > 0.7
-    return rectangularity > 0.7;
+    // More stringent criteria: Accept as square/rectangle if rectangularity > 0.85
+    return rectangularity > 0.85;
 }
 

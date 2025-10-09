@@ -49,6 +49,8 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "BUMBLEBEEBOARD";
     case camnet::v1::ServerControl_TAKEPICTURE:
         return "TAKEPICTURE";
+    case camnet::v1::ServerControl_NEXTPOSE:
+        return "NEXTPOSE";
     default:
         return "NONE";
     }
@@ -409,6 +411,10 @@ static bool ctrl_action(camnet::v1::ServerControl c,
             return false;
         uint picture_id = tpa->picture_id();
         return take_picture(picture_id);
+    }
+
+    case camnet::v1::ServerControl_NEXTPOSE: {
+        return true;
     }
 
     default:

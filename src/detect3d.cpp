@@ -1,8 +1,8 @@
 #include "detect3d.h"
 #include "global.h"
 #include "realtime_tool.h"
-#include "shaman.h"
 #include "video_capture.h"
+#include <iostream>
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
@@ -24,8 +24,6 @@ void detection3d_proc(CameraControl *camera_control,
             cam3d_idx.push_back(i);
         }
     }
-
-    shaman::SharedBoxQueue writer(true);
 
     TriangulatePoints ball2d_all_cams;
     std::chrono::high_resolution_clock::time_point start =
@@ -78,14 +76,6 @@ void detection3d_proc(CameraControl *camera_control,
 
         // project to all the streaming cameras
         if (detection3d.ball3d.new_detection.load()) {
-            shaman::Object obj;
-            std::vector<shaman::Object> center_vec;
-            obj.data = {detection3d.ball3d.center.x,
-                        detection3d.ball3d.center.y,
-                        detection3d.ball3d.center.z, 0, 0};
-            center_vec.reserve(1);
-            center_vec.push_back(obj);
-            writer.push(center_vec);
             for (int i = 0; i < num_cameras; i++) {
 
                 if (cameras_select[i].stream_on &&

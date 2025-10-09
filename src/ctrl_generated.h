@@ -470,15 +470,21 @@ inline ::flatbuffers::Offset<StopArgs> CreateStopArgs(
 struct StartStreamingArgs FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef StartStreamingArgsBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_CALIB_FOLDER = 4
+    VT_CALIB_FOLDER = 4,
+    VT_SAVE_FORMAT = 6
   };
   const ::flatbuffers::String *calib_folder() const {
     return GetPointer<const ::flatbuffers::String *>(VT_CALIB_FOLDER);
+  }
+  const ::flatbuffers::String *save_format() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_SAVE_FORMAT);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_CALIB_FOLDER) &&
            verifier.VerifyString(calib_folder()) &&
+           VerifyOffset(verifier, VT_SAVE_FORMAT) &&
+           verifier.VerifyString(save_format()) &&
            verifier.EndTable();
   }
 };
@@ -489,6 +495,9 @@ struct StartStreamingArgsBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_calib_folder(::flatbuffers::Offset<::flatbuffers::String> calib_folder) {
     fbb_.AddOffset(StartStreamingArgs::VT_CALIB_FOLDER, calib_folder);
+  }
+  void add_save_format(::flatbuffers::Offset<::flatbuffers::String> save_format) {
+    fbb_.AddOffset(StartStreamingArgs::VT_SAVE_FORMAT, save_format);
   }
   explicit StartStreamingArgsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -503,19 +512,24 @@ struct StartStreamingArgsBuilder {
 
 inline ::flatbuffers::Offset<StartStreamingArgs> CreateStartStreamingArgs(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> calib_folder = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> calib_folder = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> save_format = 0) {
   StartStreamingArgsBuilder builder_(_fbb);
+  builder_.add_save_format(save_format);
   builder_.add_calib_folder(calib_folder);
   return builder_.Finish();
 }
 
 inline ::flatbuffers::Offset<StartStreamingArgs> CreateStartStreamingArgsDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *calib_folder = nullptr) {
+    const char *calib_folder = nullptr,
+    const char *save_format = nullptr) {
   auto calib_folder__ = calib_folder ? _fbb.CreateString(calib_folder) : 0;
+  auto save_format__ = save_format ? _fbb.CreateString(save_format) : 0;
   return camnet::v1::CreateStartStreamingArgs(
       _fbb,
-      calib_folder__);
+      calib_folder__,
+      save_format__);
 }
 
 struct TakePictureArgs FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

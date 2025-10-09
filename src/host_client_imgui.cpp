@@ -312,12 +312,14 @@ static std::vector<uint8_t> build_cmd_stop(const std::string &job_id,
 
 static std::vector<uint8_t>
 build_cmd_startstreaming(const std::string &job_id, uint32_t epoch,
-                         uint32_t seq, const std::string &calib_folder) {
+                         uint32_t seq, const std::string &calib_folder,
+                         const std::string &save_format) {
     using namespace camnet::v1;
     flatbuffers::FlatBufferBuilder b(256);
     auto jid = b.CreateString(job_id);
     auto calib = b.CreateString(calib_folder);
-    auto args = CreateStartStreamingArgs(b, calib);
+    auto s_format = b.CreateString(save_format);
+    auto args = CreateStartStreamingArgs(b, calib, s_format);
     auto msg = CreateServer(
         b, Kind_KindCommand, ServerControl_STARTSTREAMING, jid, epoch, seq,
         camnet::v1::CommandBody_StartStreamingArgs, args.Union(), 0);
@@ -543,6 +545,9 @@ static void advance_phase(std::string job_id) {
         case Phase_TakePicture:
             g_phase = Phase_NextPose;
             break;
+        case Phase_NextPose:
+            g_phase = Phase_TakePicture;
+            break;
         default:
             break;
         }
@@ -650,7 +655,9 @@ static void broadcast_current_phase() {
             g_folder_name =
                 *g_clientctx->calib_save_folder + "/" + get_current_date_time();
         }
-        bytes = build_cmd_startstreaming(g_jid, g_epoch, g_seq, g_folder_name);
+        std::string save_format = *g_clientctx->selected_picture_format;
+        bytes = build_cmd_startstreaming(g_jid, g_epoch, g_seq, g_folder_name,
+                                         save_format);
 
         if (!g_phase_started) {
             on_startstreaming_phase_start(g_folder_name);

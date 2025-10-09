@@ -109,7 +109,12 @@ int main(int argc, char **args) {
     bool show_error = false;
     std::string error_message;
 
-    HostClientCtx client_ctx{&save_image_all_ready,
+    int current_picture_format = 0;
+    const char *picture_format_items[] = {"jpg", "tiff", "png"};
+    std::string selected_picture_format = picture_format_items[0];
+
+    HostClientCtx client_ctx{&selected_picture_format,
+                             &save_image_all_ready,
                              &save_pics_counter,
                              &calib_save_folder,
                              &network_config_select,
@@ -444,14 +449,16 @@ int main(int argc, char **args) {
                     }
                     ImGui::SameLine();
                     ImGui::Text("%s", picture_save_folder.c_str());
-                    static int current_picture_format = 0;
-                    const char *picture_format_items[] = {"jpg", "tiff", "png"};
-                    ImGui::Combo("Picture format", &current_picture_format,
-                                 picture_format_items,
-                                 IM_ARRAYSIZE(picture_format_items));
-                    for (int i = 0; i < num_cameras; i++) {
-                        cameras_select[i].frame_save_format = std::string(
+
+                    if (ImGui::Combo("Picture format", &current_picture_format,
+                                     picture_format_items,
+                                     IM_ARRAYSIZE(picture_format_items))) {
+                        selected_picture_format = std::string(
                             picture_format_items[current_picture_format]);
+                        for (int i = 0; i < num_cameras; i++) {
+                            cameras_select[i].frame_save_format =
+                                selected_picture_format;
+                        }
                     }
 
                     if (save_pics_counter == num_cameras) {

@@ -27,7 +27,7 @@ table OpenArgs           { config_folder:string; }
 table StartThreadsArgs   { record_folder:string; encoder_setup:string; }
 table StartArgs          { ptp_time:uint64; }
 table StopArgs           { ptp_time:uint64; }
-table StartStreamingArgs { calib_folder:string; }
+table StartStreamingArgs { calib_folder:string; save_format:string;}
 table TakePictureArgs    { picture_id:uint; }
 
 union CommandBody { OpenArgs, StartThreadsArgs, StartArgs, StopArgs, StartStreamingArgs, TakePictureArgs }

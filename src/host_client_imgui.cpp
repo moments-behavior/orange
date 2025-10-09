@@ -599,6 +599,9 @@ static void advance_phase(std::string job_id) {
             }
             break;
         }
+        case Phase_GrimlockBoard:
+            g_phase = Phase_TakePicture;
+            break;
         case Phase_Done:
             g_phase = Phase_Done;
             break;

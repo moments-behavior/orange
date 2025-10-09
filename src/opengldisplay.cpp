@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <iomanip>
+#include <fstream>
+#include <chrono>
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
@@ -388,6 +390,36 @@ void COpenGLDisplay::ThreadRunning() {
 
                     auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
                     fb->Finish(obj_msg);
+                    
+                    // Save sample detection output to file for debugging
+                    static bool sample_saved = false;
+                    if (!sample_saved && (obb_slot_valid[0] || obb_slot_valid[1])) {
+                        std::string sample_file_path = "/home/user/src/orange/sample_detection_output.txt";
+                        std::ofstream sample_file(sample_file_path);
+                        if (sample_file.is_open()) {
+                            sample_file << "=== Sample OBB Detection Output ===" << std::endl;
+                            sample_file << "Timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
+                            sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
+                            sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
+                            sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;
+                            
+                            // Save raw flatbuffer data (hex dump)
+                            sample_file << "Raw flatbuffer data (hex): ";
+                            uint8_t* buffer = fb->GetBufferPointer();
+                            size_t size = fb->GetSize();
+                            for (size_t i = 0; i < size; i++) {
+                                sample_file << std::hex << std::setfill('0') << std::setw(2) << (int)buffer[i] << " ";
+                            }
+                            sample_file << std::dec << std::endl;
+                            
+                            sample_file.close();
+                            std::cout << "Sample detection output saved to: " << sample_file_path << std::endl;
+                            sample_saved = true;
+                        } else {
+                            std::cerr << "Failed to create sample detection output file" << std::endl;
+                        }
+                    }
                     
                     // Only send message to CBOT if connected and there are stable detections
                     if (indigo_signal_builder->indigo_connection) {

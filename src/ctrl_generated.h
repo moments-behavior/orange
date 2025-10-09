@@ -77,16 +77,16 @@ enum ServerControl : uint8_t {
   ServerControl_NONE = 0,
   ServerControl_OPENCAMERA = 1,
   ServerControl_STARTTHREAD = 2,
-  ServerControl_STARTSTREAMING = 3,
-  ServerControl_STARTRECORDING = 4,
-  ServerControl_BUMBLEBEEBOARD = 5,
-  ServerControl_GRIMLOCKBOARD = 6,
-  ServerControl_NEXTPOSE = 7,
-  ServerControl_TAKEPICTURE = 8,
-  ServerControl_STOPRECORDING = 9,
-  ServerControl_TEARDOWN = 10,
+  ServerControl_STARTRECORDING = 3,
+  ServerControl_STOPRECORDING = 4,
+  ServerControl_TEARDOWN = 5,
+  ServerControl_STARTSTREAMING = 6,
+  ServerControl_BUMBLEBEEBOARD = 7,
+  ServerControl_GRIMLOCKBOARD = 8,
+  ServerControl_NEXTPOSE = 9,
+  ServerControl_TAKEPICTURE = 10,
   ServerControl_MIN = ServerControl_NONE,
-  ServerControl_MAX = ServerControl_TEARDOWN
+  ServerControl_MAX = ServerControl_TAKEPICTURE
 };
 
 inline const ServerControl (&EnumValuesServerControl())[11] {
@@ -94,14 +94,14 @@ inline const ServerControl (&EnumValuesServerControl())[11] {
     ServerControl_NONE,
     ServerControl_OPENCAMERA,
     ServerControl_STARTTHREAD,
-    ServerControl_STARTSTREAMING,
     ServerControl_STARTRECORDING,
+    ServerControl_STOPRECORDING,
+    ServerControl_TEARDOWN,
+    ServerControl_STARTSTREAMING,
     ServerControl_BUMBLEBEEBOARD,
     ServerControl_GRIMLOCKBOARD,
     ServerControl_NEXTPOSE,
-    ServerControl_TAKEPICTURE,
-    ServerControl_STOPRECORDING,
-    ServerControl_TEARDOWN
+    ServerControl_TAKEPICTURE
   };
   return values;
 }
@@ -111,21 +111,21 @@ inline const char * const *EnumNamesServerControl() {
     "NONE",
     "OPENCAMERA",
     "STARTTHREAD",
-    "STARTSTREAMING",
     "STARTRECORDING",
+    "STOPRECORDING",
+    "TEARDOWN",
+    "STARTSTREAMING",
     "BUMBLEBEEBOARD",
     "GRIMLOCKBOARD",
     "NEXTPOSE",
     "TAKEPICTURE",
-    "STOPRECORDING",
-    "TEARDOWN",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameServerControl(ServerControl e) {
-  if (::flatbuffers::IsOutRange(e, ServerControl_NONE, ServerControl_TEARDOWN)) return "";
+  if (::flatbuffers::IsOutRange(e, ServerControl_NONE, ServerControl_TAKEPICTURE)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesServerControl()[index];
 }

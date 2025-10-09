@@ -113,7 +113,7 @@ static std::vector<uint8_t> build_phase_reply(const camnet::v1::Server *cmd,
 }
 
 // ---------- server session gate ----------
-static camnet::v1::ServerControl g_last_done = camnet::v1::ServerControl_NONE;
+static uint32_t g_last_done = 0;
 static std::string g_job;
 static uint32_t g_epoch = 0;
 
@@ -124,7 +124,7 @@ static bool accept_session(const camnet::v1::Server *cmd) {
     if (g_job.empty() || cmd->epoch() > g_epoch || job != g_job) {
         g_job = job;
         g_epoch = cmd->epoch();
-        g_last_done = camnet::v1::ServerControl_NONE;
+        g_last_done = 0;
     }
     if (cmd->epoch() < g_epoch)
         return false; // stale epoch
@@ -476,7 +476,7 @@ static void server_on_event(const Incoming &evt) {
 
         // Idempotent: if we already completed this or a later phase, ack
         // again
-        if (ctrl <= g_last_done) {
+        if (cmd->seq() <= g_last_done) {
             auto bytes = build_phase_reply(cmd, g_name, 2, true, 0, "already");
             send_bytes(evt.peer_id, bytes);
             std::printf("[SRV %s] %s (duplicate)\n", g_name.c_str(),
@@ -488,7 +488,7 @@ static void server_on_event(const Incoming &evt) {
         // do we send reply if it is failure?
         auto bytes = build_phase_reply(cmd, g_name, cam_count, true, 0, "ok");
         send_bytes(evt.peer_id, bytes);
-        g_last_done = ctrl;
+        g_last_done = cmd->seq();
         std::printf("[SRV %s] %s\n", g_name.c_str(), ctrl_name(ctrl));
         break;
     }
@@ -532,7 +532,7 @@ static void cleanup_host_server_resources() {
     cameras_params.clear();
     cameras_select.clear();
 
-    g_last_done = camnet::v1::ServerControl_NONE;
+    g_last_done = 0;
 }
 
 int main(int argc, char **argv) {

@@ -404,7 +404,7 @@ void COpenGLDisplay::ThreadRunning() {
                         
                         bool file_saved = false;
                         for (const auto& sample_file_path : possible_paths) {
-                            std::ofstream sample_file(sample_file_path);
+                            std::ofstream sample_file(sample_file_path, std::ios::app);
                             if (sample_file.is_open()) {
                                 sample_file << "=== Sample OBB Detection Output ===" << std::endl;
                                 sample_file << "Timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -413,15 +413,39 @@ void COpenGLDisplay::ThreadRunning() {
                                 sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
                                 sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;
                                 
-                                // Save raw flatbuffer data (hex dump)
-                                sample_file << "Raw flatbuffer data (hex): ";
-                                uint8_t* buffer = fb->GetBufferPointer();
-                                size_t size = fb->GetSize();
-                                for (size_t i = 0; i < size; i++) {
-                                    sample_file << std::hex << std::setfill('0') << std::setw(2) << (int)buffer[i] << " ";
-                                }
-                                sample_file << std::dec << std::endl;
+                                // Print readable OBB structure content
+                                sample_file << "OBB Message Content:" << std::endl;
                                 
+                                // Access the finished flatbuffer message
+                                auto obj_msg = Obj::Getobj_msg(fb->GetBufferPointer());
+                                
+                                if (obj_msg->cylinder1()) {
+                                    auto obj1 = obj_msg->cylinder1();
+                                    sample_file << "Object 1 (cylinder1):" << std::endl;
+                                    sample_file << "  cx: " << obj1->cx() << std::endl;
+                                    sample_file << "  cy: " << obj1->cy() << std::endl;
+                                    sample_file << "  w: " << obj1->w() << std::endl;
+                                    sample_file << "  h: " << obj1->h() << std::endl;
+                                    sample_file << "  theta: " << obj1->theta() << std::endl;
+                                    sample_file << "  label: " << obj1->label() << std::endl;
+                                } else {
+                                    sample_file << "Object 1 (cylinder1): null" << std::endl;
+                                }
+                                
+                                if (obj_msg->cylinder2()) {
+                                    auto obj2 = obj_msg->cylinder2();
+                                    sample_file << "Object 2 (cylinder2):" << std::endl;
+                                    sample_file << "  cx: " << obj2->cx() << std::endl;
+                                    sample_file << "  cy: " << obj2->cy() << std::endl;
+                                    sample_file << "  w: " << obj2->w() << std::endl;
+                                    sample_file << "  h: " << obj2->h() << std::endl;
+                                    sample_file << "  theta: " << obj2->theta() << std::endl;
+                                    sample_file << "  label: " << obj2->label() << std::endl;
+                                } else {
+                                    sample_file << "Object 2 (cylinder2): null" << std::endl;
+                                }
+                                
+                                sample_file << std::endl;
                                 sample_file.close();
                                 std::cout << "Sample detection output saved to: " << sample_file_path << std::endl;
                                 sample_saved = true;

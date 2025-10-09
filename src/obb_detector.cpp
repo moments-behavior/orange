@@ -1116,7 +1116,7 @@ bool OBBDetector::is_circle_in_region(const cv::Mat& cropped_region) {
     
     // A perfect circle has circularity = 1.0
     // More stringent criteria: Accept as circle if circularity > 0.85
-    return circularity > 0.85;
+    return circularity > 0.9;
 }
 
 bool OBBDetector::is_square_in_region(const cv::Mat& cropped_region) {
@@ -1152,6 +1152,6 @@ bool OBBDetector::is_square_in_region(const cv::Mat& cropped_region) {
     
     // A perfect rectangle has rectangularity = 1.0
     // More stringent criteria: Accept as square/rectangle if rectangularity > 0.85
-    return rectangularity > 0.85;
+    return rectangularity > 0.9;
 }
 

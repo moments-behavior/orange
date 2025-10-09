@@ -326,12 +326,13 @@ static bool take_picture(uint picture_id) {
         if (steady_clock::now() - t0 > timeout) {
             // give up gracefully: flip subscribe so threads can finish politely
             camera_control.subscribe = false;
-            return false; // guard joins threads
+            return false;
         }
         // small sleep to avoid busy-spinning the core
         std::this_thread::sleep_for(1ms);
     }
     save_pics_counter = 0;
+    return true;
 }
 
 static bool ctrl_action(camnet::v1::ServerControl c,

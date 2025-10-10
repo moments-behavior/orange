@@ -20,7 +20,9 @@ OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& c
                          const OBBDetectorParams& detector_params)
     : camera_params(params), csv_paths(csv_paths), params(detector_params),
       background_initialized(false), running(false), frame_ready(false), frames_processed(0), detections_found(0),
-      d_frame_original(nullptr), h_frame_cpu(nullptr), next_object_id(1), next_stable_id(1) {
+      d_frame_original(nullptr), h_frame_cpu(nullptr), next_object_id(1), next_stable_id(1),
+      detections_locked(false), frames_since_last_update(0), lock_confidence_threshold(LOCK_CONFIDENCE_THRESHOLD),
+      min_frames_for_lock(MIN_FRAMES_FOR_LOCK) {
     
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
@@ -880,6 +882,16 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
         update_object_confidence(object_id, false);
     }
     
+    // If no detections this frame, be extra generous with existing objects
+    if (detections.empty()) {
+        // Don't decay confidence as much when no detections at all
+        for (auto& [object_id, confidence] : object_confidence) {
+            if (confidence > 0.5f) {  // Only for reasonably confident objects
+                confidence *= 0.98f;  // Very slow decay when no detections
+            }
+        }
+    }
+    
     // Process current detections
     for (const auto& detection : detections) {
         // Compute center point for tracking
@@ -898,7 +910,9 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
             // Skip objects that are too old or have low confidence
             if (!should_keep_object_alive(object_id)) continue;
             
-            float distance = cv::norm(center - last_center);
+            // Use predicted position for better association
+            cv::Point2f predicted_center = predict_object_position(object_id);
+            float distance = cv::norm(center - predicted_center);
             float dynamic_threshold = calculate_dynamic_distance_threshold(object_id);
             
             if (distance < dynamic_threshold && distance < best_distance) {
@@ -959,7 +973,8 @@ std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std:
     // Clean up old objects using enhanced persistence logic
     cleanup_old_objects();
     
-    return tracked_detections;
+    // Use lock-in system to get stable detections
+    return get_locked_or_current_detections(tracked_detections);
 }
 
 int OBBDetector::assign_stable_object_id(int object_id, const cv::Point2f& center) {
@@ -1010,11 +1025,12 @@ OBB OBBDetector::smooth_obb_coordinates(int object_id, const OBB& current_obb) {
     const auto& history = object_obb_history[object_id];
     OBB smoothed_obb = current_obb;
     
-    // Calculate weights (more recent frames get higher weights)
+    // Calculate weights (much more aggressive smoothing - heavily favor recent frames)
     std::vector<float> weights;
     float total_weight = 0.0f;
     for (size_t i = 0; i < history.size(); i++) {
-        float weight = (i + 1) * (i + 1);  // Quadratic weighting (1, 4, 9, 16, ...)
+        // Exponential weighting - much more aggressive smoothing
+        float weight = std::pow(2.0f, i);  // Exponential: 1, 2, 4, 8, 16, 32, 64, ...
         weights.push_back(weight);
         total_weight += weight;
     }
@@ -1183,12 +1199,12 @@ void OBBDetector::update_object_confidence(int object_id, bool detected) {
     }
     
     if (detected) {
-        // Object was detected, boost confidence
-        it->second = std::min(1.0f, it->second + 0.2f);
+        // Object was detected, boost confidence much more aggressively
+        it->second = std::min(1.0f, it->second + 0.5f);  // Much faster confidence gain
         object_missed_frames[object_id] = 0;
     } else {
-        // Object was not detected, decay confidence
-        it->second *= CONFIDENCE_DECAY_RATE;
+        // Object was not detected, decay confidence much more slowly
+        it->second *= CONFIDENCE_DECAY_RATE;  // 0.95 = very slow decay
         object_missed_frames[object_id]++;
     }
 }
@@ -1266,35 +1282,36 @@ void OBBDetector::cleanup_old_objects() {
 }
 
 float OBBDetector::calculate_dynamic_distance_threshold(int object_id) {
-    // Base threshold
-    float base_threshold = TRACKING_DISTANCE_THRESHOLD;
+    // Much more generous base threshold
+    float base_threshold = TRACKING_DISTANCE_THRESHOLD;  // 300 pixels base
     
-    // Adjust based on object size (larger objects can move more)
+    // Adjust based on object size (much more generous for larger objects)
     auto obb_it = object_last_obb.find(object_id);
     if (obb_it != object_last_obb.end()) {
         const OBB& obb = obb_it->second;
         float width = std::max({obb.x1, obb.x2, obb.x3, obb.x4}) - std::min({obb.x1, obb.x2, obb.x3, obb.x4});
         float height = std::max({obb.y1, obb.y2, obb.y3, obb.y4}) - std::min({obb.y1, obb.y2, obb.y3, obb.y4});
         float size_factor = std::max(width, height) / 200.0f;  // Normalize to typical object size
-        base_threshold *= (1.0f + size_factor * 0.5f);  // Increase threshold for larger objects
+        base_threshold *= (1.0f + size_factor * 2.0f);  // Much more generous for larger objects
     }
     
-    // Adjust based on confidence (lower confidence = more restrictive)
+    // Much more generous confidence adjustment
     auto conf_it = object_confidence.find(object_id);
     if (conf_it != object_confidence.end()) {
-        float confidence_factor = 0.5f + 0.5f * conf_it->second;  // Range: 0.5 to 1.0
+        float confidence_factor = 0.8f + 0.2f * conf_it->second;  // Range: 0.8 to 1.0 (much more generous)
         base_threshold *= confidence_factor;
     }
     
-    // Adjust based on velocity (faster objects need larger threshold)
+    // Much more generous velocity adjustment
     auto vel_it = object_velocity.find(object_id);
     if (vel_it != object_velocity.end()) {
         float velocity_magnitude = cv::norm(vel_it->second);
-        float velocity_factor = 1.0f + velocity_magnitude / 50.0f;  // Scale velocity
+        float velocity_factor = 1.0f + velocity_magnitude / 20.0f;  // Much more generous velocity scaling
         base_threshold *= velocity_factor;
     }
     
-    return base_threshold;
+    // Ensure minimum threshold is very generous
+    return std::max(base_threshold, 200.0f);  // Minimum 200 pixels
 }
 
 bool OBBDetector::should_keep_object_alive(int object_id) {
@@ -1311,5 +1328,108 @@ bool OBBDetector::should_keep_object_alive(int object_id) {
     }
     
     return true;
+}
+
+// Lock-in system implementation
+
+bool OBBDetector::should_lock_detections(const std::vector<OBB>& detections) {
+    // Don't lock if we already have locked detections
+    if (detections_locked) return false;
+    
+    // Need at least 2 objects to lock
+    if (detections.size() < 2) return false;
+    
+    // Check if we have enough consistent frames
+    if (frames_since_last_update < min_frames_for_lock) return false;
+    
+    // Check if all objects have high confidence
+    for (const auto& detection : detections) {
+        auto conf_it = object_confidence.find(detection.object_id);
+        if (conf_it == object_confidence.end() || conf_it->second < lock_confidence_threshold) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+void OBBDetector::lock_detections(const std::vector<OBB>& detections) {
+    locked_detections = detections;
+    detections_locked = true;
+    frames_since_last_update = 0;
+    std::cout << "OBB Detector: Locked " << detections.size() << " detections with high confidence" << std::endl;
+}
+
+bool OBBDetector::should_unlock_detections(const std::vector<OBB>& detections) {
+    // Don't unlock if we're not locked
+    if (!detections_locked) return false;
+    
+    // Force unlock after too many frames without update
+    if (frames_since_last_update > MAX_FRAMES_WITHOUT_UPDATE) {
+        std::cout << "OBB Detector: Forcing unlock after " << MAX_FRAMES_WITHOUT_UPDATE << " frames" << std::endl;
+        return true;
+    }
+    
+    // Unlock if detection count changed significantly
+    if (std::abs((int)detections.size() - (int)locked_detections.size()) > 1) {
+        std::cout << "OBB Detector: Unlocking due to detection count change: " 
+                  << locked_detections.size() << " -> " << detections.size() << std::endl;
+        return true;
+    }
+    
+    // Unlock if any object moved too much
+    for (const auto& current_detection : detections) {
+        for (const auto& locked_detection : locked_detections) {
+            if (current_detection.object_id == locked_detection.object_id) {
+                // Calculate distance between centers
+                cv::Point2f current_center = compute_centroid({
+                    cv::Point2f(current_detection.x1, current_detection.y1),
+                    cv::Point2f(current_detection.x2, current_detection.y2),
+                    cv::Point2f(current_detection.x3, current_detection.y3),
+                    cv::Point2f(current_detection.x4, current_detection.y4)
+                });
+                
+                cv::Point2f locked_center = compute_centroid({
+                    cv::Point2f(locked_detection.x1, locked_detection.y1),
+                    cv::Point2f(locked_detection.x2, locked_detection.y2),
+                    cv::Point2f(locked_detection.x3, locked_detection.y3),
+                    cv::Point2f(locked_detection.x4, locked_detection.y4)
+                });
+                
+                float distance = cv::norm(current_center - locked_center);
+                if (distance > 100.0f) {  // Significant movement threshold
+                    std::cout << "OBB Detector: Unlocking due to significant movement: " << distance << " pixels" << std::endl;
+                    return true;
+                }
+            }
+        }
+    }
+    
+    return false;
+}
+
+std::vector<OBB> OBBDetector::get_locked_or_current_detections(const std::vector<OBB>& current_detections) {
+    frames_since_last_update++;
+    
+    // If we have locked detections and shouldn't unlock, use them
+    if (detections_locked && !should_unlock_detections(current_detections)) {
+        return locked_detections;
+    }
+    
+    // If we should unlock, do it
+    if (detections_locked) {
+        detections_locked = false;
+        locked_detections.clear();
+        std::cout << "OBB Detector: Unlocked detections, using current detections" << std::endl;
+    }
+    
+    // If we should lock current detections, do it
+    if (should_lock_detections(current_detections)) {
+        lock_detections(current_detections);
+        return locked_detections;
+    }
+    
+    // Otherwise, use current detections
+    return current_detections;
 }
 

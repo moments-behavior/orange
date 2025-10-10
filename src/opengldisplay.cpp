@@ -145,6 +145,10 @@ void COpenGLDisplay::ThreadRunning() {
 
     using clock = std::chrono::steady_clock;
     
+    // Static variables for OBB lock-in system tracking
+    static std::vector<OBB> last_locked_detections;
+    static bool last_detections_sent = false;
+    
     // OBB Background Building
 
     int frameCount = 0;
@@ -229,11 +233,43 @@ void COpenGLDisplay::ThreadRunning() {
                 obb_detector->notify_frame_ready(debayer.d_debayer, 0);
                 
                 // Get latest detections (non-blocking, returns immediately)
+                // This now uses the lock-in system internally
                 std::vector<OBB> obb_detections = obb_detector->get_latest_detections();
                                     
-                // Draw OBB overlays on GPU (lightweight, non-blocking) and populate flatbuffer message
+                // Only draw and send messages when we have stable locked detections
                 if (obb_detections.size() > 0) {
-                    // Prepare flatbuffer message with up to 2 objects
+                    static auto last_message_send_time = std::chrono::steady_clock::now();
+                    
+                    // Check if detections have changed significantly (lock-in system handles this)
+                    bool detections_changed = (last_locked_detections.size() != obb_detections.size());
+                    if (!detections_changed) {
+                        // Check if positions changed significantly
+                        for (size_t i = 0; i < obb_detections.size() && i < last_locked_detections.size(); i++) {
+                            auto current_center = obb_detector->obb_to_xywhr(obb_detections[i]);
+                            auto last_center = obb_detector->obb_to_xywhr(last_locked_detections[i]);
+                            float distance = std::hypot(current_center.x - last_center.x, current_center.y - last_center.y);
+                            if (distance > 50.0f) {  // Significant position change
+                                detections_changed = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Always process detections, but only update content when changed
+                    if (detections_changed || !last_detections_sent) {
+                        // Update our tracking
+                        last_locked_detections = obb_detections;
+                        last_detections_sent = true;
+                        
+                        std::cout << "OBB: Updating " << obb_detections.size() << " locked detections (changed: " 
+                                  << (detections_changed ? "yes" : "no") << ")" << std::endl;
+                    } else {
+                        // Use the same detections as before
+                        obb_detections = last_locked_detections;
+                        std::cout << "OBB: Using same " << obb_detections.size() << " locked detections (no change)" << std::endl;
+                    }
+                    
+                    // Always prepare flatbuffer message (content may be same as before)
                     flatbuffers::FlatBufferBuilder* fb = indigo_signal_builder->builder;
                     fb->Clear();
 
@@ -302,10 +338,10 @@ void COpenGLDisplay::ThreadRunning() {
                                 CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
                                                      sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                                 
-                                // Draw axis-aligned bounding box
+                                // Draw axis-aligned bounding box in green for vertical cylinder (class 0)
                                 gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                             camera_params->height, d_obb_points + i * 8, 
-                                            obb.class_id, 0);
+                                            obb.class_id, 0, 0, 255, 0);  // Green for vertical cylinder
                                 
                                 // Populate flatbuffer with AABB (theta = 0)
                                 if (assigned_slot != -1) {
@@ -330,10 +366,10 @@ void COpenGLDisplay::ThreadRunning() {
                                 CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
                                                      sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                                 
-                                // Draw oriented bounding box
+                                // Draw oriented bounding box in blue for horizontal cylinder (class 2)
                                 gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                             camera_params->height, d_obb_points + i * 8, 
-                                            obb.class_id, 0);
+                                            obb.class_id, 0, 255, 0, 0);  // Blue for horizontal cylinder
                                 
                                 // Populate flatbuffer with oriented OBB (theta from xywhr)
                                 if (assigned_slot != -1) {
@@ -409,8 +445,22 @@ void COpenGLDisplay::ThreadRunning() {
                                 sample_file << "Timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
                                     std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
                                 sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
+                                sample_file << "Using locked detections: " << (detections_changed ? "NO (new detections)" : "YES (same as before)") << std::endl;
+                                sample_file << "Drawing colors: Green=Vertical Cylinder (class 0), Blue=Horizontal Cylinder (class 2)" << std::endl;
                                 sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
                                 sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;
+                                
+                                // Print individual detection details
+                                sample_file << "Individual Detections:" << std::endl;
+                                for (size_t i = 0; i < obb_detections.size(); i++) {
+                                    const OBB& obb = obb_detections[i];
+                                    auto xywhr = obb_detector->obb_to_xywhr(obb);
+                                    sample_file << "  Detection " << i << ": Class " << obb.class_id 
+                                              << ", Object ID " << obb.object_id 
+                                              << ", Shape Verified: " << (obb.shape_verified ? "YES" : "NO")
+                                              << ", xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
+                                              << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
+                                }
                                 
                                 // Print readable OBB structure content
                                 sample_file << "OBB Message Content:" << std::endl;
@@ -460,25 +510,18 @@ void COpenGLDisplay::ThreadRunning() {
                         }
                     }
                     
-                    // Only send message to CBOT if connected and there are stable detections
+                    // Always send message to CBOT if connected (no throttling)
                     if (indigo_signal_builder->indigo_connection) {
-                        // Check if we should send update (throttle to reduce noise)
-                        static auto last_send_time = std::chrono::steady_clock::now();
-                        auto now = std::chrono::steady_clock::now();
-                        auto time_since_last_send = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_send_time);
-                        
-                        // Send update every 100ms or if this is the first detection
-                        if (time_since_last_send.count() >= 100 || obb_detections.size() > 0) {
-                            std::cout << "DEBUG: Sending OBB message to CBOT (stable detections: " << obb_detections.size() << ")" << std::endl;
-                            send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
-                            std::cout << "DEBUG: OBB message sent successfully" << std::endl;
-                            last_send_time = now;
-                        } else {
-                            std::cout << "DEBUG: Throttling OBB message (last sent " << time_since_last_send.count() << "ms ago)" << std::endl;
-                        }
+                        std::cout << "DEBUG: Sending OBB message to CBOT (detections: " << obb_detections.size() << ")" << std::endl;
+                        send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
+                        std::cout << "DEBUG: OBB message sent successfully" << std::endl;
                     } else {
                         std::cout << "DEBUG: CBOT not connected, skipping OBB message" << std::endl;
                     }
+                } else {
+                    // No detections available, reset tracking
+                    last_locked_detections.clear();
+                    last_detections_sent = false;
                 }
             }
             // nvtxRangePush("display_gl_copy_to_interop_buffer");

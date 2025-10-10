@@ -20,9 +20,7 @@ OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& c
                          const OBBDetectorParams& detector_params)
     : camera_params(params), csv_paths(csv_paths), params(detector_params),
       background_initialized(false), running(false), frame_ready(false), frames_processed(0), detections_found(0),
-      d_frame_original(nullptr), h_frame_cpu(nullptr), next_object_id(1), next_stable_id(1),
-      detections_locked(false), frames_since_last_update(0), lock_confidence_threshold(LOCK_CONFIDENCE_THRESHOLD),
-      min_frames_for_lock(MIN_FRAMES_FOR_LOCK) {
+      d_frame_original(nullptr), h_frame_cpu(nullptr), detections_stable(false), frames_since_change(0) {
     
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
@@ -162,35 +160,26 @@ void OBBDetector::thread_loop() {
             continue;
         }
         
-        // Convert background model back to CV_8U for detection
-        cv::Mat background_u8;
-        background_model.convertTo(background_u8, CV_8U);
+        // Simple detection: CSV priors → fit bounding box → check contour shape → draw appropriate box
+        std::vector<OBB> detections = detect_objects(frame);
         
-        // Detect candidates
-        auto candidates = detect_candidates(frame, background_u8);
-        
-        // Classify candidates with priors (existing method)
-        std::vector<OBB> detections;
-        for (const auto& candidate : candidates) {
-            int class_id = classify_with_priors(candidate);
-            if (class_id >= 0) {
-                OBB obb(candidate[0].x, candidate[0].y, candidate[1].x, candidate[1].y,
-                       candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
-                       class_id, 1.0f);
-                detections.push_back(obb);
+        // Only update if we should (objects actually moved)
+        if (should_update_detections(detections)) {
+            {
+                std::lock_guard<std::mutex> lock(detections_mtx);
+                latest_detections = detections;
+                stable_detections = detections;
+                detections_stable = true;
+                frames_since_change = 0;
             }
-        }
-        
-        // Deduplicate nearby detections (merge detections that are too close to each other)
-        detections = deduplicate_detections(detections);
-        
-        // Assign object IDs and verify shapes
-        detections = assign_object_ids_and_handle_flickering(detections, frame);
-        
-        // Update results
-        {
-            std::lock_guard<std::mutex> lock(detections_mtx);
-            latest_detections = detections;
+            std::cout << "OBB: Updated detections - " << detections.size() << " objects" << std::endl;
+        } else {
+            // Use stable detections
+            {
+                std::lock_guard<std::mutex> lock(detections_mtx);
+                latest_detections = stable_detections;
+                frames_since_change++;
+            }
         }
         
         frames_processed++;
@@ -876,268 +865,60 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
     }
 }
 
-std::vector<OBB> OBBDetector::deduplicate_detections(const std::vector<OBB>& detections) {
-    if (detections.size() <= 1) return detections;
+std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
+    std::vector<OBB> detections;
     
-    std::vector<OBB> deduplicated;
-    std::vector<bool> used(detections.size(), false);
+    // Convert background model back to CV_8U for detection
+    cv::Mat background_u8;
+    background_model.convertTo(background_u8, CV_8U);
     
-    for (size_t i = 0; i < detections.size(); i++) {
-        if (used[i]) continue;
+    // Detect candidates using motion detection
+    auto candidates = detect_candidates(frame, background_u8);
+    
+    // Process each candidate
+    for (const auto& candidate : candidates) {
+        // Classify using CSV priors
+        int class_id = classify_with_priors(candidate);
+        if (class_id < 0) continue;
         
-        const OBB& current = detections[i];
-        cv::Point2f current_center = compute_centroid({
-            cv::Point2f(current.x1, current.y1),
-            cv::Point2f(current.x2, current.y2),
-            cv::Point2f(current.x3, current.y3),
-            cv::Point2f(current.x4, current.y4)
-        });
+        // Create initial OBB from candidate
+        OBB obb(candidate[0].x, candidate[0].y, candidate[1].x, candidate[1].y,
+               candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
+               class_id, 1.0f);
         
-        // Find all nearby detections to merge
-        std::vector<size_t> to_merge = {i};
-        for (size_t j = i + 1; j < detections.size(); j++) {
-            if (used[j]) continue;
+        // Check contour shape inside the bounding box
+        bool is_circle = is_circle_in_region(frame, obb);
+        bool is_square = is_square_in_region(frame, obb);
+        
+        if (is_circle) {
+            // Circle detected - use axis-aligned bounding box (no rotation)
+            float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
+            float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
+            float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
+            float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
             
-            const OBB& other = detections[j];
-            cv::Point2f other_center = compute_centroid({
-                cv::Point2f(other.x1, other.y1),
-                cv::Point2f(other.x2, other.y2),
-                cv::Point2f(other.x3, other.y3),
-                cv::Point2f(other.x4, other.y4)
-            });
-            
-            float distance = cv::norm(current_center - other_center);
-            // Merge if centers are within 100 pixels (same physical object)
-            if (distance < 100.0f) {
-                to_merge.push_back(j);
-                used[j] = true;
-            }
-        }
-        
-        // Choose the best detection from the merged group
-        OBB best_detection = current;
-        if (to_merge.size() > 1) {
-            // Prefer detections with higher confidence or better shape verification
-            // For now, just use the first one, but we could implement more sophisticated selection
-            std::cout << "DEBUG: Merging " << to_merge.size() << " nearby detections at center (" 
-                      << current_center.x << ", " << current_center.y << ")" << std::endl;
-        }
-        
-        deduplicated.push_back(best_detection);
-        used[i] = true;
-    }
-    
-    std::cout << "DEBUG: Deduplicated " << detections.size() << " detections to " << deduplicated.size() << std::endl;
-    return deduplicated;
-}
-
-std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections, const cv::Mat& frame) {
-    std::vector<OBB> tracked_detections;
-    std::set<int> detected_object_ids;
-    
-    // First, update confidence for all existing objects (mark as not detected this frame)
-    for (auto& [object_id, confidence] : object_confidence) {
-        update_object_confidence(object_id, false);
-    }
-    
-    // If no detections this frame, be extra generous with existing objects
-    if (detections.empty()) {
-        // Don't decay confidence as much when no detections at all
-        for (auto& [object_id, confidence] : object_confidence) {
-            if (confidence > 0.5f) {  // Only for reasonably confident objects
-                confidence *= 0.98f;  // Very slow decay when no detections
-            }
-        }
-    }
-    
-    // Process current detections
-    for (const auto& detection : detections) {
-        // Compute center point for tracking
-        cv::Point2f center = compute_centroid({
-            cv::Point2f(detection.x1, detection.y1),
-            cv::Point2f(detection.x2, detection.y2),
-            cv::Point2f(detection.x3, detection.y3),
-            cv::Point2f(detection.x4, detection.y4)
-        });
-        
-        // Find closest existing object using dynamic distance threshold
-        int best_object_id = -1;
-        float best_distance = std::numeric_limits<float>::max();
-        
-        for (const auto& [object_id, last_center] : object_centers) {
-            // Skip objects that are too old or have low confidence
-            if (!should_keep_object_alive(object_id)) continue;
-            
-            // Use predicted position for better association
-            cv::Point2f predicted_center = predict_object_position(object_id);
-            float distance = cv::norm(center - predicted_center);
-            float dynamic_threshold = calculate_dynamic_distance_threshold(object_id);
-            
-            if (distance < dynamic_threshold && distance < best_distance) {
-                best_distance = distance;
-                best_object_id = object_id;
-            }
-        }
-        
-        // Assign object ID
-        int object_id;
-        if (best_object_id == -1) {
-            // New object
-            object_id = next_object_id++;
-            object_class_history[object_id] = std::vector<int>();
-            object_obb_history[object_id] = std::vector<OBB>();
-            object_frame_count[object_id] = 0;
-            object_confidence[object_id] = 1.0f;  // Start with full confidence
-            object_missed_frames[object_id] = 0;
-            object_velocity[object_id] = cv::Point2f(0, 0);
-            object_position_history[object_id] = std::vector<cv::Point2f>();
+            obb.x1 = min_x; obb.y1 = min_y;  // Top-left
+            obb.x2 = max_x; obb.y2 = min_y;  // Top-right
+            obb.x3 = max_x; obb.y3 = max_y;  // Bottom-right
+            obb.x4 = min_x; obb.y4 = max_y;  // Bottom-left
+            obb.class_id = 0;  // Vertical cylinder (circle)
+        } else if (is_square) {
+            // Square detected - keep oriented bounding box
+            obb.class_id = 2;  // Horizontal cylinder (square)
         } else {
-            // Existing object
-            object_id = best_object_id;
+            // Shape verification failed - skip this detection
+            continue;
         }
         
-        // Update object tracking data
-        object_centers[object_id] = center;
-        object_frame_count[object_id]++;
-        object_missed_frames[object_id] = 0;  // Reset missed frames counter
-        update_object_confidence(object_id, true);  // Mark as detected
-        update_object_velocity(object_id, center);
-        detected_object_ids.insert(object_id);
-        
-        // Add current classification to history
-        object_class_history[object_id].push_back(detection.class_id);
-        if (object_class_history[object_id].size() > MAX_CLASS_HISTORY) {
-            object_class_history[object_id].erase(object_class_history[object_id].begin());
-        }
-        
-        // Assign stable object ID for consistent identity across frames
-        int stable_id = assign_stable_object_id(object_id, center);
-        
-        // Verify shape in the detected region
-        bool shape_verified = verify_shape_in_region(detection, frame);
-        
-        // Create tracked detection with smoothed coordinates
-        OBB tracked_detection = smooth_obb_coordinates(object_id, detection);
-        tracked_detection.object_id = stable_id;  // Use stable_id instead of internal object_id
-        tracked_detection.shape_verified = shape_verified;
-        // Keep the original class_id from prior-based classification
-        
-        // Only include stable objects in results
-        if (is_object_stable(object_id)) {
-            tracked_detections.push_back(tracked_detection);
-        }
+        detections.push_back(obb);
     }
     
-    // Clean up old objects using enhanced persistence logic
-    cleanup_old_objects();
-    
-    // Use lock-in system to get stable detections
-    return get_locked_or_current_detections(tracked_detections);
-}
-
-int OBBDetector::assign_stable_object_id(int object_id, const cv::Point2f& center) {
-    // Check if this object_id already has a stable_id
-    auto it = object_stable_id.find(object_id);
-    if (it != object_stable_id.end()) {
-        // Update the last known center for this stable object
-        stable_object_last_center[it->second] = center;
-        return it->second;
-    }
-    
-    // Check if this center is close to any existing stable object
-    for (const auto& [stable_id, last_center] : stable_object_last_center) {
-        float distance = cv::norm(center - last_center);
-        if (distance < TRACKING_DISTANCE_THRESHOLD) {
-            // This is likely the same physical object, assign the existing stable_id
-            object_stable_id[object_id] = stable_id;
-            stable_id_to_object_id[stable_id] = object_id;
-            stable_object_last_center[stable_id] = center;
-            return stable_id;
-        }
-    }
-    
-    // This is a new object, assign a new stable_id
-    int stable_id = next_stable_id++;
-    object_stable_id[object_id] = stable_id;
-    stable_id_to_object_id[stable_id] = object_id;
-    stable_object_last_center[stable_id] = center;
-    
-    return stable_id;
+    return detections;
 }
 
 
-OBB OBBDetector::smooth_obb_coordinates(int object_id, const OBB& current_obb) {
-    // Add current OBB to history
-    object_obb_history[object_id].push_back(current_obb);
-    if (object_obb_history[object_id].size() > MAX_OBB_HISTORY) {
-        object_obb_history[object_id].erase(object_obb_history[object_id].begin());
-    }
-    
-    // If we don't have enough history, return current OBB
-    if (object_obb_history[object_id].size() < 2) {
-        object_last_obb[object_id] = current_obb;
-        return current_obb;
-    }
-    
-    // Compute smoothed coordinates using weighted moving average
-    const auto& history = object_obb_history[object_id];
-    OBB smoothed_obb = current_obb;
-    
-    // Calculate weights (much more aggressive smoothing - heavily favor recent frames)
-    std::vector<float> weights;
-    float total_weight = 0.0f;
-    for (size_t i = 0; i < history.size(); i++) {
-        // Exponential weighting - much more aggressive smoothing
-        float weight = std::pow(2.0f, i);  // Exponential: 1, 2, 4, 8, 16, 32, 64, ...
-        weights.push_back(weight);
-        total_weight += weight;
-    }
-    
-    // Normalize weights
-    for (float& weight : weights) {
-        weight /= total_weight;
-    }
-    
-    // Apply weighted averaging to each coordinate
-    smoothed_obb.x1 = 0.0f; smoothed_obb.y1 = 0.0f;
-    smoothed_obb.x2 = 0.0f; smoothed_obb.y2 = 0.0f;
-    smoothed_obb.x3 = 0.0f; smoothed_obb.y3 = 0.0f;
-    smoothed_obb.x4 = 0.0f; smoothed_obb.y4 = 0.0f;
-    
-    for (size_t i = 0; i < history.size(); i++) {
-        smoothed_obb.x1 += weights[i] * history[i].x1;
-        smoothed_obb.y1 += weights[i] * history[i].y1;
-        smoothed_obb.x2 += weights[i] * history[i].x2;
-        smoothed_obb.y2 += weights[i] * history[i].y2;
-        smoothed_obb.x3 += weights[i] * history[i].x3;
-        smoothed_obb.y3 += weights[i] * history[i].y3;
-        smoothed_obb.x4 += weights[i] * history[i].x4;
-        smoothed_obb.y4 += weights[i] * history[i].y4;
-    }
-    
-    // Preserve other properties from current detection
-    smoothed_obb.class_id = current_obb.class_id;
-    smoothed_obb.confidence = current_obb.confidence;
-    smoothed_obb.object_id = current_obb.object_id;
-    smoothed_obb.shape_verified = current_obb.shape_verified;
-    
-    // Store smoothed OBB for next iteration
-    object_last_obb[object_id] = smoothed_obb;
-    
-    return smoothed_obb;
-}
 
-bool OBBDetector::is_object_stable(int object_id) {
-    auto it = object_frame_count.find(object_id);
-    if (it == object_frame_count.end()) {
-        return false;
-    }
-    
-    // Object must be seen for at least MIN_FRAMES_FOR_STABLE frames
-    return it->second >= MIN_FRAMES_FOR_STABLE;
-}
-
-bool OBBDetector::verify_shape_in_region(const OBB& obb, const cv::Mat& frame) {
+bool OBBDetector::is_circle_in_region(const cv::Mat& frame, const OBB& obb) {
     // Crop the region around the OBB
     float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
     float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
@@ -1169,22 +950,9 @@ bool OBBDetector::verify_shape_in_region(const OBB& obb, const cv::Mat& frame) {
     cv::Mat binary_region;
     cv::threshold(gray_region, binary_region, 50, 255, cv::THRESH_BINARY);
     
-    // Verify shape based on the classified class
-    if (obb.class_id == 0) {
-        // Class 0 (CylinderVertical) should be a circle
-        return is_circle_in_region(binary_region);
-    } else if (obb.class_id == 2) {
-        // Class 2 (CylinderSide) should be a square/rectangle
-        return is_square_in_region(binary_region);
-    }
-    
-    return true; // Unknown class, assume correct
-}
-
-bool OBBDetector::is_circle_in_region(const cv::Mat& cropped_region) {
     // Find contours in the binary region
     std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(cropped_region, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    cv::findContours(binary_region, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
     if (contours.empty()) return false;
     
@@ -1205,14 +973,44 @@ bool OBBDetector::is_circle_in_region(const cv::Mat& cropped_region) {
     double circularity = (4.0 * M_PI * area) / (perimeter * perimeter);
     
     // A perfect circle has circularity = 1.0
-    // More stringent criteria: Accept as circle if circularity > 0.85
-    return circularity > 0.9;
+    return circularity > 0.8;
 }
 
-bool OBBDetector::is_square_in_region(const cv::Mat& cropped_region) {
+bool OBBDetector::is_square_in_region(const cv::Mat& frame, const OBB& obb) {
+    // Crop the region around the OBB
+    float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
+    float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
+    float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
+    float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
+    
+    // Add some padding around the region
+    float padding = 10.0f;
+    int x1 = std::max(0, (int)(min_x - padding));
+    int y1 = std::max(0, (int)(min_y - padding));
+    int x2 = std::min(frame.cols - 1, (int)(max_x + padding));
+    int y2 = std::min(frame.rows - 1, (int)(max_y + padding));
+    
+    if (x2 <= x1 || y2 <= y1) return false;
+    
+    // Crop the region
+    cv::Rect roi(x1, y1, x2 - x1, y2 - y1);
+    cv::Mat cropped_region = frame(roi);
+    
+    // Convert to grayscale if needed
+    cv::Mat gray_region;
+    if (cropped_region.channels() == 3) {
+        cv::cvtColor(cropped_region, gray_region, cv::COLOR_BGR2GRAY);
+    } else {
+        gray_region = cropped_region;
+    }
+    
+    // Apply threshold to get binary image
+    cv::Mat binary_region;
+    cv::threshold(gray_region, binary_region, 50, 255, cv::THRESH_BINARY);
+    
     // Find contours in the binary region
     std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(cropped_region, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    cv::findContours(binary_region, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
     if (contours.empty()) return false;
     
@@ -1241,253 +1039,49 @@ bool OBBDetector::is_square_in_region(const cv::Mat& cropped_region) {
     double rectangularity = contour_area / rect_area;
     
     // A perfect rectangle has rectangularity = 1.0
-    // More stringent criteria: Accept as square/rectangle if rectangularity > 0.85
-    return rectangularity > 0.9;
+    return rectangularity > 0.8;
 }
 
-// Enhanced tracking methods implementation
-
-void OBBDetector::update_object_confidence(int object_id, bool detected) {
-    auto it = object_confidence.find(object_id);
-    if (it == object_confidence.end()) {
-        // New object, initialize with full confidence
-        object_confidence[object_id] = 1.0f;
-        object_missed_frames[object_id] = 0;
-        return;
-    }
-    
-    if (detected) {
-        // Object was detected, boost confidence much more aggressively
-        it->second = std::min(1.0f, it->second + 0.5f);  // Much faster confidence gain
-        object_missed_frames[object_id] = 0;
-    } else {
-        // Object was not detected, decay confidence much more slowly
-        it->second *= CONFIDENCE_DECAY_RATE;  // 0.95 = very slow decay
-        object_missed_frames[object_id]++;
-    }
-}
-
-void OBBDetector::update_object_velocity(int object_id, const cv::Point2f& new_center) {
-    // Add new position to history
-    object_position_history[object_id].push_back(new_center);
-    if (object_position_history[object_id].size() > MAX_POSITION_HISTORY) {
-        object_position_history[object_id].erase(object_position_history[object_id].begin());
-    }
-    
-    // Calculate velocity if we have at least 2 positions
-    if (object_position_history[object_id].size() >= 2) {
-        cv::Point2f velocity = new_center - object_position_history[object_id][object_position_history[object_id].size() - 2];
-        
-        // Smooth the velocity using exponential moving average
-        auto vel_it = object_velocity.find(object_id);
-        if (vel_it != object_velocity.end()) {
-            vel_it->second = VELOCITY_SMOOTHING_FACTOR * velocity + (1.0f - VELOCITY_SMOOTHING_FACTOR) * vel_it->second;
-        } else {
-            object_velocity[object_id] = velocity;
-        }
-    }
-}
-
-cv::Point2f OBBDetector::predict_object_position(int object_id) {
-    auto center_it = object_centers.find(object_id);
-    auto vel_it = object_velocity.find(object_id);
-    
-    if (center_it == object_centers.end()) {
-        return cv::Point2f(0, 0);
-    }
-    
-    cv::Point2f current_center = center_it->second;
-    
-    if (vel_it != object_velocity.end()) {
-        // Predict position based on velocity
-        return current_center + vel_it->second;
-    }
-    
-    return current_center;  // No velocity data, return current position
-}
-
-void OBBDetector::cleanup_old_objects() {
-    // Remove objects that have been missing for too long or have very low confidence
-    auto it = object_centers.begin();
-    while (it != object_centers.end()) {
-        int object_id = it->first;
-        
-        if (!should_keep_object_alive(object_id)) {
-            // Clean up stable object tracking
-            auto stable_it = object_stable_id.find(object_id);
-            if (stable_it != object_stable_id.end()) {
-                int stable_id = stable_it->second;
-                stable_id_to_object_id.erase(stable_id);
-                stable_object_last_center.erase(stable_id);
-                object_stable_id.erase(stable_it);
-            }
-            
-            // Clean up all tracking data
-            object_class_history.erase(object_id);
-            object_obb_history.erase(object_id);
-            object_frame_count.erase(object_id);
-            object_last_obb.erase(object_id);
-            object_confidence.erase(object_id);
-            object_missed_frames.erase(object_id);
-            object_velocity.erase(object_id);
-            object_position_history.erase(object_id);
-            
-            it = object_centers.erase(it);
-        } else {
-            ++it;
-        }
-    }
-}
-
-float OBBDetector::calculate_dynamic_distance_threshold(int object_id) {
-    // Much more generous base threshold
-    float base_threshold = TRACKING_DISTANCE_THRESHOLD;  // 300 pixels base
-    
-    // Adjust based on object size (much more generous for larger objects)
-    auto obb_it = object_last_obb.find(object_id);
-    if (obb_it != object_last_obb.end()) {
-        const OBB& obb = obb_it->second;
-        float width = std::max({obb.x1, obb.x2, obb.x3, obb.x4}) - std::min({obb.x1, obb.x2, obb.x3, obb.x4});
-        float height = std::max({obb.y1, obb.y2, obb.y3, obb.y4}) - std::min({obb.y1, obb.y2, obb.y3, obb.y4});
-        float size_factor = std::max(width, height) / 200.0f;  // Normalize to typical object size
-        base_threshold *= (1.0f + size_factor * 2.0f);  // Much more generous for larger objects
-    }
-    
-    // Much more generous confidence adjustment
-    auto conf_it = object_confidence.find(object_id);
-    if (conf_it != object_confidence.end()) {
-        float confidence_factor = 0.8f + 0.2f * conf_it->second;  // Range: 0.8 to 1.0 (much more generous)
-        base_threshold *= confidence_factor;
-    }
-    
-    // Much more generous velocity adjustment
-    auto vel_it = object_velocity.find(object_id);
-    if (vel_it != object_velocity.end()) {
-        float velocity_magnitude = cv::norm(vel_it->second);
-        float velocity_factor = 1.0f + velocity_magnitude / 20.0f;  // Much more generous velocity scaling
-        base_threshold *= velocity_factor;
-    }
-    
-    // Ensure minimum threshold is very generous
-    return std::max(base_threshold, 200.0f);  // Minimum 200 pixels
-}
-
-bool OBBDetector::should_keep_object_alive(int object_id) {
-    // Check if object has been missing for too many frames
-    auto missed_it = object_missed_frames.find(object_id);
-    if (missed_it != object_missed_frames.end() && missed_it->second > OBJECT_PERSISTENCE_FRAMES) {
-        return false;
-    }
-    
-    // Check if object confidence is too low
-    auto conf_it = object_confidence.find(object_id);
-    if (conf_it != object_confidence.end() && conf_it->second < MIN_CONFIDENCE_THRESHOLD) {
-        return false;
-    }
-    
-    return true;
-}
-
-// Lock-in system implementation
-
-bool OBBDetector::should_lock_detections(const std::vector<OBB>& detections) {
-    // Don't lock if we already have locked detections
-    if (detections_locked) return false;
-    
-    // Need at least 2 objects to lock
-    if (detections.size() < 2) return false;
-    
-    // Check if we have enough consistent frames
-    if (frames_since_last_update < min_frames_for_lock) return false;
-    
-    // Check if all objects have high confidence
-    for (const auto& detection : detections) {
-        auto conf_it = object_confidence.find(detection.object_id);
-        if (conf_it == object_confidence.end() || conf_it->second < lock_confidence_threshold) {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-void OBBDetector::lock_detections(const std::vector<OBB>& detections) {
-    locked_detections = detections;
-    detections_locked = true;
-    frames_since_last_update = 0;
-    std::cout << "OBB Detector: Locked " << detections.size() << " detections with high confidence" << std::endl;
-}
-
-bool OBBDetector::should_unlock_detections(const std::vector<OBB>& detections) {
-    // Don't unlock if we're not locked
-    if (!detections_locked) return false;
-    
-    // Force unlock after too many frames without update
-    if (frames_since_last_update > MAX_FRAMES_WITHOUT_UPDATE) {
-        std::cout << "OBB Detector: Forcing unlock after " << MAX_FRAMES_WITHOUT_UPDATE << " frames" << std::endl;
+bool OBBDetector::should_update_detections(const std::vector<OBB>& new_detections) {
+    // If we don't have stable detections yet, always update
+    if (!detections_stable) {
         return true;
     }
     
-    // Unlock if detection count changed significantly
-    if (std::abs((int)detections.size() - (int)locked_detections.size()) > 1) {
-        std::cout << "OBB Detector: Unlocking due to detection count change: " 
-                  << locked_detections.size() << " -> " << detections.size() << std::endl;
+    // If detection count changed significantly, update
+    if (std::abs((int)new_detections.size() - (int)stable_detections.size()) > 0) {
+        std::cout << "OBB: Detection count changed: " << stable_detections.size() << " -> " << new_detections.size() << std::endl;
         return true;
     }
     
-    // Unlock if any object moved too much
-    for (const auto& current_detection : detections) {
-        for (const auto& locked_detection : locked_detections) {
-            if (current_detection.object_id == locked_detection.object_id) {
-                // Calculate distance between centers
-                cv::Point2f current_center = compute_centroid({
-                    cv::Point2f(current_detection.x1, current_detection.y1),
-                    cv::Point2f(current_detection.x2, current_detection.y2),
-                    cv::Point2f(current_detection.x3, current_detection.y3),
-                    cv::Point2f(current_detection.x4, current_detection.y4)
-                });
-                
-                cv::Point2f locked_center = compute_centroid({
-                    cv::Point2f(locked_detection.x1, locked_detection.y1),
-                    cv::Point2f(locked_detection.x2, locked_detection.y2),
-                    cv::Point2f(locked_detection.x3, locked_detection.y3),
-                    cv::Point2f(locked_detection.x4, locked_detection.y4)
-                });
-                
-                float distance = cv::norm(current_center - locked_center);
-                if (distance > 100.0f) {  // Significant movement threshold
-                    std::cout << "OBB Detector: Unlocking due to significant movement: " << distance << " pixels" << std::endl;
-                    return true;
-                }
+    // If any object moved significantly, update
+    for (const auto& new_detection : new_detections) {
+        for (const auto& stable_detection : stable_detections) {
+            // Calculate distance between centers
+            cv::Point2f new_center = compute_centroid({
+                cv::Point2f(new_detection.x1, new_detection.y1),
+                cv::Point2f(new_detection.x2, new_detection.y2),
+                cv::Point2f(new_detection.x3, new_detection.y3),
+                cv::Point2f(new_detection.x4, new_detection.y4)
+            });
+            
+            cv::Point2f stable_center = compute_centroid({
+                cv::Point2f(stable_detection.x1, stable_detection.y1),
+                cv::Point2f(stable_detection.x2, stable_detection.y2),
+                cv::Point2f(stable_detection.x3, stable_detection.y3),
+                cv::Point2f(stable_detection.x4, stable_detection.y4)
+            });
+            
+            float distance = cv::norm(new_center - stable_center);
+            if (distance > 50.0f) {  // Significant movement threshold
+                std::cout << "OBB: Object moved significantly: " << distance << " pixels" << std::endl;
+                return true;
             }
         }
     }
     
+    // No significant changes, keep stable detections
     return false;
 }
 
-std::vector<OBB> OBBDetector::get_locked_or_current_detections(const std::vector<OBB>& current_detections) {
-    frames_since_last_update++;
-    
-    // If we have locked detections and shouldn't unlock, use them
-    if (detections_locked && !should_unlock_detections(current_detections)) {
-        return locked_detections;
-    }
-    
-    // If we should unlock, do it
-    if (detections_locked) {
-        detections_locked = false;
-        locked_detections.clear();
-        std::cout << "OBB Detector: Unlocked detections, using current detections" << std::endl;
-    }
-    
-    // If we should lock current detections, do it
-    if (should_lock_detections(current_detections)) {
-        lock_detections(current_detections);
-        return locked_detections;
-    }
-    
-    // Otherwise, use current detections
-    return current_detections;
-}
 

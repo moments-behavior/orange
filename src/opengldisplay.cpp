@@ -305,16 +305,12 @@ void COpenGLDisplay::ThreadRunning() {
                         int assigned_slot = -1;
                         
                         // Simple slot assignment: assign to first available slot
-                        // This prevents coordinate confusion from proximity-based assignment
                         if (!obb_slot_valid[0]) {
                             assigned_slot = 0;
                         } else if (!obb_slot_valid[1]) {
                             assigned_slot = 1;
                         } else {
-                            // Both slots occupied, assign to closest slot
-                            float d0 = std::hypot(cx - obb_slot_cx[0], cy - obb_slot_cy[0]);
-                            float d1 = std::hypot(cx - obb_slot_cx[1], cy - obb_slot_cy[1]);
-                            assigned_slot = (d0 <= d1) ? 0 : 1;
+                            assigned_slot = -1;  // No slots available
                         }
                         
                         // Always draw the object regardless of slot assignment

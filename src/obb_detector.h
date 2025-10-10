@@ -106,29 +106,11 @@ public:
     };
     XYWHR obb_to_xywhr(const OBB& obb);
     
-    // Object tracking and post-classification shape verification
-    std::vector<OBB> deduplicate_detections(const std::vector<OBB>& detections);
-    std::vector<OBB> assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections, const cv::Mat& frame);
-    int assign_stable_object_id(int object_id, const cv::Point2f& center);
-    bool verify_shape_in_region(const OBB& obb, const cv::Mat& frame);
-    bool is_circle_in_region(const cv::Mat& cropped_region);
-    bool is_square_in_region(const cv::Mat& cropped_region);
-    OBB smooth_obb_coordinates(int object_id, const OBB& current_obb);
-    bool is_object_stable(int object_id);
-    
-    // Enhanced tracking methods
-    void update_object_confidence(int object_id, bool detected);
-    void update_object_velocity(int object_id, const cv::Point2f& new_center);
-    cv::Point2f predict_object_position(int object_id);
-    void cleanup_old_objects();
-    float calculate_dynamic_distance_threshold(int object_id);
-    bool should_keep_object_alive(int object_id);
-    
-    // Lock-in system methods
-    bool should_lock_detections(const std::vector<OBB>& detections);
-    void lock_detections(const std::vector<OBB>& detections);
-    bool should_unlock_detections(const std::vector<OBB>& detections);
-    std::vector<OBB> get_locked_or_current_detections(const std::vector<OBB>& current_detections);
+    // Simple detection and shape verification
+    std::vector<OBB> detect_objects(const cv::Mat& frame);
+    bool is_circle_in_region(const cv::Mat& frame, const OBB& obb);
+    bool is_square_in_region(const cv::Mat& frame, const OBB& obb);
+    bool should_update_detections(const std::vector<OBB>& new_detections);
     
     // Debug function to print learned priors
     void print_priors();
@@ -197,48 +179,10 @@ private:
     std::atomic<uint64_t> frames_processed;
     std::atomic<uint64_t> detections_found;
     
-    // Object tracking
-    int next_object_id;
-    std::map<int, std::vector<int>> object_class_history;  // object_id -> list of recent class_ids
-    std::map<int, cv::Point2f> object_centers;  // object_id -> last known center
-    std::map<int, OBB> object_last_obb;  // Store last OBB for each object
-    std::map<int, std::vector<OBB>> object_obb_history;  // History for smoothing
-    std::map<int, int> object_frame_count;  // How many frames object has been seen
-    
-    // Enhanced tracking with temporal persistence
-    std::map<int, float> object_confidence;  // object_id -> confidence score (0.0 to 1.0)
-    std::map<int, int> object_missed_frames;  // object_id -> frames since last detection
-    std::map<int, cv::Point2f> object_velocity;  // object_id -> velocity vector for prediction
-    std::map<int, std::vector<cv::Point2f>> object_position_history;  // For velocity calculation
-    
-    // Lock-in system: keep stable detections until confident change
-    std::vector<OBB> locked_detections;  // The stable detections we keep using
-    bool detections_locked;  // Whether we're using locked detections
-    int frames_since_last_update;  // Frames since we last updated locked detections
-    float lock_confidence_threshold;  // Confidence needed to lock in detections
-    int min_frames_for_lock;  // Minimum frames of consistent detection before locking
-    
-    // Stable object identity tracking
-    std::map<int, int> object_stable_id;  // Maps internal object_id to stable_id
-    std::map<int, int> stable_id_to_object_id;  // Reverse mapping
-    int next_stable_id;
-    std::map<int, cv::Point2f> stable_object_last_center;  // Last known center for stable objects
-    
-    // Much more aggressive tracking parameters for stability
-    static constexpr int MAX_CLASS_HISTORY = 10;  // Keep last 10 classifications for better stability
-    static constexpr int MAX_OBB_HISTORY = 15;  // Keep last 15 OBBs for much better smoothing
-    static constexpr int MIN_FRAMES_FOR_STABLE = 2;  // Only require 2 frames before object is considered stable
-    static constexpr int OBJECT_PERSISTENCE_FRAMES = 30;  // Keep objects alive for 30 frames even if undetected
-    static constexpr float TRACKING_DISTANCE_THRESHOLD = 300.0f;  // Much larger distance threshold for better association
-    static constexpr float CONFIDENCE_DECAY_RATE = 0.95f;  // Much slower confidence decay per missed frame
-    static constexpr float MIN_CONFIDENCE_THRESHOLD = 0.1f;  // Much lower minimum confidence to keep object alive
-    static constexpr float VELOCITY_SMOOTHING_FACTOR = 0.1f;  // Much stronger smoothing factor for velocity calculation
-    static constexpr int MAX_POSITION_HISTORY = 10;  // Keep more position history for velocity calculation
-    
-    // Lock-in system parameters
-    static constexpr float LOCK_CONFIDENCE_THRESHOLD = 0.8f;  // High confidence needed to lock detections
-    static constexpr int MIN_FRAMES_FOR_LOCK = 5;  // Need 5 consistent frames before locking
-    static constexpr int MAX_FRAMES_WITHOUT_UPDATE = 50;  // Force update after 50 frames even if locked
+    // Simple stable detection tracking
+    std::vector<OBB> stable_detections;  // Current stable detections
+    bool detections_stable;  // Whether we have stable detections
+    int frames_since_change;  // Frames since last significant change
 };
 
 #endif // ORANGE_OBB_DETECTOR

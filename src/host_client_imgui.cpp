@@ -1112,6 +1112,7 @@ void host_client_draw_gui() {
             g_waiting = true;
         }
     }
+
     ImGui::SameLine();
     if (ImGui::Button("Resend")) {
         broadcast_current_phase();
@@ -1135,6 +1136,25 @@ void host_client_draw_gui() {
             ImGui::TextUnformatted(line.c_str());
     }
     ImGui::EndChild();
+
+    {
+        static int last_phase = -1;
+
+        // Detect phase change
+        if (g_phase != last_phase) {
+            // Auto-continue only for calibration
+            if (g_jid == "calibration" && !g_waiting && g_phase != Phase_Done &&
+                g_phase != Phase_TakeGlobalPicture) {
+                g_ack_by.clear();
+                for (const auto &name : g_servers)
+                    g_ack_by[name] = false;
+                broadcast_current_phase();
+                g_last_send = std::chrono::steady_clock::now();
+                g_waiting = true; // arm next phase automatically
+            }
+            last_phase = g_phase;
+        }
+    }
 
     ImGui::End();
 }

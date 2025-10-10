@@ -287,6 +287,9 @@ void COpenGLDisplay::ThreadRunning() {
                             std::cout << "OBB: Object " << obb.object_id << " detected - Class " << obb.class_id 
                                       << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
                                       << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
+                            std::cout << "OBB: Raw corners: (" << obb.x1 << "," << obb.y1 << ") (" 
+                                      << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 
+                                      << ") (" << obb.x4 << "," << obb.y4 << ")" << std::endl;
                         }
                         frame_counter++;
                         
@@ -339,6 +342,7 @@ void COpenGLDisplay::ThreadRunning() {
                                                      sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                                 
                                 // Draw axis-aligned bounding box in green for vertical cylinder (class 0)
+                                std::cout << "DEBUG: Drawing AABB for class 0 at: (" << min_x << "," << min_y << ") to (" << max_x << "," << max_y << ")" << std::endl;
                                 gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                             camera_params->height, d_obb_points + i * 8, 
                                             obb.class_id, 0, 0, 255, 0);  // Green for vertical cylinder
@@ -367,6 +371,9 @@ void COpenGLDisplay::ThreadRunning() {
                                                      sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                                 
                                 // Draw oriented bounding box in blue for horizontal cylinder (class 2)
+                                std::cout << "DEBUG: Drawing OBB for class 2 at corners: (" << obb.x1 << "," << obb.y1 << ") (" 
+                                          << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 << ") (" 
+                                          << obb.x4 << "," << obb.y4 << ")" << std::endl;
                                 gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                             camera_params->height, d_obb_points + i * 8, 
                                             obb.class_id, 0, 255, 0, 0);  // Blue for horizontal cylinder
@@ -447,6 +454,7 @@ void COpenGLDisplay::ThreadRunning() {
                                 sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
                                 sample_file << "Using locked detections: " << (detections_changed ? "NO (new detections)" : "YES (same as before)") << std::endl;
                                 sample_file << "Drawing colors: Green=Vertical Cylinder (class 0), Blue=Horizontal Cylinder (class 2)" << std::endl;
+                                sample_file << "Camera dimensions: " << camera_params->width << "x" << camera_params->height << std::endl;
                                 sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
                                 sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;
                                 
@@ -460,6 +468,9 @@ void COpenGLDisplay::ThreadRunning() {
                                               << ", Shape Verified: " << (obb.shape_verified ? "YES" : "NO")
                                               << ", xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
                                               << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
+                                    sample_file << "    Raw corners: (" << obb.x1 << "," << obb.y1 << ") (" 
+                                              << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 
+                                              << ") (" << obb.x4 << "," << obb.y4 << ")" << std::endl;
                                 }
                                 
                                 // Print readable OBB structure content

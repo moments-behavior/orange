@@ -27,7 +27,7 @@ static int g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
-static bool g_first_robot;
+static bool g_first_robot = true;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -582,8 +582,8 @@ static void advance_phase(std::string job_id) {
         case Phase_BumblebeeBoard:
             g_phase = Phase_TakePicture;
             break;
-        case Phase_TakePicture:
-            if (g_picture_id == 75) {
+        case Phase_TakePicture: {
+            if (g_picture_id >= 75) {
                 g_phase = Phase_TakePicture;
             } else if (g_picture_id == 77) {
                 g_phase = Phase_Stop;
@@ -591,6 +591,7 @@ static void advance_phase(std::string job_id) {
                 g_phase = Phase_NextPose;
             }
             break;
+        }
         case Phase_NextPose: {
             if (g_first_robot && g_picture_id == 41) {
                 g_phase = Phase_GrimlockBoard;
@@ -612,7 +613,7 @@ static void advance_phase(std::string job_id) {
 }
 
 static void reset_session() {
-    g_jid = "recording";
+    // g_jid = "recording";
     g_epoch = 1;
     g_seq = 1;
     g_phase = Phase_Open;

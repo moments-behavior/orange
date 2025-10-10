@@ -904,30 +904,26 @@ std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
             obb.class_id = 0;  // Vertical cylinder (circle)
             std::cout << "OBB: Confirmed circle (circularity > 0.85)" << std::endl;
         } else if (is_square) {
-            // Confirmed square/rectangle - keep oriented bounding box
+            // Confirmed square/rectangle - extract proper OBB corners
+            // Get the minimum area rectangle that fits the square
+            std::vector<cv::Point2f> square_points = {candidate[0], candidate[1], candidate[2], candidate[3]};
+            cv::RotatedRect rect = cv::minAreaRect(square_points);
+            
+            // Get the 4 corners of the rotated rectangle
+            cv::Point2f corners[4];
+            rect.points(corners);
+            
+            // Update OBB with proper square corners
+            obb.x1 = corners[0].x; obb.y1 = corners[0].y;  // Corner 1
+            obb.x2 = corners[1].x; obb.y2 = corners[1].y;  // Corner 2
+            obb.x3 = corners[2].x; obb.y3 = corners[2].y;  // Corner 3
+            obb.x4 = corners[3].x; obb.y4 = corners[3].y;  // Corner 4
             obb.class_id = 2;  // Horizontal cylinder (square)
-            std::cout << "OBB: Confirmed square (rectangularity > 0.85)" << std::endl;
+            std::cout << "OBB: Confirmed square (rectangularity > 0.85) - extracted OBB corners" << std::endl;
         } else {
-            // Shape verification failed - use CSV priors as fallback
-            if (class_id == 0) {
-                // CSV says vertical cylinder, but shape verification failed
-                // Assume it's a circle anyway and use axis-aligned box
-                float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
-                float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
-                float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
-                float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
-                
-                obb.x1 = min_x; obb.y1 = min_y;  // Top-left
-                obb.x2 = max_x; obb.y2 = min_y;  // Top-right
-                obb.x3 = max_x; obb.y3 = max_y;  // Bottom-right
-                obb.x4 = min_x; obb.y4 = max_y;  // Bottom-left
-                obb.class_id = 0;  // Vertical cylinder (circle)
-                std::cout << "OBB: Fallback to circle based on CSV priors" << std::endl;
-            } else {
-                // CSV says horizontal cylinder or unknown - keep oriented bounding box
-                obb.class_id = 2;  // Horizontal cylinder (oriented)
-                std::cout << "OBB: Fallback to oriented box based on CSV priors" << std::endl;
-            }
+            // Shape verification failed - skip this detection
+            std::cout << "OBB: Shape verification failed - skipping detection" << std::endl;
+            continue;
         }
         
         detections.push_back(obb);

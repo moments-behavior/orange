@@ -149,6 +149,10 @@ void COpenGLDisplay::ThreadRunning() {
     static std::vector<OBB> last_locked_detections;
     static bool last_detections_sent = false;
     
+    // Static variables for persistent slot tracking
+    static int persistent_slot_assignments[2] = {-1, -1};  // Object IDs assigned to each slot
+    static bool slots_initialized = false;
+    
     // OBB Background Building
 
     int frameCount = 0;
@@ -261,6 +265,13 @@ void COpenGLDisplay::ThreadRunning() {
                         last_locked_detections = obb_detections;
                         last_detections_sent = true;
                         
+                        // Reset slot assignments when detections change significantly
+                        if (detections_changed) {
+                            slots_initialized = false;
+                            persistent_slot_assignments[0] = -1;
+                            persistent_slot_assignments[1] = -1;
+                        }
+                        
                         std::cout << "OBB: Updating " << obb_detections.size() << " locked detections (changed: " 
                                   << (detections_changed ? "yes" : "no") << ")" << std::endl;
                     } else {
@@ -295,7 +306,7 @@ void COpenGLDisplay::ThreadRunning() {
                         
                         // Use shape verification result from OBB detector
                         bool shape_verified = obb.shape_verified;
-                        // Map label: 0 = shape verified (correct drawing), 1 = shape mismatch (fallback drawing)
+                        // Label: 0 = shape verified, 1 = shape not verified (but we keep the detection)
                         float fb_label = shape_verified ? 0.0f : 1.0f;
                         
                         // Always draw all detected objects, but still assign slots for FlatBuffer compatibility
@@ -304,13 +315,27 @@ void COpenGLDisplay::ThreadRunning() {
                         float cy = center.y;
                         int assigned_slot = -1;
                         
-                        // Simple slot assignment: assign to first available slot
-                        if (!obb_slot_valid[0]) {
-                            assigned_slot = 0;
-                        } else if (!obb_slot_valid[1]) {
-                            assigned_slot = 1;
+                        // Persistent slot assignment: only change when detections change significantly
+                        if (!slots_initialized) {
+                            // First time or after significant change - assign slots based on object ID
+                            if (obb.object_id == 0) {
+                                assigned_slot = 0;
+                                persistent_slot_assignments[0] = obb.object_id;
+                            } else if (obb.object_id == 1) {
+                                assigned_slot = 1;
+                                persistent_slot_assignments[1] = obb.object_id;
+                            } else {
+                                assigned_slot = -1;  // More than 2 objects
+                            }
                         } else {
-                            assigned_slot = -1;  // No slots available
+                            // Use persistent slot assignments
+                            if (persistent_slot_assignments[0] == obb.object_id) {
+                                assigned_slot = 0;
+                            } else if (persistent_slot_assignments[1] == obb.object_id) {
+                                assigned_slot = 1;
+                            } else {
+                                assigned_slot = -1;  // Object not in persistent slots
+                            }
                         }
                         
                         // Always draw the object regardless of slot assignment
@@ -318,12 +343,13 @@ void COpenGLDisplay::ThreadRunning() {
                         std::cout << "DEBUG: Processing object " << i << " - Class " << obb.class_id 
                                   << ", Object ID " << obb.object_id 
                                   << ", Assigned slot " << assigned_slot 
+                                  << ", Slots initialized: " << (slots_initialized ? "YES" : "NO")
                                   << ", Should draw: " << (should_draw ? "YES" : "NO") << std::endl;
 
-                        if (should_draw && shape_verified) {
-                            // Shape verification passed - draw according to class
+                        if (should_draw) {
+                            // Draw according to detected class - no fallback, keep what we detected
                             if (obb.class_id == 0) {
-                                // Class 0 (CylinderVertical) - draw non-oriented (axis-aligned) bounding box
+                                // Class 0 (Vertical Cylinder) - draw axis-aligned bounding box in green
                                 float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
                                 float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
                                 float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
@@ -339,7 +365,7 @@ void COpenGLDisplay::ThreadRunning() {
                                 CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
                                                      sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                                 
-                                // Draw axis-aligned bounding box in green for vertical cylinder (class 0)
+                                // Draw axis-aligned bounding box in green for vertical cylinder
                                 std::cout << "DEBUG: Drawing AABB for class 0 at: (" << min_x << "," << min_y << ") to (" << max_x << "," << max_y << ")" << std::endl;
                                 gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                             camera_params->height, d_obb_points + i * 8, 
@@ -357,7 +383,7 @@ void COpenGLDisplay::ThreadRunning() {
                                     else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = cx; obb_slot_cy[1] = cy; }
                                 }
                             } else {
-                                // Class 2 (CylinderSide) - draw oriented bounding box
+                                // Class 2 (Horizontal Cylinder) - draw oriented bounding box in red
                                 float obb_points[8] = {
                                     obb.x1, obb.y1,  // Top-left
                                     obb.x2, obb.y2,  // Top-right
@@ -368,13 +394,13 @@ void COpenGLDisplay::ThreadRunning() {
                                 CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
                                                      sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                                 
-                                // Draw oriented bounding box in blue for horizontal cylinder (class 2)
+                                // Draw oriented bounding box in red for horizontal cylinder
                                 std::cout << "DEBUG: Drawing OBB for class 2 at corners: (" << obb.x1 << "," << obb.y1 << ") (" 
                                           << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 << ") (" 
                                           << obb.x4 << "," << obb.y4 << ")" << std::endl;
                                 gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                             camera_params->height, d_obb_points + i * 8, 
-                                            obb.class_id, 0, 255, 0, 0);  // Blue for horizontal cylinder
+                                            obb.class_id, 0, 255, 0, 0);  // Red for horizontal cylinder
                                 
                                 // Populate flatbuffer with oriented OBB (theta from xywhr)
                                 if (assigned_slot != -1) {
@@ -383,40 +409,14 @@ void COpenGLDisplay::ThreadRunning() {
                                     else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
                                 }
                             }
-                        } else if (should_draw) {
-                            // Shape verification failed - draw fallback (axis-aligned) bounding box in green
-                            float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
-                            float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
-                            float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
-                            float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
-                            
-                            float aabb_points[8] = {
-                                min_x, min_y,  // Top-left
-                                max_x, min_y,  // Top-right
-                                max_x, max_y,  // Bottom-right
-                                min_x, max_y   // Bottom-left
-                            };
-                            
-                            CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
-                                                 sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
-                            
-                            // Draw axis-aligned bounding box in green for shape mismatch
-                            gpu_draw_obb(debayer.d_debayer, camera_params->width, 
-                                        camera_params->height, d_obb_points + i * 8, 
-                                        obb.class_id, 0, 0, 255, 0);  // Green color
-                            
-                            // Populate flatbuffer with AABB (theta = 0) and label = 1
-                            if (assigned_slot != -1) {
-                                float cx = 0.5f * (min_x + max_x);
-                                float cy = 0.5f * (min_y + max_y);
-                                float w = (max_x - min_x);
-                                float h = (max_y - min_y);
-                                float theta = 0.0f;
-                                auto fb_obj = Obj::Createobb(*fb, cx, cy, w, h, theta, fb_label);
-                                if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = cx; obb_slot_cy[0] = cy; }
-                                else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = cx; obb_slot_cy[1] = cy; }
-                            }
                         }
+                    }
+                    
+                    // Mark slots as initialized after processing all objects
+                    if (!slots_initialized) {
+                        slots_initialized = true;
+                        std::cout << "DEBUG: Slots initialized - Slot 0: Object " << persistent_slot_assignments[0] 
+                                  << ", Slot 1: Object " << persistent_slot_assignments[1] << std::endl;
                     }
 
                     // Ensure both objects exist in message (use zero object if not filled)
@@ -451,7 +451,7 @@ void COpenGLDisplay::ThreadRunning() {
                                     std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
                                 sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
                                 sample_file << "Using locked detections: " << (detections_changed ? "NO (new detections)" : "YES (same as before)") << std::endl;
-                                sample_file << "Drawing colors: Green=Vertical Cylinder (class 0), Blue=Horizontal Cylinder (class 2)" << std::endl;
+                                sample_file << "Drawing colors: Green=Vertical Cylinder (class 0), Red=Horizontal Cylinder (class 2)" << std::endl;
                                 sample_file << "Camera dimensions: " << camera_params->width << "x" << camera_params->height << std::endl;
                                 sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
                                 sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;

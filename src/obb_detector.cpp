@@ -886,37 +886,32 @@ std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
                candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
                class_id, 1.0f);
         
-        // Use CSV priors to determine if this should be a vertical cylinder (circle)
-        bool is_vertical_cylinder = (class_id == 0);  // Class 0 from CSV priors
+        // Use shape verification to determine if this is actually a circle or square
+        bool is_circle = is_circle_in_region(frame, obb);
+        bool is_square = is_square_in_region(frame, obb);
         
-        if (is_vertical_cylinder) {
-            // Check if this is actually a circle by comparing areas
-            // CSV priors tell us the expected circle area (width * height = diameter^2)
-            // For a circle: area = π * (diameter/2)^2 = π * diameter^2 / 4
-            // So expected_circle_area = π * (width * height) / 4
+        if (is_circle) {
+            // Confirmed circle - use axis-aligned bounding box
+            float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
+            float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
+            float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
+            float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
             
-            // Get the detected area from the oriented bounding box
-            auto wh = rect_wh_from_pts(candidate);
-            float detected_area = wh.first * wh.second;
-            
-            // Calculate expected circle area from CSV priors
-            float expected_circle_area = 0.0f;
-            if (priors.find(0) != priors.end()) {
-                const ClassPrior& prior = priors[0];
-                // Use median area from CSV as expected circle area
-                expected_circle_area = prior.area_median;
-            }
-            
-            // Check if detected area matches expected circle area (within tolerance)
-            bool area_matches_circle = false;
-            if (expected_circle_area > 0) {
-                float area_ratio = detected_area / expected_circle_area;
-                // Allow 20% tolerance for area matching
-                area_matches_circle = (area_ratio >= 0.8f && area_ratio <= 1.2f);
-            }
-            
-            if (area_matches_circle) {
-                // Confirmed circle - use axis-aligned bounding box
+            obb.x1 = min_x; obb.y1 = min_y;  // Top-left
+            obb.x2 = max_x; obb.y2 = min_y;  // Top-right
+            obb.x3 = max_x; obb.y3 = max_y;  // Bottom-right
+            obb.x4 = min_x; obb.y4 = max_y;  // Bottom-left
+            obb.class_id = 0;  // Vertical cylinder (circle)
+            std::cout << "OBB: Confirmed circle (circularity > 0.85)" << std::endl;
+        } else if (is_square) {
+            // Confirmed square/rectangle - keep oriented bounding box
+            obb.class_id = 2;  // Horizontal cylinder (square)
+            std::cout << "OBB: Confirmed square (rectangularity > 0.85)" << std::endl;
+        } else {
+            // Shape verification failed - use CSV priors as fallback
+            if (class_id == 0) {
+                // CSV says vertical cylinder, but shape verification failed
+                // Assume it's a circle anyway and use axis-aligned box
                 float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
                 float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
                 float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
@@ -927,17 +922,12 @@ std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
                 obb.x3 = max_x; obb.y3 = max_y;  // Bottom-right
                 obb.x4 = min_x; obb.y4 = max_y;  // Bottom-left
                 obb.class_id = 0;  // Vertical cylinder (circle)
-                std::cout << "OBB: Confirmed circle - detected area: " << detected_area 
-                          << ", expected: " << expected_circle_area << std::endl;
+                std::cout << "OBB: Fallback to circle based on CSV priors" << std::endl;
             } else {
-                // Not a circle - keep oriented bounding box but mark as horizontal cylinder
+                // CSV says horizontal cylinder or unknown - keep oriented bounding box
                 obb.class_id = 2;  // Horizontal cylinder (oriented)
-                std::cout << "OBB: Not a circle - detected area: " << detected_area 
-                          << ", expected: " << expected_circle_area << std::endl;
+                std::cout << "OBB: Fallback to oriented box based on CSV priors" << std::endl;
             }
-        } else {
-            // Not classified as vertical cylinder by CSV priors - keep oriented bounding box
-            obb.class_id = 2;  // Horizontal cylinder (oriented)
         }
         
         detections.push_back(obb);
@@ -1003,7 +993,8 @@ bool OBBDetector::is_circle_in_region(const cv::Mat& frame, const OBB& obb) {
     double circularity = (4.0 * M_PI * area) / (perimeter * perimeter);
     
     // A perfect circle has circularity = 1.0
-    return circularity > 0.8;
+    // More stringent criteria: Accept as circle if circularity > 0.85
+    return circularity > 0.85;
 }
 
 bool OBBDetector::is_square_in_region(const cv::Mat& frame, const OBB& obb) {
@@ -1069,7 +1060,8 @@ bool OBBDetector::is_square_in_region(const cv::Mat& frame, const OBB& obb) {
     double rectangularity = contour_area / rect_area;
     
     // A perfect rectangle has rectangularity = 1.0
-    return rectangularity > 0.8;
+    // More stringent criteria: Accept as square/rectangle if rectangularity > 0.85
+    return rectangularity > 0.85;
 }
 
 bool OBBDetector::should_update_detections(const std::vector<OBB>& new_detections) {

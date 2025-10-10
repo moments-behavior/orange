@@ -181,6 +181,9 @@ void OBBDetector::thread_loop() {
             }
         }
         
+        // Deduplicate nearby detections (merge detections that are too close to each other)
+        detections = deduplicate_detections(detections);
+        
         // Assign object IDs and verify shapes
         detections = assign_object_ids_and_handle_flickering(detections, frame);
         
@@ -871,6 +874,61 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
             cv::circle(res, pt, 3, color, -1);
         }
     }
+}
+
+std::vector<OBB> OBBDetector::deduplicate_detections(const std::vector<OBB>& detections) {
+    if (detections.size() <= 1) return detections;
+    
+    std::vector<OBB> deduplicated;
+    std::vector<bool> used(detections.size(), false);
+    
+    for (size_t i = 0; i < detections.size(); i++) {
+        if (used[i]) continue;
+        
+        const OBB& current = detections[i];
+        cv::Point2f current_center = compute_centroid({
+            cv::Point2f(current.x1, current.y1),
+            cv::Point2f(current.x2, current.y2),
+            cv::Point2f(current.x3, current.y3),
+            cv::Point2f(current.x4, current.y4)
+        });
+        
+        // Find all nearby detections to merge
+        std::vector<size_t> to_merge = {i};
+        for (size_t j = i + 1; j < detections.size(); j++) {
+            if (used[j]) continue;
+            
+            const OBB& other = detections[j];
+            cv::Point2f other_center = compute_centroid({
+                cv::Point2f(other.x1, other.y1),
+                cv::Point2f(other.x2, other.y2),
+                cv::Point2f(other.x3, other.y3),
+                cv::Point2f(other.x4, other.y4)
+            });
+            
+            float distance = cv::norm(current_center - other_center);
+            // Merge if centers are within 100 pixels (same physical object)
+            if (distance < 100.0f) {
+                to_merge.push_back(j);
+                used[j] = true;
+            }
+        }
+        
+        // Choose the best detection from the merged group
+        OBB best_detection = current;
+        if (to_merge.size() > 1) {
+            // Prefer detections with higher confidence or better shape verification
+            // For now, just use the first one, but we could implement more sophisticated selection
+            std::cout << "DEBUG: Merging " << to_merge.size() << " nearby detections at center (" 
+                      << current_center.x << ", " << current_center.y << ")" << std::endl;
+        }
+        
+        deduplicated.push_back(best_detection);
+        used[i] = true;
+    }
+    
+    std::cout << "DEBUG: Deduplicated " << detections.size() << " detections to " << deduplicated.size() << std::endl;
+    return deduplicated;
 }
 
 std::vector<OBB> OBBDetector::assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections, const cv::Mat& frame) {

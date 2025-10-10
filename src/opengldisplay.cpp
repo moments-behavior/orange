@@ -298,31 +298,33 @@ void COpenGLDisplay::ThreadRunning() {
                         // Map label: 0 = shape verified (correct drawing), 1 = shape mismatch (fallback drawing)
                         float fb_label = shape_verified ? 0.0f : 1.0f;
                         
-                        // Decide which slot (0 or 1) this object should occupy based on centroid proximity
+                        // Always draw all detected objects, but still assign slots for FlatBuffer compatibility
                         auto center = obb_detector->obb_to_xywhr(obb);
                         float cx = center.x;
                         float cy = center.y;
                         int assigned_slot = -1;
-                        if (obb_slot_valid[0] && !obb_slot_valid[1]) {
+                        
+                        // Simple slot assignment: assign to first available slot
+                        // This prevents coordinate confusion from proximity-based assignment
+                        if (!obb_slot_valid[0]) {
+                            assigned_slot = 0;
+                        } else if (!obb_slot_valid[1]) {
+                            assigned_slot = 1;
+                        } else {
+                            // Both slots occupied, assign to closest slot
                             float d0 = std::hypot(cx - obb_slot_cx[0], cy - obb_slot_cy[0]);
-                            assigned_slot = (d0 <= OBB_SLOT_ASSIGN_DISTANCE) ? 0 : -1;
-                        } else if (!obb_slot_valid[0] && obb_slot_valid[1]) {
                             float d1 = std::hypot(cx - obb_slot_cx[1], cy - obb_slot_cy[1]);
-                            assigned_slot = (d1 <= OBB_SLOT_ASSIGN_DISTANCE) ? 1 : -1;
-                        } else if (obb_slot_valid[0] && obb_slot_valid[1]) {
-                            float d0 = std::hypot(cx - obb_slot_cx[0], cy - obb_slot_cy[0]);
-                            float d1 = std::hypot(cx - obb_slot_cx[1], cy - obb_slot_cy[1]);
-                            if (d0 <= d1 && d0 <= OBB_SLOT_ASSIGN_DISTANCE) assigned_slot = 0;
-                            else if (d1 < d0 && d1 <= OBB_SLOT_ASSIGN_DISTANCE) assigned_slot = 1;
-                            else assigned_slot = -1;
+                            assigned_slot = (d0 <= d1) ? 0 : 1;
                         }
-                        // If no valid slot found, occupy a free slot if any
-                        if (assigned_slot == -1) {
-                            if (!obb_slot_valid[0]) assigned_slot = 0;
-                            else if (!obb_slot_valid[1]) assigned_slot = 1;
-                        }
+                        
+                        // Always draw the object regardless of slot assignment
+                        bool should_draw = true;
+                        std::cout << "DEBUG: Processing object " << i << " - Class " << obb.class_id 
+                                  << ", Object ID " << obb.object_id 
+                                  << ", Assigned slot " << assigned_slot 
+                                  << ", Should draw: " << (should_draw ? "YES" : "NO") << std::endl;
 
-                        if (shape_verified) {
+                        if (should_draw && shape_verified) {
                             // Shape verification passed - draw according to class
                             if (obb.class_id == 0) {
                                 // Class 0 (CylinderVertical) - draw non-oriented (axis-aligned) bounding box
@@ -385,7 +387,7 @@ void COpenGLDisplay::ThreadRunning() {
                                     else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
                                 }
                             }
-                        } else {
+                        } else if (should_draw) {
                             // Shape verification failed - draw fallback (axis-aligned) bounding box in green
                             float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
                             float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});

@@ -107,6 +107,7 @@ public:
     XYWHR obb_to_xywhr(const OBB& obb);
     
     // Object tracking and post-classification shape verification
+    std::vector<OBB> deduplicate_detections(const std::vector<OBB>& detections);
     std::vector<OBB> assign_object_ids_and_handle_flickering(const std::vector<OBB>& detections, const cv::Mat& frame);
     int assign_stable_object_id(int object_id, const cv::Point2f& center);
     bool verify_shape_in_region(const OBB& obb, const cv::Mat& frame);

@@ -912,34 +912,59 @@ bool OBBDetector::should_update_detections(const std::vector<OBB>& new_detection
         return true;
     }
     
-    // If any object moved significantly, update
+    // If no detections, keep stable detections
+    if (new_detections.empty()) {
+        return false;
+    }
+    
+    // Find best matches between new and stable detections
+    std::vector<bool> stable_used(stable_detections.size(), false);
+    bool significant_movement = false;
+    
     for (const auto& new_detection : new_detections) {
-        for (const auto& stable_detection : stable_detections) {
-            // Calculate distance between centers
-            cv::Point2f new_center = compute_centroid({
-                cv::Point2f(new_detection.x1, new_detection.y1),
-                cv::Point2f(new_detection.x2, new_detection.y2),
-                cv::Point2f(new_detection.x3, new_detection.y3),
-                cv::Point2f(new_detection.x4, new_detection.y4)
-            });
+        // Calculate center of new detection
+        cv::Point2f new_center = compute_centroid({
+            cv::Point2f(new_detection.x1, new_detection.y1),
+            cv::Point2f(new_detection.x2, new_detection.y2),
+            cv::Point2f(new_detection.x3, new_detection.y3),
+            cv::Point2f(new_detection.x4, new_detection.y4)
+        });
+        
+        // Find closest stable detection
+        float min_distance = std::numeric_limits<float>::max();
+        int best_match_idx = -1;
+        
+        for (size_t i = 0; i < stable_detections.size(); i++) {
+            if (stable_used[i]) continue;  // Already matched
             
             cv::Point2f stable_center = compute_centroid({
-                cv::Point2f(stable_detection.x1, stable_detection.y1),
-                cv::Point2f(stable_detection.x2, stable_detection.y2),
-                cv::Point2f(stable_detection.x3, stable_detection.y3),
-                cv::Point2f(stable_detection.x4, stable_detection.y4)
+                cv::Point2f(stable_detections[i].x1, stable_detections[i].y1),
+                cv::Point2f(stable_detections[i].x2, stable_detections[i].y2),
+                cv::Point2f(stable_detections[i].x3, stable_detections[i].y3),
+                cv::Point2f(stable_detections[i].x4, stable_detections[i].y4)
             });
             
             float distance = cv::norm(new_center - stable_center);
-            if (distance > 50.0f) {  // Significant movement threshold
-                std::cout << "OBB: Object moved significantly: " << distance << " pixels" << std::endl;
-                return true;
+            if (distance < min_distance) {
+                min_distance = distance;
+                best_match_idx = i;
             }
+        }
+        
+        // Check if the best match moved significantly
+        if (best_match_idx >= 0 && min_distance > 50.0f) {
+            std::cout << "OBB: Object moved significantly: " << min_distance << " pixels" << std::endl;
+            significant_movement = true;
+            break;
+        }
+        
+        // Mark this stable detection as used
+        if (best_match_idx >= 0) {
+            stable_used[best_match_idx] = true;
         }
     }
     
-    // No significant changes, keep stable detections
-    return false;
+    return significant_movement;
 }
 
 

@@ -317,21 +317,21 @@ void COpenGLDisplay::ThreadRunning() {
                         
                         // Persistent slot assignment: only change when detections change significantly
                         if (!slots_initialized) {
-                            // First time or after significant change - assign slots based on object ID
-                            if (obb.object_id == 0) {
+                            // First time or after significant change - assign slots based on detection index
+                            if (i == 0) {
                                 assigned_slot = 0;
-                                persistent_slot_assignments[0] = obb.object_id;
-                            } else if (obb.object_id == 1) {
+                                persistent_slot_assignments[0] = i;
+                            } else if (i == 1) {
                                 assigned_slot = 1;
-                                persistent_slot_assignments[1] = obb.object_id;
+                                persistent_slot_assignments[1] = i;
                             } else {
                                 assigned_slot = -1;  // More than 2 objects
                             }
                         } else {
-                            // Use persistent slot assignments
-                            if (persistent_slot_assignments[0] == obb.object_id) {
+                            // Use persistent slot assignments based on detection index
+                            if (persistent_slot_assignments[0] == i) {
                                 assigned_slot = 0;
-                            } else if (persistent_slot_assignments[1] == obb.object_id) {
+                            } else if (persistent_slot_assignments[1] == i) {
                                 assigned_slot = 1;
                             } else {
                                 assigned_slot = -1;  // Object not in persistent slots
@@ -341,7 +341,7 @@ void COpenGLDisplay::ThreadRunning() {
                         // Always draw the object regardless of slot assignment
                         bool should_draw = true;
                         std::cout << "DEBUG: Processing object " << i << " - Class " << obb.class_id 
-                                  << ", Object ID " << obb.object_id 
+                                  << ", Detection Index " << i 
                                   << ", Assigned slot " << assigned_slot 
                                   << ", Slots initialized: " << (slots_initialized ? "YES" : "NO")
                                   << ", Should draw: " << (should_draw ? "YES" : "NO") << std::endl;
@@ -415,8 +415,8 @@ void COpenGLDisplay::ThreadRunning() {
                     // Mark slots as initialized after processing all objects
                     if (!slots_initialized) {
                         slots_initialized = true;
-                        std::cout << "DEBUG: Slots initialized - Slot 0: Object " << persistent_slot_assignments[0] 
-                                  << ", Slot 1: Object " << persistent_slot_assignments[1] << std::endl;
+                        std::cout << "DEBUG: Slots initialized - Slot 0: Detection Index " << persistent_slot_assignments[0] 
+                                  << ", Slot 1: Detection Index " << persistent_slot_assignments[1] << std::endl;
                     }
 
                     // Ensure both objects exist in message (use zero object if not filled)

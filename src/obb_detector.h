@@ -115,6 +115,14 @@ public:
     OBB smooth_obb_coordinates(int object_id, const OBB& current_obb);
     bool is_object_stable(int object_id);
     
+    // Enhanced tracking methods
+    void update_object_confidence(int object_id, bool detected);
+    void update_object_velocity(int object_id, const cv::Point2f& new_center);
+    cv::Point2f predict_object_position(int object_id);
+    void cleanup_old_objects();
+    float calculate_dynamic_distance_threshold(int object_id);
+    bool should_keep_object_alive(int object_id);
+    
     // Debug function to print learned priors
     void print_priors();
     
@@ -190,15 +198,28 @@ private:
     std::map<int, std::vector<OBB>> object_obb_history;  // History for smoothing
     std::map<int, int> object_frame_count;  // How many frames object has been seen
     
+    // Enhanced tracking with temporal persistence
+    std::map<int, float> object_confidence;  // object_id -> confidence score (0.0 to 1.0)
+    std::map<int, int> object_missed_frames;  // object_id -> frames since last detection
+    std::map<int, cv::Point2f> object_velocity;  // object_id -> velocity vector for prediction
+    std::map<int, std::vector<cv::Point2f>> object_position_history;  // For velocity calculation
+    
     // Stable object identity tracking
     std::map<int, int> object_stable_id;  // Maps internal object_id to stable_id
     std::map<int, int> stable_id_to_object_id;  // Reverse mapping
     int next_stable_id;
     std::map<int, cv::Point2f> stable_object_last_center;  // Last known center for stable objects
-    static constexpr int MAX_CLASS_HISTORY = 3;  // Keep last 3 classifications (reduced for faster response)
-    static constexpr int MAX_OBB_HISTORY = 2;  // Keep last 2 OBBs for smoothing (reduced for faster response)
-    static constexpr int MIN_FRAMES_FOR_STABLE = 1;  // Min frames before object is considered stable (reduced for faster response)
-    static constexpr float TRACKING_DISTANCE_THRESHOLD = 100.0f;  // Max distance to associate objects (increased for better tracking)
+    
+    // Improved tracking parameters
+    static constexpr int MAX_CLASS_HISTORY = 5;  // Keep last 5 classifications for better stability
+    static constexpr int MAX_OBB_HISTORY = 7;  // Keep last 7 OBBs for better smoothing
+    static constexpr int MIN_FRAMES_FOR_STABLE = 4;  // Require 4 frames before object is considered stable
+    static constexpr int OBJECT_PERSISTENCE_FRAMES = 12;  // Keep objects alive for 12 frames even if undetected
+    static constexpr float TRACKING_DISTANCE_THRESHOLD = 150.0f;  // Increased distance threshold for better association
+    static constexpr float CONFIDENCE_DECAY_RATE = 0.85f;  // Confidence decay per missed frame
+    static constexpr float MIN_CONFIDENCE_THRESHOLD = 0.3f;  // Minimum confidence to keep object alive
+    static constexpr float VELOCITY_SMOOTHING_FACTOR = 0.3f;  // Smoothing factor for velocity calculation
+    static constexpr int MAX_POSITION_HISTORY = 5;  // Keep position history for velocity calculation
 };
 
 #endif // ORANGE_OBB_DETECTOR

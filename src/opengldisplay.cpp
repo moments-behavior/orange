@@ -259,7 +259,7 @@ void COpenGLDisplay::ThreadRunning() {
                         }
                     }
                     
-                    // Always process detections, but only update content when changed
+                    // Only process and send message when detections change
                     if (detections_changed || !last_detections_sent) {
                         // Update our tracking
                         last_locked_detections = obb_detections;
@@ -274,79 +274,226 @@ void COpenGLDisplay::ThreadRunning() {
                         
                         std::cout << "OBB: Updating " << obb_detections.size() << " locked detections (changed: " 
                                   << (detections_changed ? "yes" : "no") << ")" << std::endl;
-                    } else {
-                        // Use the same detections as before
-                        obb_detections = last_locked_detections;
-                        std::cout << "OBB: Using same " << obb_detections.size() << " locked detections (no change)" << std::endl;
-                    }
-                    
-                    // Always prepare flatbuffer message (content may be same as before)
-                    flatbuffers::FlatBufferBuilder* fb = indigo_signal_builder->builder;
-                    fb->Clear();
+                        
+                        // Only prepare and send flatbuffer message when content changes
+                        flatbuffers::FlatBufferBuilder* fb = indigo_signal_builder->builder;
+                        fb->Clear();
 
-                    // Hold up to two object offsets
-                    ::flatbuffers::Offset<Obj::obb> fb_obj_a{};
-                    ::flatbuffers::Offset<Obj::obb> fb_obj_b{};
-                    for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
-                        const OBB& obb = obb_detections[i];
-                        
-                        // Print detection coordinates in xywhr format (synchronized with drawing)
-                        auto xywhr = obb_detector->obb_to_xywhr(obb);
-                        // Only print every 30 frames to reduce noise
-                        static int frame_counter = 0;
-                        if (frame_counter % 30 == 0) {
-                            std::cout << "OBB: Object " << obb.object_id << " detected - Class " << obb.class_id 
-                                      << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
-                                      << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
-                            std::cout << "OBB: Raw corners: (" << obb.x1 << "," << obb.y1 << ") (" 
-                                      << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 
-                                      << ") (" << obb.x4 << "," << obb.y4 << ")" << std::endl;
+                        // Hold up to two object offsets
+                        ::flatbuffers::Offset<Obj::obb> fb_obj_a{};
+                        ::flatbuffers::Offset<Obj::obb> fb_obj_b{};
+                        for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
+                            const OBB& obb = obb_detections[i];
+                            
+                            // Print detection coordinates in xywhr format (synchronized with drawing)
+                            auto xywhr = obb_detector->obb_to_xywhr(obb);
+                            // Only print every 30 frames to reduce noise
+                            static int frame_counter = 0;
+                            if (frame_counter % 30 == 0) {
+                                std::cout << "OBB: Object " << obb.object_id << " detected - Class " << obb.class_id 
+                                          << " at xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
+                                          << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
+                                std::cout << "OBB: Raw corners: (" << obb.x1 << "," << obb.y1 << ") (" 
+                                          << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 
+                                          << ") (" << obb.x4 << "," << obb.y4 << ")" << std::endl;
+                            }
+                            frame_counter++;
+                            
+                            // Use shape verification result from OBB detector
+                            bool shape_verified = obb.shape_verified;
+                            // Label: 0 = shape verified, 1 = shape not verified (but we keep the detection)
+                            float fb_label = shape_verified ? 0.0f : 1.0f;
+                            
+                            // Always draw all detected objects, but still assign slots for FlatBuffer compatibility
+                            auto center = obb_detector->obb_to_xywhr(obb);
+                            float cx = center.x;
+                            float cy = center.y;
+                            int assigned_slot = -1;
+                            
+                            // Persistent slot assignment: only change when detections change significantly
+                            if (!slots_initialized) {
+                                // First time or after significant change - assign slots based on detection index
+                                if (i == 0) {
+                                    assigned_slot = 0;
+                                    persistent_slot_assignments[0] = i;
+                                } else if (i == 1) {
+                                    assigned_slot = 1;
+                                    persistent_slot_assignments[1] = i;
+                                } else {
+                                    assigned_slot = -1;  // More than 2 objects
+                                }
+                            } else {
+                                // Use persistent slot assignments based on detection index
+                                if (persistent_slot_assignments[0] == i) {
+                                    assigned_slot = 0;
+                                } else if (persistent_slot_assignments[1] == i) {
+                                    assigned_slot = 1;
+                                } else {
+                                    assigned_slot = -1;  // Object not in persistent slots
+                                }
+                            }
+                            
+                            // Always draw the object regardless of slot assignment
+                            bool should_draw = true;
+                            std::cout << "DEBUG: Processing object " << i << " - Class " << obb.class_id 
+                                      << ", Detection Index " << i 
+                                      << ", Assigned slot " << assigned_slot 
+                                      << ", Slots initialized: " << (slots_initialized ? "YES" : "NO")
+                                      << ", Should draw: " << (should_draw ? "YES" : "NO") << std::endl;
+
+                            if (should_draw) {
+                                // Draw all objects as red oriented bounding boxes
+                                float obb_points[8] = {
+                                    obb.x1, obb.y1,  // Top-left
+                                    obb.x2, obb.y2,  // Top-right
+                                    obb.x3, obb.y3,  // Bottom-right
+                                    obb.x4, obb.y4   // Bottom-left
+                                };
+                                
+                                CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
+                                                     sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
+                                
+                                // Draw oriented bounding box in red for all objects
+                                std::cout << "DEBUG: Drawing OBB at corners: (" << obb.x1 << "," << obb.y1 << ") (" 
+                                          << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 << ") (" 
+                                          << obb.x4 << "," << obb.y4 << ")" << std::endl;
+                                gpu_draw_obb(debayer.d_debayer, camera_params->width, 
+                                            camera_params->height, d_obb_points + i * 8, 
+                                            obb.class_id, 0, 255, 0, 0);  // Red for all oriented bounding boxes
+                                
+                                // Populate flatbuffer with oriented OBB (theta from xywhr)
+                                if (assigned_slot != -1) {
+                                    auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
+                                    if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
+                                    else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
+                                }
+                            }
                         }
-                        frame_counter++;
                         
-                        // Use shape verification result from OBB detector
-                        bool shape_verified = obb.shape_verified;
-                        // Label: 0 = shape verified, 1 = shape not verified (but we keep the detection)
-                        float fb_label = shape_verified ? 0.0f : 1.0f;
-                        
-                        // Always draw all detected objects, but still assign slots for FlatBuffer compatibility
-                        auto center = obb_detector->obb_to_xywhr(obb);
-                        float cx = center.x;
-                        float cy = center.y;
-                        int assigned_slot = -1;
-                        
-                        // Persistent slot assignment: only change when detections change significantly
+                        // Mark slots as initialized after processing all objects
                         if (!slots_initialized) {
-                            // First time or after significant change - assign slots based on detection index
-                            if (i == 0) {
-                                assigned_slot = 0;
-                                persistent_slot_assignments[0] = i;
-                            } else if (i == 1) {
-                                assigned_slot = 1;
-                                persistent_slot_assignments[1] = i;
-                            } else {
-                                assigned_slot = -1;  // More than 2 objects
+                            slots_initialized = true;
+                            std::cout << "DEBUG: Slots initialized - Slot 0: Detection Index " << persistent_slot_assignments[0] 
+                                      << ", Slot 1: Detection Index " << persistent_slot_assignments[1] << std::endl;
+                        }
+
+                        // Ensure both objects exist in message (use zero object if not filled)
+                        if (!fb_obj_a.o) {
+                            fb_obj_a = Obj::Createobb(*fb, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+                            obb_slot_valid[0] = 0;
+                        }
+                        if (!fb_obj_b.o) {
+                            fb_obj_b = Obj::Createobb(*fb, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+                            obb_slot_valid[1] = 0;
+                        }
+
+                        auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
+                        fb->Finish(obj_msg);
+                        
+                        // Save sample detection output to file for debugging (append mode)
+                        if (obb_slot_valid[0] || obb_slot_valid[1]) {
+                            // Try multiple locations for the output file
+                            std::vector<std::string> possible_paths = {
+                                "/tmp/sample_detection_output.txt",
+                                "./sample_detection_output.txt",
+                                "/home/ratan/sample_detection_output.txt",
+                                "/home/ratan/src/lime/sample_detection_output.txt"
+                            };
+                            
+                            bool file_saved = false;
+                            for (const auto& sample_file_path : possible_paths) {
+                                std::ofstream sample_file(sample_file_path, std::ios::app);
+                                if (sample_file.is_open()) {
+                                    sample_file << "=== Sample OBB Detection Output ===" << std::endl;
+                                    sample_file << "Timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
+                                    sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
+                                    sample_file << "Using locked detections: " << (detections_changed ? "NO (new detections)" : "YES (same as before)") << std::endl;
+                                    sample_file << "Drawing colors: Red=Oriented Bounding Box (all objects)" << std::endl;
+                                    sample_file << "Camera dimensions: " << camera_params->width << "x" << camera_params->height << std::endl;
+                                    sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
+                                    sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;
+                                    
+                                    // Print individual detection details
+                                    sample_file << "Individual Detections:" << std::endl;
+                                    for (size_t i = 0; i < obb_detections.size(); i++) {
+                                        const OBB& obb = obb_detections[i];
+                                        auto xywhr = obb_detector->obb_to_xywhr(obb);
+                                        sample_file << "  Detection " << i << ": Class " << obb.class_id 
+                                                  << ", Object ID " << obb.object_id 
+                                                  << ", Shape Verified: " << (obb.shape_verified ? "YES" : "NO")
+                                                  << ", xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
+                                                  << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
+                                        sample_file << "    Raw corners: (" << obb.x1 << "," << obb.y1 << ") (" 
+                                                  << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 
+                                                  << ") (" << obb.x4 << "," << obb.y4 << ")" << std::endl;
+                                    }
+                                    
+                                    // Print readable OBB structure content
+                                    sample_file << "OBB Message Content:" << std::endl;
+                                    
+                                    // Access the finished flatbuffer message
+                                    auto obj_msg = Obj::Getobj_msg(fb->GetBufferPointer());
+                                    
+                                    if (obj_msg->cylinder1()) {
+                                        auto obj1 = obj_msg->cylinder1();
+                                        sample_file << "Object 1 (cylinder1):" << std::endl;
+                                        sample_file << "  cx: " << obj1->cx() << std::endl;
+                                        sample_file << "  cy: " << obj1->cy() << std::endl;
+                                        sample_file << "  w: " << obj1->w() << std::endl;
+                                        sample_file << "  h: " << obj1->h() << std::endl;
+                                        sample_file << "  theta: " << obj1->theta() << std::endl;
+                                        sample_file << "  label: " << obj1->label() << std::endl;
+                                    } else {
+                                        sample_file << "Object 1 (cylinder1): null" << std::endl;
+                                    }
+                                    
+                                    if (obj_msg->cylinder2()) {
+                                        auto obj2 = obj_msg->cylinder2();
+                                        sample_file << "Object 2 (cylinder2):" << std::endl;
+                                        sample_file << "  cx: " << obj2->cx() << std::endl;
+                                        sample_file << "  cy: " << obj2->cy() << std::endl;
+                                        sample_file << "  w: " << obj2->w() << std::endl;
+                                        sample_file << "  h: " << obj2->h() << std::endl;
+                                        sample_file << "  theta: " << obj2->theta() << std::endl;
+                                        sample_file << "  label: " << obj2->label() << std::endl;
+                                    } else {
+                                        sample_file << "Object 2 (cylinder2): null" << std::endl;
+                                    }
+                                    
+                                    sample_file << std::endl;
+                                    sample_file.close();
+                                    std::cout << "Sample detection output appended to: " << sample_file_path << std::endl;
+                                    file_saved = true;
+                                    break;
+                                }
                             }
-                        } else {
-                            // Use persistent slot assignments based on detection index
-                            if (persistent_slot_assignments[0] == i) {
-                                assigned_slot = 0;
-                            } else if (persistent_slot_assignments[1] == i) {
-                                assigned_slot = 1;
-                            } else {
-                                assigned_slot = -1;  // Object not in persistent slots
+                            
+                            if (!file_saved) {
+                                std::cerr << "Failed to create sample detection output file in any location. Tried:" << std::endl;
+                                for (const auto& path : possible_paths) {
+                                    std::cerr << "  - " << path << std::endl;
+                                }
                             }
                         }
                         
-                        // Always draw the object regardless of slot assignment
-                        bool should_draw = true;
-                        std::cout << "DEBUG: Processing object " << i << " - Class " << obb.class_id 
-                                  << ", Detection Index " << i 
-                                  << ", Assigned slot " << assigned_slot 
-                                  << ", Slots initialized: " << (slots_initialized ? "YES" : "NO")
-                                  << ", Should draw: " << (should_draw ? "YES" : "NO") << std::endl;
-
-                        if (should_draw) {
+                        // Send message to CBOT only when content changes
+                        if (indigo_signal_builder->indigo_connection) {
+                            std::cout << "DEBUG: Sending OBB message to CBOT (detections: " << obb_detections.size() << ")" << std::endl;
+                            send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
+                            std::cout << "DEBUG: OBB message sent successfully" << std::endl;
+                        } else {
+                            std::cout << "DEBUG: CBOT not connected, skipping OBB message" << std::endl;
+                        }
+                    } else {
+                        // Use the same detections as before - no message sending
+                        obb_detections = last_locked_detections;
+                        std::cout << "OBB: Using same " << obb_detections.size() << " locked detections (no change) - skipping message send" << std::endl;
+                        
+                        // Still draw the objects (but don't send message)
+                        for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
+                            const OBB& obb = obb_detections[i];
+                            
                             // Draw all objects as red oriented bounding boxes
                             float obb_points[8] = {
                                 obb.x1, obb.y1,  // Top-left
@@ -359,136 +506,10 @@ void COpenGLDisplay::ThreadRunning() {
                                                  sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
                             
                             // Draw oriented bounding box in red for all objects
-                            std::cout << "DEBUG: Drawing OBB at corners: (" << obb.x1 << "," << obb.y1 << ") (" 
-                                      << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 << ") (" 
-                                      << obb.x4 << "," << obb.y4 << ")" << std::endl;
                             gpu_draw_obb(debayer.d_debayer, camera_params->width, 
                                         camera_params->height, d_obb_points + i * 8, 
                                         obb.class_id, 0, 255, 0, 0);  // Red for all oriented bounding boxes
-                            
-                            // Populate flatbuffer with oriented OBB (theta from xywhr)
-                            if (assigned_slot != -1) {
-                                auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
-                                if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
-                                else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
-                            }
                         }
-                    }
-                    
-                    // Mark slots as initialized after processing all objects
-                    if (!slots_initialized) {
-                        slots_initialized = true;
-                        std::cout << "DEBUG: Slots initialized - Slot 0: Detection Index " << persistent_slot_assignments[0] 
-                                  << ", Slot 1: Detection Index " << persistent_slot_assignments[1] << std::endl;
-                    }
-
-                    // Ensure both objects exist in message (use zero object if not filled)
-                    if (!fb_obj_a.o) {
-                        fb_obj_a = Obj::Createobb(*fb, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-                        obb_slot_valid[0] = 0;
-                    }
-                    if (!fb_obj_b.o) {
-                        fb_obj_b = Obj::Createobb(*fb, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-                        obb_slot_valid[1] = 0;
-                    }
-
-                    auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
-                    fb->Finish(obj_msg);
-                    
-                    // Save sample detection output to file for debugging (append mode)
-                    if (obb_slot_valid[0] || obb_slot_valid[1]) {
-                        // Try multiple locations for the output file
-                        std::vector<std::string> possible_paths = {
-                            "/tmp/sample_detection_output.txt",
-                            "./sample_detection_output.txt",
-                            "/home/ratan/sample_detection_output.txt",
-                            "/home/ratan/src/lime/sample_detection_output.txt"
-                        };
-                        
-                        bool file_saved = false;
-                        for (const auto& sample_file_path : possible_paths) {
-                            std::ofstream sample_file(sample_file_path, std::ios::app);
-                            if (sample_file.is_open()) {
-                                sample_file << "=== Sample OBB Detection Output ===" << std::endl;
-                                sample_file << "Timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
-                                    std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
-                                sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
-                                sample_file << "Using locked detections: " << (detections_changed ? "NO (new detections)" : "YES (same as before)") << std::endl;
-                                sample_file << "Drawing colors: Red=Oriented Bounding Box (all objects)" << std::endl;
-                                sample_file << "Camera dimensions: " << camera_params->width << "x" << camera_params->height << std::endl;
-                                sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
-                                sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;
-                                
-                                // Print individual detection details
-                                sample_file << "Individual Detections:" << std::endl;
-                                for (size_t i = 0; i < obb_detections.size(); i++) {
-                                    const OBB& obb = obb_detections[i];
-                                    auto xywhr = obb_detector->obb_to_xywhr(obb);
-                                    sample_file << "  Detection " << i << ": Class " << obb.class_id 
-                                              << ", Object ID " << obb.object_id 
-                                              << ", Shape Verified: " << (obb.shape_verified ? "YES" : "NO")
-                                              << ", xywhr(" << xywhr.x << ", " << xywhr.y << ", " 
-                                              << xywhr.w << ", " << xywhr.h << ", " << xywhr.r << ")" << std::endl;
-                                    sample_file << "    Raw corners: (" << obb.x1 << "," << obb.y1 << ") (" 
-                                              << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 
-                                              << ") (" << obb.x4 << "," << obb.y4 << ")" << std::endl;
-                                }
-                                
-                                // Print readable OBB structure content
-                                sample_file << "OBB Message Content:" << std::endl;
-                                
-                                // Access the finished flatbuffer message
-                                auto obj_msg = Obj::Getobj_msg(fb->GetBufferPointer());
-                                
-                                if (obj_msg->cylinder1()) {
-                                    auto obj1 = obj_msg->cylinder1();
-                                    sample_file << "Object 1 (cylinder1):" << std::endl;
-                                    sample_file << "  cx: " << obj1->cx() << std::endl;
-                                    sample_file << "  cy: " << obj1->cy() << std::endl;
-                                    sample_file << "  w: " << obj1->w() << std::endl;
-                                    sample_file << "  h: " << obj1->h() << std::endl;
-                                    sample_file << "  theta: " << obj1->theta() << std::endl;
-                                    sample_file << "  label: " << obj1->label() << std::endl;
-                                } else {
-                                    sample_file << "Object 1 (cylinder1): null" << std::endl;
-                                }
-                                
-                                if (obj_msg->cylinder2()) {
-                                    auto obj2 = obj_msg->cylinder2();
-                                    sample_file << "Object 2 (cylinder2):" << std::endl;
-                                    sample_file << "  cx: " << obj2->cx() << std::endl;
-                                    sample_file << "  cy: " << obj2->cy() << std::endl;
-                                    sample_file << "  w: " << obj2->w() << std::endl;
-                                    sample_file << "  h: " << obj2->h() << std::endl;
-                                    sample_file << "  theta: " << obj2->theta() << std::endl;
-                                    sample_file << "  label: " << obj2->label() << std::endl;
-                                } else {
-                                    sample_file << "Object 2 (cylinder2): null" << std::endl;
-                                }
-                                
-                                sample_file << std::endl;
-                                sample_file.close();
-                                std::cout << "Sample detection output appended to: " << sample_file_path << std::endl;
-                                file_saved = true;
-                                break;
-                            }
-                        }
-                        
-                        if (!file_saved) {
-                            std::cerr << "Failed to create sample detection output file in any location. Tried:" << std::endl;
-                            for (const auto& path : possible_paths) {
-                                std::cerr << "  - " << path << std::endl;
-                            }
-                        }
-                    }
-                    
-                    // Always send message to CBOT if connected (no throttling)
-                    if (indigo_signal_builder->indigo_connection) {
-                        std::cout << "DEBUG: Sending OBB message to CBOT (detections: " << obb_detections.size() << ")" << std::endl;
-                        send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
-                        std::cout << "DEBUG: OBB message sent successfully" << std::endl;
-                    } else {
-                        std::cout << "DEBUG: CBOT not connected, skipping OBB message" << std::endl;
                     }
                 } else {
                     // No detections available, reset tracking

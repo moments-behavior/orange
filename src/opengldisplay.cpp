@@ -282,8 +282,10 @@ void COpenGLDisplay::ThreadRunning() {
                         // Hold up to two object offsets
                         ::flatbuffers::Offset<Obj::obb> fb_obj_a{};
                         ::flatbuffers::Offset<Obj::obb> fb_obj_b{};
-                        for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
-                            const OBB& obb = obb_detections[i];
+                        // Build message strictly from stable (locked) detections
+                        const auto& stable_detections = last_locked_detections;
+                        for (size_t i = 0; i < stable_detections.size() && i < 10; i++) {
+                            const OBB& obb = stable_detections[i];
                             
                             // Print detection coordinates in xywhr format (synchronized with drawing)
                             auto xywhr = obb_detector->obb_to_xywhr(obb);
@@ -407,7 +409,7 @@ void COpenGLDisplay::ThreadRunning() {
                                     sample_file << "=== Sample OBB Detection Output ===" << std::endl;
                                     sample_file << "Timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
                                         std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
-                                    sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
+                                    sample_file << "Stable detections count: " << stable_detections.size() << std::endl;
                                     sample_file << "Using locked detections: " << (detections_changed ? "NO (new detections)" : "YES (same as before)") << std::endl;
                                     sample_file << "Drawing colors: Red=Oriented Bounding Box (all objects)" << std::endl;
                                     sample_file << "Camera dimensions: " << camera_params->width << "x" << camera_params->height << std::endl;
@@ -416,8 +418,8 @@ void COpenGLDisplay::ThreadRunning() {
                                     
                                     // Print individual detection details
                                     sample_file << "Individual Detections:" << std::endl;
-                                    for (size_t i = 0; i < obb_detections.size(); i++) {
-                                        const OBB& obb = obb_detections[i];
+                                    for (size_t i = 0; i < stable_detections.size(); i++) {
+                                        const OBB& obb = stable_detections[i];
                                         auto xywhr = obb_detector->obb_to_xywhr(obb);
                                         sample_file << "  Detection " << i << ": Class " << obb.class_id 
                                                   << ", Object ID " << obb.object_id 
@@ -486,29 +488,52 @@ void COpenGLDisplay::ThreadRunning() {
                             std::cout << "DEBUG: CBOT not connected, skipping OBB message" << std::endl;
                         }
                     } else {
-                        // Use the same detections as before - no message sending
-                        obb_detections = last_locked_detections;
-                        std::cout << "OBB: Using same " << obb_detections.size() << " locked detections (no change) - skipping message send" << std::endl;
-                        
-                        // Still draw the objects (but don't send message)
-                        for (size_t i = 0; i < obb_detections.size() && i < 10; i++) {
-                            const OBB& obb = obb_detections[i];
-                            
-                            // Draw all objects as red oriented bounding boxes
+                        // Use the same detections as before - send the same stable message every frame
+                        const auto& stable_detections = last_locked_detections;
+                        std::cout << "OBB: Using same " << stable_detections.size() << " locked detections (no change) - sending same message" << std::endl;
+
+                        // Draw the objects
+                        for (size_t i = 0; i < stable_detections.size() && i < 10; i++) {
+                            const OBB& obb = stable_detections[i];
+
                             float obb_points[8] = {
                                 obb.x1, obb.y1,  // Top-left
                                 obb.x2, obb.y2,  // Top-right
                                 obb.x3, obb.y3,  // Bottom-right
                                 obb.x4, obb.y4   // Bottom-left
                             };
-                            
-                            CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
+
+                            CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points,
                                                  sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
-                            
-                            // Draw oriented bounding box in red for all objects
-                            gpu_draw_obb(debayer.d_debayer, camera_params->width, 
-                                        camera_params->height, d_obb_points + i * 8, 
-                                        obb.class_id, 0, 255, 0, 0);  // Red for all oriented bounding boxes
+
+                            gpu_draw_obb(debayer.d_debayer, camera_params->width,
+                                        camera_params->height, d_obb_points + i * 8,
+                                        obb.class_id, 0, 255, 0, 0);
+                        }
+
+                        // Rebuild and send message from the same stable detections
+                        flatbuffers::FlatBufferBuilder* fb = indigo_signal_builder->builder;
+                        fb->Clear();
+
+                        ::flatbuffers::Offset<Obj::obb> fb_obj_a{};
+                        ::flatbuffers::Offset<Obj::obb> fb_obj_b{};
+                        for (size_t i = 0; i < stable_detections.size() && i < 2; i++) {
+                            const OBB& obb = stable_detections[i];
+                            auto xywhr = obb_detector->obb_to_xywhr(obb);
+                            float fb_label = obb.shape_verified ? 0.0f : 1.0f;
+                            auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
+                            if (i == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
+                            else if (i == 1) { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
+                        }
+
+                        if (!fb_obj_a.o) { fb_obj_a = Obj::Createobb(*fb, 0,0,0,0,0,0); obb_slot_valid[0] = 0; }
+                        if (!fb_obj_b.o) { fb_obj_b = Obj::Createobb(*fb, 0,0,0,0,0,0); obb_slot_valid[1] = 0; }
+
+                        auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
+                        fb->Finish(obj_msg);
+
+                        if (indigo_signal_builder->indigo_connection) {
+                            send_cbot_obj_pos2d(indigo_signal_builder->server, fb, indigo_signal_builder->indigo_connection);
                         }
                     }
                 } else {

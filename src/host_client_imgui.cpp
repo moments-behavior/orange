@@ -27,7 +27,6 @@ static int g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
-static bool g_first_robot = true;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -424,8 +423,11 @@ enum Phase {
     Phase_Streaming,
     Phase_BumblebeeBoard,
     Phase_GrimlockBoard,
-    Phase_TakePicture,
-    Phase_NextPose
+    Phase_TakePicture_B,
+    Phase_NextPose_B,
+    Phase_TakePicture_G,
+    Phase_NextPose_G,
+    Phase_TakeGlobalPicture
 };
 
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
@@ -510,12 +512,18 @@ static camnet::v1::ServerControl current_ctrl() {
         return camnet::v1::ServerControl_STARTSTREAMING;
     case Phase_BumblebeeBoard:
         return camnet::v1::ServerControl_BUMBLEBEEBOARD;
-    case Phase_TakePicture:
+    case Phase_TakePicture_B:
         return camnet::v1::ServerControl_TAKEPICTURE;
-    case Phase_NextPose:
+    case Phase_NextPose_B:
         return camnet::v1::ServerControl_NEXTPOSE;
     case Phase_GrimlockBoard:
         return camnet::v1::ServerControl_GRIMLOCKBOARD;
+    case Phase_TakePicture_G:
+        return camnet::v1::ServerControl_TAKEPICTURE;
+    case Phase_NextPose_G:
+        return camnet::v1::ServerControl_NEXTPOSE;
+    case Phase_TakeGlobalPicture:
+        return camnet::v1::ServerControl_TAKEPICTURE;
     default:
         return camnet::v1::ServerControl_NONE;
     }
@@ -537,12 +545,18 @@ static const char *phase_name() {
         return "STREAMING";
     case Phase_BumblebeeBoard:
         return "BUMBLEBEEBOARD";
-    case Phase_TakePicture:
-        return "TAKEPICTURE";
-    case Phase_NextPose:
-        return "NEXTPOSE";
+    case Phase_TakePicture_B:
+        return "TAKEPICTURE_B";
+    case Phase_NextPose_B:
+        return "NEXTPOSE_B";
     case Phase_GrimlockBoard:
         return "GRIMLOCKBOARD";
+    case Phase_TakePicture_G:
+        return "TAKEPICTURE_G";
+    case Phase_NextPose_G:
+        return "NEXTPOSE_G";
+    case Phase_TakeGlobalPicture:
+        return "TAKEGLOBALPICTURE";
     default:
         return "?";
     }
@@ -580,30 +594,42 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_BumblebeeBoard;
             break;
         case Phase_BumblebeeBoard:
-            g_phase = Phase_TakePicture;
+            g_phase = Phase_TakePicture_B;
             break;
-        case Phase_TakePicture: {
-            if (g_picture_id >= 75) {
-                g_phase = Phase_TakePicture;
-            } else if (g_picture_id == 77) {
-                g_phase = Phase_Stop;
-            } else {
-                g_phase = Phase_NextPose;
-            }
+        case Phase_TakePicture_B:
+            g_phase = Phase_NextPose_B;
             break;
-        }
-        case Phase_NextPose: {
-            if (g_first_robot && g_picture_id == 41) {
+        case Phase_NextPose_B: {
+            if (g_picture_id == 41) {
                 g_phase = Phase_GrimlockBoard;
             } else {
-                g_phase = Phase_TakePicture;
+                g_phase = Phase_TakePicture_B;
             }
             break;
         }
         case Phase_GrimlockBoard:
-            g_phase = Phase_TakePicture;
+            g_phase = Phase_TakePicture_G;
             break;
-        case Phase_Done:
+        case Phase_TakePicture_G:
+            g_phase = Phase_NextPose_G;
+            break;
+        case Phase_NextPose_G: {
+            if (g_picture_id == 75) {
+                g_phase = Phase_TakeGlobalPicture;
+            } else {
+                g_phase = Phase_TakePicture_G;
+            }
+            break;
+        }
+        case Phase_TakeGlobalPicture: {
+            if (g_picture_id == 77) {
+                g_phase = Phase_Stop;
+            } else {
+                g_phase = Phase_TakeGlobalPicture;
+            }
+            break;
+        }
+        case Phase_Stop:
             g_phase = Phase_Done;
             break;
         default:
@@ -628,7 +654,6 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
-    g_first_robot = true;
     logf("session reset");
 }
 
@@ -733,14 +758,13 @@ static void broadcast_current_phase() {
         break;
     }
     case Phase_GrimlockBoard: {
-        g_first_robot = false;
         bytes = build_cmd_grimlockboard(g_jid, g_epoch, g_seq);
         if (!g_phase_started) {
             g_phase_started = true;
         }
         break;
     }
-    case Phase_TakePicture: {
+    case Phase_TakePicture_B: {
         if (!g_phase_started) {
             g_picture_id++;
         }
@@ -751,9 +775,38 @@ static void broadcast_current_phase() {
         }
         break;
     }
-    case Phase_NextPose: {
+    case Phase_NextPose_B: {
         bytes = build_cmd_nextpose(g_jid, g_epoch, g_seq);
         if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_TakePicture_G: {
+        if (!g_phase_started) {
+            g_picture_id++;
+        }
+        bytes = build_cmd_takepicture(g_jid, g_epoch, g_seq, g_picture_id);
+        if (!g_phase_started) {
+            on_takepicture_phase_start(g_picture_id);
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_NextPose_G: {
+        bytes = build_cmd_nextpose(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_TakeGlobalPicture: {
+        if (!g_phase_started) {
+            g_picture_id++;
+        }
+        bytes = build_cmd_takepicture(g_jid, g_epoch, g_seq, g_picture_id);
+        if (!g_phase_started) {
+            on_takepicture_phase_start(g_picture_id);
             g_phase_started = true;
         }
         break;
@@ -896,7 +949,8 @@ void host_client_tick() {
 
     // check if this server is ready
     bool this_server_ready = true;
-    if (g_phase == Phase_TakePicture) {
+    if (g_phase == Phase_TakePicture_G || g_phase == Phase_NextPose_G ||
+        g_phase == Phase_TakeGlobalPicture) {
         auto save_image_all_ready = *g_clientctx->save_image_all_ready;
         if (save_image_all_ready) {
             *g_clientctx->save_pics_counter = 0;

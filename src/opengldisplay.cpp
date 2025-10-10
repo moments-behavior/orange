@@ -391,9 +391,8 @@ void COpenGLDisplay::ThreadRunning() {
                     auto obj_msg = Obj::Createobj_msg(*fb, fb_obj_a, fb_obj_b);
                     fb->Finish(obj_msg);
                     
-                    // Save sample detection output to file for debugging
-                    static bool sample_saved = false;
-                    if (!sample_saved && (obb_slot_valid[0] || obb_slot_valid[1])) {
+                    // Save sample detection output to file for debugging (append mode)
+                    if (obb_slot_valid[0] || obb_slot_valid[1]) {
                         // Try multiple locations for the output file
                         std::vector<std::string> possible_paths = {
                             "/tmp/sample_detection_output.txt",
@@ -447,8 +446,7 @@ void COpenGLDisplay::ThreadRunning() {
                                 
                                 sample_file << std::endl;
                                 sample_file.close();
-                                std::cout << "Sample detection output saved to: " << sample_file_path << std::endl;
-                                sample_saved = true;
+                                std::cout << "Sample detection output appended to: " << sample_file_path << std::endl;
                                 file_saved = true;
                                 break;
                             }

@@ -108,8 +108,6 @@ public:
     
     // Simple detection and shape verification
     std::vector<OBB> detect_objects(const cv::Mat& frame);
-    bool is_circle_in_region(const cv::Mat& frame, const OBB& obb);
-    bool is_square_in_region(const cv::Mat& frame, const OBB& obb);
     bool should_update_detections(const std::vector<OBB>& new_detections);
     
     // Debug function to print learned priors

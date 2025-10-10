@@ -347,67 +347,30 @@ void COpenGLDisplay::ThreadRunning() {
                                   << ", Should draw: " << (should_draw ? "YES" : "NO") << std::endl;
 
                         if (should_draw) {
-                            // Draw according to detected class - no fallback, keep what we detected
-                            if (obb.class_id == 0) {
-                                // Class 0 (Vertical Cylinder) - draw axis-aligned bounding box in green
-                                float min_x = std::min({obb.x1, obb.x2, obb.x3, obb.x4});
-                                float max_x = std::max({obb.x1, obb.x2, obb.x3, obb.x4});
-                                float min_y = std::min({obb.y1, obb.y2, obb.y3, obb.y4});
-                                float max_y = std::max({obb.y1, obb.y2, obb.y3, obb.y4});
-                                
-                                float aabb_points[8] = {
-                                    min_x, min_y,  // Top-left
-                                    max_x, min_y,  // Top-right
-                                    max_x, max_y,  // Bottom-right
-                                    min_x, max_y   // Bottom-left
-                                };
-                                
-                                CHECK(cudaMemcpyAsync(d_obb_points + i * 8, aabb_points, 
-                                                     sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
-                                
-                                // Draw axis-aligned bounding box in green for vertical cylinder
-                                std::cout << "DEBUG: Drawing AABB for class 0 at: (" << min_x << "," << min_y << ") to (" << max_x << "," << max_y << ")" << std::endl;
-                                gpu_draw_obb(debayer.d_debayer, camera_params->width, 
-                                            camera_params->height, d_obb_points + i * 8, 
-                                            obb.class_id, 0, 0, 255, 0);  // Green for vertical cylinder
-                                
-                                // Populate flatbuffer with AABB (theta = 0)
-                                if (assigned_slot != -1) {
-                                    float cx = 0.5f * (min_x + max_x);
-                                    float cy = 0.5f * (min_y + max_y);
-                                    float w = (max_x - min_x);
-                                    float h = (max_y - min_y);
-                                    float theta = 0.0f;
-                                    auto fb_obj = Obj::Createobb(*fb, cx, cy, w, h, theta, fb_label);
-                                    if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = cx; obb_slot_cy[0] = cy; }
-                                    else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = cx; obb_slot_cy[1] = cy; }
-                                }
-                            } else {
-                                // Class 2 (Horizontal Cylinder) - draw oriented bounding box in red
-                                float obb_points[8] = {
-                                    obb.x1, obb.y1,  // Top-left
-                                    obb.x2, obb.y2,  // Top-right
-                                    obb.x3, obb.y3,  // Bottom-right
-                                    obb.x4, obb.y4   // Bottom-left
-                                };
-                                
-                                CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
-                                                     sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
-                                
-                                // Draw oriented bounding box in red for horizontal cylinder
-                                std::cout << "DEBUG: Drawing OBB for class 2 at corners: (" << obb.x1 << "," << obb.y1 << ") (" 
-                                          << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 << ") (" 
-                                          << obb.x4 << "," << obb.y4 << ")" << std::endl;
-                                gpu_draw_obb(debayer.d_debayer, camera_params->width, 
-                                            camera_params->height, d_obb_points + i * 8, 
-                                            obb.class_id, 0, 255, 0, 0);  // Red for horizontal cylinder
-                                
-                                // Populate flatbuffer with oriented OBB (theta from xywhr)
-                                if (assigned_slot != -1) {
-                                    auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
-                                    if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
-                                    else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
-                                }
+                            // Draw all objects as red oriented bounding boxes
+                            float obb_points[8] = {
+                                obb.x1, obb.y1,  // Top-left
+                                obb.x2, obb.y2,  // Top-right
+                                obb.x3, obb.y3,  // Bottom-right
+                                obb.x4, obb.y4   // Bottom-left
+                            };
+                            
+                            CHECK(cudaMemcpyAsync(d_obb_points + i * 8, obb_points, 
+                                                 sizeof(float) * 8, cudaMemcpyHostToDevice, 0));
+                            
+                            // Draw oriented bounding box in red for all objects
+                            std::cout << "DEBUG: Drawing OBB at corners: (" << obb.x1 << "," << obb.y1 << ") (" 
+                                      << obb.x2 << "," << obb.y2 << ") (" << obb.x3 << "," << obb.y3 << ") (" 
+                                      << obb.x4 << "," << obb.y4 << ")" << std::endl;
+                            gpu_draw_obb(debayer.d_debayer, camera_params->width, 
+                                        camera_params->height, d_obb_points + i * 8, 
+                                        obb.class_id, 0, 255, 0, 0);  // Red for all oriented bounding boxes
+                            
+                            // Populate flatbuffer with oriented OBB (theta from xywhr)
+                            if (assigned_slot != -1) {
+                                auto fb_obj = Obj::Createobb(*fb, xywhr.x, xywhr.y, xywhr.w, xywhr.h, xywhr.r, fb_label);
+                                if (assigned_slot == 0) { fb_obj_a = fb_obj; obb_slot_valid[0] = 1; obb_slot_cx[0] = xywhr.x; obb_slot_cy[0] = xywhr.y; }
+                                else { fb_obj_b = fb_obj; obb_slot_valid[1] = 1; obb_slot_cx[1] = xywhr.x; obb_slot_cy[1] = xywhr.y; }
                             }
                         }
                     }
@@ -451,7 +414,7 @@ void COpenGLDisplay::ThreadRunning() {
                                     std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
                                 sample_file << "Stable detections count: " << obb_detections.size() << std::endl;
                                 sample_file << "Using locked detections: " << (detections_changed ? "NO (new detections)" : "YES (same as before)") << std::endl;
-                                sample_file << "Drawing colors: Green=Vertical Cylinder (class 0), Red=Horizontal Cylinder (class 2)" << std::endl;
+                                sample_file << "Drawing colors: Red=Oriented Bounding Box (all objects)" << std::endl;
                                 sample_file << "Camera dimensions: " << camera_params->width << "x" << camera_params->height << std::endl;
                                 sample_file << "Slot A valid: " << obb_slot_valid[0] << std::endl;
                                 sample_file << "Slot B valid: " << obb_slot_valid[1] << std::endl;

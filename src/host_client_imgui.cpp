@@ -176,11 +176,20 @@ static void on_takepicture_phase_start(uint picture_id) {
 }
 
 static bool is_takepicture_ready() {
-    return *g_clientctx->save_image_all_ready;
+    auto num_cameras = *g_clientctx->num_cameras;
+    CameraEachSelect *&cameras_select = *g_clientctx->cameras_select;
+    bool save_image_all_ready = true;
+    for (int i = 0; i < num_cameras; i++) {
+        if (cameras_select[i].sigs->frame_save_state.load() !=
+            State_Frame_Idle) {
+            save_image_all_ready = false;
+            break;
+        }
+    }
+    return save_image_all_ready;
 }
 
 static void on_takepicture_complete() {
-    *g_clientctx->save_pics_counter = 0;
     logf("This server ready (TAKEPICTURE).");
 }
 
@@ -258,7 +267,7 @@ static bool is_stoprecording_ready() {
 }
 
 static void on_stoprecording_complete() {
-    logf("This server ready.");
+    logf("This server ready (STOPRECORDING).");
     cleanup_host_client_resources();
 }
 

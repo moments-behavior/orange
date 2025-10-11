@@ -113,8 +113,6 @@ int main(int argc, char **args) {
     std::string selected_picture_format = picture_format_items[0];
 
     HostClientCtx client_ctx{&selected_picture_format,
-                             &save_image_all_ready,
-                             &save_pics_counter,
                              &calib_save_folder,
                              &network_config_select,
                              &network_config_folders,
@@ -463,8 +461,13 @@ int main(int argc, char **args) {
                         }
                     }
 
-                    if (save_pics_counter == num_cameras) {
-                        save_image_all_ready = true;
+                    save_image_all_ready = true;
+                    for (int i = 0; i < num_cameras; i++) {
+                        if (cameras_select[i].sigs->frame_save_state.load() !=
+                            State_Frame_Idle) {
+                            save_image_all_ready = false;
+                            break;
+                        }
                     }
 
                     if (!save_image_all_ready) {

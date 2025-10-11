@@ -109,6 +109,5 @@ void FrameSaver::thread_loop() {
 
         camera_select->pictures_counter++;
         camera_select->sigs->frame_save_state.store(State_Frame_Idle);
-        sync_fetch_and_add(&save_pics_counter, 1);
     }
 }

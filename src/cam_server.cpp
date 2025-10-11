@@ -384,7 +384,17 @@ static bool take_picture(uint picture_id) {
     using namespace std::chrono;
     auto t0 = steady_clock::now();
     const auto timeout = 180s; // tune for your hardware
-    while (save_pics_counter != cam_count) {
+
+    bool save_image_all_ready = true;
+    for (int i = 0; i < cam_count; i++) {
+        if (cameras_select[i].sigs->frame_save_state.load() !=
+            State_Frame_Idle) {
+            save_image_all_ready = false;
+            break;
+        }
+    }
+
+    while (!save_image_all_ready) {
         if (steady_clock::now() - t0 > timeout) {
             // give up gracefully: flip subscribe so threads can finish politely
             camera_control.subscribe = false;
@@ -393,7 +403,6 @@ static bool take_picture(uint picture_id) {
         // small sleep to avoid busy-spinning the core
         std::this_thread::sleep_for(1ms);
     }
-    save_pics_counter = 0;
     return true;
 }
 

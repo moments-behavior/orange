@@ -9,8 +9,6 @@
 
 struct HostClientCtx {
     std::string *selected_picture_format = nullptr;
-    bool *save_image_all_ready = nullptr;
-    uint64_t *save_pics_counter = nullptr;
     std::string *calib_save_folder = nullptr;
     int *network_config_select = nullptr;
     std::vector<std::string> *network_config_folders = nullptr;

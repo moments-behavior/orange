@@ -12,7 +12,6 @@ extern std::mutex mtx3d;
 extern std::condition_variable cv3d;
 extern std::atomic<uint64_t> detector_counter;
 extern std::mutex graph_capture_mutex;
-extern uint64_t save_pics_counter;
 bool try_start_timer();
 bool try_stop_timer();
 

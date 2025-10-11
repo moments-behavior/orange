@@ -42,7 +42,6 @@ static int g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
-static bool this_server_ready = false;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -180,7 +179,7 @@ static bool is_takepicture_ready() {
     return *g_clientctx->save_image_all_ready;
 }
 
-static void on_takepicture_ready_once() {
+static void on_takepicture_complete() {
     *g_clientctx->save_pics_counter = 0;
     logf("This server ready (TAKEPICTURE).");
 }
@@ -239,9 +238,9 @@ static void cleanup_host_client_resources() {
     ptp_params->ptp_stop_counter = 0;
     ptp_params->network_sync = false;
     ptp_params->network_set_start_ptp = false;
-    ptp_params->ptp_stop_reached = false;
     ptp_params->ptp_start_reached = false;
-
+    ptp_params->network_set_stop_ptp = false;
+    ptp_params->ptp_stop_reached = false;
     for (int i = 0; i < num_cameras; i++) {
         close_camera(&ecams[i].camera, &cameras_params[i]);
     }
@@ -258,7 +257,7 @@ static bool is_stoprecording_ready() {
     return ptp && ptp->network_set_stop_ptp && ptp->ptp_stop_reached;
 }
 
-static void on_stoprecording_ready_once() {
+static void on_stoprecording_complete() {
     logf("This server ready.");
     cleanup_host_client_resources();
 }
@@ -667,7 +666,6 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
-    this_server_ready = false;
     logf("session reset");
 }
 
@@ -991,17 +989,6 @@ void host_client_tick() {
         break;
     }
 
-    // rising-edge detect: run side-effects only when transitioning false ->
-    // true
-    if (!this_server_ready && ready_now) {
-        if (ctrl == camnet::v1::ServerControl_TAKEPICTURE) {
-            on_takepicture_ready_once();
-        } else if (ctrl == camnet::v1::ServerControl_STOPRECORDING) {
-            on_stoprecording_ready_once();
-        }
-    }
-    this_server_ready = ready_now;
-
     // decide barrier every tick
     if (g_waiting) {
         const bool all_acked = std::all_of(
@@ -1010,8 +997,17 @@ void host_client_tick() {
                 return it != g_ack_by.end() && it->second;
             });
 
-        if (all_acked && this_server_ready) {
+        if (all_acked && ready_now) {
             logf("barrier OK for %s", ctrl_name(ctrl));
+
+            // run one-time local completion work just before advancing
+            if (ctrl == camnet::v1::ServerControl_TAKEPICTURE) {
+                on_takepicture_complete(); // idempotent
+            } else if (ctrl == camnet::v1::ServerControl_STOPRECORDING) {
+                on_stoprecording_complete(); // idempotent (may clear PTP
+                                             // flags)
+            }
+
             g_phase_started = false;
             g_waiting = false;
             ++g_seq;

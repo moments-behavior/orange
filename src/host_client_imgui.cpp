@@ -42,7 +42,7 @@ static int g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
-static bool this_server_ready = true;
+static bool this_server_ready = false;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -176,15 +176,13 @@ static void on_takepicture_phase_start(uint picture_id) {
     }
 }
 
-static void on_takepicture_phase_complete() {
-    auto save_image_all_ready = *g_clientctx->save_image_all_ready;
-    if (save_image_all_ready) {
-        *g_clientctx->save_pics_counter = 0;
-        logf("This server ready.");
-        this_server_ready = true;
-    } else {
-        this_server_ready = false;
-    }
+static bool is_takepicture_ready() {
+    return *g_clientctx->save_image_all_ready;
+}
+
+static void on_takepicture_ready_once() {
+    *g_clientctx->save_pics_counter = 0;
+    logf("This server ready (TAKEPICTURE).");
 }
 
 static void cleanup_host_client_resources() {
@@ -255,14 +253,14 @@ static void cleanup_host_client_resources() {
     }
 }
 
-static void on_stoprecording_phase_complete() {
-    PTPParams *ptp_params = g_clientctx->ptp_params;
-    if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
-        cleanup_host_client_resources();
-        this_server_ready = true;
-    } else {
-        this_server_ready = false;
-    }
+static bool is_stoprecording_ready() {
+    const PTPParams *ptp = g_clientctx->ptp_params;
+    return ptp && ptp->network_set_stop_ptp && ptp->ptp_stop_reached;
+}
+
+static void on_stoprecording_ready_once() {
+    logf("This server ready.");
+    cleanup_host_client_resources();
 }
 
 // ============================================================================
@@ -669,7 +667,7 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
-    this_server_ready = true;
+    this_server_ready = false;
     logf("session reset");
 }
 
@@ -957,68 +955,69 @@ void host_client_init(
 }
 
 void host_client_tick() {
+    // drain network + registry
     if (g_step_net_in_tick) {
         (void)enet_dispatch_drain(g_ctxp->net, host_on_event);
     }
-
     update_servers_from_registry();
 
+    // collect replies and update ack map
     std::vector<ReplyEvent> batch;
     drain_replies(batch);
-    if (!batch.empty()) {
-        for (const ReplyEvent &e : batch) {
-            if (e.job_id != g_jid || e.epoch != g_epoch || e.seq != g_seq)
-                continue;
-            if (e.ctrl != current_ctrl())
-                continue;
-            logf("%s reply from %s ok=%d", ctrl_name(e.ctrl),
-                 e.server_id.c_str(), (int)e.ok);
-            if (e.ok)
-                g_ack_by[e.server_id] = true;
-        }
+    for (const ReplyEvent &e : batch) {
+        if (e.job_id != g_jid || e.epoch != g_epoch || e.seq != g_seq)
+            continue;
+        if (e.ctrl != current_ctrl())
+            continue;
 
-        if (g_waiting) {
-            bool all = true;
-            for (const auto &name : g_servers) {
-                if (!g_ack_by.count(name) || !g_ack_by[name]) {
-                    all = false;
-                    break;
-                }
-            }
-            if (all) {
-                // wait for this server down
-                if (current_ctrl() == camnet::v1::ServerControl_TAKEPICTURE) {
-                    on_takepicture_phase_complete();
-                } else if (current_ctrl() ==
-                           camnet::v1::ServerControl_STOPRECORDING) {
-                    on_stoprecording_phase_complete();
-                }
-
-                if (this_server_ready) {
-                    logf("barrier OK for %s", ctrl_name(current_ctrl()));
-                    g_phase_started = false;
-                    g_waiting = false;
-                    ++g_seq;
-                    advance_phase(g_jid);
-                }
-            }
-        }
+        logf("%s reply from %s ok=%d", ctrl_name(e.ctrl), e.server_id.c_str(),
+             (int)e.ok);
+        if (e.ok)
+            g_ack_by[e.server_id] = true;
     }
 
-    // if (g_waiting) {
-    //     auto now = std::chrono::steady_clock::now();
-    //     if (now - g_last_send > std::chrono::milliseconds(g_timeout_ms)) {
-    //         for (const auto &name : g_servers) {
-    //             if (!g_ack_by.count(name) || !g_ack_by[name]) {
-    //                 logf("waiting for %s on %s …", name.c_str(),
-    //                      ctrl_name(current_ctrl()));
-    //             }
-    //         }
-    //         broadcast_current_phase();
-    //         g_last_send = std::chrono::steady_clock::now();
-    //         logf("timeout → re-send %s", ctrl_name(current_ctrl()));
-    //     }
-    // }
+    // compute local readiness (pure)
+    const auto ctrl = current_ctrl();
+    bool ready_now = false;
+    switch (ctrl) {
+    case camnet::v1::ServerControl_TAKEPICTURE:
+        ready_now = is_takepicture_ready();
+        break;
+    case camnet::v1::ServerControl_STOPRECORDING:
+        ready_now = is_stoprecording_ready();
+        break;
+    default:
+        ready_now = true;
+        break;
+    }
+
+    // rising-edge detect: run side-effects only when transitioning false ->
+    // true
+    if (!this_server_ready && ready_now) {
+        if (ctrl == camnet::v1::ServerControl_TAKEPICTURE) {
+            on_takepicture_ready_once();
+        } else if (ctrl == camnet::v1::ServerControl_STOPRECORDING) {
+            on_stoprecording_ready_once();
+        }
+    }
+    this_server_ready = ready_now;
+
+    // decide barrier every tick
+    if (g_waiting) {
+        const bool all_acked = std::all_of(
+            g_servers.begin(), g_servers.end(), [](const auto &name) {
+                auto it = g_ack_by.find(name);
+                return it != g_ack_by.end() && it->second;
+            });
+
+        if (all_acked && this_server_ready) {
+            logf("barrier OK for %s", ctrl_name(ctrl));
+            g_phase_started = false;
+            g_waiting = false;
+            ++g_seq;
+            advance_phase(g_jid);
+        }
+    }
 }
 
 void host_client_draw_gui() {

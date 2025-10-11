@@ -455,7 +455,7 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         auto t0 = steady_clock::now();
         const auto timeout = 180s; // tune for your hardware
 
-        while (!ptp_params.ptp_start_reached) {
+        while (!ptp_params.ptp_stop_reached) {
             if (steady_clock::now() - t0 > timeout) {
                 cleanup_host_server_resources();
                 return false; // guard joins threads

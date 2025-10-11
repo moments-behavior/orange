@@ -110,6 +110,26 @@ static void on_startthread_phase_start(std::string encoder_setup,
                            ptp_params, calib_yaml_folder, detection3d_thread);
 }
 
+static bool is_startthread_ready() {
+    auto num_cameras = *g_clientctx->num_cameras;
+    PTPParams *ptp_params = g_clientctx->ptp_params;
+    return ptp_params->ptp_counter == num_cameras;
+}
+
+static bool is_startstreaming_ready() {
+    auto num_cameras = *g_clientctx->num_cameras;
+    PTPParams *ptp_params = g_clientctx->ptp_params;
+    return ptp_params->ptp_counter == num_cameras;
+}
+
+static void on_startthread_complete() {
+    logf("This server ready (STARTTHREAD).");
+}
+
+static void on_startstreaming_complete() {
+    logf("This server ready (STARTSTREAMING).");
+}
+
 static void on_startstreaming_phase_start(std::string folder_name,
                                           std::string save_format) {
     // unpack
@@ -993,6 +1013,10 @@ void host_client_tick() {
     case camnet::v1::ServerControl_STOPRECORDING:
         ready_now = is_stoprecording_ready();
         break;
+    case camnet::v1::ServerControl_STARTTHREAD:
+        ready_now = is_startthread_ready();
+    case camnet::v1::ServerControl_STARTSTREAMING:
+        ready_now = is_startstreaming_ready();
     default:
         ready_now = true;
         break;
@@ -1015,6 +1039,10 @@ void host_client_tick() {
             } else if (ctrl == camnet::v1::ServerControl_STOPRECORDING) {
                 on_stoprecording_complete(); // idempotent (may clear PTP
                                              // flags)
+            } else if (ctrl == camnet::v1::ServerControl_STARTTHREAD) {
+                on_startthread_complete();
+            } else if (ctrl == camnet::v1::ServerControl_STARTSTREAMING) {
+                on_startstreaming_complete();
             }
 
             g_phase_started = false;

@@ -1,68 +1,118 @@
 #include "utils.h"
 #include "NvEncoder/NvCodecUtils.h"
+#include "json.hpp"
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 
+#if defined(_WIN32)
+#include <shlobj.h>
+#include <windows.h>
+#pragma comment(lib, "shell32.lib")
+#else
+#include <cstdlib>
+#include <pwd.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
+
 simplelogger::Logger *logger =
     simplelogger::LoggerFactory::CreateConsoleLogger();
 
-void prepare_application_folders(std::string orange_root_dir_str) {
-
-    std::string recordings_str = orange_root_dir_str + "/exp/unsorted";
-    std::filesystem::path recordings_path(recordings_str);
-    if (!std::filesystem::exists(recordings_path)) {
-        if (std::filesystem::create_directories(recordings_path)) {
-            std::cout << "Create recording folder..." << std::endl;
-        }
+std::string get_home_directory() {
+#if defined(_WIN32)
+    PWSTR path = nullptr;
+    std::string home;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &path))) {
+        char buffer[MAX_PATH];
+        WideCharToMultiByte(CP_UTF8, 0, path, -1, buffer, MAX_PATH, NULL, NULL);
+        home = buffer;
+        CoTaskMemFree(path);
     }
+    return home;
+#else
+    const char *home = std::getenv("HOME");
+    if (home != nullptr && std::strcmp(home, "/root") != 0)
+        return std::string(home);
 
-    std::string calib_dir_str = orange_root_dir_str + "/calib_yaml";
-    std::filesystem::path calib_path(calib_dir_str);
-    if (!std::filesystem::exists(calib_path)) {
-        if (std::filesystem::create_directories(calib_path)) {
-            std::cout << "Create calib_yaml folder..." << std::endl;
-        }
-    }
-    std::string detect_str = orange_root_dir_str + "/detect";
-    std::filesystem::path detect_path(detect_str);
-    if (!std::filesystem::exists(detect_path)) {
-        if (std::filesystem::create_directory(detect_path)) {
-            std::cout << "Create detecting folder..." << std::endl;
-        }
-    }
-
-    std::string config_local = orange_root_dir_str + "/config/local";
-    std::filesystem::path config_local_path(config_local);
-    if (!std::filesystem::exists(config_local_path)) {
-        if (std::filesystem::create_directories(config_local_path)) {
-            std::cout << "Create config/local folder..." << std::endl;
-        }
+    // Check for SUDO_USER — the original username before sudo
+    const char *sudo_user = std::getenv("SUDO_USER");
+    if (sudo_user != nullptr) {
+        struct passwd *pw = getpwnam(sudo_user);
+        if (pw != nullptr)
+            return std::string(pw->pw_dir);
     }
 
-    std::string config_network = orange_root_dir_str + "/config/network";
-    std::filesystem::path config_network_path(config_network);
-    if (!std::filesystem::exists(config_network_path)) {
-        if (std::filesystem::create_directory(config_network_path)) {
-            std::cout << "Create config/network folder..." << std::endl;
+    // fallback: use real UID (not effective UID)
+    struct passwd *pw = getpwuid(getuid());
+    if (pw != nullptr)
+        return std::string(pw->pw_dir);
+
+    return {};
+#endif
+}
+
+void create_required_folders(const std::string &base_dir,
+                             const std::vector<std::string> &app_folders) {
+    for (const auto &folder : app_folders) {
+        std::filesystem::path path = std::filesystem::path(base_dir) / folder;
+
+        try {
+            if (!std::filesystem::exists(path)) {
+                if (std::filesystem::create_directories(path)) {
+                    std::cout << "Created folder: " << path << std::endl;
+                }
+            }
+        } catch (const std::filesystem::filesystem_error &e) {
+            std::cerr << "Error creating " << path << ": " << e.what()
+                      << std::endl;
+        }
+    }
+}
+
+void prepare_application_folders(std::string &orange_root_dir,
+                                 std::string &recording_root_dir,
+                                 std::string &encoder_codec) {
+
+    std::string home_dir = get_home_directory();
+
+    // check for config.json
+    std::filesystem::path config_path =
+        std::filesystem::path(home_dir) / ".config/orange/config.json";
+    if (std::filesystem::exists(config_path)) {
+        try {
+            std::ifstream f(config_path);
+            nlohmann::json j;
+            f >> j;
+
+            if (j.contains("recording_folder") &&
+                j["recording_folder"].is_string()) {
+                recording_root_dir = j["recording_folder"].get<std::string>();
+            }
+
+            if (j.contains("codec") && j["codec"].is_string()) {
+                encoder_codec = j["codec"].get<std::string>();
+            }
+        } catch (const std::exception &e) {
+            std::cerr << "Failed to read/parse config.json: " << e.what()
+                      << std::endl;
         }
     }
 
-    std::string picture_str = orange_root_dir_str + "/pictures";
-    std::filesystem::path picture_path(picture_str);
-    if (!std::filesystem::exists(picture_path)) {
-        if (std::filesystem::create_directory(picture_path)) {
-            std::cout << "Create picture folder..." << std::endl;
-        }
+    if (orange_root_dir.empty()) {
+        orange_root_dir = home_dir + "/orange_data";
+    }
+    std::vector<std::string> app_folders = {
+        "calib_yaml", "detect", "config/local", "config/network", "pictures"};
+    create_required_folders(orange_root_dir, app_folders);
+
+    if (recording_root_dir.empty()) {
+        recording_root_dir = orange_root_dir;
     }
 
-    std::string calibration_str = orange_root_dir_str + "/exp/calibration";
-    std::filesystem::path calibration_path(calibration_str);
-    if (!std::filesystem::exists(calibration_path)) {
-        if (std::filesystem::create_directory(calibration_path)) {
-            std::cout << "Create calibration folder..." << std::endl;
-        }
-    }
+    std::vector<std::string> recording_folders = {"exp/unsorted",
+                                                  "exp/calibration"};
+    create_required_folders(recording_root_dir, recording_folders);
 }
 
 std::vector<std::string> string_split(std::string s, std::string delimiter) {

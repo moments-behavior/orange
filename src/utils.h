@@ -79,7 +79,9 @@ inline NppStreamContext make_npp_stream_context(int device_id,
     return ctx;
 }
 
-void prepare_application_folders(std::string orange_root_dir_str);
+void prepare_application_folders(std::string &orange_root_dir,
+                                 std::string &recording_root_dir,
+                                 std::string &encoder_codec);
 std::vector<std::string> string_split(std::string s, std::string delimiter);
 std::vector<std::string> string_split_char(char *string_c,
                                            std::string delimiter);

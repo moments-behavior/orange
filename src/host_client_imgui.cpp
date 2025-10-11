@@ -22,11 +22,27 @@
 #include "utils.h"
 using namespace std::chrono_literals;
 
+// ---- thread-safe logs (net thread may log)
+static std::mutex g_logs_m;
+static std::vector<std::string> g_logs;
+static void logf(const char *fmt, ...) {
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    std::lock_guard<std::mutex> lk(g_logs_m);
+    g_logs.emplace_back(buf);
+}
+
+static bool g_phase_started = false;
+
 // persistent to handle missing messages
 static int g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
+static bool this_server_ready = true;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -53,10 +69,6 @@ static void on_open_phase_start() {
     open_selected_cameras(check, cam_count, devs, cfg_files, num_cams, params,
                           select, ecams, plots);
     camera_control->open = true;
-}
-
-static void on_open_phase_complete() {
-    // Optional: persist metadata, update UI, etc.
 }
 
 static void on_startthread_phase_start(std::string encoder_setup,
@@ -164,74 +176,92 @@ static void on_takepicture_phase_start(uint picture_id) {
     }
 }
 
+static void on_takepicture_phase_complete() {
+    auto save_image_all_ready = *g_clientctx->save_image_all_ready;
+    if (save_image_all_ready) {
+        *g_clientctx->save_pics_counter = 0;
+        logf("This server ready.");
+        this_server_ready = true;
+    } else {
+        this_server_ready = false;
+    }
+}
+
 static void cleanup_host_client_resources() {
     PTPParams *ptp_params = g_clientctx->ptp_params;
+
+    auto &check = *g_clientctx->check;
+    int &cam_count = *g_clientctx->cam_count;
+    int &num_cameras = *g_clientctx->num_cameras;
+    CameraEachSelect *&cameras_select = *g_clientctx->cameras_select;
+    CameraParams *&cameras_params = *g_clientctx->cameras_params;
+    std::vector<std::thread> *camera_threads = g_clientctx->camera_threads;
+    GL_Texture *&tex_gl = *g_clientctx->tex_gl;
+    CameraControl *camera_control = g_clientctx->camera_control;
+    int &evt_buffer_size = *g_clientctx->evt_buffer_size;
+    CameraEmergent *&ecams = *g_clientctx->ecams;
+
+    ptp_params->network_set_stop_ptp = false;
+
+    for (int i = 0; i < num_cameras; i++) {
+        if (cameras_select[i].stream_on) {
+            int camera_width =
+                int(cameras_params[i].width / cameras_select[i].downsample);
+            int camera_height =
+                int(cameras_params[i].height / cameras_select[i].downsample);
+            clear_upload_and_cleanup(tex_gl[i], camera_width, camera_height);
+        }
+    }
+    delete[] tex_gl;
+    tex_gl = nullptr;
+
+    for (auto &t : *camera_threads)
+        t.join();
+
+    for (int i = 0; i < num_cameras; i++) {
+        camera_threads->pop_back();
+    }
+    for (int i = 0; i < num_cameras; i++) {
+        destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,
+                             evt_buffer_size, &cameras_params[i]);
+        delete[] ecams[i].evt_frame;
+        check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera),
+                            cameras_params[i].camera_serial.c_str());
+    }
+
+    for (int i = 0; i < num_cameras; i++) {
+        ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
+    }
+    camera_control->sync_camera = false;
+    camera_control->record_video = false;
+
+    ptp_params->ptp_global_time = 0;
+    ptp_params->ptp_stop_time = 0;
+    ptp_params->ptp_counter = 0;
+    ptp_params->ptp_stop_counter = 0;
+    ptp_params->network_sync = false;
+    ptp_params->network_set_start_ptp = false;
+    ptp_params->ptp_stop_reached = false;
+    ptp_params->ptp_start_reached = false;
+
+    for (int i = 0; i < num_cameras; i++) {
+        close_camera(&ecams[i].camera, &cameras_params[i]);
+    }
+
+    camera_control->open = false;
+
+    for (int i = 0; i < cam_count; i++) {
+        check[i] = 0;
+    }
+}
+
+static void on_stoprecording_phase_complete() {
+    PTPParams *ptp_params = g_clientctx->ptp_params;
     if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
-
-        auto &check = *g_clientctx->check;
-        int &cam_count = *g_clientctx->cam_count;
-        int &num_cameras = *g_clientctx->num_cameras;
-        CameraEachSelect *&cameras_select = *g_clientctx->cameras_select;
-        CameraParams *&cameras_params = *g_clientctx->cameras_params;
-        std::vector<std::thread> *camera_threads = g_clientctx->camera_threads;
-        GL_Texture *&tex_gl = *g_clientctx->tex_gl;
-        CameraControl *camera_control = g_clientctx->camera_control;
-        int &evt_buffer_size = *g_clientctx->evt_buffer_size;
-        CameraEmergent *&ecams = *g_clientctx->ecams;
-
-        ptp_params->network_set_stop_ptp = false;
-
-        for (int i = 0; i < num_cameras; i++) {
-            if (cameras_select[i].stream_on) {
-                int camera_width =
-                    int(cameras_params[i].width / cameras_select[i].downsample);
-                int camera_height = int(cameras_params[i].height /
-                                        cameras_select[i].downsample);
-                clear_upload_and_cleanup(tex_gl[i], camera_width,
-                                         camera_height);
-            }
-        }
-        delete[] tex_gl;
-        tex_gl = nullptr;
-
-        for (auto &t : *camera_threads)
-            t.join();
-
-        for (int i = 0; i < num_cameras; i++) {
-            camera_threads->pop_back();
-        }
-        for (int i = 0; i < num_cameras; i++) {
-            destroy_frame_buffer(&ecams[i].camera, ecams[i].evt_frame,
-                                 evt_buffer_size, &cameras_params[i]);
-            delete[] ecams[i].evt_frame;
-            check_camera_errors(EVT_CameraCloseStream(&ecams[i].camera),
-                                cameras_params[i].camera_serial.c_str());
-        }
-
-        for (int i = 0; i < num_cameras; i++) {
-            ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
-        }
-        camera_control->sync_camera = false;
-        camera_control->record_video = false;
-
-        ptp_params->ptp_global_time = 0;
-        ptp_params->ptp_stop_time = 0;
-        ptp_params->ptp_counter = 0;
-        ptp_params->ptp_stop_counter = 0;
-        ptp_params->network_sync = false;
-        ptp_params->network_set_start_ptp = false;
-        ptp_params->ptp_stop_reached = false;
-        ptp_params->ptp_start_reached = false;
-
-        for (int i = 0; i < num_cameras; i++) {
-            close_camera(&ecams[i].camera, &cameras_params[i]);
-        }
-
-        camera_control->open = false;
-
-        for (int i = 0; i < cam_count; i++) {
-            check[i] = 0;
-        }
+        cleanup_host_client_resources();
+        this_server_ready = true;
+    } else {
+        this_server_ready = false;
     }
 }
 
@@ -468,21 +498,6 @@ static void drain_replies(std::vector<ReplyEvent> &out) {
     out.swap(g_rep_q);
 }
 
-// ---- thread-safe logs (net thread may log)
-static std::mutex g_logs_m;
-static std::vector<std::string> g_logs;
-static void logf(const char *fmt, ...) {
-    char buf[512];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    std::lock_guard<std::mutex> lk(g_logs_m);
-    g_logs.emplace_back(buf);
-}
-
-static bool g_phase_started = false;
-
 // ============================================================================
 // Utilities
 // ============================================================================
@@ -654,6 +669,7 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
+    this_server_ready = true;
     logf("session reset");
 }
 
@@ -947,21 +963,6 @@ void host_client_tick() {
 
     update_servers_from_registry();
 
-    // check if this server is ready
-    bool this_server_ready = true;
-    if (g_phase == Phase_TakePicture_G || g_phase == Phase_NextPose_G ||
-        g_phase == Phase_TakeGlobalPicture) {
-        auto save_image_all_ready = *g_clientctx->save_image_all_ready;
-        if (save_image_all_ready) {
-            *g_clientctx->save_pics_counter = 0;
-            // TODO: put this to on_phase_complete(); or have a global
-            // this_server_ready flag
-            // logf("This server ready.");
-        } else {
-            this_server_ready = false;
-        }
-    }
-
     std::vector<ReplyEvent> batch;
     drain_replies(batch);
     if (!batch.empty()) {
@@ -984,20 +985,26 @@ void host_client_tick() {
                     break;
                 }
             }
-            if (all && this_server_ready) {
-                logf("barrier OK for %s", ctrl_name(current_ctrl()));
-                if (current_ctrl() == camnet::v1::ServerControl_OPENCAMERA) {
-                    on_open_phase_complete();
+            if (all) {
+                // wait for this server down
+                if (current_ctrl() == camnet::v1::ServerControl_TAKEPICTURE) {
+                    on_takepicture_phase_complete();
+                } else if (current_ctrl() ==
+                           camnet::v1::ServerControl_STOPRECORDING) {
+                    on_stoprecording_phase_complete();
                 }
-                g_phase_started = false;
-                g_waiting = false;
-                ++g_seq;
-                advance_phase(g_jid);
+
+                if (this_server_ready) {
+                    logf("barrier OK for %s", ctrl_name(current_ctrl()));
+                    g_phase_started = false;
+                    g_waiting = false;
+                    ++g_seq;
+                    advance_phase(g_jid);
+                }
             }
         }
     }
 
-    cleanup_host_client_resources();
     // if (g_waiting) {
     //     auto now = std::chrono::steady_clock::now();
     //     if (now - g_last_send > std::chrono::milliseconds(g_timeout_ms)) {
@@ -1015,134 +1022,299 @@ void host_client_tick() {
 }
 
 void host_client_draw_gui() {
-    ImGui::Begin("Network");
+    if (!ImGui::Begin("Network"))
+        return;
 
+    // --- Compact style for this window only ---
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 6));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 4));
+
+    // --- Data refs ---
     std::string &selected_network_folder =
         *g_clientctx->selected_network_folder;
     int &network_config_select = *g_clientctx->network_config_select;
     auto &network_config_folders = *g_clientctx->network_config_folders;
 
+    // --- Valid selection guard ---
     if (network_config_select < 0 ||
         network_config_select >= (int)network_config_folders.size()) {
         int idx =
             find_cfg_index(network_config_folders, selected_network_folder);
         network_config_select =
             (idx >= 0 ? idx : (network_config_folders.empty() ? -1 : 0));
-        selected_network_folder = network_config_folders[network_config_select];
-    }
-
-    ImGuiStyle &style = ImGui::GetStyle();
-    const int n = (int)network_config_folders.size();
-    for (int i = 0; i < n; ++i) {
-        if (i > 0)
-            ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-
-        std::string label = std::filesystem::path(network_config_folders[i])
-                                .filename()
-                                .string();
-
-        const bool is_rig_new = (label == "rig_new");
-        if (is_rig_new)
-            ImGui::PushStyleColor(ImGuiCol_Text,
-                                  ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
-
-        if (ImGui::RadioButton((label + "##cfg" + std::to_string(i)).c_str(),
-                               &network_config_select, i)) {
+        if (network_config_select >= 0)
             selected_network_folder =
                 network_config_folders[network_config_select];
-        }
-
-        if (is_rig_new)
-            ImGui::PopStyleColor();
     }
 
-    if (ImGui::CollapsingHeader("Endpoints", ImGuiTreeNodeFlags_DefaultOpen)) {
-        for (const auto &ep : g_endpoints) {
-            ImGui::BulletText("%s:%d", ep.first.c_str(), ep.second);
-        }
-    }
+    // --- Header row: Network selector + Job mode + Phase toolbar ---
+    // ImGui::SeparatorText("Session");
 
-    if (ImGui::CollapsingHeader("Camera Servers",
-                                ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto info = g_ctxp->peers.snapshot_info();
-        ImGui::Text("Known peers: %d", (int)info.size());
-        for (const auto &pi : info) {
-            ImGui::BulletText("pid=%u name=%s camsK=%d cams=%d", pi.peer_id,
-                              pi.name.c_str(), (int)pi.camsK, pi.cams);
-        }
-    }
+    // Network selector (combo from folder names)
+    {
+        ImGui::SetNextItemWidth(160.0f);
 
-    ImGui::Separator();
+        std::string preview_str =
+            (network_config_select >= 0)
+                ? std::filesystem::path(
+                      network_config_folders[network_config_select])
+                      .filename()
+                      .string()
+                : "(none)";
+        const char *preview = preview_str.c_str();
 
-    const char *options[] = {"recording", "calibration"};
-    static int current = (g_jid == "recording") ? 0 : 1;
-    ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::BeginCombo("Network Config", preview)) {
+            for (int i = 0; i < (int)network_config_folders.size(); ++i) {
+                std::string label =
+                    std::filesystem::path(network_config_folders[i])
+                        .filename()
+                        .string();
+                bool is_selected = (network_config_select == i);
 
-    if (ImGui::BeginCombo("Job Mode", options[current])) {
-        for (int n = 0; n < IM_ARRAYSIZE(options); n++) {
-            bool is_selected = (current == n);
-            if (ImGui::Selectable(options[n], is_selected)) {
-                current = n;
-                g_jid = options[n];
+                if (label == "rig_new")
+                    ImGui::PushStyleColor(ImGuiCol_Text,
+                                          ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
+                if (ImGui::Selectable(label.c_str(), is_selected)) {
+                    network_config_select = i;
+                    selected_network_folder = network_config_folders[i];
+                }
+                if (label == "rig_new")
+                    ImGui::PopStyleColor();
+
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
             }
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
+            ImGui::EndCombo();
         }
-        ImGui::EndCombo();
+        ImGui::SameLine();
     }
 
-    ImGui::Text("Job: %s  epoch=%u  seq=%u", g_jid.c_str(), g_epoch, g_seq);
-    ImGui::Text("Phase: %s", phase_name());
-
-    if (!g_servers.empty()) {
-        ImGui::Text("Acks:");
-        ImGui::Indent();
-        for (const auto &name : g_servers) {
-            bool got = g_ack_by.count(name) ? g_ack_by[name] : false;
-            ImGui::BulletText("%s  [%s]", name.c_str(), got ? "OK" : "...");
+    // Job mode compact combo + Phase visuals/toolbar
+    {
+        const char *options[] = {"recording", "calibration"};
+        static int current = (g_jid == "recording") ? 0 : 1;
+        ImGui::SetNextItemWidth(160.0f);
+        if (ImGui::BeginCombo("Job Mode", options[current])) {
+            for (int n = 0; n < IM_ARRAYSIZE(options); n++) {
+                bool is_selected = (current == n);
+                if (ImGui::Selectable(options[n], is_selected)) {
+                    current = n;
+                    g_jid = options[n];
+                }
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
         }
-        ImGui::Unindent();
-    }
+        ImGui::SameLine();
 
-    if (ImGui::Button(g_waiting ? "Waiting..." : "Advance Phase")) {
-        if (!g_waiting && g_phase != Phase_Done) {
+        std::string phase_str = phase_name();
+
+        // Map phase to a base color (tweak as needed)
+        auto phase_color = [](const std::string &p) -> ImVec4 {
+            if (p.find("STARTRECORDING") != std::string::npos)
+                return ImVec4(0.20f, 0.70f, 0.30f, 1.0f); // green
+            if (p.find("STOPRECORDING") != std::string::npos)
+                return ImVec4(0.80f, 0.25f, 0.25f, 1.0f); // red
+            return ImVec4(0.95f, 0.75f, 0.30f, 1.0f);     // amber default
+        };
+
+        ImVec4 base = phase_color(phase_str);
+
+        // Subtle pulse while waiting
+        ImVec4 btn_col = base;
+        if (g_waiting) {
+            float t = (float)ImGui::GetTime();
+            float pulse =
+                0.85f + 0.15f * (0.5f + 0.5f * sinf(t * 4.0f)); // 0.85..1.0
+            btn_col.x *= pulse;
+            btn_col.y *= pulse;
+            btn_col.z *= pulse;
+        }
+
+        // Build label: "Advance → PHASE" or "Waiting… PHASE" or "Done"
+        std::string advance_label;
+        if (g_phase == Phase_Done) {
+            advance_label = "Done";
+        } else if (g_waiting) {
+            advance_label = "Waiting… " + phase_str;
+        } else {
+            advance_label = std::string("Advance ->") + phase_str; // →
+        }
+
+        auto lighten = [](ImVec4 c, float factor) {
+            c.x = std::min(c.x * factor, 1.0f);
+            c.y = std::min(c.y * factor, 1.0f);
+            c.z = std::min(c.z * factor, 1.0f);
+            return c;
+        };
+        auto darken = [](ImVec4 c, float factor) {
+            c.x *= factor;
+            c.y *= factor;
+            c.z *= factor;
+            return c;
+        };
+
+        // Wider, high-contrast button
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 4));
+        ImGui::PushStyleColor(ImGuiCol_Button, btn_col);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, lighten(btn_col, 1.25f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, darken(btn_col, 0.80f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 1));
+
+        bool disable_advance = g_waiting || (g_phase == Phase_Done);
+        if (disable_advance)
+            ImGui::BeginDisabled();
+
+        if (ImGui::Button(advance_label.c_str(), ImVec2(200, 0))) {
+            // Only fires when not disabled
             g_ack_by.clear();
             broadcast_current_phase();
             g_last_send = std::chrono::steady_clock::now();
             g_waiting = true;
         }
+
+        if (disable_advance)
+            ImGui::EndDisabled();
+
+        ImGui::PopStyleColor(4);
+        ImGui::PopStyleVar(2);
+
+        // Optional tooltip
+        // if (ImGui::IsItemHovered()) {
+        //     ImGui::SetTooltip("Current phase: %s", phase_str.c_str());
+        // }
+
+        // Keep the rest inline
+        ImGui::SameLine();
+        std::string resend_label = "Resend";
+        if (ImGui::Button(resend_label.c_str())) {
+            broadcast_current_phase();
+            g_last_send = std::chrono::steady_clock::now();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset Session")) {
+            reset_session();
+        }
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Resend")) {
-        broadcast_current_phase();
-        g_last_send = std::chrono::steady_clock::now();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Reset Session")) {
-        reset_session();
+    ImGui::Text("Job: %s | epoch=%u | seq=%u", g_jid.c_str(), g_epoch, g_seq);
+
+    // --- Tabs: Endpoints / Connected Servers / Log ---
+    if (ImGui::BeginTabBar("net_tabs", ImGuiTabBarFlags_AutoSelectNewTabs)) {
+
+        if (ImGui::BeginTabItem("Connected Servers")) {
+            auto info = g_ctxp->peers.snapshot_info();
+            // ImGui::TextDisabled("Known peers: %d", (int)info.size());
+
+            if (ImGui::BeginTable("tbl_peers_acks", 4,
+                                  ImGuiTableFlags_RowBg |
+                                      ImGuiTableFlags_BordersInnerV |
+                                      ImGuiTableFlags_SizingStretchProp)) {
+                ImGui::TableSetupColumn(
+                    "Peer ID", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn(
+                    "Name", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+                // ImGui::TableSetupColumn(
+                //     "camsK", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+                ImGui::TableSetupColumn(
+                    "cams", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+                ImGui::TableSetupColumn(
+                    "Ack Status", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+                ImGui::TableHeadersRow();
+
+                for (const auto &pi : info) {
+                    ImGui::TableNextRow();
+
+                    // Peer info columns
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%u", pi.peer_id);
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(pi.name.c_str());
+
+                    // ImGui::TableSetColumnIndex(2);
+                    // ImGui::Text("%d", (int)pi.camsK);
+
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%d", pi.cams);
+
+                    // Ack status (lookup by name)
+                    ImGui::TableSetColumnIndex(3);
+                    bool got =
+                        g_ack_by.count(pi.name) ? g_ack_by.at(pi.name) : false;
+                    ImGui::TextColored(got ? ImVec4(0.3f, 0.9f, 0.3f, 1.0f)
+                                           : ImVec4(0.9f, 0.7f, 0.2f, 1.0f),
+                                       got ? "OK" : "...");
+                }
+
+                ImGui::EndTable();
+            }
+
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Endpoints")) {
+            if (ImGui::BeginTable("tbl_endpoints", 2,
+                                  ImGuiTableFlags_RowBg |
+                                      ImGuiTableFlags_BordersInnerV |
+                                      ImGuiTableFlags_SizingStretchProp)) {
+                ImGui::TableSetupColumn(
+                    "Host", ImGuiTableColumnFlags_WidthStretch, 0.6f);
+                ImGui::TableSetupColumn(
+                    "Port", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableHeadersRow();
+                for (const auto &ep : g_endpoints) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(ep.first.c_str());
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%d", ep.second);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Log")) {
+            // Toolbar
+            if (ImGui::Button("Clear Log")) {
+                std::lock_guard<std::mutex> lk(g_logs_m);
+                g_logs.clear();
+            }
+            ImGui::SameLine();
+            static bool auto_scroll = true;
+            ImGui::Checkbox("Auto-scroll", &auto_scroll);
+
+            ImGui::BeginChild("log_child", ImVec2(0, 0), true,
+                              ImGuiWindowFlags_HorizontalScrollbar);
+            {
+                std::lock_guard<std::mutex> lk(g_logs_m);
+                ImGuiListClipper clipper;
+                clipper.Begin((int)g_logs.size());
+                while (clipper.Step()) {
+                    for (int i = clipper.DisplayStart; i < clipper.DisplayEnd;
+                         ++i) {
+                        ImGui::TextUnformatted(g_logs[i].c_str());
+                    }
+                }
+                if (auto_scroll &&
+                    ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+                    ImGui::SetScrollHereY(1.0f);
+            }
+            ImGui::EndChild();
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
     }
 
-    ImGui::Separator();
-    if (ImGui::Button("Clear Log")) {
-        std::lock_guard<std::mutex> lk(g_logs_m);
-        g_logs.clear();
-    }
-    ImGui::BeginChild("log", ImVec2(0, 0), true,
-                      ImGuiWindowFlags_HorizontalScrollbar);
-    {
-        std::lock_guard<std::mutex> lk(g_logs_m);
-        for (const auto &line : g_logs)
-            ImGui::TextUnformatted(line.c_str());
-    }
-    ImGui::EndChild();
-
+    // Auto-advance logic
     {
         static int last_phase = -1;
-
-        // Detect phase change
         if (g_phase != last_phase) {
-            // Auto-continue only for calibration
             if (g_jid == "calibration" && !g_waiting && g_phase != Phase_Done &&
                 g_phase != Phase_TakeGlobalPicture) {
                 g_ack_by.clear();
@@ -1150,11 +1322,12 @@ void host_client_draw_gui() {
                     g_ack_by[name] = false;
                 broadcast_current_phase();
                 g_last_send = std::chrono::steady_clock::now();
-                g_waiting = true; // arm next phase automatically
+                g_waiting = true;
             }
             last_phase = g_phase;
         }
     }
 
+    ImGui::PopStyleVar(2);
     ImGui::End();
 }

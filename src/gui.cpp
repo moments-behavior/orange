@@ -244,6 +244,10 @@ void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
         input_text("YOLO", cameras_select->yolo_model);
         ImGui::Checkbox("GPU Direct",
                         &cameras_params[selected_camera].gpu_direct);
+        if (cameras_params[selected_camera].gpu_direct) {
+            ImGui::InputInt("GPU ID", &cameras_params[selected_camera].gpu_id);
+        }
+
         ImGui::Checkbox("Color", &cameras_params[selected_camera].color);
 
         if (cameras_params[selected_camera].color) {

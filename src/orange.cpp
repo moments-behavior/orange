@@ -34,13 +34,12 @@ int main(int argc, char **args) {
     GigEVisionDeviceInfo device_info[max_cameras];
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
-    std::filesystem::path cwd = std::filesystem::current_path();
-    std::string delimiter = "/";
-    std::vector<std::string> tokenized_path = string_split(cwd, delimiter);
-    std::string orange_root_dir_str =
-        "/home/" + tokenized_path[2] + "/orange_data";
-    prepare_application_folders(orange_root_dir_str);
-    std::string recording_root_dir_str = "/data0";
+    std::string orange_root_dir_str;
+    std::string encoder_codec;
+    std::string recording_root_dir_str;
+    prepare_application_folders(orange_root_dir_str, recording_root_dir_str,
+                                encoder_codec);
+
     std::string input_folder = recording_root_dir_str + "/exp/unsorted";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
 
@@ -61,7 +60,6 @@ int main(int argc, char **args) {
     PTPParams *ptp_params =
         new PTPParams{0, 0, 0, 0, false, false, false, false};
 
-    std::string encoder_codec = "h264";
     std::string encoder_preset = "p1";
 
     ScrollingBuffer *realtime_plot_data;
@@ -92,14 +90,15 @@ int main(int argc, char **args) {
          std::filesystem::directory_iterator(local_start_folder_name)) {
         local_config_folders.push_back(entry.path().string());
     }
-    std::string picture_save_folder = orange_root_dir_str + "/pictures/";
+    std::string picture_save_folder =
+        orange_root_dir_str + "/pictures/" + get_current_date();
     std::string calib_save_folder = recording_root_dir_str + "/exp/calibration";
 
     int local_config_select = 0;
     bool select_all_cameras = false;
     char *temp_string = (char *)malloc(128);
     *temp_string = '\0';
-    bool save_image_all_ready{false};
+    bool save_image_all_ready{true};
 
     std::vector<std::string> color_temps = {"CT_Off",   "CT_2800K", "CT_3000K",
                                             "CT_4000K", "CT_5000K", "CT_6500K",
@@ -268,7 +267,7 @@ int main(int argc, char **args) {
             int fps_temp =
                 streaming_target_fps.load(); // get the current atomic value
 
-            if (ImGui::InputInt("streaming fps", &fps_temp)) {
+            if (ImGui::InputInt("Streaming FPS", &fps_temp)) {
                 // Clamp if necessary
                 if (fps_temp < 1)
                     fps_temp = 1;
@@ -450,6 +449,9 @@ int main(int argc, char **args) {
                     ImGui::SameLine();
                     ImGui::Text("%s", picture_save_folder.c_str());
 
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(100.0f);
+
                     if (ImGui::Combo("Picture format", &current_picture_format,
                                      picture_format_items,
                                      IM_ARRAYSIZE(picture_format_items))) {
@@ -465,41 +467,21 @@ int main(int argc, char **args) {
                         save_image_all_ready = true;
                     }
 
-                    ImGui::Text("Reset counter: ");
-                    const int cols = 5;
-                    for (int i = 0; i < num_cameras; ++i) {
-                        std::string label =
-                            cameras_params[i].camera_name + ": " +
-                            std::to_string(cameras_select[i].pictures_counter) +
-                            "##calibration_save";
-                        if (ImGui::Selectable(label.c_str(), false,
-                                              ImGuiSelectableFlags_None,
-                                              ImVec2(150, 50))) {
-                            cameras_select[i].pictures_counter = 0;
-                        }
-
-                        // Keep items on the same line until end of row
-                        if ((i + 1) % cols != 0)
-                            ImGui::SameLine();
-                    }
-
                     if (!save_image_all_ready) {
                         ImGui::BeginDisabled();
                     }
 
-                    ImGui::NewLine();
-                    if (ImGui::Button("Reset counters all")) {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Save pictures")) {
+                        make_folder(picture_save_folder);
+                        std::string frame_save_name =
+                            get_current_time_milliseconds();
                         for (int i = 0; i < num_cameras; i++) {
-                            cameras_select[i].pictures_counter = 0;
-                        }
-                    }
-
-                    if (ImGui::Button("Calib save images with counter")) {
-                        for (int i = 0; i < num_cameras; i++) {
-                            cameras_select[i].frame_save_name = std::to_string(
-                                cameras_select[i].pictures_counter);
+                            cameras_select[i].frame_save_name = frame_save_name;
+                            cameras_select[i].frame_save_format =
+                                selected_picture_format;
                             cameras_select[i].picture_save_folder =
-                                calib_save_folder;
+                                picture_save_folder;
                             cameras_select[i].sigs->frame_save_state.store(
                                 State_Copy_New_Frame);
                         }

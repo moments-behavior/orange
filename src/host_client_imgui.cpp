@@ -43,6 +43,7 @@ static int g_picture_id;
 static std::string g_folder_name;
 static unsigned long long g_ptp_start_time;
 static unsigned long long g_ptp_stop_time;
+static AppContext *g_ctxp = nullptr;
 
 static HostClientCtx *g_clientctx = nullptr;
 void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
@@ -115,10 +116,10 @@ static void on_startthread_phase_start(std::string encoder_setup,
         }
     }
 
-    start_camera_streaming(*camera_threads, camera_control, ecams,
-                           cameras_params, cameras_select, tex_gl, num_cameras,
-                           evt_buffer_size, true, encoder_setup, folder_name,
-                           ptp_params, calib_yaml_folder, detection3d_thread);
+    start_camera_streaming(
+        *camera_threads, camera_control, ecams, cameras_params, cameras_select,
+        tex_gl, num_cameras, evt_buffer_size, true, encoder_setup, folder_name,
+        ptp_params, calib_yaml_folder, detection3d_thread, g_ctxp);
 }
 
 static bool is_startthread_ready() {
@@ -179,7 +180,7 @@ static void on_startstreaming_phase_start(std::string folder_name,
     start_camera_streaming(*camera_threads, camera_control, ecams,
                            cameras_params, cameras_select, tex_gl, num_cameras,
                            evt_buffer_size, true, "", "", ptp_params,
-                           calib_yaml_folder, detection3d_thread);
+                           calib_yaml_folder, detection3d_thread, g_ctxp);
 }
 
 static void on_startrecord_phase_start(unsigned long long ptp_global_time) {
@@ -479,8 +480,6 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
 // ============================================================================
 // Global host client state
 // ============================================================================
-static AppContext *g_ctxp = nullptr;
-
 enum Phase {
     Phase_Open,
     Phase_Threads,

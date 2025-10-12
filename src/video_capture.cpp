@@ -42,6 +42,12 @@ void load_camera_json_config_files(std::string file_name,
     if (camera_config.contains("yolo")) {
         camera_select->yolo_model = camera_config["yolo"];
     }
+    if (camera_config.contains("offsetx")) {
+        camera_params->offsetx = camera_config["offsetx"];
+    }
+    if (camera_config.contains("offsety")) {
+        camera_params->offsety = camera_config["offsety"];
+    }
 }
 
 bool set_camera_params(CameraParams *camera_params,
@@ -323,7 +329,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraEachSelect *camera_select,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
-                    std::string folder_name, PTPParams *ptp_params) {
+                    std::string folder_name, PTPParams *ptp_params,
+                    AppContext *ctx) {
     CHECK(cudaSetDevice(camera_params->gpu_id));
     CameraState camera_state;
     PTPState ptp_state;
@@ -348,7 +355,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     COpenGLDisplay *openGLDisplay = nullptr;
     if (camera_select->stream_on) {
         openGLDisplay = new COpenGLDisplay("gl", camera_params, camera_select,
-                                           display_buffer);
+                                           display_buffer, ctx);
         openGLDisplay->StartThread();
     }
 #endif

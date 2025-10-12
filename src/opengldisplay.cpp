@@ -3,6 +3,7 @@
 #if defined(__GNUC__)
 #include <unistd.h>
 #endif
+#include "ctrl_generated.h"
 #include "global.h"
 #include "kernel.cuh"
 #include "opengldisplay.h"
@@ -15,9 +16,9 @@
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
-                               unsigned char *display_buffer)
+                               unsigned char *display_buffer, AppContext *ctx)
     : CThreadWorker(name), camera_params(camera_params),
-      camera_select(camera_select), display_buffer(display_buffer) {
+      camera_select(camera_select), display_buffer(display_buffer), ctx(ctx) {
     input_image_size.width = camera_params->width;
     input_image_size.height = camera_params->height;
     input_image_roi.x = 0;
@@ -48,6 +49,42 @@ COpenGLDisplay::~COpenGLDisplay() {
     if (camera_select->detect_mode == Detect2D_GLThread) {
         delete yolov8;
     }
+}
+
+static void
+send_indigo_trigger_message(AppContext *ctx,
+                            flatbuffers::FlatBufferBuilder &flatb_builder) {
+    using namespace camnet::v1;
+
+    // Build FlatBuffers message
+    auto jid = flatb_builder.CreateString("detection");
+    auto msg = CreateServer(flatb_builder, Kind_KindCommand,
+                            camnet::v1::ServerControl_TRIALTRIGGER, jid,
+                            /* major */ 1,
+                            /* minor */ 1, CommandBody_NONE, 0, 0);
+    flatb_builder.Finish(msg);
+
+    // Look up peer by name
+    uint32_t pid = ctx->peers.get_pid_by_name("indigo");
+    if (!pid) {
+        // Optional: log or print a warning
+        std::cerr << "[send_indigo_message] Peer 'indigo' not found\n";
+        return;
+    }
+
+    // Copy FlatBuffer contents into byte vector
+    std::vector<uint8_t> bytes(flatb_builder.GetBufferPointer(),
+                               flatb_builder.GetBufferPointer() +
+                                   flatb_builder.GetSize());
+
+    // Prepare and send outgoing packet
+    Outgoing o;
+    o.peer_id = pid;
+    o.channel = 0;
+    o.flags = ENET_PACKET_FLAG_RELIABLE;
+    o.bytes = std::move(bytes);
+
+    ctx->net.send(o);
 }
 
 void COpenGLDisplay::ThreadRunning() {
@@ -81,6 +118,7 @@ void COpenGLDisplay::ThreadRunning() {
         CHECK(cudaMemcpyAsync(d_skeleton, skeleton, sizeof(unsigned int) * 8,
                               cudaMemcpyHostToDevice, stream));
     }
+    flatbuffers::FlatBufferBuilder flatb_builder(256);
 
     std::vector<Bbox> objs;
     std::vector<Bbox> objs_last_frame;
@@ -164,9 +202,7 @@ void COpenGLDisplay::ThreadRunning() {
                     if (objs[0].rect.x < 2800.0 &&
                         objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
-                        // send_message_to_indigo(
-                        //     ctx_.sender, ctx_.peers, "indigo",
-                        //     FetchGame::SignalType_INDIGO_TRIAL_TRIGGER);
+                        send_indigo_trigger_message(ctx, flatb_builder);
                     }
                     objs_last_frame.push_back(objs[0]);
                 } else {

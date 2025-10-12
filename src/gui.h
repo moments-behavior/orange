@@ -74,7 +74,8 @@ void start_camera_streaming(
     CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras,
     int evt_buffer_size, bool ptp_stream_sync, const std::string &encoder_setup,
     const std::string &folder_name, PTPParams *ptp_params,
-    std::string calib_yaml_folder, std::thread &detection3d_thread);
+    std::string calib_yaml_folder, std::thread &detection3d_thread,
+    AppContext *ctx);
 
 void stop_camera_streaming(std::vector<std::thread> &camera_threads,
                            CameraControl *camera_control, CameraEmergent *ecams,

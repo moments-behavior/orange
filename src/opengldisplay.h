@@ -1,4 +1,5 @@
 #pragma once
+#include "enet_utils.h"
 #include "image_processing.h"
 #include "threadworker.h"
 #include "utils.h"
@@ -10,7 +11,7 @@ class COpenGLDisplay : public CThreadWorker {
   public:
     COpenGLDisplay(const char *name, CameraParams *camera_params,
                    CameraEachSelect *camera_select,
-                   unsigned char *display_buffer);
+                   unsigned char *display_buffer, AppContext *ctx);
     ~COpenGLDisplay();
 
     bool PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height,
@@ -34,6 +35,7 @@ class COpenGLDisplay : public CThreadWorker {
     float *d_points;
     unsigned int *d_skeleton;
     unsigned int *d_resize;
+    AppContext *ctx;
 
   private:
     virtual void

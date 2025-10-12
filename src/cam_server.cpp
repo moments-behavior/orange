@@ -258,10 +258,10 @@ static bool start_camera_thread(std::string record_folder,
     }
     try {
         for (int i = 0; i < cam_count; i++) {
-            camera_threads.push_back(
-                std::thread(&acquire_frames, &ecams[i], &cameras_params[i],
-                            &cameras_select[i], &camera_control, nullptr,
-                            encoder_basic_setup, record_folder, &ptp_params));
+            camera_threads.push_back(std::thread(
+                &acquire_frames, &ecams[i], &cameras_params[i],
+                &cameras_select[i], &camera_control, nullptr,
+                encoder_basic_setup, record_folder, &ptp_params, nullptr));
         }
     } catch (...) {
         std::cout << "Error creating camera thread." << std::endl;
@@ -347,7 +347,7 @@ static bool start_camera_streaming(std::string calib_folder,
             camera_threads.push_back(
                 std::thread(&acquire_frames, &ecams[i], &cameras_params[i],
                             &cameras_select[i], &camera_control, nullptr, "",
-                            "", &ptp_params));
+                            "", &ptp_params, nullptr));
         }
     } catch (...) {
         std::cout << "Error creating camera thread." << std::endl;

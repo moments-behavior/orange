@@ -1,4 +1,5 @@
 #include "host_client_imgui.h"
+#include <ImGuiFileDialog.h>
 
 #include <algorithm>
 #include <atomic>
@@ -49,7 +50,7 @@ void set_host_client_ctx(HostClientCtx *ctx) { g_clientctx = ctx; }
 // ============================================================================
 // Phase hooks
 // ============================================================================
-static void on_open_phase_start() {
+static void on_open_phase_start(std::string job_id) {
     std::string &selected_folder = *g_clientctx->selected_network_folder;
     auto *devs = g_clientctx->device_info;
     int &cam_count = *g_clientctx->cam_count;
@@ -61,6 +62,7 @@ static void on_open_phase_start() {
     CameraEmergent *&ecams = *g_clientctx->ecams;
     ScrollingBuffer *&plots = *g_clientctx->realtime_plot_data;
     CameraControl *camera_control = g_clientctx->camera_control;
+    std::string &input_folder = *g_clientctx->input_folder;
 
     std::vector<std::string> cfg_files;
     update_camera_configs(cfg_files, selected_folder);
@@ -68,6 +70,15 @@ static void on_open_phase_start() {
     open_selected_cameras(check, cam_count, devs, cfg_files, num_cams, params,
                           select, ecams, plots);
     camera_control->open = true;
+
+    if (job_id == "recording") {
+        IGFD::FileDialogConfig config;
+        config.countSelectionMax = 1;
+        config.path = input_folder;
+        config.flags = ImGuiFileDialogFlags_Modal;
+        ImGuiFileDialog::Instance()->OpenDialog(
+            "ChooseRecordingDir", "Choose a Directory", nullptr, config);
+    }
 }
 
 static void on_startthread_phase_start(std::string encoder_setup,
@@ -721,7 +732,7 @@ static void broadcast_current_phase() {
         bytes = build_cmd_open(g_jid, g_epoch, g_seq,
                                *g_clientctx->selected_network_folder);
         if (!g_phase_started) {
-            on_open_phase_start();
+            on_open_phase_start(g_jid);
             g_phase_started = true;
         }
         break;

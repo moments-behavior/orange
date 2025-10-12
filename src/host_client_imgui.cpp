@@ -34,7 +34,7 @@ static void logf(const char *fmt, ...) {
     std::lock_guard<std::mutex> lk(g_logs_m);
     g_logs.emplace_back(buf);
 }
-
+static int last_phase = -1; // for auto advancing
 static bool g_phase_started = false;
 
 // persistent to handle missing messages
@@ -695,6 +695,7 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
+    last_phase = -1;
     logf("session reset");
 }
 
@@ -1345,7 +1346,6 @@ void host_client_draw_gui() {
 
     // Auto-advance logic
     {
-        static int last_phase = -1;
         if (g_phase != last_phase) {
             if (g_jid == "calibration" && !g_waiting && g_phase != Phase_Done &&
                 g_phase != Phase_TakeGlobalPicture) {

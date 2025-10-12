@@ -14,10 +14,10 @@
 #include <vector>
 
 #include "camera.h"
-#include "ctrl_generated.h"       // camnet::v1 schema (generated)
-#include "enet_fb_helpers.h"      // optional FB parse helpers
-#include "enet_runtime_unified.h" // <-- unified wrapper (connect/dispatch/start)
-#include "enet_utils.h"           // AppContext, Incoming/Outgoing, PeerRegistry
+#include "ctrl_generated.h"
+#include "enet_fb_helpers.h"
+#include "enet_runtime_unified.h"
+#include "enet_utils.h"
 #include "gui.h"
 #include "imgui.h"
 #include "utils.h"

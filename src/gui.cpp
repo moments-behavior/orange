@@ -441,3 +441,56 @@ void draw_boxes(std::vector<cv::Rect_<float>> bboxes, int frame_height,
                  marker, pt_size);
     }
 }
+
+void open_selected_cameras(const std::vector<bool> &check, int cam_count,
+                           GigEVisionDeviceInfo *device_info,
+                           std::vector<std::string> &camera_config_files,
+                           int &num_cameras, CameraParams *&cameras_params,
+                           CameraEachSelect *&cameras_select,
+                           CameraEmergent *&ecams,
+                           ScrollingBuffer *&realtime_plot_data) {
+
+    num_cameras = 0;
+    for (int i = 0; i < cam_count; i++) {
+        if (check[i]) {
+            num_cameras++;
+        }
+    }
+    if (num_cameras > 0) {
+        cameras_params = new CameraParams[num_cameras]();
+        cameras_select = new CameraEachSelect[num_cameras]();
+
+        std::vector<int> selected_cameras;
+        for (int i = 0; i < cam_count; i++) {
+            if (check[i]) {
+                selected_cameras.push_back(i);
+            }
+        }
+        for (int i = 0; i < num_cameras; i++) {
+            set_camera_params(&cameras_params[i], &cameras_select[i],
+                              &device_info[selected_cameras[i]],
+                              camera_config_files, selected_cameras[i],
+                              num_cameras);
+        }
+
+        for (int i = 0; i < num_cameras; i++) {
+            cameras_select[i].stream_on = false;
+            if (cameras_params[i].camera_name == "Cam16") {
+                cameras_select[i].stream_on = true;
+                cameras_select[i].detect_mode = Detect2D_GLThread;
+            }
+            if (cameras_params[i].camera_name == "shelter") {
+                cameras_select[i].stream_on = true;
+            }
+        }
+
+        ecams = new CameraEmergent[num_cameras];
+        for (int i = 0; i < num_cameras; i++) {
+            open_camera_with_params(&ecams[i].camera,
+                                    &device_info[cameras_params[i].camera_id],
+                                    &cameras_params[i]);
+        }
+
+        realtime_plot_data = new ScrollingBuffer[num_cameras];
+    }
+}

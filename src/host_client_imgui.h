@@ -1,7 +1,6 @@
 #pragma once
 #include "enet_utils.h" // for AppContext
 #include "gui.h"
-#include "plot_buffers.h"
 #include "video_capture.h"
 #include <string>
 #include <utility>

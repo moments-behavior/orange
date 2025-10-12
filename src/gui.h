@@ -21,6 +21,47 @@ struct GL_Texture {
     int num_channels;
 };
 
+struct ScrollingBuffer {
+    int MaxSize;
+    int Offset;
+    ImVector<ImVec2> Data;
+    ScrollingBuffer(int max_size = 2000) {
+        MaxSize = max_size;
+        Offset = 0;
+        Data.reserve(MaxSize);
+    }
+    void AddPoint(float x, float y) {
+        if (Data.size() < MaxSize)
+            Data.push_back(ImVec2(x, y));
+        else {
+            Data[Offset] = ImVec2(x, y);
+            Offset = (Offset + 1) % MaxSize;
+        }
+    }
+    void Erase() {
+        if (Data.size() > 0) {
+            Data.shrink(0);
+            Offset = 0;
+        }
+    }
+};
+
+// utility structure for realtime plot
+struct RollingBuffer {
+    float Span;
+    ImVector<ImVec2> Data;
+    RollingBuffer() {
+        Span = 10.0f;
+        Data.reserve(2000);
+    }
+    void AddPoint(float x, float y) {
+        float xmod = fmodf(x, Span);
+        if (!Data.empty() && xmod < Data.back().x)
+            Data.shrink(0);
+        Data.push_back(ImVec2(xmod, y));
+    }
+};
+
 void setup_texture(GL_Texture &tex, int width, int height);
 
 void upload_texture_from_pbo(GL_Texture &tex, int width, int height);
@@ -66,5 +107,13 @@ void draw_box(cv::Rect_<float> bbox, int frame_height, ImVec4 color,
 void draw_boxes(std::vector<cv::Rect_<float>> bboxes, int frame_height,
                 ImVec4 color, std::string name, ImPlotMarker marker,
                 float pt_size);
+
+void open_selected_cameras(const std::vector<bool> &check, int cam_count,
+                           GigEVisionDeviceInfo *device_info,
+                           std::vector<std::string> &camera_config_files,
+                           int &num_cameras, CameraParams *&cameras_params,
+                           CameraEachSelect *&cameras_select,
+                           CameraEmergent *&ecams,
+                           ScrollingBuffer *&realtime_plot_data);
 
 #endif

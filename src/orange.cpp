@@ -1,12 +1,10 @@
 #include "camera.h"
-#include "enet_fb_helpers.h"
 #include "enet_utils.h"
 #include "global.h"
 #include "gui.h"
 #include "host_client_imgui.h"
 #include "imgui.h"
 #include "implot.h"
-#include "plot_buffers.h"
 #include "realtime_tool.h"
 #include "utils.h"
 #include "video_capture.h"
@@ -197,14 +195,6 @@ int main(int argc, char **args) {
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (camera_control->subscribe) {
-                ImGui::EndDisabled();
-            }
-
-            if (camera_control->record_video) {
-                ImGui::BeginDisabled();
-            }
-
             ImGui::PushStyleColor(ImGuiCol_Button,
                                   ImVec4(0.5f, 0.0f, 0.7f, 1.0f)); // normal
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
@@ -274,23 +264,11 @@ int main(int argc, char **args) {
                 streaming_target_fps.store(fps_temp);
             }
 
-            if (camera_control->record_video) {
+            if (camera_control->subscribe) {
                 ImGui::EndDisabled();
             }
 
             if (camera_control->open) {
-                if (camera_control->record_video) {
-                    ImGui::BeginDisabled();
-                }
-
-                ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
-                set_camera_properties(ecams, cameras_params, cameras_select,
-                                      num_cameras, color_temps);
-
-                if (camera_control->record_video) {
-                    ImGui::EndDisabled();
-                }
-
                 if (camera_control->subscribe) {
                     ImGui::BeginDisabled();
                 }
@@ -428,9 +406,19 @@ int main(int argc, char **args) {
                     ImGui::EndDisabled();
                 }
 
+                if (camera_control->record_video) {
+                    ImGui::BeginDisabled();
+                }
+
+                ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
+                set_camera_properties(ecams, cameras_params, cameras_select,
+                                      num_cameras, color_temps);
+
+                if (camera_control->record_video) {
+                    ImGui::EndDisabled();
+                }
+
                 if (camera_control->subscribe == true) {
-                    ImGui::Separator();
-                    ImGui::Spacing();
                     if (ImGui::Button("Picture save to")) {
                         make_folder(picture_save_folder);
                         for (int i = 0; i < num_cameras; i++) {

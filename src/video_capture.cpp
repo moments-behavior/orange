@@ -9,6 +9,95 @@
 #include "opengldisplay.h"
 #endif
 
+void load_camera_json_config_files(std::string file_name,
+                                   CameraParams *camera_params,
+                                   CameraEachSelect *camera_select,
+                                   int camera_id, int num_cameras) {
+
+    std::ifstream f(file_name);
+    json camera_config = json::parse(f);
+
+    camera_params->camera_id = camera_id;
+    camera_params->num_cameras = num_cameras;
+    camera_params->need_reorder = false;
+
+    camera_params->camera_name = camera_config["name"];
+    camera_params->width = camera_config["width"];
+    camera_params->height = camera_config["height"];
+    camera_params->frame_rate = camera_config["frame_rate"];
+    camera_params->gain = camera_config["gain"];
+    camera_params->exposure = camera_config["exposure"];
+    camera_params->pixel_format = camera_config["pixel_format"];
+    camera_params->color_temp = camera_config["color_temp"];
+    camera_params->gpu_id = camera_config["gpu_id"];
+    camera_params->gpu_direct = camera_config["gpu_direct"];
+    camera_params->color = camera_config["color"];
+    camera_params->focus = camera_config["focus"];
+    camera_params->iris = camera_config["iris"];
+    if (camera_config.contains("gop")) {
+        camera_params->gop = camera_config["gop"];
+    } else {
+        camera_params->gop = 1;
+    }
+    if (camera_config.contains("yolo")) {
+        camera_select->yolo_model = camera_config["yolo"];
+    }
+    if (camera_config.contains("offsetx")) {
+        camera_params->offsetx = camera_config["offsetx"];
+    }
+    if (camera_config.contains("offsety")) {
+        camera_params->offsety = camera_config["offsety"];
+    }
+}
+
+bool set_camera_params(CameraParams *camera_params,
+                       CameraEachSelect *camera_select,
+                       GigEVisionDeviceInfo *device_info,
+                       std::vector<std::string> &camera_config_files,
+                       int camera_idx, int num_cameras) {
+    // first checkt to see if it is in the config files
+    camera_params->camera_serial.append(device_info->serialNumber);
+    camera_params->camera_name = camera_params->camera_serial;
+
+    std::string sub_str = camera_params->camera_serial + ".json";
+    auto it =
+        std::find_if(camera_config_files.begin(), camera_config_files.end(),
+                     [&](const std::string &str) {
+                         return str.find(sub_str) != std::string::npos;
+                     });
+
+    if (it == camera_config_files.end()) {
+        if (strcmp(device_info->modelName, "HB-65000GM") == 0) {
+            int gpu_id = 0;
+            init_65MP_camera_params_mono(camera_params, camera_idx, num_cameras,
+                                         2000, 1000, gpu_id, 400); // 458
+        } else if (strcmp(device_info->modelName, "HB-7000SC") == 0) {
+            int gpu_id = 0;
+            init_7MP_camera_params_color(camera_params, camera_idx, num_cameras,
+                                         1500, 3000, gpu_id, 30); // 2000, 3000
+        } else if (strcmp(device_info->modelName, "HB-65000GC") == 0) {
+            int gpu_id = 0;
+            init_65MP_camera_params_color(camera_params, camera_idx,
+                                          num_cameras, 2000, 28000, gpu_id, 10);
+        } else if (strcmp(device_info->modelName, "HB-7000SM") == 0) {
+            int gpu_id = 0;
+            init_7MP_camera_params_mono(camera_params, camera_idx, num_cameras,
+                                        1000, 3000, gpu_id, 30); // 2000, 3000
+        } else {
+            printf("Use default parameters. \n");
+            return false;
+        }
+    } else {
+        auto config_idx = std::distance(camera_config_files.begin(), it);
+        std::cout << "Load camera json file: "
+                  << camera_config_files[config_idx] << std::endl;
+        load_camera_json_config_files(camera_config_files[config_idx],
+                                      camera_params, camera_select, camera_idx,
+                                      num_cameras);
+    }
+    return true;
+}
+
 void report_statistics(CameraParams *camera_params, CameraState *camera_state,
                        double time_diff) {
     std::string print_out;
@@ -163,10 +252,12 @@ inline void get_one_frame(CameraState *camera_state,
     if (!camera_state->camera_return) {
         // Counting dropped frames through frame_id as redundant check.
         if (((ecam->frame_recv.frame_id) != camera_state->id_prev + 1) &&
-            (camera_state->frame_count != 0))
+            (camera_state->frame_count != 0)) {
             camera_state->dropped_frames++;
-        else {
+            camera_select->dropped_frames++;
+        } else {
             camera_state->frames_recd++;
+            camera_select->capture_fps_estimator.update();
         }
 
         // In GVSP there is no id 0 so when 16 bit id counter in camera is max
@@ -195,13 +286,14 @@ inline void get_one_frame(CameraState *camera_state,
                 camera_state->frame_count);
         }
         FrameDetector *detector = static_cast<FrameDetector *>(frame_detector);
-        if (detector &&
-            camera_select->frame_detect_state.load() == State_Copy_New_Frame) {
+        if (detector && camera_select->sigs->frame_detect_state.load() ==
+                            State_Copy_New_Frame) {
             detector->notify_frame_ready(ecam->frame_recv.imagePtr, 0);
         }
 #endif
 
-        if (camera_select->frame_save_state.load() == State_Copy_New_Frame) {
+        if (camera_select->sigs->frame_save_state.load() ==
+            State_Copy_New_Frame) {
             frame_saver->notify_frame_ready(ecam->frame_recv.imagePtr);
         }
 
@@ -238,7 +330,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
                     std::string folder_name, PTPParams *ptp_params,
-                    INDIGOSignalBuilder *indigo_signal_builder) {
+                    AppContext *ctx) {
     CHECK(cudaSetDevice(camera_params->gpu_id));
     CameraState camera_state;
     PTPState ptp_state;
@@ -257,14 +349,13 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
             // fflush(stdout);
             usleep(10);
         }
-        camera_select->frame_detect_state.store(State_Copy_New_Frame);
+        camera_select->sigs->frame_detect_state.store(State_Copy_New_Frame);
     }
 
     COpenGLDisplay *openGLDisplay = nullptr;
     if (camera_select->stream_on) {
-        openGLDisplay =
-            new COpenGLDisplay("", camera_params, camera_select, display_buffer,
-                               indigo_signal_builder);
+        openGLDisplay = new COpenGLDisplay("gl", camera_params, camera_select,
+                                           display_buffer, ctx);
         openGLDisplay->StartThread();
     }
 #endif
@@ -275,7 +366,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     GPUVideoEncoder *gpu_encoder = nullptr;
     bool encoder_ready_signal = false;
     if (camera_control->record_video && camera_select->record) {
-        gpu_encoder = new GPUVideoEncoder("", camera_params, encoder_setup,
+        gpu_encoder = new GPUVideoEncoder("encoder", camera_params,
+                                          camera_select, encoder_setup,
                                           folder_name, &encoder_ready_signal);
         gpu_encoder->StartThread();
 

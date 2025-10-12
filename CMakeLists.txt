@@ -1,14 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 project(OrangeApp LANGUAGES CXX CUDA)
 
-# Set build type
-set(CMAKE_BUILD_TYPE Debug)
-
-# Set CUDA architecture and options
+# CUDA
 set(CMAKE_CUDA_ARCHITECTURES 80)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_80")
 
-# Directories
+# ---- Options ---------------------------------------------------------------
+option(BUILD_ORANGE         "Build GUI 'orange' app"        ON)
+option(BUILD_CAM_SERVER     "Build cam_server"  ON)
+option(BUILD_YOLO_OFFLINE   "Build yolo_offline tool"       ON)
+
+# ---- Dirs ------------------------------------------------------------------
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(THIRD_PARTY_DIR ${CMAKE_SOURCE_DIR}/third_party)
 set(DIR_IMGUI ${THIRD_PARTY_DIR}/imgui)
@@ -21,63 +22,9 @@ set(DIR_FFMPEG $ENV{HOME}/nvidia/ffmpeg)
 set(DIR_TENSORRT $ENV{HOME}/nvidia/TensorRT)
 set(DIR_NVENC_API ${CMAKE_SOURCE_DIR}/nvenc_api)
 
-# Add the source files
-file(GLOB ORANGE_SOURCES
-    ${SRC_DIR}/*.cpp
-    ${DIR_NVENCODER}/*.cpp
-)
-
-list(REMOVE_ITEM ORANGE_SOURCES ${SRC_DIR}/orange_headless_client.cpp ${SRC_DIR}/yolo_offline.cpp)
-
-file(GLOB NVENCODER_SOURCES ${PROJECT_SOURCE_DIR}/src/NvEncoder/*.cpp)
-# Add sourc files for orange_client
-file(GLOB ORANGE_CLIENT_SOURCES
-    ${SRC_DIR}/*.cpp
-    ${DIR_NVENCODER}/*.cpp
-)
-list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolo_offline.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp ${SRC_DIR}/FrameDetector.cpp ${SRC_DIR}/realtime_tool.cpp ${SRC_DIR}/detect3d.cpp)
-
-set(YOLO_OFFLINE_SOURCES
-    src/yolo_offline.cpp
-    src/yolov8_det.cpp
-)
-
-# ImGui Sources
-set(IMGUI_SOURCES
-    ${DIR_IMGUI}/imgui.cpp
-    ${DIR_IMGUI}/imgui_demo.cpp
-    ${DIR_IMGUI}/imgui_draw.cpp
-    ${DIR_IMGUI}/imgui_tables.cpp
-    ${DIR_IMGUI}/imgui_widgets.cpp
-    ${DIR_IMGUI_BACKEND}/imgui_impl_glfw.cpp
-    ${DIR_IMGUI_BACKEND}/imgui_impl_opengl3.cpp
-)
-
-# ImPlot Sources
-set(IMPLOT_SOURCES
-    ${DIR_IMPLOT}/implot.cpp
-    ${DIR_IMPLOT}/implot_items.cpp
-    ${DIR_IMPLOT}/implot_demo.cpp
-)
-
-# FileDialog Source
-set(FILEDIALOG_SOURCES
-    ${DIR_FILEBROWSER}/ImGuiFileDialog.cpp
-)
-
-# Add CUDA sources
-set(CUDA_SOURCES
-    ${SRC_DIR}/kernel.cu
-)
-
-# Add include directories
+# ---- Common includes/links -------------------------------------------------
 include_directories(
     ${SRC_DIR}
-    ${DIR_IMGUI}
-    ${DIR_IMGUI_BACKEND}
-    ${DIR_IMPLOT}
-    ${DIR_FILEBROWSER}
-    ${DIR_ICONFONT}
     ${DIR_NVENCODER}
     ${DIR_NVENC_API}/include
     /opt/EVT/eSDK/include/
@@ -88,7 +35,6 @@ include_directories(
     ${DIR_TENSORRT}/include
 )
 
-# Add link directories
 link_directories(
     /opt/EVT/eSDK/lib/
     /usr/local/cuda/lib64/
@@ -96,110 +42,116 @@ link_directories(
     ${DIR_TENSORRT}/lib/
 )
 
-# Define target
-add_executable(orange
-    ${ORANGE_SOURCES}
-    ${IMGUI_SOURCES}
-    ${IMPLOT_SOURCES}
-    ${FILEDIALOG_SOURCES}
-    ${CUDA_SOURCES}
-)
+# ---- Sources ---------------------------------------------------------------
+file(GLOB NVENCODER_SOURCES ${SRC_DIR}/NvEncoder/*.cpp)
+set(CUDA_SOURCES ${SRC_DIR}/kernel.cu)
 
-add_executable(orange_client
-    ${ORANGE_CLIENT_SOURCES}
-    ${CUDA_SOURCES}
-)
+# orange (GUI) sources only if building it
+if(BUILD_ORANGE)
+    file(GLOB ORANGE_SOURCES
+        ${SRC_DIR}/*.cpp
+        ${DIR_NVENCODER}/*.cpp
+    )
+    list(REMOVE_ITEM ORANGE_SOURCES
+        ${SRC_DIR}/cam_server.cpp
+        ${SRC_DIR}/yolo_offline.cpp
+    )
 
-add_executable(yolo_offline
-    ${YOLO_OFFLINE_SOURCES}
-    ${CUDA_SOURCES}
-)
+    # ImGui/ImPlot only when GUI target is on
+    set(IMGUI_SOURCES
+        ${DIR_IMGUI}/imgui.cpp
+        ${DIR_IMGUI}/imgui_demo.cpp
+        ${DIR_IMGUI}/imgui_draw.cpp
+        ${DIR_IMGUI}/imgui_tables.cpp
+        ${DIR_IMGUI}/imgui_widgets.cpp
+        ${DIR_IMGUI_BACKEND}/imgui_impl_glfw.cpp
+        ${DIR_IMGUI_BACKEND}/imgui_impl_opengl3.cpp
+    )
+    set(IMPLOT_SOURCES
+        ${DIR_IMPLOT}/implot.cpp
+        ${DIR_IMPLOT}/implot_items.cpp
+        ${DIR_IMPLOT}/implot_demo.cpp
+    )
+    set(FILEDIALOG_SOURCES ${DIR_FILEBROWSER}/ImGuiFileDialog.cpp)
+endif()
 
-# Link libraries
-target_link_libraries(orange
-    pthread
-    m
-    enet
-    GLEW
-    GL
-    cudart
-    cuda
-    nppicc
-    nppidei
-    nvidia-encode
-    nppc
-    nppig
-    nppial
-    EmergentCamera
-    EmergentGenICam
-    EmergentGigEVision
-    avformat
-    swscale
-    swresample
-    avutil
-    avcodec
-    opencv_sfm
-    opencv_core
-    opencv_imgcodecs
-    opencv_imgproc
-    opencv_calib3d
-    nvinfer
-    nvinfer_plugin
-    nvToolsExt
-    glfw
-)
+# cam_server sources
+if(BUILD_CAM_SERVER)
+    file(GLOB CAM_SERVER_SOURCES
+        ${SRC_DIR}/*.cpp
+        ${DIR_NVENCODER}/*.cpp
+    )
+    list(REMOVE_ITEM CAM_SERVER_SOURCES
+        ${SRC_DIR}/orange.cpp
+        ${SRC_DIR}/yolo_offline.cpp
+        ${SRC_DIR}/yolov8_det.cpp
+        ${SRC_DIR}/opengldisplay.cpp
+        ${SRC_DIR}/FrameDetector.cpp
+        ${SRC_DIR}/realtime_tool.cpp
+        ${SRC_DIR}/detect3d.cpp
+        ${SRC_DIR}/gui.cpp
+        ${SRC_DIR}/gx_helper.cpp
+        ${SRC_DIR}/host_client_imgui.cpp
+    )
+endif()
 
-# Link libraries
-target_link_libraries(orange_client
-    EmergentCamera
-    EmergentGenICam
-    EmergentGigEVision
-    pthread
-    enet
-    cudart
-    cuda
-    nppicc
-    nppidei
-    nvidia-encode
-    nppc
-    avformat
-    swscale
-    swresample
-    avutil
-    avcodec
-    m
-    opencv_sfm
-    opencv_core
-    opencv_imgcodecs
-    opencv_imgproc
-)
-target_compile_definitions(orange_client PRIVATE HEADLESS)
+# yolo_offline sources
+if(BUILD_YOLO_OFFLINE)
+    set(YOLO_OFFLINE_SOURCES
+        ${SRC_DIR}/yolo_offline.cpp
+        ${SRC_DIR}/yolov8_det.cpp
+        ${CUDA_SOURCES}
+    )
+endif()
 
-target_link_libraries(yolo_offline
-    opencv_sfm
-    opencv_core
-    opencv_imgproc
-    opencv_videoio
-    opencv_highgui
-    opencv_video
-    nvinfer
-    nvinfer_plugin
-    cudart
-    cuda
-    nppicc
-    nppidei
-    nvidia-encode
-    nppc
-    nppig
-    nppial
-)
+# ---- Targets ---------------------------------------------------------------
+if(BUILD_ORANGE)
+    add_executable(orange
+        ${ORANGE_SOURCES}
+        ${IMGUI_SOURCES}
+        ${IMPLOT_SOURCES}
+        ${FILEDIALOG_SOURCES}
+        ${CUDA_SOURCES}
+    )
+    target_compile_definitions(orange PRIVATE ENET_RUNTIME_THREADED)
+    # GUI-only deps
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GLFW3 REQUIRED glfw3)
+    target_include_directories(orange PRIVATE
+        ${DIR_IMGUI} ${DIR_IMGUI_BACKEND} ${DIR_IMPLOT} ${DIR_FILEBROWSER} ${DIR_ICONFONT}
+        ${GLFW3_INCLUDE_DIRS}
+    )
+    target_link_libraries(orange
+        pthread m enet GLEW GL
+        cudart cuda nppicc nppidei nvidia-encode nppc nppig nppial
+        EmergentCamera EmergentGenICam EmergentGigEVision
+        avformat swscale swresample avutil avcodec
+        opencv_sfm opencv_core opencv_imgcodecs opencv_imgproc opencv_calib3d
+        nvinfer nvinfer_plugin nvToolsExt glfw
+        ${GLFW3_LIBRARIES}
+    )
+endif()
 
-# Link pkg-config libraries
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GLFW3 REQUIRED glfw3)
-target_include_directories(orange PRIVATE ${GLFW3_INCLUDE_DIRS})
-target_link_libraries(orange ${GLFW3_LIBRARIES})
+if(BUILD_CAM_SERVER)
+    add_executable(cam_server
+        ${CAM_SERVER_SOURCES}
+        ${CUDA_SOURCES}
+    )
+    target_compile_definitions(cam_server PRIVATE HEADLESS ENET_RUNTIME_THREADED)
+    target_link_libraries(cam_server
+        EmergentCamera EmergentGenICam EmergentGigEVision
+        pthread enet
+        cudart cuda nppicc nppidei nvidia-encode nppc
+        avformat swscale swresample avutil avcodec m
+        opencv_sfm opencv_core opencv_imgcodecs opencv_imgproc
+    )
+endif()
 
-# Add output directory
-#set_target_properties(orange PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/targets)
-#set_target_properties(orange PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/targets)
+if(BUILD_YOLO_OFFLINE)
+    add_executable(yolo_offline ${YOLO_OFFLINE_SOURCES})
+    target_link_libraries(yolo_offline
+        opencv_sfm opencv_core opencv_imgproc opencv_videoio opencv_highgui opencv_video
+        nvinfer nvinfer_plugin
+        cudart cuda nppicc nppidei nvidia-encode nppc nppig nppial
+    )
+endif()

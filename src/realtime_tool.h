@@ -4,11 +4,12 @@
 #include "camera.h"
 #include "opencv2/core/core.hpp"
 #include "types.h"
+#include "video_capture.h"
 #include <atomic>
 #include <csignal>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/sfm.hpp>
-#include <vector> 
+#include <vector>
 
 #define PI 3.14159265
 
@@ -49,6 +50,7 @@ struct DetectionDataPerCam {
     CameraCalibResults camera_calib;
     Aruco2d marker2d;
     Ball2d ball2d;
+    FPSEstimator fps_estimator;
 };
 
 struct Aruco3d {
@@ -68,6 +70,7 @@ struct Ball3d {
 struct Detection3d {
     Aruco3d marker3d;
     Ball3d ball3d;
+    FPSEstimator fps_estimator;
 };
 
 void print_calibration_results(CameraCalibResults *calib_results);

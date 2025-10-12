@@ -1,0 +1,61 @@
+namespace camnet.v1;
+
+enum Kind : ubyte { KindCommand, KindReply }
+
+enum ServerControl : ubyte {
+  NONE,
+  OPENCAMERA,
+  STARTTHREAD,
+  STARTRECORDING,
+  STOPRECORDING,
+  TEARDOWN,
+  STARTSTREAMING,
+  BUMBLEBEEBOARD,
+  GRIMLOCKBOARD,
+  NEXTPOSE,
+  TAKEPICTURE,
+  TRIALTRIGGER
+}
+
+
+table BringupMessage {
+  server_name:string;
+  num_cameras:uint16;
+}
+
+// ---- Command payloads ----
+table OpenArgs           { config_folder:string; }
+table StartThreadsArgs   { record_folder:string; encoder_setup:string; }
+table StartArgs          { ptp_time:uint64; }
+table StopArgs           { ptp_time:uint64; }
+table StartStreamingArgs { calib_folder:string; save_format:string;}
+table TakePictureArgs    { picture_id:uint; }
+
+union CommandBody { OpenArgs, StartThreadsArgs, StartArgs, StopArgs, StartStreamingArgs, TakePictureArgs }
+
+// ---- Reply payload ----
+table ReplyInfo {
+  ok:bool = true;
+  code:int = 0;
+  detail:string;
+  bringup:BringupMessage;  // present on initial bringup
+  server_id:string;
+}
+
+// ---- Envelope ----
+table Server {
+  kind:Kind = KindCommand;
+  control:ServerControl = NONE;
+
+  // idempotency / retries
+  job_id:string;
+  epoch:uint = 0;
+  seq:uint = 0;
+
+  // Only one of the following is set depending on kind:
+  command_body:CommandBody; // for KindCommand
+  reply:ReplyInfo;          // for KindReply
+}
+
+root_type Server;
+

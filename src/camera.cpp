@@ -768,7 +768,6 @@ void quick_print_camera(GigEVisionDeviceInfo *device_info, int camera_idx) {
 }
 
 int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info) {
-    int cameras_found = 0;
     unsigned int listcam_buf_size = max_cameras;
     unsigned int count;
 

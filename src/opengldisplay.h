@@ -1,16 +1,17 @@
 #pragma once
+#include "enet_utils.h"
 #include "image_processing.h"
 #include "threadworker.h"
+#include "utils.h"
 #include "yolov8_det.h"
 #include <nppi.h>
-#define WORK_ENTRIES_MAX 2
+#define WORK_ENTRIES_MAX 1
 
 class COpenGLDisplay : public CThreadWorker {
   public:
-    COpenGLDisplay(
-        const char *name, CameraParams *camera_params,
-        CameraEachSelect *camera_select, unsigned char *display_buffer,
-        INDIGOSignalBuilder *indigo_signal_builder); // name is the thread name
+    COpenGLDisplay(const char *name, CameraParams *camera_params,
+                   CameraEachSelect *camera_select,
+                   unsigned char *display_buffer, AppContext *ctx);
     ~COpenGLDisplay();
 
     bool PushToDisplay(void *imagePtr, size_t bufferSize, int width, int height,
@@ -18,13 +19,12 @@ class COpenGLDisplay : public CThreadWorker {
                        unsigned long long frame_id);
 
     // open gl dimensions:
+    cudaStream_t stream;
     CameraParams *camera_params;
     CameraEachSelect *camera_select;
     unsigned char *display_buffer;
-    FrameGPU frame_original; // frame on gpu device
+    FrameGPU frame_original;
     Debayer debayer;
-    INDIGOSignalBuilder *indigo_signal_builder;
-    // for real time: refactor this
     unsigned char *d_convert;
     YOLOv8 *yolov8;
     FrameCPU frame_cpu;
@@ -35,6 +35,7 @@ class COpenGLDisplay : public CThreadWorker {
     float *d_points;
     unsigned int *d_skeleton;
     unsigned int *d_resize;
+    AppContext *ctx;
 
   private:
     virtual void

@@ -1,3 +1,4 @@
+#include "video_capture.h"
 #if defined(__GNUC__)
 #include <unistd.h>
 #endif
@@ -125,12 +126,13 @@ static inline void close_writer(EncoderContext *encoder, Writer *writer) {
 }
 
 GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params,
+                                 CameraEachSelect *camera_select,
                                  std::string encoder_setup,
                                  std::string folder_name,
                                  bool *encoder_ready_signal)
     : CThreadWorker(name), camera_params(camera_params),
-      encoder_setup(encoder_setup), folder_name(folder_name),
-      encoder_ready_signal(encoder_ready_signal) {
+      camera_select(camera_select), encoder_setup(encoder_setup),
+      folder_name(folder_name), encoder_ready_signal(encoder_ready_signal) {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = ENCODER_ENTRIES_MAX;
     for (int i = 0; i < workerEntriesFreeQueueCount; i++) {
@@ -174,6 +176,7 @@ void GPUVideoEncoder::ThreadRunning() {
         void *f = GetObjectFromQueueIn();
         if (f) {
             ProcessOneFrame(f);
+            camera_select->encoder_fps_estimator.update();
         }
     }
 

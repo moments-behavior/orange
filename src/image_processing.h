@@ -135,6 +135,20 @@ inline void debayer_frame_gpu(CameraParams *camera_params,
     }
 }
 
+inline void debayer_frame_gpu_rgba_ctx(CameraParams *camera_params,
+                                       FrameGPU *frame_original,
+                                       Debayer *debayer,
+                                       const NppStreamContext &npp_ctx) {
+    const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R_Ctx(
+        frame_original->d_orig, camera_params->width * sizeof(unsigned char),
+        debayer->size, debayer->roi, debayer->d_debayer,
+        camera_params->width * sizeof(uchar4), debayer->grid,
+        NPPI_INTER_UNDEFINED, debayer->nAlpha, npp_ctx);
+    if (npp_result != 0) {
+        std::cout << "\nNPP error %d \n" << npp_result << std::endl;
+    }
+}
+
 inline void debayer_frame_gpu_rgb_ctx(CameraParams *camera_params,
                                       FrameGPU *frame_original,
                                       Debayer *debayer,
@@ -155,6 +169,20 @@ inline void duplicate_channel_gpu(CameraParams *camera_params,
         frame_original->d_orig, camera_params->width * sizeof(unsigned char),
         debayer->d_debayer, camera_params->width * sizeof(uchar4),
         debayer->size);
+
+    if (npp_result != 0) {
+        std::cout << "\nNPP error %d \n" << npp_result << std::endl;
+    }
+}
+
+inline void duplicate_channel_gpu_4_ctx(CameraParams *camera_params,
+                                        FrameGPU *frame_original,
+                                        Debayer *debayer,
+                                        const NppStreamContext &npp_ctx) {
+    const NppStatus npp_result = nppiDup_8u_C1AC4R_Ctx(
+        frame_original->d_orig, camera_params->width * sizeof(unsigned char),
+        debayer->d_debayer, camera_params->width * sizeof(uchar4),
+        debayer->size, npp_ctx);
 
     if (npp_result != 0) {
         std::cout << "\nNPP error %d \n" << npp_result << std::endl;

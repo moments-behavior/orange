@@ -1,4 +1,5 @@
 #include "FrameSaver.h"
+#include "global.h"
 #include "image_processing.h"
 #include "kernel.cuh"
 #include "utils.h"
@@ -43,7 +44,7 @@ void FrameSaver::notify_frame_ready(void *device_image_ptr) {
                            camera_params->width, camera_params->width,
                            camera_params->height, cudaMemcpyHostToDevice));
     }
-    camera_select->frame_save_state.store(State_Frame_Copy_Done);
+    camera_select->sigs->frame_save_state.store(State_Frame_Copy_Done);
     cv.notify_one();
 }
 
@@ -63,7 +64,7 @@ void FrameSaver::thread_loop() {
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [&] {
-            return camera_select->frame_save_state.load() ==
+            return camera_select->sigs->frame_save_state.load() ==
                        State_Frame_Copy_Done ||
                    !running.load();
         });
@@ -107,6 +108,6 @@ void FrameSaver::thread_loop() {
         cv::imwrite(image_name, view);
 
         camera_select->pictures_counter++;
-        camera_select->frame_save_state.store(State_Frame_Idle);
+        camera_select->sigs->frame_save_state.store(State_Frame_Idle);
     }
 }

@@ -2,10 +2,11 @@
 #include "global.h"
 #include "realtime_tool.h"
 #include "video_capture.h"
+#include <iostream>
 
 bool all_ready(CameraEachSelect *cameras_select, std::vector<int> &cam3d_idx) {
     for (int idx : cam3d_idx) {
-        if (cameras_select[idx].frame_detect_state.load() !=
+        if (cameras_select[idx].sigs->frame_detect_state.load() !=
             State_Frame_Detection_Ready) {
             return false;
         }
@@ -66,7 +67,8 @@ void detection3d_proc(CameraControl *camera_control,
 
         // reset the 3d camera states
         for (int idx : cam3d_idx) {
-            cameras_select[idx].frame_detect_state.store(State_Copy_New_Frame);
+            cameras_select[idx].sigs->frame_detect_state.store(
+                State_Copy_New_Frame);
         }
 
         detection3d.ball3d.new_detection.store(
@@ -100,6 +102,7 @@ void detection3d_proc(CameraControl *camera_control,
             }
         }
         count++;
+        detection3d.fps_estimator.update();
     }
 
     if (start == std::chrono::high_resolution_clock::time_point()) {

@@ -1,12 +1,15 @@
 #ifndef ORANGE_UTILS
 #define ORANGE_UTILS
-#include <atomic>
+#include "camera.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <memory>
+#include <filesystem>
 #include <npp.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
+#include <vector>
 
 #define CHECK(call)                                                            \
     do {                                                                       \
@@ -28,6 +31,15 @@ inline float tick() {
         return 0;
     }
     return ((float)((ts.tv_sec * 1e9) + ts.tv_nsec)) / (float)1.0e9;
+}
+
+inline int find_cfg_index(const std::vector<std::string> &folders,
+                          std::string base) {
+    for (int i = 0; i < (int)folders.size(); ++i) {
+        if (std::filesystem::path(folders[i]).filename() == base)
+            return i;
+    }
+    return -1;
 }
 
 // Increment value with a lock and return the previous value
@@ -67,51 +79,38 @@ inline NppStreamContext make_npp_stream_context(int device_id,
     return ctx;
 }
 
-template <typename T> class lock_free_queue {
-  private:
-    struct node {
-        std::shared_ptr<T> data;
-        node *next;
-        node() : next(nullptr) {}
-    };
-    std::atomic<node *> head;
-    std::atomic<node *> tail;
-    node *pop_head() {
-        node *const old_head = head.load();
-        if (old_head == tail.load()) {
-            return nullptr;
-        }
-        head.store(old_head->next);
-        return old_head;
-    }
+void prepare_application_folders(std::string &orange_root_dir,
+                                 std::string &recording_root_dir,
+                                 std::string &encoder_codec);
+std::vector<std::string> string_split(std::string s, std::string delimiter);
+std::vector<std::string> string_split_char(char *string_c,
+                                           std::string delimiter);
+std::string get_current_time_milliseconds();
+std::string get_current_date();
+std::string get_current_date_time();
+std::string format_elapsed_time(std::chrono::seconds elapsed_seconds);
+void init_galvo_camera_params(CameraParams *camera_params, int camera_id,
+                              int num_cameras, int gain, int exposure);
+void init_65MP_camera_params_mono(CameraParams *camera_params, int camera_id,
+                                  int num_cameras, int gain, int exposure,
+                                  int gpu_id, int frame_rate);
+void init_65MP_camera_params_color(CameraParams *camera_params, int camera_id,
+                                   int num_cameras, int gain, int exposure,
+                                   int gpu_id, int frame_rate);
+void init_7MP_camera_params_color(CameraParams *camera_params, int camera_id,
+                                  int num_cameras, int gain, int exposure,
+                                  int gpu_id, int frame_rate);
+void init_7MP_camera_params_mono(CameraParams *camera_params, int camera_id,
+                                 int num_cameras, int gain, int exposure,
+                                 int gpu_id, int frame_rate);
+bool make_folder(std::string folder_name);
+void update_camera_configs(std::vector<std::string> &camera_config_files,
+                           std::string input_folder);
+void select_cameras_have_configs(std::vector<std::string> &camera_config_files,
+                                 GigEVisionDeviceInfo *device_info,
+                                 std::vector<bool> &check, int cam_count);
+void allocate_camera_frame_buffers(CameraEmergent *ecams,
+                                   CameraParams *cameras_params,
+                                   int evt_buffer_size, int num_cameras);
 
-  public:
-    lock_free_queue() : head(new node), tail(head.load()) {}
-    lock_free_queue(const lock_free_queue &other) = delete;
-    lock_free_queue &operator=(const lock_free_queue &other) = delete;
-    ~lock_free_queue() {
-        while (node *const old_head = head.load()) {
-            head.store(old_head->next);
-            delete old_head;
-        }
-    }
-    std::shared_ptr<T> pop() {
-        node *old_head = pop_head();
-        if (!old_head) {
-            return std::shared_ptr<T>();
-        }
-        std::shared_ptr<T> const res(old_head->data);
-        delete old_head;
-        return res;
-    }
-    void push(T new_value) {
-        std::shared_ptr<T> new_data(std::make_shared<T>(new_value));
-        node *p = new node;
-        node *const old_tail = tail.load();
-        old_tail->data.swap(new_data);
-        old_tail->next = p;
-        tail.store(p);
-    }
-};
-
-#endif // ORANGE_THREADS
+#endif

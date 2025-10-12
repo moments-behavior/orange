@@ -1,3 +1,3 @@
-#!/bin/bash
-DIR="$(dirname "$(realpath "$0")")"
-$DIR/quick_build/orange.sh
+mkdir -p release && cd release
+cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . -j

@@ -1,4 +1,5 @@
 #include "gui.h"
+#include "global.h"
 
 void setup_texture(GL_Texture &tex, int width, int height) {
     create_pbo(&tex.pbo, width, height);
@@ -66,7 +67,7 @@ void start_camera_streaming(
     const std::string &folder_name, PTPParams *ptp_params,
     std::string calib_yaml_folder, std::thread &detection3d_thread,
     AppContext *ctx) {
-
+    detector_counter.store(0);
     detection2d = new DetectionDataPerCam[num_cameras];
     int idx3d = 0;
     int total_standoff_detector = 0;

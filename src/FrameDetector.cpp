@@ -1,4 +1,5 @@
 #include "FrameDetector.h"
+#include "enet_utils.h"
 #include "global.h"
 #include "utils.h"
 #include "video_capture.h"
@@ -6,8 +7,9 @@
 #include <npp.h>
 #include <nvToolsExt.h>
 
-FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select)
-    : camera_params(params), camera_select(select), running(false) {
+FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select,
+                             AppContext *ctx)
+    : camera_params(params), camera_select(select), ctx(ctx), running(false) {
     CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
     cudaEventCreateWithFlags(&copy_done_event, cudaEventDisableTiming);
@@ -84,6 +86,7 @@ void FrameDetector::thread_loop() {
     uint64_t current_counter =
         detector_counter.fetch_add(1); // Atomic increment
     printf("%lu\n", current_counter);
+    flatbuffers::FlatBufferBuilder flatb_builder(256);
 
     std::vector<Bbox> objs;
     std::cout << "camera detector: " << camera_params->camera_serial
@@ -148,6 +151,19 @@ void FrameDetector::thread_loop() {
             // std::cout << detection2d[camera_select->idx2d].ball2d.center[0].x
             //           << std::endl;
             detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
+            // send to indigo
+            if (objs[0].rect.x < 2800.0 &&
+                objs[0].rect.x > 2100.0) { // trigger earlier
+                // std::cout << "trigger ball drop" << std::endl;
+
+                // struct timespec ts_rt1;
+                // clock_gettime(CLOCK_REALTIME, &ts_rt1);
+                // uint64_t real_time =
+                //     (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
+
+                // std::cout << "trigger ball drop: " << real_time << std::endl;
+                send_indigo_trigger_message(ctx, flatb_builder);
+            }
         } else {
             detection2d[camera_select->idx2d].ball2d.find_ball.store(false);
         }

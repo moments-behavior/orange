@@ -340,7 +340,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     FrameDetector *frame_detector = nullptr;
     if (camera_select->detect_mode == Detect3D_Standoff ||
         camera_select->detect_mode == Detect2D_Standoff) {
-        frame_detector = new FrameDetector(camera_params, camera_select);
+        frame_detector = new FrameDetector(camera_params, camera_select, ctx);
         frame_detector->start();
 
         while (detector_counter.load() !=

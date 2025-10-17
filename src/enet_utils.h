@@ -11,3 +11,6 @@ struct AppContext {
     AppContext(const AppContext &) = delete;
     AppContext &operator=(const AppContext &) = delete;
 };
+
+void send_indigo_trigger_message(AppContext *ctx,
+                                 flatbuffers::FlatBufferBuilder &flatb_builder);

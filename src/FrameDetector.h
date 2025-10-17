@@ -1,6 +1,7 @@
 #pragma once
 
 #include "camera.h"
+#include "enet_utils.h"
 #include "image_processing.h"
 #include "video_capture.h"
 #include "yolov8_det.h"
@@ -12,7 +13,8 @@
 
 class FrameDetector {
   public:
-    FrameDetector(CameraParams *params, CameraEachSelect *select);
+    FrameDetector(CameraParams *params, CameraEachSelect *select,
+                  AppContext *ctx);
     ~FrameDetector();
 
     void start();
@@ -30,6 +32,7 @@ class FrameDetector {
     CameraEachSelect *camera_select;
     FrameProcess frame_process;
     YOLOv8 *yolov8;
+    AppContext *ctx;
 
     std::atomic<bool> running;
     std::mutex mtx;

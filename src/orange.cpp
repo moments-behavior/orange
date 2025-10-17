@@ -908,7 +908,7 @@ int main(int argc, char **args) {
                                 Detect2D_Standoff) {
                             if (detection2d[i].ball2d.find_ball.load()) {
                                 std::string ball2d_name =
-                                    "ball##" + std::to_string(i);
+                                    "##ball##" + std::to_string(i);
                                 draw_boxes(
                                     detection2d[i].ball2d.rects,
                                     cameras_params[i].height,

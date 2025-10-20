@@ -14,7 +14,7 @@
 class FrameDetector {
   public:
     FrameDetector(CameraParams *params, CameraEachSelect *select,
-                  AppContext *ctx);
+                  AppContext *ctx, std::string folder_name);
     ~FrameDetector();
 
     void start();
@@ -33,6 +33,7 @@ class FrameDetector {
     FrameProcess frame_process;
     YOLOv8 *yolov8;
     AppContext *ctx;
+    std::string folder_name;
 
     std::atomic<bool> running;
     std::mutex mtx;

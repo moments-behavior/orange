@@ -8,8 +8,10 @@
 #include <nvToolsExt.h>
 
 FrameDetector::FrameDetector(CameraParams *params, CameraEachSelect *select,
-                             AppContext *ctx)
-    : camera_params(params), camera_select(select), ctx(ctx), running(false) {
+                             AppContext *ctx, std::string folder_name)
+    : camera_params(params), camera_select(select), ctx(ctx),
+      folder_name(folder_name), running(false) {
+
     CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
     cudaEventCreateWithFlags(&copy_done_event, cudaEventDisableTiming);
@@ -92,6 +94,22 @@ void FrameDetector::thread_loop() {
     std::cout << "camera detector: " << camera_params->camera_serial
               << std::endl;
 
+    bool log_detection = !folder_name.empty();
+
+    std::ofstream write_file;
+    if (log_detection) {
+        std::string detection_file_name = folder_name + "/Cam" +
+                                          camera_params->camera_serial +
+                                          "_detection.csv";
+
+        write_file.open(detection_file_name, std::ios::app);
+        if (!write_file.is_open()) {
+            throw std::runtime_error("Cannot open file: " +
+                                     detection_file_name);
+        }
+        write_file << "timestamp_sys,x,y,width,height,label,prob\n";
+    }
+
     std::chrono::high_resolution_clock::time_point start =
         std::chrono::high_resolution_clock::time_point();
     int count = 0;
@@ -152,17 +170,20 @@ void FrameDetector::thread_loop() {
             //           << std::endl;
             detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
             // send to indigo
-            if (objs[0].rect.x < 2800.0 &&
-                objs[0].rect.x > 2100.0) { // trigger earlier
-                // std::cout << "trigger ball drop" << std::endl;
-
-                // struct timespec ts_rt1;
-                // clock_gettime(CLOCK_REALTIME, &ts_rt1);
-                // uint64_t real_time =
-                //     (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
-
-                // std::cout << "trigger ball drop: " << real_time << std::endl;
+            if (objs[0].rect.x < 2800.0 && objs[0].rect.x > 2100.0) {
                 send_indigo_trigger_message(ctx, flatb_builder);
+            }
+
+            if (log_detection) {
+                struct timespec ts_rt1;
+                clock_gettime(CLOCK_REALTIME, &ts_rt1);
+                uint64_t real_time =
+                    (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
+
+                write_file << real_time << "," << objs[0].rect.x << ","
+                           << objs[0].rect.y << "," << objs[0].rect.width << ","
+                           << objs[0].rect.height << "," << objs[0].label << ","
+                           << objs[0].prob << "\n";
             }
         } else {
             detection2d[camera_select->idx2d].ball2d.find_ball.store(false);

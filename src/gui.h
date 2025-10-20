@@ -115,6 +115,5 @@ void open_selected_cameras(const std::vector<bool> &check, int cam_count,
                            int &num_cameras, CameraParams *&cameras_params,
                            CameraEachSelect *&cameras_select,
                            CameraEmergent *&ecams,
-                           ScrollingBuffer *&realtime_plot_data);
-
+                           ScrollingBuffer *&realtime_plot_data, bool is_calib);
 #endif

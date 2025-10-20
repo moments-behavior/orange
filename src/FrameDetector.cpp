@@ -213,4 +213,7 @@ void FrameDetector::thread_loop() {
                   << ", Detect Frame Rate : " + std::to_string(calc_frame_rate)
                   << std::endl;
     }
+    if (log_detection) {
+        write_file.close();
+    }
 }

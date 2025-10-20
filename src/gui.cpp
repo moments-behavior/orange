@@ -451,7 +451,8 @@ void open_selected_cameras(const std::vector<bool> &check, int cam_count,
                            int &num_cameras, CameraParams *&cameras_params,
                            CameraEachSelect *&cameras_select,
                            CameraEmergent *&ecams,
-                           ScrollingBuffer *&realtime_plot_data) {
+                           ScrollingBuffer *&realtime_plot_data,
+                           bool is_calib) {
 
     num_cameras = 0;
     for (int i = 0; i < cam_count; i++) {
@@ -480,7 +481,12 @@ void open_selected_cameras(const std::vector<bool> &check, int cam_count,
             cameras_select[i].stream_on = false;
             if (cameras_params[i].camera_name == "Cam16") {
                 cameras_select[i].stream_on = true;
-                cameras_select[i].detect_mode = Detect2D_Standoff;
+                if (is_calib) {
+                    cameras_select[i].detect_mode = Detect_OFF;
+
+                } else {
+                    cameras_select[i].detect_mode = Detect2D_Standoff;
+                }
             }
             if (cameras_params[i].camera_name == "shelter") {
                 cameras_select[i].stream_on = true;

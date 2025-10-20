@@ -68,8 +68,13 @@ static void on_open_phase_start(std::string job_id) {
     std::vector<std::string> cfg_files;
     update_camera_configs(cfg_files, selected_folder);
     select_cameras_have_configs(cfg_files, devs, check, cam_count);
-    open_selected_cameras(check, cam_count, devs, cfg_files, num_cams, params,
-                          select, ecams, plots);
+    if (job_id == "recording") {
+        open_selected_cameras(check, cam_count, devs, cfg_files, num_cams,
+                              params, select, ecams, plots, false);
+    } else {
+        open_selected_cameras(check, cam_count, devs, cfg_files, num_cams,
+                              params, select, ecams, plots, true);
+    }
     camera_control->open = true;
 
     if (job_id == "recording") {

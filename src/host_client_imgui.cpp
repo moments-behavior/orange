@@ -1181,13 +1181,16 @@ void host_client_draw_gui() {
         }
 
         // Build label: "Advance → PHASE" or "Waiting… PHASE" or "Done"
+        auto peers_info = g_ctxp->peers.snapshot_info();
         std::string advance_label;
         if (g_phase == Phase_Done) {
             advance_label = "Done";
         } else if (g_waiting) {
             advance_label = "Waiting… " + phase_str;
+        } else if (g_phase == Phase_Open && (peers_info.size() < 3)) {
+            advance_label = std::string("Connect all 3 servers");
         } else {
-            advance_label = std::string("Advance ->") + phase_str; // →
+            advance_label = std::string("Advance ->") + phase_str;
         }
 
         auto lighten = [](ImVec4 c, float factor) {
@@ -1211,7 +1214,8 @@ void host_client_draw_gui() {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, darken(btn_col, 0.80f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 1));
 
-        bool disable_advance = g_waiting || (g_phase == Phase_Done);
+        bool disable_advance = g_waiting || (g_phase == Phase_Done) ||
+                               (g_phase == Phase_Open && peers_info.size() < 3);
         if (disable_advance)
             ImGui::BeginDisabled();
 

@@ -1187,7 +1187,9 @@ void host_client_draw_gui() {
             advance_label = "Done";
         } else if (g_waiting) {
             advance_label = "Waiting… " + phase_str;
-        } else if (g_phase == Phase_Open && (peers_info.size() < 3)) {
+        } else if ((g_phase == Phase_Open || g_phase == Phase_Threads ||
+                    g_phase == Phase_Start) &&
+                   (peers_info.size() < 3)) {
             advance_label = std::string("Connect all 3 servers");
         } else {
             advance_label = std::string("Advance ->") + phase_str;
@@ -1214,8 +1216,11 @@ void host_client_draw_gui() {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, darken(btn_col, 0.80f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 1));
 
-        bool disable_advance = g_waiting || (g_phase == Phase_Done) ||
-                               (g_phase == Phase_Open && peers_info.size() < 3);
+        bool disable_advance =
+            g_waiting || (g_phase == Phase_Done) ||
+            ((g_phase == Phase_Open || g_phase == Phase_Threads ||
+              g_phase == Phase_Start) &&
+             peers_info.size() < 3);
         if (disable_advance)
             ImGui::BeginDisabled();
 

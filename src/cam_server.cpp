@@ -510,12 +510,18 @@ static bool ctrl_action(camnet::v1::ServerControl c,
     }
 }
 
+static uint32_t g_current_peer = 0;
+
 // ---------- event handler ----------
 static void server_on_event(const Incoming &evt) {
     switch (evt.type) {
     case Incoming::Connect: {
         std::printf("[SRV %s] host connected (pid=%u) → sending bringup\n",
                     g_name.c_str(), evt.peer_id);
+        g_current_peer = evt.peer_id;
+        g_last_done = 0; // <-- key reset for duplicate gate
+        g_job.clear();   // optional; force accept_session to treat as fresh
+        g_epoch = 0;
 
         unsorted_devices.clear();
         sorted_devices.clear();
@@ -565,6 +571,9 @@ static void server_on_event(const Incoming &evt) {
     }
     case Incoming::Disconnect:
         std::printf("[SRV %s] host disconnected\n", g_name.c_str());
+        if (evt.peer_id == g_current_peer) {
+            g_last_done = 0; // be explicit on disconnect too
+        }
         break;
     }
 }

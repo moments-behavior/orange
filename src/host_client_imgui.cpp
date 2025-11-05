@@ -696,7 +696,6 @@ static void advance_phase(std::string job_id) {
 
 static void reset_session() {
     ++g_epoch;
-    g_epoch = 1;
     g_seq = 1;
     g_phase = Phase_Open;
     g_waiting = false;

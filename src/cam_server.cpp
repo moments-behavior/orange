@@ -148,11 +148,9 @@ static PTPParams ptp_params{0, 0, 0, 0, false, false, false, false};
 static void cleanup_host_server_resources() {
     ptp_params.network_set_stop_ptp = false;
     for (auto &t : camera_threads)
-        t.join();
-
-    for (int i = 0; i < cam_count; i++) {
-        camera_threads.pop_back();
-    }
+        if (t.joinable())
+            t.join();
+    camera_threads.clear();
 
     for (int i = 0; i < cam_count; i++) {
         ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
@@ -552,12 +550,17 @@ static void server_on_event(const Incoming &evt) {
             break;
         }
 
-        bool is_success = ctrl_action(ctrl, cmd);
-        // do we send reply if it is failure?
-        auto bytes = build_phase_reply(cmd, g_name, cam_count, true, 0, "ok");
+        bool ok = ctrl_action(ctrl, cmd);
+        // Reply reflects actual outcome
+        auto bytes = build_phase_reply(cmd, g_name, cam_count, ok, ok ? 0 : -1,
+                                       ok ? "ok" : "failed");
         send_bytes(evt.peer_id, bytes);
-        g_last_done = cmd->seq();
-        std::printf("[SRV %s] %s\n", g_name.c_str(), ctrl_name(ctrl));
+        // Only advance monotonic seq on success
+        if (ok)
+            g_last_done = cmd->seq();
+
+        std::printf("[SRV %s] %s%s\n", g_name.c_str(), ctrl_name(ctrl),
+                    ok ? "" : " (failed)");
         break;
     }
     case Incoming::Disconnect:

@@ -399,8 +399,20 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera,
     update_width_value(camera, camera_params->width, camera_params);
     update_height_value(camera, camera_params->height, camera_params);
 
-    update_offsetX_value(camera, 0, camera_params);
-    update_offsetY_value(camera, 0, camera_params);
+    // Set offset values - use values from camera_params if set, otherwise default to 0
+    // Special case for camera "710040"
+    unsigned int offsetx_val = 0;
+    unsigned int offsety_val = 0;
+    if (camera_params->camera_name == "710040") {
+        offsetx_val = 512;
+        offsety_val = 528;
+    } else if (camera_params->offsetx > 0 || camera_params->offsety > 0) {
+        // Use values from camera_params if they were set (e.g., from JSON config)
+        offsetx_val = camera_params->offsetx;
+        offsety_val = camera_params->offsety;
+    }
+    update_offsetX_value(camera, offsetx_val, camera_params);
+    update_offsetY_value(camera, offsety_val, camera_params);
 
     const char *pixel_format = camera_params->pixel_format.c_str();
     check_camera_errors(

@@ -43,7 +43,7 @@ int main(int argc, char **args) {
     std::string orange_root_dir_str =
         "/home/" + tokenized_path[2] + "/orange_data";
     prepare_application_folders(orange_root_dir_str);
-    std::string recording_root_dir_str = "/data0";
+    std::string recording_root_dir_str = "/home/" + tokenized_path[2] + "/orange_data";
     // std::string input_folder = orange_root_dir_str + "/exp/unsorted";
     std::string input_folder = recording_root_dir_str + "/exp/unsorted";
     std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
@@ -303,9 +303,9 @@ int main(int argc, char **args) {
                 }
                 ImGui::PopStyleColor(1);
                 ImGui::SameLine();
-                ImGui::SetWindowFontScale(1.5f); // 1.0 is default
+                ImGui::SetWindowFontScale(2.5f); // 1.0 is default
                 ImGui::Text("%s", input_folder.c_str());
-                ImGui::SetWindowFontScale(1.0f); // Reset to normal
+                ImGui::SetWindowFontScale(2.5f); // Reset to normal
             }
 
             if (!camera_control->subscribe &&

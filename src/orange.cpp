@@ -274,6 +274,16 @@ int main(int argc, char **args) {
                             if (cameras_params[i].camera_name == "shelter") {
                                 cameras_select[i].stream_on = true;
                             }
+                            if (cameras_params[i].camera_name == "710040") //shelter
+                            {
+                                cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo_model = "";
+                                cameras_params[i].offsetx = 512;
+                                cameras_params[i].offsety = 528;
+                                cameras_params[i].width = 1856;
+                                cameras_params[i].height = 984;
+                                std::cout << "setting offset for 710040" << std::endl;
+                            }
                         }
 
                         ecams = new CameraEmergent[num_cameras];
@@ -1004,6 +1014,16 @@ int main(int argc, char **args) {
 
                             if (cameras_params[i].camera_name == "shelter") {
                                 cameras_select[i].stream_on = true;
+                            }
+                            if (cameras_params[i].camera_name == "710040") //shelter
+                            {
+                                cameras_select[i].stream_on = true;
+                                cameras_select[i].yolo_model = "";
+                                cameras_params[i].offsetx = 512;
+                                cameras_params[i].offsety = 528;
+                                cameras_params[i].width = 1856;
+                                cameras_params[i].height = 984;
+                                std::cout << "setting offset for 710040" << std::endl;
                             }
                         }
 

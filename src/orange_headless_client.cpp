@@ -357,16 +357,25 @@ int main(int argc, char *argv[]) {
                       << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached
                       << ", ptp_start_reached=" << ptp_params->ptp_start_reached << std::endl;
             
-            // Only prevent transition if a new recording is starting
-            // When we're in RECORDSTOPPED, cameras are closed, so we can safely transition to IDLE
+            // CRITICAL SAFETY CHECK: Only transition to IDLE if:
+            // 1. We're not starting a new recording (network_set_start_ptp is false)
+            // 2. We're not actively recording (ptp_start_reached is false OR ptp_stop_reached is true)
+            // This prevents transitioning to IDLE during active recording
             if (ptp_params->network_set_start_ptp) {
                 // Don't transition if a new recording is starting
                 std::cout << "DEBUG CAMERA CLIENT: New recording starting, NOT transitioning to IDLE" << std::endl;
+            } else if (ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached) {
+                // CRITICAL: We're actively recording! This should never happen in RECORDSTOPPED
+                // If we're here, something is wrong - the state should be WAITSTOP, not RECORDSTOPPED
+                std::cout << "DEBUG CAMERA CLIENT: ERROR - In RECORDSTOPPED but actively recording! "
+                          << "ptp_start_reached=true, ptp_stop_reached=false. "
+                          << "This is a bug - state should be WAITSTOP, not RECORDSTOPPED. "
+                          << "NOT transitioning to IDLE." << std::endl;
             } else {
                 // When we're in RECORDSTOPPED, cameras are closed (see lines 198-200 where cameras are closed)
-                // So we can safely transition to IDLE to allow reopening cameras
+                // And we're not actively recording, so we can safely transition to IDLE
                 // This allows transition to IDLE after stop_recording is pressed and processed
-                std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE (cameras closed)" << std::endl;
+                std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE (cameras closed, not recording)" << std::endl;
                 manager_context.state = FetchGame::ManagerState_IDLE;
                 client_send_state_update_message(&client, fb_builder,
                                                  &client.m_pNetwork->peers[0],

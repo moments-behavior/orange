@@ -115,7 +115,7 @@ int main(int argc, char **args) {
 
     std::thread enet_thread =
         std::thread(&create_enet_thread, &server, my_servers,
-                    &indigo_signal_builder, &quite_enet);
+                    &indigo_signal_builder, &quite_enet, ptp_params);
     std::vector<std::string> color_temps = {"CT_Off",   "CT_2800K", "CT_3000K",
                                             "CT_4000K", "CT_5000K", "CT_6500K",
                                             "CT_Custom"};

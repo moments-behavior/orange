@@ -3,8 +3,9 @@
 #include "imgui.h"
 #include "global.h"
 #include "obj_generated.h"
+#include "camera.h"
 
-void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, bool* quit_enet)
+void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, bool* quit_enet, PTPParams* ptp_params)
 {
     while(!(*quit_enet)) {
         service_network(server, ImGui::GetIO().DeltaTime, [&](const ENetEvent& evnt)
@@ -90,11 +91,23 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                                                 auto server_state = server_control->server_state();
                                                 // Verify server_state is valid before updating
                                                 if (!::flatbuffers::IsOutRange(server_state, FetchGame::ManagerState_IDLE, FetchGame::ManagerState_WAITSTOP)) {
-                                                    for (int i = 0; i < 2; i++) {
-                                                        if (my_servers[i].peer == evnt.peer) {
-                                                            auto old_state = my_servers[i].server_state;
-                                                            my_servers[i].server_state = server_state;
-                                                            std::cout << "DEBUG: Updated camera client " << i << " state from " << (int)old_state << " to " << (int)server_state << " from ClientStateUpdate" << std::endl;
+                                                    // CRITICAL SAFETY CHECK: Prevent accepting IDLE state from camera clients during active recording
+                                                    // This prevents the button from disappearing when clients incorrectly send IDLE during recording
+                                                    if (server_state == FetchGame::ManagerState_IDLE && 
+                                                        ptp_params && 
+                                                        ptp_params->ptp_start_reached && 
+                                                        !ptp_params->ptp_stop_reached) {
+                                                        std::cout << "DEBUG SERVER: REJECTING IDLE state update from camera client - actively recording! "
+                                                                  << "ptp_start_reached=" << ptp_params->ptp_start_reached 
+                                                                  << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached 
+                                                                  << ". Ignoring ClientStateUpdate." << std::endl;
+                                                    } else {
+                                                        for (int i = 0; i < 2; i++) {
+                                                            if (my_servers[i].peer == evnt.peer) {
+                                                                auto old_state = my_servers[i].server_state;
+                                                                my_servers[i].server_state = server_state;
+                                                                std::cout << "DEBUG: Updated camera client " << i << " state from " << (int)old_state << " to " << (int)server_state << " from ClientStateUpdate" << std::endl;
+                                                            }
                                                         }
                                                     }
                                                 } else {

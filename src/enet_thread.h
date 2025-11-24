@@ -39,14 +39,35 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                         try {
                             auto obj_msg = Obj::Getobj_msg(buffer_pointer);
                             if (obj_msg) {
-                                // Try to access obj_msg-specific fields - if this works, it's likely obj_msg
+                                // Try to access obj_msg-specific fields
+                                // For obj_msg, these should be accessible (even if null)
+                                // For Server messages parsed as obj_msg, accessing these might give garbage
                                 try {
                                     auto c1 = obj_msg->cylinder1();
                                     auto c2 = obj_msg->cylinder2();
-                                    // If we can access these fields, it's an obj_msg
-                                    // (Server messages don't have cylinder1/cylinder2)
-                                    is_obj_msg = true;
-                                    std::cout << "DEBUG: Detected obj_msg from non-camera-client, skipping Server parsing" << std::endl;
+                                    
+                                    // Additional verification: try to parse as Server and check if it gives invalid data
+                                    // If Server parsing gives invalid signal_type, it's likely obj_msg
+                                    bool likely_obj_msg = false;
+                                    try {
+                                        auto test_server = FetchGame::GetServer(buffer_pointer);
+                                        if (test_server) {
+                                            auto test_signal = test_server->signal_type();
+                                            // If signal_type is invalid, it's probably obj_msg misparsed as Server
+                                            if (::flatbuffers::IsOutRange(test_signal, FetchGame::SignalType_ClientBringup, FetchGame::SignalType_CalibrationDone)) {
+                                                likely_obj_msg = true;
+                                            }
+                                        }
+                                    } catch (...) {
+                                        // Server parsing failed - likely obj_msg
+                                        likely_obj_msg = true;
+                                    }
+                                    
+                                    // If we can access cylinder fields AND Server parsing is invalid, it's obj_msg
+                                    if (likely_obj_msg) {
+                                        is_obj_msg = true;
+                                        std::cout << "DEBUG: Detected obj_msg from non-camera-client (Server parsing invalid), skipping Server parsing" << std::endl;
+                                    }
                                 } catch (...) {
                                     // Access failed, might not be obj_msg
                                 }
@@ -69,6 +90,8 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                                     
                                     if (signal_type == FetchGame::SignalType_ClientBringup) {
                                         // Handle general client bring-up
+                                        // Only update server state if this is from a camera client
+                                        bool updated_camera_client = false;
                                         for (int i = 0; i < 2; i++) {
                                             if (my_servers[i].peer == evnt.peer) {
                                                 auto server_name = server_control->server_mesg()->server_name()->c_str();
@@ -76,12 +99,20 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                                                 auto server_state = server_control->server_state();
                                                 my_servers[i].num_cameras = server_num_cameras;
                                                 my_servers[i].server_state = server_state;
+                                                updated_camera_client = true;
+                                                std::cout << "DEBUG: Updated camera client " << i << " state to " << (int)server_state << " from ClientBringup" << std::endl;
                                             }                           
                                         }
                                         
                                         // Also set this as potential CBOT connection for OBB messages
-                                        std::cout << "DEBUG: Setting CBOT connection from ClientBringup signal" << std::endl;
-                                        indigo_signal_builder->indigo_connection = evnt.peer;
+                                        // But only if it's not a camera client (CBOT sends ClientBringup too)
+                                        if (!updated_camera_client) {
+                                            std::cout << "DEBUG: Setting CBOT connection from ClientBringup signal (non-camera-client)" << std::endl;
+                                            indigo_signal_builder->indigo_connection = evnt.peer;
+                                        } else {
+                                            std::cout << "DEBUG: ClientBringup from camera client, also setting as CBOT connection" << std::endl;
+                                            indigo_signal_builder->indigo_connection = evnt.peer;
+                                        }
                                         
                                     } else if (signal_type == FetchGame::SignalType_INDIGO) {
                                         std::cout << "DEBUG: Setting CBOT connection from INDIGO signal" << std::endl;
@@ -103,18 +134,19 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                                                 if (!::flatbuffers::IsOutRange(server_state, FetchGame::ManagerState_IDLE, FetchGame::ManagerState_WAITSTOP)) {
                                                     for (int i = 0; i < 2; i++) {
                                                         if (my_servers[i].peer == evnt.peer) {
+                                                            auto old_state = my_servers[i].server_state;
                                                             my_servers[i].server_state = server_state;
-                                                            std::cout << "DEBUG: Updated server state to " << (int)server_state << " from camera client" << std::endl;
+                                                            std::cout << "DEBUG: Updated camera client " << i << " state from " << (int)old_state << " to " << (int)server_state << " from ClientStateUpdate" << std::endl;
                                                         }
                                                     }
                                                 } else {
-                                                    std::cout << "DEBUG: Invalid server_state: " << (int)server_state << ", ignoring" << std::endl;
+                                                    std::cout << "DEBUG: Invalid server_state: " << (int)server_state << ", ignoring ClientStateUpdate" << std::endl;
                                                 }
                                             } catch (...) {
-                                                std::cout << "DEBUG: Failed to access server_state, ignoring message" << std::endl;
+                                                std::cout << "DEBUG: Failed to access server_state, ignoring ClientStateUpdate message" << std::endl;
                                             }
                                         } else {
-                                            std::cout << "DEBUG: ClientStateUpdate from non-camera-client peer, ignoring" << std::endl;
+                                            std::cout << "DEBUG: ClientStateUpdate from non-camera-client peer, ignoring (this should never update server state)" << std::endl;
                                         }
                                     }
                                     else {

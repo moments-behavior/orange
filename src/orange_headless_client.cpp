@@ -168,6 +168,8 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
 
         if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
             std::cout << "DEBUG CAMERA CLIENT: Stopping recording, transitioning to RECORDSTOPPED" << std::endl;
+            std::cout << "DEBUG CAMERA CLIENT: Current state before stop=" << (int)manager_context->state 
+                      << " (" << FetchGame::EnumNamesManagerState()[manager_context->state] << ")" << std::endl;
             ptp_params->network_set_stop_ptp = false;
             for (auto &t : camera_threads)
                 t.join();
@@ -306,12 +308,16 @@ int main(int argc, char *argv[]) {
                                FetchGame::ServerControl_STOPRECORDING) {
                         // stop recording
                         printf("stop signal\n");
+                        std::cout << "DEBUG CAMERA CLIENT: Received STOPRECORDING signal" << std::endl;
                         std::cout << server_control->ptp_global_time()
                                   << std::endl;
                         ptp_params->ptp_stop_time =
                             server_control->ptp_global_time();
                         std::cout << ptp_params->ptp_stop_time << std::endl;
                         ptp_params->network_set_stop_ptp = true;
+                        std::cout << "DEBUG CAMERA CLIENT: Set network_set_stop_ptp=true, current state=" 
+                                  << (int)manager_context.state << " (" 
+                                  << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
                     }
                     enet_packet_destroy(evnt.packet);
                 } break;

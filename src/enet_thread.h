@@ -29,30 +29,31 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                         }
                     }
                     
-                    // CRITICAL: Only update server state from known camera clients (dosa0/dosa1)
-                    // obj_msg messages should NEVER update server state, regardless of where they come from
-                    // The safest approach: try to detect obj_msg, but even if detection fails,
-                    // only process Server messages from known camera clients
-                    
-                    // Try to detect obj_msg by attempting to parse it
-                    // obj_msg has cylinder1 and cylinder2 fields that Server messages don't have
-                    try {
-                        auto obj_msg = Obj::Getobj_msg(buffer_pointer);
-                        if (obj_msg) {
-                            // Try to access obj_msg-specific fields - if this works, it's likely obj_msg
-                            try {
-                                auto c1 = obj_msg->cylinder1();
-                                auto c2 = obj_msg->cylinder2();
-                                // If we can access these fields, it's an obj_msg
-                                // (Server messages don't have cylinder1/cylinder2)
-                                is_obj_msg = true;
-                                std::cout << "DEBUG: Detected obj_msg (has cylinder1/cylinder2), skipping Server parsing" << std::endl;
-                            } catch (...) {
-                                // Access failed, might not be obj_msg
+                    // CRITICAL: Only try obj_msg detection if it's NOT from a camera client
+                    // Camera clients (dosa0/dosa1) only send Server messages, never obj_msg
+                    // obj_msg should only come from INDIGO/CBOT connection
+                    // If it's from a camera client, it's definitely a Server message
+                    if (!is_camera_client) {
+                        // Try to detect obj_msg by attempting to parse it
+                        // obj_msg has cylinder1 and cylinder2 fields that Server messages don't have
+                        try {
+                            auto obj_msg = Obj::Getobj_msg(buffer_pointer);
+                            if (obj_msg) {
+                                // Try to access obj_msg-specific fields - if this works, it's likely obj_msg
+                                try {
+                                    auto c1 = obj_msg->cylinder1();
+                                    auto c2 = obj_msg->cylinder2();
+                                    // If we can access these fields, it's an obj_msg
+                                    // (Server messages don't have cylinder1/cylinder2)
+                                    is_obj_msg = true;
+                                    std::cout << "DEBUG: Detected obj_msg from non-camera-client, skipping Server parsing" << std::endl;
+                                } catch (...) {
+                                    // Access failed, might not be obj_msg
+                                }
                             }
+                        } catch (...) {
+                            // Not an obj_msg, continue to try Server parsing
                         }
-                    } catch (...) {
-                        // Not an obj_msg, continue to try Server parsing
                     }
                     
                     // If it's not an obj_msg, try parsing as Server message

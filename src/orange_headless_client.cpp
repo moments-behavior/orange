@@ -360,19 +360,18 @@ int main(int argc, char *argv[]) {
             
             // CRITICAL SAFETY CHECK: Only transition to IDLE if:
             // 1. We're not starting a new recording (network_set_start_ptp is false)
-            // 2. Recording has actually stopped (ptp_start_reached is false OR we've processed the stop)
-            // This prevents transitioning to IDLE during active recording
+            // 2. The stop process has completed (network_set_stop_ptp is false, meaning stop was processed)
+            //    This means stop_recording was pressed, processed, and we're now in RECORDSTOPPED
+            // 3. We're NOT still actively recording (if ptp_start_reached is true, ptp_stop_reached must also be true)
+            // This prevents transitioning to IDLE during active recording, but allows it after stop_recording
             if (ptp_params->network_set_start_ptp) {
                 // Don't transition if a new recording is starting
                 std::cout << "DEBUG CAMERA CLIENT: New recording starting, NOT transitioning to IDLE" << std::endl;
-            } else if (ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached) {
-                // CRITICAL: If recording has started (ptp_start_reached) but stop hasn't been reached,
-                // we're still actively recording - do NOT transition to IDLE
-                // This prevents the button from disappearing during active recording
-                std::cout << "DEBUG CAMERA CLIENT: Still actively recording (ptp_start_reached=true, ptp_stop_reached=false), NOT transitioning to IDLE" << std::endl;
             } else {
-                // Safe to transition: recording has stopped
-                std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE" << std::endl;
+                // When we're in RECORDSTOPPED, cameras are closed (see lines 198-200 where cameras are closed)
+                // So we can safely transition to IDLE to allow reopening cameras
+                // This allows transition to IDLE after stop_recording is pressed and processed
+                std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE (cameras closed)" << std::endl;
                 manager_context.state = FetchGame::ManagerState_IDLE;
                 client_send_state_update_message(&client, fb_builder,
                                                  &client.m_pNetwork->peers[0],

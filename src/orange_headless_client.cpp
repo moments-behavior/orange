@@ -386,7 +386,6 @@ int main(int argc, char *argv[]) {
                 // The state should already be WAITSTOP, but this ensures it doesn't change
             }
         }
-        }
 
         usleep(1000);
         last_time = current_time;

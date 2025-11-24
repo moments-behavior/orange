@@ -391,19 +391,22 @@ int main(int argc, char **args) {
 
             // Debug: Log button condition check
             static int button_check_counter = 0;
-            if (++button_check_counter % 60 == 0) {  // Log every 60 frames to avoid spam
+            bool button_should_show = (!ptp_params->network_set_stop_ptp &&
+                                      ptp_params->ptp_start_reached &&
+                                      my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP &&
+                                      my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP);
+            
+            if (++button_check_counter % 60 == 0 || !button_should_show) {  // Log every 60 frames OR when button should not show
                 std::cout << "DEBUG BUTTON CHECK: network_set_stop_ptp=" << ptp_params->network_set_stop_ptp 
                           << ", ptp_start_reached=" << ptp_params->ptp_start_reached
                           << ", server0_state=" << (int)my_servers[0].server_state 
-                          << ", server1_state=" << (int)my_servers[1].server_state << std::endl;
+                          << " (" << FetchGame::EnumNamesManagerState()[my_servers[0].server_state] << ")"
+                          << ", server1_state=" << (int)my_servers[1].server_state
+                          << " (" << FetchGame::EnumNamesManagerState()[my_servers[1].server_state] << ")"
+                          << ", button_should_show=" << button_should_show << std::endl;
             }
             
-            if (!ptp_params->network_set_stop_ptp &&
-                ptp_params->ptp_start_reached &&
-                my_servers[0].server_state ==
-                    FetchGame::ManagerState_WAITSTOP &&
-                my_servers[1].server_state ==
-                    FetchGame::ManagerState_WAITSTOP) {
+            if (button_should_show) {
                 ImGui::PushStyleColor(ImGuiCol_Button,
                                       ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {

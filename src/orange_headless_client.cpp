@@ -309,15 +309,34 @@ int main(int argc, char *argv[]) {
                         // stop recording
                         printf("stop signal\n");
                         std::cout << "DEBUG CAMERA CLIENT: Received STOPRECORDING signal" << std::endl;
-                        std::cout << server_control->ptp_global_time()
-                                  << std::endl;
-                        ptp_params->ptp_stop_time =
-                            server_control->ptp_global_time();
-                        std::cout << ptp_params->ptp_stop_time << std::endl;
-                        ptp_params->network_set_stop_ptp = true;
-                        std::cout << "DEBUG CAMERA CLIENT: Set network_set_stop_ptp=true, current state=" 
-                                  << (int)manager_context.state << " (" 
-                                  << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
+                        std::cout << "DEBUG CAMERA CLIENT: Current state=" << (int)manager_context.state 
+                                  << " (" << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
+                        std::cout << "DEBUG CAMERA CLIENT: ptp_start_reached=" << ptp_params->ptp_start_reached 
+                                  << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached << std::endl;
+                        
+                        // CRITICAL SAFETY CHECK: Only process STOPRECORDING if we're actively recording
+                        // If we're in IDLE or not in WAITSTOP, we shouldn't process this signal
+                        // This prevents clients from incorrectly transitioning to RECORDSTOPPED when not recording
+                        if (manager_context.state != FetchGame::ManagerState_WAITSTOP) {
+                            std::cout << "DEBUG CAMERA CLIENT: IGNORING STOPRECORDING signal - not in WAITSTOP state. "
+                                      << "Current state=" << (int)manager_context.state 
+                                      << " (" << FetchGame::EnumNamesManagerState()[manager_context.state] << "). "
+                                      << "This signal should only be processed when actively recording." << std::endl;
+                        } else if (!ptp_params->ptp_start_reached) {
+                            std::cout << "DEBUG CAMERA CLIENT: IGNORING STOPRECORDING signal - not actively recording. "
+                                      << "ptp_start_reached=" << ptp_params->ptp_start_reached 
+                                      << ". This signal should only be processed when actively recording." << std::endl;
+                        } else {
+                            // We're in WAITSTOP and actively recording - process the stop signal
+                            std::cout << server_control->ptp_global_time() << std::endl;
+                            ptp_params->ptp_stop_time =
+                                server_control->ptp_global_time();
+                            std::cout << ptp_params->ptp_stop_time << std::endl;
+                            ptp_params->network_set_stop_ptp = true;
+                            std::cout << "DEBUG CAMERA CLIENT: Set network_set_stop_ptp=true, current state=" 
+                                      << (int)manager_context.state << " (" 
+                                      << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
+                        }
                     }
                     enet_packet_destroy(evnt.packet);
                 } break;

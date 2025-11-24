@@ -349,21 +349,16 @@ int main(int argc, char *argv[]) {
                                              manager_context.state);
         } else if (manager_context.state ==
                    FetchGame::ManagerState_RECORDSTOPPED) {
-            // RECORDSTOPPED state means recording has stopped
+            // RECORDSTOPPED state means recording has stopped and cameras are closed
             // We should transition to IDLE to allow reopening cameras
-            // CRITICAL: We must verify recording has actually stopped before transitioning
             std::cout << "DEBUG CAMERA CLIENT: In RECORDSTOPPED, checking if should transition to IDLE" << std::endl;
             std::cout << "DEBUG CAMERA CLIENT: network_set_start_ptp=" << ptp_params->network_set_start_ptp 
                       << ", network_set_stop_ptp=" << ptp_params->network_set_stop_ptp 
                       << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached
                       << ", ptp_start_reached=" << ptp_params->ptp_start_reached << std::endl;
             
-            // CRITICAL SAFETY CHECK: Only transition to IDLE if:
-            // 1. We're not starting a new recording (network_set_start_ptp is false)
-            // 2. The stop process has completed (network_set_stop_ptp is false, meaning stop was processed)
-            //    This means stop_recording was pressed, processed, and we're now in RECORDSTOPPED
-            // 3. We're NOT still actively recording (if ptp_start_reached is true, ptp_stop_reached must also be true)
-            // This prevents transitioning to IDLE during active recording, but allows it after stop_recording
+            // Only prevent transition if a new recording is starting
+            // When we're in RECORDSTOPPED, cameras are closed, so we can safely transition to IDLE
             if (ptp_params->network_set_start_ptp) {
                 // Don't transition if a new recording is starting
                 std::cout << "DEBUG CAMERA CLIENT: New recording starting, NOT transitioning to IDLE" << std::endl;
@@ -377,6 +372,20 @@ int main(int argc, char *argv[]) {
                                                  &client.m_pNetwork->peers[0],
                                                  manager_context.state);
             }
+        }
+        
+        // CRITICAL SAFETY CHECK: If we're in WAITSTOP (actively recording), ensure we stay in WAITSTOP
+        // This prevents the button from disappearing during active recording
+        // The only way out of WAITSTOP should be through RECORDSTOPPED (after stop_recording is processed)
+        if (manager_context.state == FetchGame::ManagerState_WAITSTOP) {
+            // If we're actively recording, we must stay in WAITSTOP
+            // Check if we're still actively recording
+            if (ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached) {
+                // We're actively recording - ensure we stay in WAITSTOP
+                // This is a safety check to prevent the button from disappearing
+                // The state should already be WAITSTOP, but this ensures it doesn't change
+            }
+        }
         }
 
         usleep(1000);

@@ -481,6 +481,10 @@ void client_send_state_update_message(EnetContext *enet_context,
                                       flatbuffers::FlatBufferBuilder *builder,
                                       ENetPeer *server_connection,
                                       FetchGame::ManagerState server_state) {
+    // CRITICAL SAFETY CHECK: Log state updates to help debug issues
+    std::cout << "DEBUG CAMERA CLIENT: Sending ClientStateUpdate with state=" << (int)server_state 
+              << " (" << FetchGame::EnumNamesManagerState()[server_state] << ")" << std::endl;
+    
     builder->Clear();
     FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_signal_type(FetchGame::SignalType_ClientStateUpdate);

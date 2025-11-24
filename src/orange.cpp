@@ -389,6 +389,15 @@ int main(int argc, char **args) {
                 }
             }
 
+            // Debug: Log button condition check
+            static int button_check_counter = 0;
+            if (++button_check_counter % 60 == 0) {  // Log every 60 frames to avoid spam
+                std::cout << "DEBUG BUTTON CHECK: network_set_stop_ptp=" << ptp_params->network_set_stop_ptp 
+                          << ", ptp_start_reached=" << ptp_params->ptp_start_reached
+                          << ", server0_state=" << (int)my_servers[0].server_state 
+                          << ", server1_state=" << (int)my_servers[1].server_state << std::endl;
+            }
+            
             if (!ptp_params->network_set_stop_ptp &&
                 ptp_params->ptp_start_reached &&
                 my_servers[0].server_state ==

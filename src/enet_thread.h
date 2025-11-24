@@ -29,33 +29,25 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                         }
                     }
                     
-                    // If message is from INDIGO connection (which might also be a camera client),
-                    // try obj_msg first since obj_msg messages are sent TO the INDIGO connection
-                    // But actually, the server sends obj_msg TO the INDIGO connection, it shouldn't receive them back
-                    // So if we receive a message FROM the INDIGO connection, it's likely a Server message
-                    // UNLESS there's some routing issue. Let's check both message types carefully.
-                    
-                    // First, try to parse as obj_msg if from INDIGO connection
-                    // We need to be careful because obj_msg and Server might both parse successfully
-                    if (indigo_signal_builder->indigo_connection == evnt.peer && 
-                        indigo_signal_builder->indigo_connection != nullptr) {
+                    // Always try to parse as obj_msg first for any message
+                    // obj_msg messages can come from any source and should be ignored here
+                    // We check message size first as a quick filter (obj_msg is typically small)
+                    if (evnt.packet->dataLength < 200) {  // obj_msg is typically small
                         try {
                             auto obj_msg = Obj::Getobj_msg(buffer_pointer);
                             if (obj_msg) {
                                 // Try to access the structure - if it's a valid obj_msg, we should be able to
                                 // access cylinder1 and cylinder2 (they may be null, but accessors should work)
-                                // Also check message size - obj_msg should be relatively small
-                                if (evnt.packet->dataLength < 200) {  // obj_msg is typically small
-                                    // Try accessing the fields - if no crash, likely obj_msg
-                                    try {
-                                        auto c1 = obj_msg->cylinder1();
-                                        auto c2 = obj_msg->cylinder2();
-                                        // If we got here without crashing, it's likely an obj_msg
-                                        is_obj_msg = true;
-                                        std::cout << "DEBUG: Received obj_msg from INDIGO connection (size: " << evnt.packet->dataLength << "), skipping Server parsing" << std::endl;
-                                    } catch (...) {
-                                        // Access failed, probably not obj_msg
-                                    }
+                                try {
+                                    auto c1 = obj_msg->cylinder1();
+                                    auto c2 = obj_msg->cylinder2();
+                                    // If we got here without crashing, it's likely an obj_msg
+                                    // Double-check by verifying the structure makes sense
+                                    // (obj_msg should have these fields even if null)
+                                    is_obj_msg = true;
+                                    std::cout << "DEBUG: Received obj_msg (size: " << evnt.packet->dataLength << "), skipping Server parsing" << std::endl;
+                                } catch (...) {
+                                    // Access failed, probably not obj_msg
                                 }
                             }
                         } catch (...) {

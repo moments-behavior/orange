@@ -410,13 +410,14 @@ int main(int argc, char **args) {
                 ImGui::PushStyleColor(ImGuiCol_Button,
                                       ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {
+                    std::cout << "DEBUG SERVER: 'Stop Recording' button pressed by user" << std::endl;
                     unsigned long long ptp_time =
                         get_current_PTP_time(&ecams[0].camera);
                     int delay_in_second = 3;
                     ptp_params->ptp_stop_time =
                         ((unsigned long long)delay_in_second) * 1000000000 +
                         ptp_time;
-                    std::cout << ptp_params->ptp_stop_time << std::endl;
+                    std::cout << "DEBUG SERVER: Broadcasting STOPRECORDING signal to all clients, ptp_stop_time=" << ptp_params->ptp_stop_time << std::endl;
                     fb_builder->Clear();
                     FetchGame::ServerBuilder server_builder(*fb_builder);
                     server_builder.add_control(
@@ -431,6 +432,7 @@ int main(int argc, char **args) {
                         enet_packet_create(server_buffer, server_buf_size, 0);
                     enet_host_broadcast(server.m_pNetwork, 0, enet_packet);
                     ptp_params->network_set_stop_ptp = true;
+                    std::cout << "DEBUG SERVER: STOPRECORDING broadcast complete" << std::endl;
                 }
                 ImGui::PopStyleColor(1);
             }

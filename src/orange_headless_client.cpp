@@ -1,5 +1,6 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "fetch_generated.h"
+#include "obj_generated.h"
 #include "network_base.h"
 #include "project.h"
 #include "types.h"
@@ -274,7 +275,40 @@ int main(int argc, char *argv[]) {
                            evnt.channelID);
 
                     uint8_t *buffer_pointer = evnt.packet->data;
+                    
+                    // CRITICAL: Check if this is an obj_msg first to prevent misparsing
+                    // obj_msg messages are sent to CBOT, not camera clients, so we should ignore them
+                    try {
+                        auto obj_msg_check = Obj::Getobj_msg(buffer_pointer);
+                        if (obj_msg_check) {
+                            // Check if it has the characteristic obj_msg fields (cylinder1/cylinder2)
+                            // Even if Getobj_msg returns non-null, we need to verify it's actually an obj_msg
+                            // by checking if we can access its fields without crashing
+                            try {
+                                if (obj_msg_check->cylinder1() != nullptr || obj_msg_check->cylinder2() != nullptr) {
+                                    // This is definitely an obj_msg - ignore it
+                                    std::cout << "DEBUG CAMERA CLIENT: Received obj_msg (OBB detection data), ignoring. "
+                                              << "Camera clients should not receive obj_msg messages." << std::endl;
+                                    enet_packet_destroy(evnt.packet);
+                                    break;
+                                }
+                            } catch (...) {
+                                // If accessing fields fails, it might not be a valid obj_msg
+                                // Continue to try parsing as Server message
+                            }
+                        }
+                    } catch (...) {
+                        // Not an obj_msg or parsing failed - continue to try Server message
+                    }
+                    
+                    // Try parsing as Server message
                     auto server_control = FetchGame::GetServer(buffer_pointer);
+                    if (!server_control) {
+                        std::cout << "DEBUG CAMERA CLIENT: Failed to parse message as Server, ignoring" << std::endl;
+                        enet_packet_destroy(evnt.packet);
+                        break;
+                    }
+                    
                     auto server_signal = server_control->control();
 
                     if (server_signal == FetchGame::ServerControl_OPENCAMERA) {

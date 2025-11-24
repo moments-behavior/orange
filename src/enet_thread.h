@@ -29,30 +29,30 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                         }
                     }
                     
-                    // Always try to parse as obj_msg first for any message
-                    // obj_msg messages can come from any source and should be ignored here
-                    // We check message size first as a quick filter (obj_msg is typically small)
-                    if (evnt.packet->dataLength < 200) {  // obj_msg is typically small
-                        try {
-                            auto obj_msg = Obj::Getobj_msg(buffer_pointer);
-                            if (obj_msg) {
-                                // Try to access the structure - if it's a valid obj_msg, we should be able to
-                                // access cylinder1 and cylinder2 (they may be null, but accessors should work)
-                                try {
-                                    auto c1 = obj_msg->cylinder1();
-                                    auto c2 = obj_msg->cylinder2();
-                                    // If we got here without crashing, it's likely an obj_msg
-                                    // Double-check by verifying the structure makes sense
-                                    // (obj_msg should have these fields even if null)
-                                    is_obj_msg = true;
-                                    std::cout << "DEBUG: Received obj_msg (size: " << evnt.packet->dataLength << "), skipping Server parsing" << std::endl;
-                                } catch (...) {
-                                    // Access failed, probably not obj_msg
-                                }
+                    // CRITICAL: Only update server state from known camera clients (dosa0/dosa1)
+                    // obj_msg messages should NEVER update server state, regardless of where they come from
+                    // The safest approach: try to detect obj_msg, but even if detection fails,
+                    // only process Server messages from known camera clients
+                    
+                    // Try to detect obj_msg by attempting to parse it
+                    // obj_msg has cylinder1 and cylinder2 fields that Server messages don't have
+                    try {
+                        auto obj_msg = Obj::Getobj_msg(buffer_pointer);
+                        if (obj_msg) {
+                            // Try to access obj_msg-specific fields - if this works, it's likely obj_msg
+                            try {
+                                auto c1 = obj_msg->cylinder1();
+                                auto c2 = obj_msg->cylinder2();
+                                // If we can access these fields, it's an obj_msg
+                                // (Server messages don't have cylinder1/cylinder2)
+                                is_obj_msg = true;
+                                std::cout << "DEBUG: Detected obj_msg (has cylinder1/cylinder2), skipping Server parsing" << std::endl;
+                            } catch (...) {
+                                // Access failed, might not be obj_msg
                             }
-                        } catch (...) {
-                            // Not an obj_msg, continue to try Server parsing
                         }
+                    } catch (...) {
+                        // Not an obj_msg, continue to try Server parsing
                     }
                     
                     // If it's not an obj_msg, try parsing as Server message
@@ -92,19 +92,33 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                                         std::cout << "From Indigo: Calibration done." << std::endl;
                                         calib_state = CalibIdle;
                                     }
-                                    else {
+                                    else if (signal_type == FetchGame::SignalType_ClientStateUpdate) {
                                         // Only update server state if this is from a camera client
-                                        // This prevents obj_msg from corrupting states even if it parses as Server
+                                        // AND verify it's a valid Server message by checking it has server_state field
                                         if (is_camera_client) {
-                                            for (int i = 0; i < 2; i++) {
-                                                if (my_servers[i].peer == evnt.peer) {
-                                                    auto server_state = server_control->server_state();
-                                                    my_servers[i].server_state = server_state;
+                                            try {
+                                                auto server_state = server_control->server_state();
+                                                // Verify server_state is valid before updating
+                                                if (!::flatbuffers::IsOutRange(server_state, FetchGame::ManagerState_IDLE, FetchGame::ManagerState_WAITSTOP)) {
+                                                    for (int i = 0; i < 2; i++) {
+                                                        if (my_servers[i].peer == evnt.peer) {
+                                                            my_servers[i].server_state = server_state;
+                                                            std::cout << "DEBUG: Updated server state to " << (int)server_state << " from camera client" << std::endl;
+                                                        }
+                                                    }
+                                                } else {
+                                                    std::cout << "DEBUG: Invalid server_state: " << (int)server_state << ", ignoring" << std::endl;
                                                 }
+                                            } catch (...) {
+                                                std::cout << "DEBUG: Failed to access server_state, ignoring message" << std::endl;
                                             }
                                         } else {
-                                            std::cout << "DEBUG: Server message from non-camera-client peer, ignoring state update" << std::endl;
+                                            std::cout << "DEBUG: ClientStateUpdate from non-camera-client peer, ignoring" << std::endl;
                                         }
+                                    }
+                                    else {
+                                        // Other signal types - don't update server state
+                                        std::cout << "DEBUG: Received signal type " << (int)signal_type << ", no state update needed" << std::endl;
                                     }
                                 } else {
                                     // Invalid signal_type - might be obj_msg that parsed incorrectly

@@ -18,7 +18,6 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
             case ENET_EVENT_TYPE_RECEIVE:
                 {
                     uint8_t* buffer_pointer = evnt.packet->data;
-                    bool is_obj_msg = false;
                     bool is_camera_client = false;
                     
                     // Check if this is from a known camera client (dosa0/dosa1)
@@ -29,56 +28,15 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                         }
                     }
                     
-                    // CRITICAL: Only try obj_msg detection if it's NOT from a camera client
-                    // Camera clients (dosa0/dosa1) only send Server messages, never obj_msg
-                    // obj_msg should only come from INDIGO/CBOT connection
-                    // If it's from a camera client, it's definitely a Server message
-                    if (!is_camera_client) {
-                        // Try to detect obj_msg by attempting to parse it
-                        // obj_msg has cylinder1 and cylinder2 fields that Server messages don't have
-                        try {
-                            auto obj_msg = Obj::Getobj_msg(buffer_pointer);
-                            if (obj_msg) {
-                                // Try to access obj_msg-specific fields
-                                // For obj_msg, these should be accessible (even if null)
-                                // For Server messages parsed as obj_msg, accessing these might give garbage
-                                try {
-                                    auto c1 = obj_msg->cylinder1();
-                                    auto c2 = obj_msg->cylinder2();
-                                    
-                                    // Additional verification: try to parse as Server and check if it gives invalid data
-                                    // If Server parsing gives invalid signal_type, it's likely obj_msg
-                                    bool likely_obj_msg = false;
-                                    try {
-                                        auto test_server = FetchGame::GetServer(buffer_pointer);
-                                        if (test_server) {
-                                            auto test_signal = test_server->signal_type();
-                                            // If signal_type is invalid, it's probably obj_msg misparsed as Server
-                                            if (::flatbuffers::IsOutRange(test_signal, FetchGame::SignalType_ClientBringup, FetchGame::SignalType_CalibrationDone)) {
-                                                likely_obj_msg = true;
-                                            }
-                                        }
-                                    } catch (...) {
-                                        // Server parsing failed - likely obj_msg
-                                        likely_obj_msg = true;
-                                    }
-                                    
-                                    // If we can access cylinder fields AND Server parsing is invalid, it's obj_msg
-                                    if (likely_obj_msg) {
-                                        is_obj_msg = true;
-                                        std::cout << "DEBUG: Detected obj_msg from non-camera-client (Server parsing invalid), skipping Server parsing" << std::endl;
-                                    }
-                                } catch (...) {
-                                    // Access failed, might not be obj_msg
-                                }
-                            }
-                        } catch (...) {
-                            // Not an obj_msg, continue to try Server parsing
-                        }
-                    }
+                    // CRITICAL INSIGHT: We only SEND obj_msg to CBOT, we never RECEIVE them back
+                    // So obj_msg should never be in the receive path. The real issue must be something else.
+                    // 
+                    // The safest approach: Only process Server messages from known camera clients
+                    // If it's not from a camera client, try to parse as Server but be very careful
+                    // about state updates - only update from camera clients.
                     
-                    // If it's not an obj_msg, try parsing as Server message
-                    if (!is_obj_msg) {
+                    // Try parsing as Server message
+                    {
                         try {
                             auto server_control = FetchGame::GetServer(buffer_pointer);
                             if (server_control) {
@@ -159,13 +117,12 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
                                 }
                             }
                         } catch (...) {
-                            // If parsing as Server fails, log and ignore
-                            std::cout << "DEBUG: Failed to parse message as Server, ignoring" << std::endl;
+                            // If parsing as Server fails, it might be obj_msg or some other message type
+                            // Since we only send obj_msg and never receive them, this is unexpected
+                            // Log it but don't process it
+                            std::cout << "DEBUG: Failed to parse message as Server (might be obj_msg or unknown type), ignoring" << std::endl;
                         }
                     }
-                    
-                    // If it's an obj_msg, we've already skipped processing
-                    // (obj_msg messages are handled in opengldisplay.cpp)
                     
                     enet_packet_destroy(evnt.packet);
                 }

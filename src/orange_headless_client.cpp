@@ -276,29 +276,36 @@ int main(int argc, char *argv[]) {
 
                     uint8_t *buffer_pointer = evnt.packet->data;
                     
-                    // CRITICAL: Check if this is an obj_msg first to prevent misparsing
-                    // obj_msg messages are sent to CBOT, not camera clients, so we should ignore them
+                    // CRITICAL: Try to verify as Server message first (this is what we expect from server)
+                    // Only check for obj_msg if Server verification fails
+                    bool is_valid_server = false;
                     try {
-                        auto obj_msg_check = Obj::Getobj_msg(buffer_pointer);
-                        if (obj_msg_check) {
-                            // Check if it has the characteristic obj_msg fields (cylinder1/cylinder2)
-                            // Even if Getobj_msg returns non-null, we need to verify it's actually an obj_msg
-                            // by checking if we can access its fields without crashing
-                            try {
-                                if (obj_msg_check->cylinder1() != nullptr || obj_msg_check->cylinder2() != nullptr) {
-                                    // This is definitely an obj_msg - ignore it
-                                    std::cout << "DEBUG CAMERA CLIENT: Received obj_msg (OBB detection data), ignoring. "
-                                              << "Camera clients should not receive obj_msg messages." << std::endl;
-                                    enet_packet_destroy(evnt.packet);
-                                    break;
-                                }
-                            } catch (...) {
-                                // If accessing fields fails, it might not be a valid obj_msg
-                                // Continue to try parsing as Server message
-                            }
+                        ::flatbuffers::Verifier verifier(buffer_pointer, evnt.packet->dataLength);
+                        if (FetchGame::VerifyServerBuffer(verifier)) {
+                            is_valid_server = true;
                         }
                     } catch (...) {
-                        // Not an obj_msg or parsing failed - continue to try Server message
+                        // Verification failed
+                        is_valid_server = false;
+                    }
+                    
+                    // If it's not a valid Server message, check if it's an obj_msg
+                    if (!is_valid_server) {
+                        try {
+                            ::flatbuffers::Verifier verifier(buffer_pointer, evnt.packet->dataLength);
+                            if (Obj::Verifyobj_msgBuffer(verifier)) {
+                                // This is an obj_msg - ignore it (camera clients shouldn't receive these)
+                                std::cout << "DEBUG CAMERA CLIENT: Received obj_msg (OBB detection data), ignoring. "
+                                          << "Camera clients should not receive obj_msg messages." << std::endl;
+                                enet_packet_destroy(evnt.packet);
+                                break;
+                            }
+                        } catch (...) {
+                            // Not an obj_msg either - might be corrupted or unknown message type
+                            std::cout << "DEBUG CAMERA CLIENT: Message is neither valid Server nor obj_msg, ignoring" << std::endl;
+                            enet_packet_destroy(evnt.packet);
+                            break;
+                        }
                     }
                     
                     // Try parsing as Server message
@@ -309,7 +316,14 @@ int main(int argc, char *argv[]) {
                         break;
                     }
                     
+                    // Additional validation: Check if control() value is valid
                     auto server_signal = server_control->control();
+                    if (::flatbuffers::IsOutRange(server_signal, FetchGame::ServerControl_IDLE, FetchGame::ServerControl_QUIT)) {
+                        std::cout << "DEBUG CAMERA CLIENT: Invalid ServerControl value: " << (int)server_signal 
+                                  << ", might be misparsed obj_msg. Ignoring." << std::endl;
+                        enet_packet_destroy(evnt.packet);
+                        break;
+                    }
 
                     if (server_signal == FetchGame::ServerControl_OPENCAMERA) {
                         config_folder =

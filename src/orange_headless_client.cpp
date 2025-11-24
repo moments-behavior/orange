@@ -332,18 +332,21 @@ int main(int argc, char *argv[]) {
         // coordinate with other thread
         if (manager_context.state == FetchGame::ManagerState_CONNECTED) {
             manager_context.state = FetchGame::ManagerState_IDLE;
+            std::cout << "DEBUG CAMERA CLIENT: Transitioning CONNECTED->IDLE, sending bringup message" << std::endl;
             client_send_bringup_message(&client, fb_builder,
                                         &client.m_pNetwork->peers[0], cam_count,
                                         manager_context.state);
         }
         if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {
             manager_context.state = FetchGame::ManagerState_WAITTHREAD;
+            std::cout << "DEBUG CAMERA CLIENT: Transitioning CAMERAOPENED->WAITTHREAD" << std::endl;
             client_send_state_update_message(&client, fb_builder,
                                              &client.m_pNetwork->peers[0],
                                              manager_context.state);
         } else if (manager_context.state ==
                    FetchGame::ManagerState_THREADREADY) {
             manager_context.state = FetchGame::ManagerState_WAITSTART;
+            std::cout << "DEBUG CAMERA CLIENT: Transitioning THREADREADY->WAITSTART" << std::endl;
             client_send_state_update_message(&client, fb_builder,
                                              &client.m_pNetwork->peers[0],
                                              manager_context.state);
@@ -375,12 +378,34 @@ int main(int argc, char *argv[]) {
                 // When we're in RECORDSTOPPED, cameras are closed (see lines 198-200 where cameras are closed)
                 // And we're not actively recording, so we can safely transition to IDLE
                 // This allows transition to IDLE after stop_recording is pressed and processed
-                std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE (cameras closed, not recording)" << std::endl;
-                manager_context.state = FetchGame::ManagerState_IDLE;
-                client_send_state_update_message(&client, fb_builder,
-                                                 &client.m_pNetwork->peers[0],
-                                                 manager_context.state);
+                // FINAL SAFETY CHECK: Double-check we're not actively recording before sending IDLE
+                if (ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached) {
+                    std::cout << "DEBUG CAMERA CLIENT: ERROR - Attempted to send IDLE but still actively recording! "
+                              << "ptp_start_reached=" << ptp_params->ptp_start_reached 
+                              << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached 
+                              << ". NOT sending IDLE state update." << std::endl;
+                } else {
+                    std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE (cameras closed, not recording)" << std::endl;
+                    manager_context.state = FetchGame::ManagerState_IDLE;
+                    client_send_state_update_message(&client, fb_builder,
+                                                     &client.m_pNetwork->peers[0],
+                                                     manager_context.state);
+                }
             }
+        }
+        
+        // CRITICAL: Before sending ANY state update, verify we're not actively recording
+        // This is a final safety check to prevent sending IDLE during active recording
+        // regardless of what state we think we're in
+        static FetchGame::ManagerState last_sent_state = FetchGame::ManagerState_IDLE;
+        if (manager_context.state != last_sent_state) {
+            // State changed - log it
+            std::cout << "DEBUG CAMERA CLIENT: State changed from " 
+                      << (int)last_sent_state << " (" 
+                      << FetchGame::EnumNamesManagerState()[last_sent_state] << ") to "
+                      << (int)manager_context.state << " (" 
+                      << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
+            last_sent_state = manager_context.state;
         }
         
         // CRITICAL SAFETY CHECK: If we're in WAITSTOP (actively recording), ensure we stay in WAITSTOP

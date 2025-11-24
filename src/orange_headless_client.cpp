@@ -351,26 +351,32 @@ int main(int argc, char *argv[]) {
                    FetchGame::ManagerState_RECORDSTOPPED) {
             // RECORDSTOPPED state means recording has stopped
             // We should transition to IDLE to allow reopening cameras
-            // The original code transitioned unconditionally, but we need to prevent
-            // transitioning if we're still actively recording (in WAITSTOP state)
-            // Since we're in RECORDSTOPPED, recording has stopped, so we can safely transition
-            // However, we should check that we're not in the middle of starting a new recording
+            // CRITICAL: We must verify recording has actually stopped before transitioning
             std::cout << "DEBUG CAMERA CLIENT: In RECORDSTOPPED, checking if should transition to IDLE" << std::endl;
             std::cout << "DEBUG CAMERA CLIENT: network_set_start_ptp=" << ptp_params->network_set_start_ptp 
                       << ", network_set_stop_ptp=" << ptp_params->network_set_stop_ptp 
-                      << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached << std::endl;
-            // Transition to IDLE if we're not starting a new recording
-            // The stop process sets network_set_stop_ptp=false when it completes (line 171),
-            // so if we're in RECORDSTOPPED, the stop is done
-            // Only prevent transition if a new recording is starting
-            if (!ptp_params->network_set_start_ptp) {
+                      << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached
+                      << ", ptp_start_reached=" << ptp_params->ptp_start_reached << std::endl;
+            
+            // CRITICAL SAFETY CHECK: Only transition to IDLE if:
+            // 1. We're not starting a new recording (network_set_start_ptp is false)
+            // 2. Recording has actually stopped (ptp_start_reached is false OR we've processed the stop)
+            // This prevents transitioning to IDLE during active recording
+            if (ptp_params->network_set_start_ptp) {
+                // Don't transition if a new recording is starting
+                std::cout << "DEBUG CAMERA CLIENT: New recording starting, NOT transitioning to IDLE" << std::endl;
+            } else if (ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached) {
+                // CRITICAL: If recording has started (ptp_start_reached) but stop hasn't been reached,
+                // we're still actively recording - do NOT transition to IDLE
+                // This prevents the button from disappearing during active recording
+                std::cout << "DEBUG CAMERA CLIENT: Still actively recording (ptp_start_reached=true, ptp_stop_reached=false), NOT transitioning to IDLE" << std::endl;
+            } else {
+                // Safe to transition: recording has stopped
                 std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE" << std::endl;
                 manager_context.state = FetchGame::ManagerState_IDLE;
                 client_send_state_update_message(&client, fb_builder,
                                                  &client.m_pNetwork->peers[0],
                                                  manager_context.state);
-            } else {
-                std::cout << "DEBUG CAMERA CLIENT: New recording starting, NOT transitioning to IDLE" << std::endl;
             }
         }
 

@@ -276,8 +276,48 @@ int main(int argc, char *argv[]) {
 
                     uint8_t *buffer_pointer = evnt.packet->data;
                     
-                    // CRITICAL: Try to verify as Server message first (this is what we expect from server)
-                    // Only check for obj_msg if Server verification fails
+                    // CRITICAL: Check for obj_msg FIRST using verifier
+                    // obj_msg messages are sent to CBOT, not camera clients
+                    // We must detect and ignore them before they can be misparsed as Server messages
+                    bool is_obj_msg = false;
+                    try {
+                        ::flatbuffers::Verifier verifier(buffer_pointer, evnt.packet->dataLength);
+                        if (Obj::Verifyobj_msgBuffer(verifier)) {
+                            // Verification passed - this is definitely an obj_msg
+                            // Double-check by trying to access obj_msg-specific fields
+                            auto obj_msg_check = Obj::Getobj_msg(buffer_pointer);
+                            if (obj_msg_check) {
+                                try {
+                                    // obj_msg has cylinder1 and cylinder2 - Server messages don't have these
+                                    auto cyl1 = obj_msg_check->cylinder1();
+                                    auto cyl2 = obj_msg_check->cylinder2();
+                                    // If we can access these fields, it's definitely an obj_msg
+                                    is_obj_msg = true;
+                                } catch (...) {
+                                    // Access failed, but verification passed, so treat as obj_msg
+                                    is_obj_msg = true;
+                                }
+                            } else {
+                                // Verification passed but Getobj_msg returned null - treat as obj_msg anyway
+                                is_obj_msg = true;
+                            }
+                        }
+                    } catch (...) {
+                        // Verification failed - not an obj_msg
+                        is_obj_msg = false;
+                    }
+                    
+                    // If it's an obj_msg, ignore it immediately (before trying to parse as Server)
+                    if (is_obj_msg) {
+                        std::cout << "DEBUG CAMERA CLIENT: Received obj_msg (OBB detection data), ignoring. "
+                                  << "Camera clients should not receive obj_msg messages. Packet size: " 
+                                  << evnt.packet->dataLength << std::endl;
+                        enet_packet_destroy(evnt.packet);
+                        break;
+                    }
+                    
+                    // Try parsing as Server message
+                    // First verify it's actually a Server message
                     bool is_valid_server = false;
                     try {
                         ::flatbuffers::Verifier verifier(buffer_pointer, evnt.packet->dataLength);
@@ -289,26 +329,14 @@ int main(int argc, char *argv[]) {
                         is_valid_server = false;
                     }
                     
-                    // If it's not a valid Server message, check if it's an obj_msg
                     if (!is_valid_server) {
-                        try {
-                            ::flatbuffers::Verifier verifier(buffer_pointer, evnt.packet->dataLength);
-                            if (Obj::Verifyobj_msgBuffer(verifier)) {
-                                // This is an obj_msg - ignore it (camera clients shouldn't receive these)
-                                std::cout << "DEBUG CAMERA CLIENT: Received obj_msg (OBB detection data), ignoring. "
-                                          << "Camera clients should not receive obj_msg messages." << std::endl;
-                                enet_packet_destroy(evnt.packet);
-                                break;
-                            }
-                        } catch (...) {
-                            // Not an obj_msg either - might be corrupted or unknown message type
-                            std::cout << "DEBUG CAMERA CLIENT: Message is neither valid Server nor obj_msg, ignoring" << std::endl;
-                            enet_packet_destroy(evnt.packet);
-                            break;
-                        }
+                        std::cout << "DEBUG CAMERA CLIENT: Message failed Server verification, ignoring. "
+                                  << "Packet size: " << evnt.packet->dataLength << std::endl;
+                        enet_packet_destroy(evnt.packet);
+                        break;
                     }
                     
-                    // Try parsing as Server message
+                    // Parse as Server message (we know it's valid now)
                     auto server_control = FetchGame::GetServer(buffer_pointer);
                     if (!server_control) {
                         std::cout << "DEBUG CAMERA CLIENT: Failed to parse message as Server, ignoring" << std::endl;
@@ -316,11 +344,13 @@ int main(int argc, char *argv[]) {
                         break;
                     }
                     
-                    // Additional validation: Check if control() value is valid
+                    // Additional validation: Check if control() value is valid BEFORE using it
+                    // This catches any remaining misparsed messages
                     auto server_signal = server_control->control();
                     if (::flatbuffers::IsOutRange(server_signal, FetchGame::ServerControl_IDLE, FetchGame::ServerControl_QUIT)) {
                         std::cout << "DEBUG CAMERA CLIENT: Invalid ServerControl value: " << (int)server_signal 
-                                  << ", might be misparsed obj_msg. Ignoring." << std::endl;
+                                  << ", might be misparsed obj_msg. Ignoring. Packet size: " 
+                                  << evnt.packet->dataLength << std::endl;
                         enet_packet_destroy(evnt.packet);
                         break;
                     }

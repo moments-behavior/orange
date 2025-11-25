@@ -275,43 +275,63 @@ int main(int argc, char *argv[]) {
                            evnt.channelID);
 
                     uint8_t *buffer_pointer = evnt.packet->data;
+                    size_t packet_size = evnt.packet->dataLength;
                     
-                    // CRITICAL: Check for obj_msg FIRST using verifier
+                    // CRITICAL: Check for obj_msg FIRST - try both verification AND field access
                     // obj_msg messages are sent to CBOT, not camera clients
                     // We must detect and ignore them before they can be misparsed as Server messages
                     bool is_obj_msg = false;
+                    
+                    // Method 1: Try obj_msg verification
                     try {
-                        ::flatbuffers::Verifier verifier(buffer_pointer, evnt.packet->dataLength);
+                        ::flatbuffers::Verifier verifier(buffer_pointer, packet_size);
                         if (Obj::Verifyobj_msgBuffer(verifier)) {
-                            // Verification passed - this is definitely an obj_msg
-                            // Double-check by trying to access obj_msg-specific fields
+                            // Verification passed - try to access obj_msg-specific fields to confirm
                             auto obj_msg_check = Obj::Getobj_msg(buffer_pointer);
                             if (obj_msg_check) {
-                                try {
-                                    // obj_msg has cylinder1 and cylinder2 - Server messages don't have these
-                                    auto cyl1 = obj_msg_check->cylinder1();
-                                    auto cyl2 = obj_msg_check->cylinder2();
-                                    // If we can access these fields, it's definitely an obj_msg
-                                    is_obj_msg = true;
-                                } catch (...) {
-                                    // Access failed, but verification passed, so treat as obj_msg
-                                    is_obj_msg = true;
-                                }
+                                // obj_msg has cylinder1 and cylinder2 - Server messages don't have these
+                                // Try to access these fields - if successful, it's definitely obj_msg
+                                auto cyl1 = obj_msg_check->cylinder1();
+                                auto cyl2 = obj_msg_check->cylinder2();
+                                // If we can access these (even if null), it's obj_msg
+                                is_obj_msg = true;
                             } else {
-                                // Verification passed but Getobj_msg returned null - treat as obj_msg anyway
+                                // Verification passed but Getobj_msg returned null - still treat as obj_msg
                                 is_obj_msg = true;
                             }
                         }
                     } catch (...) {
-                        // Verification failed - not an obj_msg
-                        is_obj_msg = false;
+                        // Verification or access failed - might not be obj_msg
+                    }
+                    
+                    // Method 2: If verification didn't catch it, try direct field access as fallback
+                    // This catches cases where verification is too lenient
+                    if (!is_obj_msg) {
+                        try {
+                            auto obj_msg_check = Obj::Getobj_msg(buffer_pointer);
+                            if (obj_msg_check) {
+                                // Try to access obj_msg-specific fields
+                                auto cyl1 = obj_msg_check->cylinder1();
+                                auto cyl2 = obj_msg_check->cylinder2();
+                                // If we can access these fields without crashing, it's likely obj_msg
+                                // But we need Server verification to fail to be sure
+                                ::flatbuffers::Verifier server_verifier(buffer_pointer, packet_size);
+                                bool server_verifies = FetchGame::VerifyServerBuffer(server_verifier);
+                                // If obj_msg fields are accessible AND Server verification fails, it's obj_msg
+                                if (!server_verifies) {
+                                    is_obj_msg = true;
+                                }
+                            }
+                        } catch (...) {
+                            // Access failed - not obj_msg
+                        }
                     }
                     
                     // If it's an obj_msg, ignore it immediately (before trying to parse as Server)
                     if (is_obj_msg) {
                         std::cout << "DEBUG CAMERA CLIENT: Received obj_msg (OBB detection data), ignoring. "
                                   << "Camera clients should not receive obj_msg messages. Packet size: " 
-                                  << evnt.packet->dataLength << std::endl;
+                                  << packet_size << std::endl;
                         enet_packet_destroy(evnt.packet);
                         break;
                     }
@@ -320,7 +340,7 @@ int main(int argc, char *argv[]) {
                     // First verify it's actually a Server message
                     bool is_valid_server = false;
                     try {
-                        ::flatbuffers::Verifier verifier(buffer_pointer, evnt.packet->dataLength);
+                        ::flatbuffers::Verifier verifier(buffer_pointer, packet_size);
                         if (FetchGame::VerifyServerBuffer(verifier)) {
                             is_valid_server = true;
                         }
@@ -331,7 +351,7 @@ int main(int argc, char *argv[]) {
                     
                     if (!is_valid_server) {
                         std::cout << "DEBUG CAMERA CLIENT: Message failed Server verification, ignoring. "
-                                  << "Packet size: " << evnt.packet->dataLength << std::endl;
+                                  << "Packet size: " << packet_size << std::endl;
                         enet_packet_destroy(evnt.packet);
                         break;
                     }
@@ -344,16 +364,22 @@ int main(int argc, char *argv[]) {
                         break;
                     }
                     
-                    // Additional validation: Check if control() value is valid BEFORE using it
-                    // This catches any remaining misparsed messages
+                    // CRITICAL: Check if control() value is valid BEFORE using it
+                    // This is the final safety check - obj_msg messages will have invalid control() values
                     auto server_signal = server_control->control();
                     if (::flatbuffers::IsOutRange(server_signal, FetchGame::ServerControl_IDLE, FetchGame::ServerControl_QUIT)) {
                         std::cout << "DEBUG CAMERA CLIENT: Invalid ServerControl value: " << (int)server_signal 
                                   << ", might be misparsed obj_msg. Ignoring. Packet size: " 
-                                  << evnt.packet->dataLength << std::endl;
+                                  << packet_size << std::endl;
                         enet_packet_destroy(evnt.packet);
                         break;
                     }
+                    
+                    // Message passed all checks - it's a valid Server message with valid control() value
+                    std::cout << "DEBUG CAMERA CLIENT: Valid Server message received. control()=" 
+                              << (int)server_signal << " (" 
+                              << FetchGame::EnumNamesServerControl()[(int)server_signal] << "), "
+                              << "packet size: " << packet_size << std::endl;
 
                     if (server_signal == FetchGame::ServerControl_OPENCAMERA) {
                         config_folder =

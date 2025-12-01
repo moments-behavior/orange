@@ -86,11 +86,14 @@ enum ServerControl : uint8_t {
   ServerControl_NEXTPOSE = 9,
   ServerControl_TAKEPICTURE = 10,
   ServerControl_TRIALTRIGGER = 11,
+  ServerControl_BUMBLEBEEBALL = 12,
+  ServerControl_GRIMLOCKBALL = 13,
+  ServerControl_OPTIMUSBALL = 14,
   ServerControl_MIN = ServerControl_NONE,
-  ServerControl_MAX = ServerControl_TRIALTRIGGER
+  ServerControl_MAX = ServerControl_OPTIMUSBALL
 };
 
-inline const ServerControl (&EnumValuesServerControl())[12] {
+inline const ServerControl (&EnumValuesServerControl())[15] {
   static const ServerControl values[] = {
     ServerControl_NONE,
     ServerControl_OPENCAMERA,
@@ -103,13 +106,16 @@ inline const ServerControl (&EnumValuesServerControl())[12] {
     ServerControl_GRIMLOCKBOARD,
     ServerControl_NEXTPOSE,
     ServerControl_TAKEPICTURE,
-    ServerControl_TRIALTRIGGER
+    ServerControl_TRIALTRIGGER,
+    ServerControl_BUMBLEBEEBALL,
+    ServerControl_GRIMLOCKBALL,
+    ServerControl_OPTIMUSBALL
   };
   return values;
 }
 
 inline const char * const *EnumNamesServerControl() {
-  static const char * const names[13] = {
+  static const char * const names[16] = {
     "NONE",
     "OPENCAMERA",
     "STARTTHREAD",
@@ -122,13 +128,16 @@ inline const char * const *EnumNamesServerControl() {
     "NEXTPOSE",
     "TAKEPICTURE",
     "TRIALTRIGGER",
+    "BUMBLEBEEBALL",
+    "GRIMLOCKBALL",
+    "OPTIMUSBALL",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameServerControl(ServerControl e) {
-  if (::flatbuffers::IsOutRange(e, ServerControl_NONE, ServerControl_TRIALTRIGGER)) return "";
+  if (::flatbuffers::IsOutRange(e, ServerControl_NONE, ServerControl_OPTIMUSBALL)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesServerControl()[index];
 }

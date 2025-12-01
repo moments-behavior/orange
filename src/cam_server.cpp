@@ -53,6 +53,12 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "NEXTPOSE";
     case camnet::v1::ServerControl_GRIMLOCKBOARD:
         return "GRIMLOCKBOARD";
+    case camnet::v1::ServerControl_BUMBLEBEEBALL:
+        return "BUMBLEBEEBALL";
+    case camnet::v1::ServerControl_GRIMLOCKBALL:
+        return "GRIMLOCKBALL";
+    case camnet::v1::ServerControl_OPTIMUSBALL:
+        return "OPTIMUSBALL";
     default:
         return "NONE";
     }
@@ -502,6 +508,18 @@ static bool ctrl_action(camnet::v1::ServerControl c,
     }
 
     case camnet::v1::ServerControl_GRIMLOCKBOARD: {
+        return true;
+    }
+
+    case camnet::v1::ServerControl_BUMBLEBEEBALL: {
+        return true;
+    }
+
+    case camnet::v1::ServerControl_GRIMLOCKBALL: {
+        return true;
+    }
+
+    case camnet::v1::ServerControl_OPTIMUSBALL: {
         return true;
     }
 

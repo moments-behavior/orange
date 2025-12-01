@@ -90,7 +90,7 @@ int main(int argc, char **args) {
     }
     std::string picture_save_folder =
         orange_root_dir_str + "/pictures/" + get_current_date();
-    std::string calib_save_folder = recording_root_dir_str + "/exp/calibration";
+    std::string calib_save_folder = recording_root_dir_str + "/exp";
 
     int local_config_select = 0;
     bool select_all_cameras = false;

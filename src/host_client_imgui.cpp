@@ -428,6 +428,44 @@ static std::vector<uint8_t> build_cmd_grimlockboard(const std::string &job_id,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+static std::vector<uint8_t> build_cmd_bumblebeeball(const std::string &job_id,
+                                                    uint32_t epoch,
+                                                    uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg = CreateServer(b, Kind_KindCommand,
+                            camnet::v1::ServerControl_BUMBLEBEEBALL, jid, epoch,
+                            seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
+static std::vector<uint8_t> build_cmd_grimlockball(const std::string &job_id,
+                                                   uint32_t epoch,
+                                                   uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg = CreateServer(b, Kind_KindCommand,
+                            camnet::v1::ServerControl_GRIMLOCKBALL, jid, epoch,
+                            seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
+static std::vector<uint8_t>
+build_cmd_optimusball(const std::string &job_id, uint32_t epoch, uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg =
+        CreateServer(b, Kind_KindCommand, camnet::v1::ServerControl_OPTIMUSBALL,
+                     jid, epoch, seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 static std::vector<uint8_t> build_cmd_takepicture(const std::string &job_id,
                                                   uint32_t epoch, uint32_t seq,
                                                   uint picture_id) {
@@ -498,7 +536,12 @@ enum Phase {
     Phase_NextPose_B,
     Phase_TakePicture_G,
     Phase_NextPose_G,
-    Phase_TakeGlobalPicture
+    Phase_TakeGlobalPicture,
+    Phase_BumblebeeBall,
+    Phase_GrimlockBall,
+    Phase_OptimusBall,
+    Phase_TakePicture_O,
+    Phase_NextPose_O,
 };
 
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
@@ -613,6 +656,16 @@ static const char *phase_name() {
         return "NEXTPOSE_G";
     case Phase_TakeGlobalPicture:
         return "TAKEGLOBALPICTURE";
+    case Phase_TakePicture_O:
+        return "TAKEPICTURE_O";
+    case Phase_NextPose_O:
+        return "NEXTPOSE_O";
+    case Phase_BumblebeeBall:
+        return "BUMBLEBEEBALL";
+    case Phase_GrimlockBall:
+        return "GRIMLOCKBALL";
+    case Phase_OptimusBall:
+        return "OPTIMUSBALL";
     default:
         return "?";
     }
@@ -637,7 +690,7 @@ static void advance_phase(std::string job_id) {
         default:
             break;
         }
-    } else {
+    } else if (job_id == "calibration") {
         // calibration
         switch (g_phase) {
         case Phase_Open:
@@ -682,6 +735,66 @@ static void advance_phase(std::string job_id) {
                 g_phase = Phase_Stop;
             } else {
                 g_phase = Phase_TakeGlobalPicture;
+            }
+            break;
+        }
+        case Phase_Stop:
+            g_phase = Phase_Done;
+            break;
+        default:
+            break;
+        }
+    } else {
+        // robot
+        switch (g_phase) {
+        case Phase_Open:
+            g_phase = Phase_Streaming;
+            break;
+        case Phase_Streaming:
+            g_phase = Phase_Start;
+            break;
+        case Phase_Start:
+            g_phase = Phase_BumblebeeBall;
+            break;
+        case Phase_BumblebeeBall:
+            g_phase = Phase_TakePicture_B;
+            break;
+        case Phase_TakePicture_B:
+            g_phase = Phase_NextPose_B;
+            break;
+        case Phase_NextPose_B: {
+            if (g_picture_id == 6) {
+                g_phase = Phase_GrimlockBall;
+            } else {
+                g_phase = Phase_TakePicture_B;
+            }
+            break;
+        }
+        case Phase_GrimlockBall:
+            g_phase = Phase_TakePicture_G;
+            break;
+        case Phase_TakePicture_G:
+            g_phase = Phase_NextPose_G;
+            break;
+        case Phase_NextPose_G: {
+            if (g_picture_id == 12) {
+                g_phase = Phase_OptimusBall;
+            } else {
+                g_phase = Phase_TakePicture_G;
+            }
+            break;
+        }
+        case Phase_OptimusBall:
+            g_phase = Phase_TakePicture_O;
+            break;
+        case Phase_TakePicture_O:
+            g_phase = Phase_NextPose_O;
+            break;
+        case Phase_NextPose_O: {
+            if (g_picture_id == 18) {
+                g_phase = Phase_Done;
+            } else {
+                g_phase = Phase_TakePicture_O;
             }
             break;
         }
@@ -770,7 +883,6 @@ static void broadcast_current_phase() {
             on_startrecord_phase_start(g_ptp_start_time);
             g_phase_started = true;
         }
-
         break;
     }
     case Phase_Stop: {
@@ -792,13 +904,17 @@ static void broadcast_current_phase() {
     }
     case Phase_Streaming: {
         if (!g_phase_started) {
-            g_folder_name =
-                *g_clientctx->calib_save_folder + "/" + get_current_date_time();
+            if (g_jid == "calibration") {
+                g_folder_name = *g_clientctx->calib_save_folder +
+                                "/calibration/" + get_current_date_time();
+            } else {
+                g_folder_name = *g_clientctx->calib_save_folder + "/robot/" +
+                                get_current_date_time();
+            }
         }
         std::string save_format = *g_clientctx->selected_picture_format;
         bytes = build_cmd_startstreaming(g_jid, g_epoch, g_seq, g_folder_name,
                                          save_format);
-
         if (!g_phase_started) {
             on_startstreaming_phase_start(g_folder_name, save_format);
             g_phase_started = true;
@@ -820,6 +936,29 @@ static void broadcast_current_phase() {
         }
         break;
     }
+    case Phase_BumblebeeBall: {
+        g_picture_id = -1;
+        bytes = build_cmd_bumblebeeball(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_GrimlockBall: {
+        bytes = build_cmd_grimlockball(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_OptimusBall: {
+        bytes = build_cmd_optimusball(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+
     case Phase_TakePicture_B: {
         if (!g_phase_started) {
             g_picture_id++;
@@ -850,6 +989,24 @@ static void broadcast_current_phase() {
         break;
     }
     case Phase_NextPose_G: {
+        bytes = build_cmd_nextpose(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_TakePicture_O: {
+        if (!g_phase_started) {
+            g_picture_id++;
+        }
+        bytes = build_cmd_takepicture(g_jid, g_epoch, g_seq, g_picture_id);
+        if (!g_phase_started) {
+            on_takepicture_phase_start(g_picture_id);
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_NextPose_O: {
         bytes = build_cmd_nextpose(g_jid, g_epoch, g_seq);
         if (!g_phase_started) {
             g_phase_started = true;
@@ -1138,8 +1295,16 @@ void host_client_draw_gui() {
 
     // Job mode compact combo + Phase visuals/toolbar
     {
-        const char *options[] = {"recording", "calibration"};
-        static int current = (g_jid == "recording") ? 0 : 1;
+        const char *options[] = {"recording", "calibration", "robot"};
+
+        static int current = 0; // default = "recording"
+        if (g_jid == "recording")
+            current = 0;
+        else if (g_jid == "calibration")
+            current = 1;
+        else if (g_jid == "robot")
+            current = 2;
+
         ImGui::SetNextItemWidth(160.0f);
         if (ImGui::BeginCombo("Job Mode", options[current])) {
             for (int n = 0; n < IM_ARRAYSIZE(options); n++) {
@@ -1368,20 +1533,21 @@ void host_client_draw_gui() {
     }
 
     // Auto-advance logic
-    {
-        if (g_phase != last_phase) {
-            if (g_jid == "calibration" && !g_waiting && g_phase != Phase_Done &&
-                g_phase != Phase_TakeGlobalPicture) {
-                g_ack_by.clear();
-                for (const auto &name : g_servers)
-                    g_ack_by[name] = false;
-                broadcast_current_phase();
-                g_last_send = std::chrono::steady_clock::now();
-                g_waiting = true;
-            }
-            last_phase = g_phase;
-        }
-    }
+    // {
+    //     if (g_phase != last_phase) {
+    //         if (g_jid == "calibration" && !g_waiting && g_phase != Phase_Done
+    //         &&
+    //             g_phase != Phase_TakeGlobalPicture) {
+    //             g_ack_by.clear();
+    //             for (const auto &name : g_servers)
+    //                 g_ack_by[name] = false;
+    //             broadcast_current_phase();
+    //             g_last_send = std::chrono::steady_clock::now();
+    //             g_waiting = true;
+    //         }
+    //         last_phase = g_phase;
+    //     }
+    // }
 
     ImGui::PopStyleVar(2);
     ImGui::End();

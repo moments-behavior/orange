@@ -808,7 +808,7 @@ static void advance_phase(std::string job_id) {
             break;
         case Phase_NextPose_O: {
             if (g_picture_id == 26) {
-                g_phase = Phase_Done;
+                g_phase = Phase_Stop;
             } else {
                 g_phase = Phase_TakePicture_O;
             }
@@ -1549,21 +1549,20 @@ void host_client_draw_gui() {
     }
 
     // Auto-advance logic
-    // {
-    //     if (g_phase != last_phase) {
-    //         if (g_jid == "calibration" && !g_waiting && g_phase != Phase_Done
-    //         &&
-    //             g_phase != Phase_TakeGlobalPicture) {
-    //             g_ack_by.clear();
-    //             for (const auto &name : g_servers)
-    //                 g_ack_by[name] = false;
-    //             broadcast_current_phase();
-    //             g_last_send = std::chrono::steady_clock::now();
-    //             g_waiting = true;
-    //         }
-    //         last_phase = g_phase;
-    //     }
-    // }
+    {
+        if (g_phase != last_phase) {
+            if ((g_jid == "calibration" || g_jid == "robot") && !g_waiting &&
+                g_phase != Phase_Done && g_phase != Phase_TakeGlobalPicture) {
+                g_ack_by.clear();
+                for (const auto &name : g_servers)
+                    g_ack_by[name] = false;
+                broadcast_current_phase();
+                g_last_send = std::chrono::steady_clock::now();
+                g_waiting = true;
+            }
+            last_phase = g_phase;
+        }
+    }
 
     ImGui::PopStyleVar(2);
     ImGui::End();

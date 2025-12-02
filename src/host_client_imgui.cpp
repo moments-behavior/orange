@@ -35,7 +35,6 @@ static void logf(const char *fmt, ...) {
     std::lock_guard<std::mutex> lk(g_logs_m);
     g_logs.emplace_back(buf);
 }
-static int last_phase = -1; // for auto advancing
 static bool g_phase_started = false;
 
 // persistent to handle missing messages
@@ -558,7 +557,7 @@ static std::string g_jid = "recording";
 static uint32_t g_epoch = 1;
 static uint32_t g_seq = 1;
 static Phase g_phase = Phase_Open;
-
+static int last_phase = g_phase;
 static bool g_waiting = false;
 static int g_timeout_ms = 2000;
 static std::chrono::steady_clock::time_point g_last_send;
@@ -827,6 +826,7 @@ static void reset_session() {
     ++g_epoch;
     g_seq = 1;
     g_phase = Phase_Open;
+    last_phase = g_phase;
     g_waiting = false;
     g_ack_by.clear();
     {
@@ -838,7 +838,6 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
-    last_phase = -1;
     logf("session reset");
 }
 

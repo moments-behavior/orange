@@ -515,6 +515,12 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "NEXTPOSE";
     case camnet::v1::ServerControl_GRIMLOCKBOARD:
         return "GRIMLOCKBOARD";
+    case camnet::v1::ServerControl_BUMBLEBEEBALL:
+        return "BUMBLEBEEBALL";
+    case camnet::v1::ServerControl_GRIMLOCKBALL:
+        return "GRIMLOCKBALL";
+    case camnet::v1::ServerControl_OPTIMUSBALL:
+        return "OPTIMUSBALL";
     default:
         return "NONE";
     }
@@ -623,6 +629,16 @@ static camnet::v1::ServerControl current_ctrl() {
         return camnet::v1::ServerControl_NEXTPOSE;
     case Phase_TakeGlobalPicture:
         return camnet::v1::ServerControl_TAKEPICTURE;
+    case Phase_BumblebeeBall:
+        return camnet::v1::ServerControl_BUMBLEBEEBALL;
+    case Phase_GrimlockBall:
+        return camnet::v1::ServerControl_GRIMLOCKBALL;
+    case Phase_OptimusBall:
+        return camnet::v1::ServerControl_OPTIMUSBALL;
+    case Phase_TakePicture_O:
+        return camnet::v1::ServerControl_TAKEPICTURE;
+    case Phase_NextPose_O:
+        return camnet::v1::ServerControl_NEXTPOSE;
     default:
         return camnet::v1::ServerControl_NONE;
     }

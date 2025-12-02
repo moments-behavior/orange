@@ -779,7 +779,7 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_NextPose_B;
             break;
         case Phase_NextPose_B: {
-            if (g_picture_id == 6) {
+            if (g_picture_id == 8) {
                 g_phase = Phase_GrimlockBall;
             } else {
                 g_phase = Phase_TakePicture_B;
@@ -793,7 +793,7 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_NextPose_G;
             break;
         case Phase_NextPose_G: {
-            if (g_picture_id == 12) {
+            if (g_picture_id == 17) {
                 g_phase = Phase_OptimusBall;
             } else {
                 g_phase = Phase_TakePicture_G;
@@ -807,7 +807,7 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_NextPose_O;
             break;
         case Phase_NextPose_O: {
-            if (g_picture_id == 18) {
+            if (g_picture_id == 26) {
                 g_phase = Phase_Done;
             } else {
                 g_phase = Phase_TakePicture_O;

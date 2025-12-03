@@ -257,6 +257,9 @@ inline void get_one_frame(CameraState *camera_state,
             camera_select->dropped_frames++;
         } else {
             camera_state->frames_recd++;
+            camera_select->camera_track_state->frame_count++;
+            camera_select->camera_track_state->last_progress_time.store(
+                std::chrono::steady_clock::now());
             camera_select->capture_fps_estimator.update();
         }
 
@@ -310,11 +313,11 @@ inline void get_one_frame(CameraState *camera_state,
         //     fflush(stdout);
         // }
 
-        if (camera_state->frame_count % 1000 == 99) {
-            // printf(".");
-            // fflush(stdout);
-            std::cout << camera_params->camera_name << std::endl;
-        }
+        // if (camera_state->frame_count % 1000 == 99) {
+        //     // printf(".");
+        //     // fflush(stdout);
+        //     std::cout << camera_params->camera_name << std::endl;
+        // }
         // if (camera_state->frame_count % 20000 == 9999)
         // printf("\n");
     } else {

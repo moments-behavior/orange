@@ -5,6 +5,7 @@
 #include "json.hpp"
 #include <atomic>
 #include <chrono>
+#include <memory>
 
 using json = nlohmann::json;
 
@@ -75,6 +76,12 @@ struct CameraSignals {
     std::atomic<PictureState> frame_detect_state{State_Frame_Idle};
 };
 
+struct CameraTrackState {
+    std::atomic<uint64_t> frame_count{0};
+    std::atomic<uint64_t> last_checked_frame{0};
+    std::atomic<std::chrono::steady_clock::time_point> last_progress_time;
+};
+
 struct CameraEachSelect {
     // copyable/movable config & UI-ish state
     bool stream_on = true;
@@ -89,6 +96,8 @@ struct CameraEachSelect {
     FPSEstimator encoder_fps_estimator, capture_fps_estimator;
 
     // runtime shared between threads
+    std::unique_ptr<CameraTrackState> camera_track_state =
+        std::make_unique<CameraTrackState>();
     std::unique_ptr<CameraSignals> sigs = std::make_unique<CameraSignals>();
 };
 

@@ -107,7 +107,7 @@ void FrameDetector::thread_loop() {
             throw std::runtime_error("Cannot open file: " +
                                      detection_file_name);
         }
-        write_file << "timestamp_sys,x,y,width,height,label,prob\n";
+        write_file << "timestamp_sys,frame_id,x,y,width,height,label,prob\n";
     }
 
     std::chrono::high_resolution_clock::time_point start =
@@ -180,10 +180,12 @@ void FrameDetector::thread_loop() {
                 uint64_t real_time =
                     (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
 
-                write_file << real_time << "," << objs[0].rect.x << ","
-                           << objs[0].rect.y << "," << objs[0].rect.width << ","
-                           << objs[0].rect.height << "," << objs[0].label << ","
-                           << objs[0].prob << "\n";
+                write_file
+                    << real_time << ","
+                    << camera_select->camera_track_state->frame_count.load()
+                    << "," << objs[0].rect.x << "," << objs[0].rect.y << ","
+                    << objs[0].rect.width << "," << objs[0].rect.height << ","
+                    << objs[0].label << "," << objs[0].prob << "\n";
             }
         } else {
             detection2d[camera_select->idx2d].ball2d.find_ball.store(false);

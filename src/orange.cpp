@@ -846,6 +846,27 @@ int main(int argc, char **args) {
 
                     ImGui::SameLine();
 
+                    using Clock = std::chrono::steady_clock;
+                    auto now = Clock::now();
+                    auto last =
+                        cameras_select[i]
+                            .camera_track_state->last_progress_time.load(
+                                std::memory_order_relaxed);
+
+                    float idle_seconds =
+                        std::chrono::duration<float>(now - last).count();
+                    bool hung =
+                        idle_seconds > 3.0f; // e.g. hung if idle > 3 seconds
+
+                    if (hung) {
+                        ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f),
+                                           ICON_FK_CIRCLE); // red
+                    } else {
+                        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f),
+                                           ICON_FK_CIRCLE); // green
+                    }
+                    ImGui::SameLine();
+
                     std::ostringstream oss;
                     oss << std::fixed << std::setprecision(1);
 

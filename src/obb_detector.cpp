@@ -881,6 +881,12 @@ std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
         int class_id = classify_with_priors(candidate);
         if (class_id < 0) continue;
         
+        // Reject class 1 (Ball) - only accept class 0 (CylinderVertical) and class 2 (CylinderSide)
+        if (class_id == 1) {
+            std::cout << "OBB: Rejecting detection classified as class 1 (Ball)" << std::endl;
+            continue;
+        }
+        
         // Create initial OBB from candidate
         OBB obb(candidate[0].x, candidate[0].y, candidate[1].x, candidate[1].y,
                candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
@@ -888,8 +894,7 @@ std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
         
         // Use the oriented bounding box directly from motion detection
         // No shape verification - just use the detected oriented bounding box
-        obb.class_id = 1;  // Single class for all oriented bounding boxes
-        std::cout << "OBB: Using oriented bounding box from motion detection" << std::endl;
+        std::cout << "OBB: Using oriented bounding box from motion detection, class_id=" << class_id << std::endl;
         
         detections.push_back(obb);
     }

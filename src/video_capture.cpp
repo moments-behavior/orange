@@ -240,9 +240,12 @@ inline void get_one_frame(CameraState *camera_state,
     camera_state->camera_return =
         EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
 
+    int ptp_offset = 0;
+    EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset", &ptp_offset);
+
     // get the system clock
     struct timespec ts_rt1;
-    clock_gettime(CLOCK_REALTIME, &ts_rt1);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts_rt1);
     uint64_t real_time = (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
 
     if (camera_control->sync_camera) {
@@ -276,7 +279,7 @@ inline void get_one_frame(CameraState *camera_state,
                 ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize,
                 ecam->frame_recv.size_x, ecam->frame_recv.size_y,
                 ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
-                camera_state->frame_count, real_time);
+                camera_state->frame_count, real_time, ptp_offset);
         }
 
 #ifndef HEADLESS

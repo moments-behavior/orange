@@ -2,6 +2,7 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "json.hpp"
 #include <algorithm>
+#include <atomic>
 #include <fstream>
 #include <iostream>
 

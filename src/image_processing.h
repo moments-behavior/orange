@@ -14,6 +14,7 @@ typedef struct {
     unsigned long long timestamp;
     unsigned long long frame_id;
     uint64_t timestamp_sys;
+    int ptp_offset;
 } WORKER_ENTRY;
 
 struct FrameGPU {

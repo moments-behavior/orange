@@ -112,5 +112,7 @@ void select_cameras_have_configs(std::vector<std::string> &camera_config_files,
 void allocate_camera_frame_buffers(CameraEmergent *ecams,
                                    CameraParams *cameras_params,
                                    int evt_buffer_size, int num_cameras);
+void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
+                              CameraParams *cameras_params);
 
 #endif

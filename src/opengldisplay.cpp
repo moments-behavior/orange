@@ -164,7 +164,7 @@ void COpenGLDisplay::ThreadRunning() {
                     // < objs_last_frame[0].rect.x) { if (objs[0].rect.x <
                     // 2500.0 && objs[0].rect.x > 2100.0) {
 
-                    if (objs[0].rect.x < 2800.0 &&
+                    if (objs[0].rect.x < 2680.0 &&
                         objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
                         // struct timespec ts_rt1;

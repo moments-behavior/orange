@@ -170,7 +170,7 @@ void FrameDetector::thread_loop() {
             //           << std::endl;
             detection2d[camera_select->idx2d].ball2d.find_ball.store(true);
             // send to indigo
-            if (objs[0].rect.x < 2800.0 && objs[0].rect.x > 2100.0) {
+            if (objs[0].rect.x < 2680.0 && objs[0].rect.x > 2100.0) {
                 send_indigo_trigger_message(ctx, flatb_builder);
             }
 

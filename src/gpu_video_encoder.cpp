@@ -177,6 +177,9 @@ void GPUVideoEncoder::ThreadRunning() {
         if (f) {
             ProcessOneFrame(f);
             camera_select->encoder_fps_estimator.update();
+        } else {
+            std::this_thread::sleep_for(
+                std::chrono::microseconds(200)); // or 1ms
         }
     }
 

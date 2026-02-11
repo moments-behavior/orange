@@ -562,8 +562,7 @@ static bool g_waiting = false;
 static int g_timeout_ms = 2000;
 static std::chrono::steady_clock::time_point g_last_send;
 
-// We default to NOT stepping ENet in the GUI tick; a dispatcher thread handles
-// it.
+// default to NOT stepping ENet in the GUI tick; a dispatcher thread handles it.
 static bool g_step_net_in_tick = false;
 
 // ---- thread-safe reply queue (producer: net thread, consumer: GUI)
@@ -778,7 +777,7 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_NextPose_B;
             break;
         case Phase_NextPose_B: {
-            if (g_picture_id == 8) {
+            if (g_picture_id == 55) {
                 g_phase = Phase_GrimlockBall;
             } else {
                 g_phase = Phase_TakePicture_B;
@@ -792,7 +791,7 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_NextPose_G;
             break;
         case Phase_NextPose_G: {
-            if (g_picture_id == 17) {
+            if (g_picture_id == 111) {
                 g_phase = Phase_OptimusBall;
             } else {
                 g_phase = Phase_TakePicture_G;
@@ -806,7 +805,7 @@ static void advance_phase(std::string job_id) {
             g_phase = Phase_NextPose_O;
             break;
         case Phase_NextPose_O: {
-            if (g_picture_id == 26) {
+            if (g_picture_id == 167) {
                 g_phase = Phase_Stop;
             } else {
                 g_phase = Phase_TakePicture_O;

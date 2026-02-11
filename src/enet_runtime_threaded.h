@@ -6,9 +6,9 @@
 #include <thread>
 #include <unordered_map>
 
-class EnetRuntimeThreaded {
+class EnetRuntime {
   public:
-    ~EnetRuntimeThreaded() { stop(); }
+    ~EnetRuntime() { stop(); }
 
     // Server mode (bind & listen)
     bool start_server(uint16_t port, size_t max_clients = 64,

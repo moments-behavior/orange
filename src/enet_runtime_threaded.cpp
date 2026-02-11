@@ -3,9 +3,9 @@ extern "C" {
 #include <enet/enet.h>
 }
 
-bool EnetRuntimeThreaded::start_server(uint16_t port, size_t max_clients,
-                                       size_t channels, enet_uint32 in_bw,
-                                       enet_uint32 out_bw) {
+bool EnetRuntime::start_server(uint16_t port, size_t max_clients,
+                               size_t channels, enet_uint32 in_bw,
+                               enet_uint32 out_bw) {
     if (running_)
         return true;
     ENetAddress addr;
@@ -15,11 +15,11 @@ bool EnetRuntimeThreaded::start_server(uint16_t port, size_t max_clients,
     if (!host_)
         return false;
     running_ = true;
-    io_thread_ = std::thread(&EnetRuntimeThreaded::io_loop, this);
+    io_thread_ = std::thread(&EnetRuntime::io_loop, this);
     return true;
 }
 
-void EnetRuntimeThreaded::disconnect(uint32_t peer_id, enet_uint32 data) {
+void EnetRuntime::disconnect(uint32_t peer_id, enet_uint32 data) {
     ENetPeer *p = nullptr;
     {
         std::lock_guard<std::mutex> lk(peers_m_);
@@ -31,7 +31,7 @@ void EnetRuntimeThreaded::disconnect(uint32_t peer_id, enet_uint32 data) {
         enet_peer_disconnect(p, data);
 }
 
-void EnetRuntimeThreaded::stop() {
+void EnetRuntime::stop() {
     if (!running_.exchange(false))
         return;
     if (io_thread_.joinable())
@@ -48,7 +48,7 @@ void EnetRuntimeThreaded::stop() {
     next_peer_id_ = 1;
 }
 
-void EnetRuntimeThreaded::peers_snapshot(std::vector<PeerSnapshot> &out) {
+void EnetRuntime::peers_snapshot(std::vector<PeerSnapshot> &out) {
     std::lock_guard<std::mutex> lk(peers_m_);
     out.clear();
     out.reserve(peers_.size());
@@ -57,11 +57,14 @@ void EnetRuntimeThreaded::peers_snapshot(std::vector<PeerSnapshot> &out) {
     }
 }
 
-void EnetRuntimeThreaded::io_loop() {
+void EnetRuntime::io_loop() {
     while (running_.load()) {
+        bool did_work = false;
+
         // Handle queued connect requests (client mode)
         ConnectReq cr;
         while (connect_reqs_.try_pop(cr)) {
+            did_work = true;
             if (!host_) {
                 host_ = enet_host_create(/*client*/ nullptr, /*max peers*/ 8,
                                          cr.channels, 0, 0);
@@ -79,7 +82,9 @@ void EnetRuntimeThreaded::io_loop() {
 
         // Service network events
         ENetEvent ev;
-        while (host_ && enet_host_service(host_, &ev, 2) > 0) {
+        while (host_ && enet_host_service(host_, &ev, 0) > 0) {
+            did_work = true;
+
             if (ev.type == ENET_EVENT_TYPE_CONNECT) {
                 uint32_t id = next_peer_id_++;
                 {
@@ -126,13 +131,17 @@ void EnetRuntimeThreaded::io_loop() {
         Outgoing out;
         int sent = 0;
         while (outgoing_.try_pop(out)) {
+            did_work = true;
             ENetPacket *pkt = enet_packet_create(out.bytes.data(),
                                                  out.bytes.size(), out.flags);
             if (!pkt)
                 continue;
-            if (out.peer_id == 0)
-                enet_host_broadcast(host_, out.channel, pkt);
-            else {
+            if (out.peer_id == 0) {
+                if (host_)
+                    enet_host_broadcast(host_, out.channel, pkt);
+                else
+                    enet_packet_destroy(pkt);
+            } else {
                 ENetPeer *p = nullptr;
                 {
                     std::lock_guard<std::mutex> lk(peers_m_);
@@ -140,18 +149,28 @@ void EnetRuntimeThreaded::io_loop() {
                     if (it != peers_.end())
                         p = it->second;
                 }
-                if (p)
+                if (p) {
                     enet_peer_send(p, out.channel, pkt);
+
+                } else {
+                    enet_packet_destroy(pkt);
+                }
             }
             ++sent;
         }
-        if (sent)
+
+        if (sent && host_)
             enet_host_flush(host_);
+
+        // Idle backoff (prevents 100% CPU spin)
+        if (!did_work) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
     }
 }
 
-bool EnetRuntimeThreaded::start_client(size_t channels, enet_uint32 in_bw,
-                                       enet_uint32 out_bw) {
+bool EnetRuntime::start_client(size_t channels, enet_uint32 in_bw,
+                               enet_uint32 out_bw) {
     if (running_.load(std::memory_order_acquire))
         return true; // already running
 
@@ -166,6 +185,6 @@ bool EnetRuntimeThreaded::start_client(size_t channels, enet_uint32 in_bw,
             return false;
     }
     running_.store(true, std::memory_order_release);
-    io_thread_ = std::thread(&EnetRuntimeThreaded::io_loop, this);
+    io_thread_ = std::thread(&EnetRuntime::io_loop, this);
     return true;
 }

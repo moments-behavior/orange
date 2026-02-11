@@ -175,7 +175,7 @@ void COpenGLDisplay::ThreadRunning() {
                         // std::cout << "trigger ball drop: " << real_time
                         //           << std::endl;
 
-                        send_indigo_trigger_message(ctx, flatb_builder);
+                        // send_indigo_trigger_message(ctx, flatb_builder);
                     }
                     objs_last_frame.push_back(objs[0]);
                 } else {

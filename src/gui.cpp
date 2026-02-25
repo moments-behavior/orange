@@ -1,4 +1,6 @@
 #include "gui.h"
+#include "global.h"
+#include "video_capture.h"
 
 void setup_texture(GL_Texture &tex, int width, int height) {
     create_pbo(&tex.pbo, width, height);
@@ -66,7 +68,7 @@ void start_camera_streaming(
     const std::string &folder_name, PTPParams *ptp_params,
     std::string calib_yaml_folder, std::thread &detection3d_thread,
     AppContext *ctx) {
-
+    detector_counter.store(0);
     detection2d = new DetectionDataPerCam[num_cameras];
     int idx3d = 0;
     int total_standoff_detector = 0;
@@ -449,7 +451,8 @@ void open_selected_cameras(const std::vector<bool> &check, int cam_count,
                            int &num_cameras, CameraParams *&cameras_params,
                            CameraEachSelect *&cameras_select,
                            CameraEmergent *&ecams,
-                           ScrollingBuffer *&realtime_plot_data) {
+                           ScrollingBuffer *&realtime_plot_data,
+                           bool is_calib) {
 
     num_cameras = 0;
     for (int i = 0; i < cam_count; i++) {
@@ -478,7 +481,12 @@ void open_selected_cameras(const std::vector<bool> &check, int cam_count,
             cameras_select[i].stream_on = false;
             if (cameras_params[i].camera_name == "Cam16") {
                 cameras_select[i].stream_on = true;
-                cameras_select[i].detect_mode = Detect2D_GLThread;
+                if (is_calib) {
+                    cameras_select[i].detect_mode = Detect_OFF;
+
+                } else {
+                    cameras_select[i].detect_mode = Detect2D_Standoff;
+                }
             }
             if (cameras_params[i].camera_name == "shelter") {
                 cameras_select[i].stream_on = true;

@@ -12,6 +12,79 @@
 #include <iostream>
 #include <sys/stat.h>
 
+// Control flags
+std::atomic<bool> g_workerRunning{false};
+std::atomic<bool> g_workerShouldStop{false};
+
+// Optional: store last measurement for UI display
+std::mutex g_resultsMutex;
+std::vector<int> g_lastOffsets; // size = num_cameras
+
+void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
+                              CameraParams *cameras_params) {
+    // Open CSV in append mode; create if not exists
+    std::ofstream ofs("ptp_offsets.csv", std::ios::app);
+    if (!ofs) {
+        printf("Failed to open ptp_offsets.csv\n");
+        g_workerRunning = false;
+        return;
+    }
+
+    // Check if file is empty -> write header once
+    bool needHeader = (ofs.tellp() == std::streampos(0));
+    if (needHeader) {
+        // Optional first column: timestamp
+        ofs << "timestamp";
+        for (int i = 0; i < num_cameras; ++i) {
+            ofs << ","
+                << cameras_params[i].camera_serial; // adjust field name/type
+        }
+        ofs << "\n";
+        ofs.flush();
+    }
+
+    for (int i = 0; i < num_cameras; i++) {
+        ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+    }
+
+    // Prepare buffer for offsets
+    std::vector<int> offsets(num_cameras);
+
+    // Main loop
+    while (!g_workerShouldStop.load()) {
+
+        for (int i = 0; i < num_cameras; i++) {
+            int ptp_offset = 0;
+            EVT_CameraGetInt32Param(&ecams[i].camera, "PtpOffset", &ptp_offset);
+            offsets[i] = ptp_offset;
+        }
+
+        // 3) Append row to CSV
+        // Optional timestamp in seconds since epoch
+        auto now = std::chrono::system_clock::now();
+        auto now_s = std::chrono::duration_cast<std::chrono::seconds>(
+                         now.time_since_epoch())
+                         .count();
+        ofs << now_s;
+        for (int i = 0; i < num_cameras; ++i) {
+            ofs << "," << offsets[i];
+        }
+        ofs << "\n";
+        ofs.flush(); // ensure data is written promptly
+
+        // 4) Update latest offsets for UI (optional)
+        {
+            std::lock_guard<std::mutex> lock(g_resultsMutex);
+            g_lastOffsets = offsets;
+        }
+
+        // 5) Sleep between measurements (tune this)
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    g_workerRunning = false;
+}
+
 int main(int argc, char **args) {
     int display_gpu_id = 0;
     CHECK(cudaSetDevice(display_gpu_id));
@@ -90,7 +163,7 @@ int main(int argc, char **args) {
     }
     std::string picture_save_folder =
         orange_root_dir_str + "/pictures/" + get_current_date();
-    std::string calib_save_folder = recording_root_dir_str + "/exp/calibration";
+    std::string calib_save_folder = recording_root_dir_str + "/exp";
 
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -410,12 +483,48 @@ int main(int argc, char **args) {
                     ImGui::BeginDisabled();
                 }
 
-                ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
                 set_camera_properties(ecams, cameras_params, cameras_select,
                                       num_cameras, color_temps);
 
                 if (camera_control->record_video) {
                     ImGui::EndDisabled();
+                }
+
+                ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
+                if (ImGui::Button("Start PTP Logging")) {
+                    if (!g_workerRunning) {
+                        g_workerShouldStop = false;
+                        g_workerRunning = true;
+
+                        // Start worker thread
+                        std::thread([num_cameras, ecams, cameras_params] {
+                            poll_ptp_offset_and_dump(num_cameras, ecams,
+                                                     cameras_params);
+                        }).detach();
+                    }
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Stop PTP Logging")) {
+                    g_workerShouldStop = true;
+                }
+
+                if (g_workerRunning) {
+                    ImGui::Text("Status: logging to ptp_offsets.csv");
+                } else {
+                    ImGui::Text("Status: stopped");
+                }
+
+                // Optional: display last offsets
+                {
+                    std::lock_guard<std::mutex> lock(g_resultsMutex);
+                    if (!g_lastOffsets.empty()) {
+                        for (int i = 0; i < num_cameras; ++i) {
+                            ImGui::Text("Cam %d (%s): %d", i,
+                                        cameras_params[i].camera_serial.c_str(),
+                                        g_lastOffsets[i]);
+                        }
+                    }
                 }
 
                 if (camera_control->subscribe == true) {
@@ -738,11 +847,11 @@ int main(int argc, char **args) {
                         std::string folder_name =
                             input_folder + "/" + get_current_date_time();
                         make_folder(folder_name);
-                        if (num_cameras > 1) {
-                            ptp_stream_sync = true;
-                        } else {
-                            ptp_stream_sync = false;
-                        }
+                        // if (num_cameras > 1) {
+                        ptp_stream_sync = true;
+                        // } else {
+                        //     ptp_stream_sync = false;
+                        // }
 
                         cudaSetDevice(display_gpu_id);
                         tex_gl = new GL_Texture[num_cameras];
@@ -846,6 +955,27 @@ int main(int argc, char **args) {
 
                     ImGui::SameLine();
 
+                    using Clock = std::chrono::steady_clock;
+                    auto now = Clock::now();
+                    auto last =
+                        cameras_select[i]
+                            .camera_track_state->last_progress_time.load(
+                                std::memory_order_relaxed);
+
+                    float idle_seconds =
+                        std::chrono::duration<float>(now - last).count();
+                    bool hung =
+                        idle_seconds > 3.0f; // e.g. hung if idle > 3 seconds
+
+                    if (hung) {
+                        ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f),
+                                           ICON_FK_CIRCLE); // red
+                    } else {
+                        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f),
+                                           ICON_FK_CIRCLE); // green
+                    }
+                    ImGui::SameLine();
+
                     std::ostringstream oss;
                     oss << std::fixed << std::setprecision(1);
 
@@ -908,7 +1038,7 @@ int main(int argc, char **args) {
                                 Detect2D_Standoff) {
                             if (detection2d[i].ball2d.find_ball.load()) {
                                 std::string ball2d_name =
-                                    "ball##" + std::to_string(i);
+                                    "##ball##" + std::to_string(i);
                                 draw_boxes(
                                     detection2d[i].ball2d.rects,
                                     cameras_params[i].height,

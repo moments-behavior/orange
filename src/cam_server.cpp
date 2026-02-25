@@ -53,6 +53,12 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "NEXTPOSE";
     case camnet::v1::ServerControl_GRIMLOCKBOARD:
         return "GRIMLOCKBOARD";
+    case camnet::v1::ServerControl_BUMBLEBEEBALL:
+        return "BUMBLEBEEBALL";
+    case camnet::v1::ServerControl_GRIMLOCKBALL:
+        return "GRIMLOCKBALL";
+    case camnet::v1::ServerControl_OPTIMUSBALL:
+        return "OPTIMUSBALL";
     default:
         return "NONE";
     }
@@ -148,11 +154,9 @@ static PTPParams ptp_params{0, 0, 0, 0, false, false, false, false};
 static void cleanup_host_server_resources() {
     ptp_params.network_set_stop_ptp = false;
     for (auto &t : camera_threads)
-        t.join();
-
-    for (int i = 0; i < cam_count; i++) {
-        camera_threads.pop_back();
-    }
+        if (t.joinable())
+            t.join();
+    camera_threads.clear();
 
     for (int i = 0; i < cam_count; i++) {
         ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
@@ -507,10 +511,24 @@ static bool ctrl_action(camnet::v1::ServerControl c,
         return true;
     }
 
+    case camnet::v1::ServerControl_BUMBLEBEEBALL: {
+        return true;
+    }
+
+    case camnet::v1::ServerControl_GRIMLOCKBALL: {
+        return true;
+    }
+
+    case camnet::v1::ServerControl_OPTIMUSBALL: {
+        return true;
+    }
+
     default:
         return false;
     }
 }
+
+static uint32_t g_current_peer = 0;
 
 // ---------- event handler ----------
 static void server_on_event(const Incoming &evt) {
@@ -518,6 +536,10 @@ static void server_on_event(const Incoming &evt) {
     case Incoming::Connect: {
         std::printf("[SRV %s] host connected (pid=%u) → sending bringup\n",
                     g_name.c_str(), evt.peer_id);
+        g_current_peer = evt.peer_id;
+        g_last_done = 0; // <-- key reset for duplicate gate
+        g_job.clear();   // optional; force accept_session to treat as fresh
+        g_epoch = 0;
 
         unsorted_devices.clear();
         sorted_devices.clear();
@@ -552,16 +574,24 @@ static void server_on_event(const Incoming &evt) {
             break;
         }
 
-        bool is_success = ctrl_action(ctrl, cmd);
-        // do we send reply if it is failure?
-        auto bytes = build_phase_reply(cmd, g_name, cam_count, true, 0, "ok");
+        bool ok = ctrl_action(ctrl, cmd);
+        // Reply reflects actual outcome
+        auto bytes = build_phase_reply(cmd, g_name, cam_count, ok, ok ? 0 : -1,
+                                       ok ? "ok" : "failed");
         send_bytes(evt.peer_id, bytes);
-        g_last_done = cmd->seq();
-        std::printf("[SRV %s] %s\n", g_name.c_str(), ctrl_name(ctrl));
+        // Only advance monotonic seq on success
+        if (ok)
+            g_last_done = cmd->seq();
+
+        std::printf("[SRV %s] %s%s\n", g_name.c_str(), ctrl_name(ctrl),
+                    ok ? "" : " (failed)");
         break;
     }
     case Incoming::Disconnect:
         std::printf("[SRV %s] host disconnected\n", g_name.c_str());
+        if (evt.peer_id == g_current_peer) {
+            g_last_done = 0; // be explicit on disconnect too
+        }
         break;
     }
 }

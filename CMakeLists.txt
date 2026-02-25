@@ -113,7 +113,7 @@ if(BUILD_ORANGE)
         ${FILEDIALOG_SOURCES}
         ${CUDA_SOURCES}
     )
-    target_compile_definitions(orange PRIVATE ENET_RUNTIME_THREADED)
+    target_compile_definitions(orange PRIVATE)
     # GUI-only deps
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GLFW3 REQUIRED glfw3)
@@ -137,7 +137,7 @@ if(BUILD_CAM_SERVER)
         ${CAM_SERVER_SOURCES}
         ${CUDA_SOURCES}
     )
-    target_compile_definitions(cam_server PRIVATE HEADLESS ENET_RUNTIME_THREADED)
+    target_compile_definitions(cam_server PRIVATE HEADLESS)
     target_link_libraries(cam_server
         EmergentCamera EmergentGenICam EmergentGigEVision
         pthread enet

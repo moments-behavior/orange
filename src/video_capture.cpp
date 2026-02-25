@@ -240,9 +240,12 @@ inline void get_one_frame(CameraState *camera_state,
     camera_state->camera_return =
         EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
 
+    int ptp_offset = 0;
+    EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset", &ptp_offset);
+
     // get the system clock
     struct timespec ts_rt1;
-    clock_gettime(CLOCK_REALTIME, &ts_rt1);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts_rt1);
     uint64_t real_time = (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
 
     if (camera_control->sync_camera) {
@@ -257,6 +260,9 @@ inline void get_one_frame(CameraState *camera_state,
             camera_select->dropped_frames++;
         } else {
             camera_state->frames_recd++;
+            camera_select->camera_track_state->frame_count++;
+            camera_select->camera_track_state->last_progress_time.store(
+                std::chrono::steady_clock::now());
             camera_select->capture_fps_estimator.update();
         }
 
@@ -273,7 +279,7 @@ inline void get_one_frame(CameraState *camera_state,
                 ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize,
                 ecam->frame_recv.size_x, ecam->frame_recv.size_y,
                 ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
-                camera_state->frame_count, real_time);
+                camera_state->frame_count, real_time, ptp_offset);
         }
 
 #ifndef HEADLESS
@@ -305,16 +311,16 @@ inline void get_one_frame(CameraState *camera_state,
             std::cout << "EVT_CameraQueueFrame Error!" << std::endl;
         }
 
-        /* if (camera_state->frame_count % 500 == 99) {
-            printf("\n");
-            fflush(stdout);
-        }
+        // if (camera_state->frame_count % 500 == 99) {
+        //     printf("\n");
+        //     fflush(stdout);
+        // }
 
-        if (camera_state->frame_count % 1000 == 99) {
-            // printf(".");
-            // fflush(stdout);
-            std::cout << camera_params->camera_name << std::endl;
-        } */
+        // if (camera_state->frame_count % 1000 == 99) {
+        //     // printf(".");
+        //     // fflush(stdout);
+        //     std::cout << camera_params->camera_name << std::endl;
+        // }
         // if (camera_state->frame_count % 20000 == 9999)
         // printf("\n");
     } else {
@@ -340,7 +346,8 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     FrameDetector *frame_detector = nullptr;
     if (camera_select->detect_mode == Detect3D_Standoff ||
         camera_select->detect_mode == Detect2D_Standoff) {
-        frame_detector = new FrameDetector(camera_params, camera_select);
+        frame_detector =
+            new FrameDetector(camera_params, camera_select, ctx, folder_name);
         frame_detector->start();
 
         while (detector_counter.load() !=

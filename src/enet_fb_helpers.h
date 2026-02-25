@@ -1,5 +1,5 @@
 #pragma once
-#include "enet_runtime_select.h"
+#include "enet_runtime_threaded.h"
 #include <flatbuffers/flatbuffers.h>
 #include <mutex>
 #include <string>

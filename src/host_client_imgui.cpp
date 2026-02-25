@@ -35,7 +35,6 @@ static void logf(const char *fmt, ...) {
     std::lock_guard<std::mutex> lk(g_logs_m);
     g_logs.emplace_back(buf);
 }
-static int last_phase = -1; // for auto advancing
 static bool g_phase_started = false;
 
 // persistent to handle missing messages
@@ -68,8 +67,13 @@ static void on_open_phase_start(std::string job_id) {
     std::vector<std::string> cfg_files;
     update_camera_configs(cfg_files, selected_folder);
     select_cameras_have_configs(cfg_files, devs, check, cam_count);
-    open_selected_cameras(check, cam_count, devs, cfg_files, num_cams, params,
-                          select, ecams, plots);
+    if (job_id == "recording") {
+        open_selected_cameras(check, cam_count, devs, cfg_files, num_cams,
+                              params, select, ecams, plots, false);
+    } else {
+        open_selected_cameras(check, cam_count, devs, cfg_files, num_cams,
+                              params, select, ecams, plots, true);
+    }
     camera_control->open = true;
 
     if (job_id == "recording") {
@@ -423,6 +427,44 @@ static std::vector<uint8_t> build_cmd_grimlockboard(const std::string &job_id,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+static std::vector<uint8_t> build_cmd_bumblebeeball(const std::string &job_id,
+                                                    uint32_t epoch,
+                                                    uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg = CreateServer(b, Kind_KindCommand,
+                            camnet::v1::ServerControl_BUMBLEBEEBALL, jid, epoch,
+                            seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
+static std::vector<uint8_t> build_cmd_grimlockball(const std::string &job_id,
+                                                   uint32_t epoch,
+                                                   uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg = CreateServer(b, Kind_KindCommand,
+                            camnet::v1::ServerControl_GRIMLOCKBALL, jid, epoch,
+                            seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
+static std::vector<uint8_t>
+build_cmd_optimusball(const std::string &job_id, uint32_t epoch, uint32_t seq) {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(128);
+    auto jid = b.CreateString(job_id);
+    auto msg =
+        CreateServer(b, Kind_KindCommand, camnet::v1::ServerControl_OPTIMUSBALL,
+                     jid, epoch, seq, camnet::v1::CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 static std::vector<uint8_t> build_cmd_takepicture(const std::string &job_id,
                                                   uint32_t epoch, uint32_t seq,
                                                   uint picture_id) {
@@ -472,6 +514,12 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "NEXTPOSE";
     case camnet::v1::ServerControl_GRIMLOCKBOARD:
         return "GRIMLOCKBOARD";
+    case camnet::v1::ServerControl_BUMBLEBEEBALL:
+        return "BUMBLEBEEBALL";
+    case camnet::v1::ServerControl_GRIMLOCKBALL:
+        return "GRIMLOCKBALL";
+    case camnet::v1::ServerControl_OPTIMUSBALL:
+        return "OPTIMUSBALL";
     default:
         return "NONE";
     }
@@ -493,7 +541,12 @@ enum Phase {
     Phase_NextPose_B,
     Phase_TakePicture_G,
     Phase_NextPose_G,
-    Phase_TakeGlobalPicture
+    Phase_TakeGlobalPicture,
+    Phase_BumblebeeBall,
+    Phase_GrimlockBall,
+    Phase_OptimusBall,
+    Phase_TakePicture_O,
+    Phase_NextPose_O,
 };
 
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
@@ -504,13 +557,12 @@ static std::string g_jid = "recording";
 static uint32_t g_epoch = 1;
 static uint32_t g_seq = 1;
 static Phase g_phase = Phase_Open;
-
+static int last_phase = g_phase;
 static bool g_waiting = false;
 static int g_timeout_ms = 2000;
 static std::chrono::steady_clock::time_point g_last_send;
 
-// We default to NOT stepping ENet in the GUI tick; a dispatcher thread handles
-// it.
+// default to NOT stepping ENet in the GUI tick; a dispatcher thread handles it.
 static bool g_step_net_in_tick = false;
 
 // ---- thread-safe reply queue (producer: net thread, consumer: GUI)
@@ -575,6 +627,16 @@ static camnet::v1::ServerControl current_ctrl() {
         return camnet::v1::ServerControl_NEXTPOSE;
     case Phase_TakeGlobalPicture:
         return camnet::v1::ServerControl_TAKEPICTURE;
+    case Phase_BumblebeeBall:
+        return camnet::v1::ServerControl_BUMBLEBEEBALL;
+    case Phase_GrimlockBall:
+        return camnet::v1::ServerControl_GRIMLOCKBALL;
+    case Phase_OptimusBall:
+        return camnet::v1::ServerControl_OPTIMUSBALL;
+    case Phase_TakePicture_O:
+        return camnet::v1::ServerControl_TAKEPICTURE;
+    case Phase_NextPose_O:
+        return camnet::v1::ServerControl_NEXTPOSE;
     default:
         return camnet::v1::ServerControl_NONE;
     }
@@ -608,6 +670,16 @@ static const char *phase_name() {
         return "NEXTPOSE_G";
     case Phase_TakeGlobalPicture:
         return "TAKEGLOBALPICTURE";
+    case Phase_TakePicture_O:
+        return "TAKEPICTURE_O";
+    case Phase_NextPose_O:
+        return "NEXTPOSE_O";
+    case Phase_BumblebeeBall:
+        return "BUMBLEBEEBALL";
+    case Phase_GrimlockBall:
+        return "GRIMLOCKBALL";
+    case Phase_OptimusBall:
+        return "OPTIMUSBALL";
     default:
         return "?";
     }
@@ -632,7 +704,7 @@ static void advance_phase(std::string job_id) {
         default:
             break;
         }
-    } else {
+    } else if (job_id == "calibration") {
         // calibration
         switch (g_phase) {
         case Phase_Open:
@@ -686,14 +758,74 @@ static void advance_phase(std::string job_id) {
         default:
             break;
         }
+    } else {
+        // robot
+        switch (g_phase) {
+        case Phase_Open:
+            g_phase = Phase_Streaming;
+            break;
+        case Phase_Streaming:
+            g_phase = Phase_Start;
+            break;
+        case Phase_Start:
+            g_phase = Phase_BumblebeeBall;
+            break;
+        case Phase_BumblebeeBall:
+            g_phase = Phase_TakePicture_B;
+            break;
+        case Phase_TakePicture_B:
+            g_phase = Phase_NextPose_B;
+            break;
+        case Phase_NextPose_B: {
+            if (g_picture_id == 55) {
+                g_phase = Phase_GrimlockBall;
+            } else {
+                g_phase = Phase_TakePicture_B;
+            }
+            break;
+        }
+        case Phase_GrimlockBall:
+            g_phase = Phase_TakePicture_G;
+            break;
+        case Phase_TakePicture_G:
+            g_phase = Phase_NextPose_G;
+            break;
+        case Phase_NextPose_G: {
+            if (g_picture_id == 111) {
+                g_phase = Phase_OptimusBall;
+            } else {
+                g_phase = Phase_TakePicture_G;
+            }
+            break;
+        }
+        case Phase_OptimusBall:
+            g_phase = Phase_TakePicture_O;
+            break;
+        case Phase_TakePicture_O:
+            g_phase = Phase_NextPose_O;
+            break;
+        case Phase_NextPose_O: {
+            if (g_picture_id == 167) {
+                g_phase = Phase_Stop;
+            } else {
+                g_phase = Phase_TakePicture_O;
+            }
+            break;
+        }
+        case Phase_Stop:
+            g_phase = Phase_Done;
+            break;
+        default:
+            break;
+        }
     }
 }
 
 static void reset_session() {
-    // g_jid = "recording";
-    g_epoch = 1;
+    ++g_epoch;
     g_seq = 1;
     g_phase = Phase_Open;
+    last_phase = g_phase;
     g_waiting = false;
     g_ack_by.clear();
     {
@@ -705,7 +837,6 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
-    last_phase = -1;
     logf("session reset");
 }
 
@@ -766,7 +897,6 @@ static void broadcast_current_phase() {
             on_startrecord_phase_start(g_ptp_start_time);
             g_phase_started = true;
         }
-
         break;
     }
     case Phase_Stop: {
@@ -788,13 +918,17 @@ static void broadcast_current_phase() {
     }
     case Phase_Streaming: {
         if (!g_phase_started) {
-            g_folder_name =
-                *g_clientctx->calib_save_folder + "/" + get_current_date_time();
+            if (g_jid == "calibration") {
+                g_folder_name = *g_clientctx->calib_save_folder +
+                                "/calibration/" + get_current_date_time();
+            } else {
+                g_folder_name = *g_clientctx->calib_save_folder + "/robot/" +
+                                get_current_date_time();
+            }
         }
         std::string save_format = *g_clientctx->selected_picture_format;
         bytes = build_cmd_startstreaming(g_jid, g_epoch, g_seq, g_folder_name,
                                          save_format);
-
         if (!g_phase_started) {
             on_startstreaming_phase_start(g_folder_name, save_format);
             g_phase_started = true;
@@ -816,6 +950,29 @@ static void broadcast_current_phase() {
         }
         break;
     }
+    case Phase_BumblebeeBall: {
+        g_picture_id = -1;
+        bytes = build_cmd_bumblebeeball(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_GrimlockBall: {
+        bytes = build_cmd_grimlockball(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_OptimusBall: {
+        bytes = build_cmd_optimusball(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+
     case Phase_TakePicture_B: {
         if (!g_phase_started) {
             g_picture_id++;
@@ -846,6 +1003,24 @@ static void broadcast_current_phase() {
         break;
     }
     case Phase_NextPose_G: {
+        bytes = build_cmd_nextpose(g_jid, g_epoch, g_seq);
+        if (!g_phase_started) {
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_TakePicture_O: {
+        if (!g_phase_started) {
+            g_picture_id++;
+        }
+        bytes = build_cmd_takepicture(g_jid, g_epoch, g_seq, g_picture_id);
+        if (!g_phase_started) {
+            on_takepicture_phase_start(g_picture_id);
+            g_phase_started = true;
+        }
+        break;
+    }
+    case Phase_NextPose_O: {
         bytes = build_cmd_nextpose(g_jid, g_epoch, g_seq);
         if (!g_phase_started) {
             g_phase_started = true;
@@ -1134,8 +1309,16 @@ void host_client_draw_gui() {
 
     // Job mode compact combo + Phase visuals/toolbar
     {
-        const char *options[] = {"recording", "calibration"};
-        static int current = (g_jid == "recording") ? 0 : 1;
+        const char *options[] = {"recording", "calibration", "robot"};
+
+        static int current = 0; // default = "recording"
+        if (g_jid == "recording")
+            current = 0;
+        else if (g_jid == "calibration")
+            current = 1;
+        else if (g_jid == "robot")
+            current = 2;
+
         ImGui::SetNextItemWidth(160.0f);
         if (ImGui::BeginCombo("Job Mode", options[current])) {
             for (int n = 0; n < IM_ARRAYSIZE(options); n++) {
@@ -1176,13 +1359,18 @@ void host_client_draw_gui() {
         }
 
         // Build label: "Advance → PHASE" or "Waiting… PHASE" or "Done"
+        auto peers_info = g_ctxp->peers.snapshot_info();
         std::string advance_label;
         if (g_phase == Phase_Done) {
             advance_label = "Done";
         } else if (g_waiting) {
             advance_label = "Waiting… " + phase_str;
+        } else if ((g_phase == Phase_Open || g_phase == Phase_Threads ||
+                    g_phase == Phase_Start) &&
+                   (peers_info.size() < 3)) {
+            advance_label = std::string("Connect all 3 servers");
         } else {
-            advance_label = std::string("Advance ->") + phase_str; // →
+            advance_label = std::string("Advance ->") + phase_str;
         }
 
         auto lighten = [](ImVec4 c, float factor) {
@@ -1206,7 +1394,11 @@ void host_client_draw_gui() {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, darken(btn_col, 0.80f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 1));
 
-        bool disable_advance = g_waiting || (g_phase == Phase_Done);
+        bool disable_advance =
+            g_waiting || (g_phase == Phase_Done) ||
+            ((g_phase == Phase_Open || g_phase == Phase_Threads ||
+              g_phase == Phase_Start) &&
+             peers_info.size() < 3);
         if (disable_advance)
             ImGui::BeginDisabled();
 
@@ -1357,8 +1549,8 @@ void host_client_draw_gui() {
     // Auto-advance logic
     {
         if (g_phase != last_phase) {
-            if (g_jid == "calibration" && !g_waiting && g_phase != Phase_Done &&
-                g_phase != Phase_TakeGlobalPicture) {
+            if ((g_jid == "calibration" || g_jid == "robot") && !g_waiting &&
+                g_phase != Phase_Done && g_phase != Phase_TakeGlobalPicture) {
                 g_ack_by.clear();
                 for (const auto &name : g_servers)
                     g_ack_by[name] = false;

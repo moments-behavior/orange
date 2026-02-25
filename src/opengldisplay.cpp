@@ -4,6 +4,7 @@
 #include <unistd.h>
 #endif
 #include "ctrl_generated.h"
+#include "enet_utils.h"
 #include "global.h"
 #include "kernel.cuh"
 #include "opengldisplay.h"
@@ -49,42 +50,6 @@ COpenGLDisplay::~COpenGLDisplay() {
     if (camera_select->detect_mode == Detect2D_GLThread) {
         delete yolov8;
     }
-}
-
-static void
-send_indigo_trigger_message(AppContext *ctx,
-                            flatbuffers::FlatBufferBuilder &flatb_builder) {
-    using namespace camnet::v1;
-
-    // Build FlatBuffers message
-    auto jid = flatb_builder.CreateString("detection");
-    auto msg = CreateServer(flatb_builder, Kind_KindCommand,
-                            camnet::v1::ServerControl_TRIALTRIGGER, jid,
-                            /* major */ 1,
-                            /* minor */ 1, CommandBody_NONE, 0, 0);
-    flatb_builder.Finish(msg);
-
-    // Look up peer by name
-    uint32_t pid = ctx->peers.get_pid_by_name("indigo");
-    if (!pid) {
-        // Optional: log or print a warning
-        std::cerr << "[send_indigo_message] Peer 'indigo' not found\n";
-        return;
-    }
-
-    // Copy FlatBuffer contents into byte vector
-    std::vector<uint8_t> bytes(flatb_builder.GetBufferPointer(),
-                               flatb_builder.GetBufferPointer() +
-                                   flatb_builder.GetSize());
-
-    // Prepare and send outgoing packet
-    Outgoing o;
-    o.peer_id = pid;
-    o.channel = 0;
-    o.flags = ENET_PACKET_FLAG_RELIABLE;
-    o.bytes = std::move(bytes);
-
-    ctx->net.send(o);
 }
 
 void COpenGLDisplay::ThreadRunning() {
@@ -199,10 +164,18 @@ void COpenGLDisplay::ThreadRunning() {
                     // < objs_last_frame[0].rect.x) { if (objs[0].rect.x <
                     // 2500.0 && objs[0].rect.x > 2100.0) {
 
-                    if (objs[0].rect.x < 2800.0 &&
+                    if (objs[0].rect.x < 2680.0 &&
                         objs[0].rect.x > 2100.0) { // trigger earlier
                         // std::cout << "trigger ball drop" << std::endl;
-                        send_indigo_trigger_message(ctx, flatb_builder);
+                        // struct timespec ts_rt1;
+                        // clock_gettime(CLOCK_REALTIME, &ts_rt1);
+                        // uint64_t real_time =
+                        //     (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
+
+                        // std::cout << "trigger ball drop: " << real_time
+                        //           << std::endl;
+
+                        // send_indigo_trigger_message(ctx, flatb_builder);
                     }
                     objs_last_frame.push_back(objs[0]);
                 } else {

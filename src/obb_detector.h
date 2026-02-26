@@ -14,6 +14,9 @@
 #include <condition_variable>
 #include <thread>
 
+// Forward-declare YOLO bounding box (defined in common.hpp)
+struct Bbox;
+
 // Structure to hold oriented bounding box corners
 struct OBB {
     float x1, y1, x2, y2, x3, y3, x4, y4;
@@ -32,10 +35,12 @@ struct ClassPrior {
     float area_median, area_iqr, area_lo, area_hi;
     float aspect_median, aspect_iqr, aspect_lo, aspect_hi;
     float angle_median, angle_iqr;
+    float width_median, height_median;  // long side, short side medians
     
     ClassPrior() : area_median(0), area_iqr(0), area_lo(0), area_hi(0),
                    aspect_median(0), aspect_iqr(0), aspect_lo(0), aspect_hi(0),
-                   angle_median(0), angle_iqr(0) {}
+                   angle_median(0), angle_iqr(0),
+                   width_median(0), height_median(0) {}
 };
 
 // Structure to hold detection parameters
@@ -69,6 +74,11 @@ public:
     
     // Called from capture thread when a frame is ready
     void notify_frame_ready(void* device_image_ptr, cudaStream_t copy_stream);
+    
+    // Supply YOLO axis-aligned boxes for two-stage refinement.
+    // When non-empty, the thread loop uses refine_yolo_detections instead of
+    // background-subtraction-only detection.
+    void set_yolo_boxes(const std::vector<Bbox>& boxes);
     
     // Get the latest detection results
     std::vector<OBB> get_latest_detections();
@@ -110,6 +120,16 @@ public:
     std::vector<OBB> detect_objects(const cv::Mat& frame);
     bool should_update_detections(const std::vector<OBB>& new_detections);
     
+    // Two-stage detection: YOLO boxes + local mask refinement + prior size.
+    // Takes axis-aligned YOLO Bbox detections and the current BGR frame,
+    // returns oriented bounding boxes using:
+    //   center = YOLO box center
+    //   size   = CSV prior median (w, h) for the given class
+    //   angle  = from cv::minAreaRect on a local foreground mask
+    std::vector<OBB> refine_yolo_detections(const cv::Mat& frame,
+                                            const std::vector<Bbox>& yolo_boxes,
+                                            int target_class_id = 2);
+    
     // Debug function to print learned priors
     void print_priors();
     
@@ -137,6 +157,12 @@ private:
     
     // Classification
     float compute_classification_score(const std::vector<cv::Point2f>& points, int class_id);
+    
+    // Local mask angle extraction for two-stage refinement
+    float extract_angle_from_local_mask(const cv::Mat& frame,
+                                        float cx, float cy,
+                                        float crop_w, float crop_h,
+                                        float pad_factor = 1.2f);
     
     // CUDA utilities
     void copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame);
@@ -181,6 +207,10 @@ private:
     std::vector<OBB> stable_detections;  // Current stable detections
     bool detections_stable;  // Whether we have stable detections
     int frames_since_change;  // Frames since last significant change
+    
+    // Two-stage: YOLO boxes fed from external detector
+    std::vector<Bbox> yolo_boxes_pending;
+    std::mutex yolo_mtx;
 };
 
 #endif // ORANGE_OBB_DETECTOR

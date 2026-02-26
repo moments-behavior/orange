@@ -485,6 +485,15 @@ void client_send_state_update_message(EnetContext *enet_context,
     std::cout << "DEBUG CAMERA CLIENT: Sending ClientStateUpdate with state=" << (int)server_state 
               << " (" << FetchGame::EnumNamesManagerState()[server_state] << ")" << std::endl;
     
+    // CRITICAL: Prevent sending IDLE state if we're actively recording
+    // This is a final safety check at the network layer
+    // Note: We can't check ptp_params here, so this check is done in the caller
+    // But we log it here for debugging
+    if (server_state == FetchGame::ManagerState_IDLE) {
+        std::cout << "DEBUG CAMERA CLIENT: WARNING - About to send IDLE state. "
+                  << "This should only happen when not actively recording." << std::endl;
+    }
+    
     builder->Clear();
     FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_signal_type(FetchGame::SignalType_ClientStateUpdate);

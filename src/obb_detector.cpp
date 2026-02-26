@@ -1,4 +1,5 @@
 #include "obb_detector.h"
+#include "common.hpp"
 #include "kernel.cuh"
 #include <fstream>
 #include <sstream>
@@ -94,6 +95,11 @@ void OBBDetector::notify_frame_ready(void* device_image_ptr, cudaStream_t copy_s
     cv.notify_one();
 }
 
+void OBBDetector::set_yolo_boxes(const std::vector<Bbox>& boxes) {
+    std::lock_guard<std::mutex> lock(yolo_mtx);
+    yolo_boxes_pending = boxes;
+}
+
 void OBBDetector::thread_loop() {
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     CUDA_CHECK(cudaStreamCreate(&stream));
@@ -160,8 +166,19 @@ void OBBDetector::thread_loop() {
             continue;
         }
         
-        // Simple detection: CSV priors → fit bounding box → check contour shape → draw appropriate box
-        std::vector<OBB> detections = detect_objects(frame);
+        // Two-stage path: if YOLO boxes are available, refine them with local mask + priors.
+        // Otherwise fall back to pure background-subtraction detection.
+        std::vector<OBB> detections;
+        {
+            std::lock_guard<std::mutex> ylock(yolo_mtx);
+            if (!yolo_boxes_pending.empty()) {
+                detections = refine_yolo_detections(frame, yolo_boxes_pending);
+                yolo_boxes_pending.clear();
+            }
+        }
+        if (detections.empty()) {
+            detections = detect_objects(frame);
+        }
         
         // Only update if we should (objects actually moved)
         if (should_update_detections(detections)) {
@@ -276,7 +293,7 @@ ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Po
     
     if (class_samples.empty()) return prior;
     
-    std::vector<float> areas, aspects, angles;
+    std::vector<float> areas, aspects, angles, widths, heights;
     
     for (const auto& sample : class_samples) {
         auto wh = rect_wh_from_pts(sample);
@@ -287,6 +304,8 @@ ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Po
         areas.push_back(area);
         aspects.push_back(aspect);
         angles.push_back(angle);
+        widths.push_back(wh.first);
+        heights.push_back(wh.second);
     }
     
     // Compute IQR bounds for area and aspect
@@ -318,6 +337,12 @@ ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Po
     }
     std::sort(angular_diffs.begin(), angular_diffs.end());
     prior.angle_iqr = angular_diffs[std::min((size_t)q3_idx, n-1)] - angular_diffs[std::min((size_t)q1_idx, n-1)];
+    
+    // Width/height medians (long side, short side)
+    std::sort(widths.begin(), widths.end());
+    std::sort(heights.begin(), heights.end());
+    prior.width_median = widths[n / 2];
+    prior.height_median = heights[n / 2];
     
     return prior;
 }
@@ -649,6 +674,7 @@ void OBBDetector::print_priors() {
         std::cout << "  Aspect: median=" << prior.aspect_median << ", iqr=" << prior.aspect_iqr 
                   << ", range=[" << prior.aspect_lo << ", " << prior.aspect_hi << "]" << std::endl;
         std::cout << "  Angle: median=" << prior.angle_median << ", iqr=" << prior.angle_iqr << std::endl;
+        std::cout << "  Size: width_median=" << prior.width_median << ", height_median=" << prior.height_median << std::endl;
         std::cout << std::endl;
     }
 }
@@ -904,6 +930,92 @@ std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
 
 
 
+
+float OBBDetector::extract_angle_from_local_mask(
+    const cv::Mat& frame, float cx, float cy,
+    float crop_w, float crop_h, float pad_factor) {
+    
+    int h = frame.rows, w = frame.cols;
+    float pw = crop_w * pad_factor;
+    float ph = crop_h * pad_factor;
+    int x1p = std::max(0, (int)(cx - pw / 2));
+    int y1p = std::max(0, (int)(cy - ph / 2));
+    int x2p = std::min(w - 1, (int)(cx + pw / 2));
+    int y2p = std::min(h - 1, (int)(cy + ph / 2));
+    if (x2p <= x1p || y2p <= y1p) return 0.0f;
+
+    cv::Mat patch = frame(cv::Rect(x1p, y1p, x2p - x1p + 1, y2p - y1p + 1));
+    cv::Mat gray, blur, mask;
+    cv::cvtColor(patch, gray, cv::COLOR_BGR2GRAY);
+    cv::GaussianBlur(gray, blur, cv::Size(5, 5), 0);
+    cv::threshold(blur, mask, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
+    if (cv::mean(mask)[0] > 127) cv::bitwise_not(mask, mask);
+
+    cv::Mat kern = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kern, cv::Point(-1, -1), 1);
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kern, cv::Point(-1, -1), 1);
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    if (contours.empty()) return 0.0f;
+
+    auto cnt = *std::max_element(contours.begin(), contours.end(),
+        [](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+    if (cv::contourArea(cnt) < 20) return 0.0f;
+
+    cv::RotatedRect rect = cv::minAreaRect(cnt);
+    return rect.angle;
+}
+
+std::vector<OBB> OBBDetector::refine_yolo_detections(
+    const cv::Mat& frame, const std::vector<Bbox>& yolo_boxes, int target_class_id) {
+    
+    std::vector<OBB> results;
+    if (frame.empty() || yolo_boxes.empty()) return results;
+
+    // Get prior for the target class (CylinderSide = 2 by default)
+    float prior_w = 0, prior_h = 0;
+    if (priors.find(target_class_id) != priors.end()) {
+        const ClassPrior& p = priors[target_class_id];
+        prior_w = p.width_median;   // long side
+        prior_h = p.height_median;  // short side
+    }
+
+    for (const auto& bbox : yolo_boxes) {
+        float bx1 = bbox.rect.x;
+        float by1 = bbox.rect.y;
+        float bw  = bbox.rect.width;
+        float bh  = bbox.rect.height;
+        float cx  = bx1 + bw / 2.0f;
+        float cy  = by1 + bh / 2.0f;
+
+        // Use prior size if available, otherwise fall back to YOLO box size
+        float obb_w = (prior_w > 0) ? prior_w : bw;
+        float obb_h = (prior_h > 0) ? prior_h : bh;
+
+        // Extract angle from the local foreground mask
+        float angle = extract_angle_from_local_mask(frame, cx, cy,
+                                                     std::max(bw, obb_w),
+                                                     std::max(bh, obb_h));
+
+        // Build the final OBB: YOLO center, prior size, mask angle
+        cv::RotatedRect rrect(cv::Point2f(cx, cy), cv::Size2f(obb_w, obb_h), angle);
+        cv::Point2f pts[4];
+        rrect.points(pts);
+
+        auto ordered = order_corners_clockwise_start_tl(
+            {pts[0], pts[1], pts[2], pts[3]});
+
+        OBB obb(ordered[0].x, ordered[0].y,
+                ordered[1].x, ordered[1].y,
+                ordered[2].x, ordered[2].y,
+                ordered[3].x, ordered[3].y,
+                target_class_id, bbox.prob, -1, true);
+        results.push_back(obb);
+    }
+
+    return results;
+}
 
 bool OBBDetector::should_update_detections(const std::vector<OBB>& new_detections) {
     // If we don't have stable detections yet, always update

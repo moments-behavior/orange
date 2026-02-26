@@ -233,6 +233,10 @@ void COpenGLDisplay::ThreadRunning() {
             
             // OBB Detection (async, non-blocking)
             if (camera_select->enable_obb && obb_detector) {
+                // Feed YOLO boxes to OBB detector for two-stage refinement
+                if (!objs.empty()) {
+                    obb_detector->set_yolo_boxes(objs);
+                }
                 // Notify OBB detector of new frame (async, non-blocking)
                 obb_detector->notify_frame_ready(debayer.d_debayer, 0);
                 

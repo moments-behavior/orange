@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include "obb_detector.h"
+#include "common.hpp"
 #include "camera.h"
 
 // Simple test to verify OBB detector on real image
@@ -260,6 +261,54 @@ int main() {
         std::cout << "Saved green channel: ../csv/frame_200_green.jpg" << std::endl;
     }
     
-    std::cout << "OBB detector test completed successfully!" << std::endl;
+    // ====================================================================
+    // Two-stage test: simulate YOLO axis-aligned box → refine with local
+    // mask + CSV priors (same flow as the Python two_stage_obb_predict.py)
+    // ====================================================================
+    std::cout << "\n=== Two-Stage (YOLO + mask) Test ===" << std::endl;
+    
+    // Build fake YOLO detections centred on the objects we found above.
+    // In production, these come from YOLOv8::postprocess(objs).
+    std::vector<Bbox> fake_yolo;
+    for (const auto& obb : classified_obbs) {
+        auto xywhr = detector.obb_to_xywhr(obb);
+        Bbox b;
+        b.rect = cv::Rect_<float>(xywhr.x - xywhr.w / 2, xywhr.y - xywhr.h / 2,
+                                   xywhr.w, xywhr.h);
+        b.prob = obb.confidence;
+        b.label = obb.class_id;
+        fake_yolo.push_back(b);
+        std::cout << "  Fake YOLO box: (" << b.rect.x << ", " << b.rect.y
+                  << ", " << b.rect.width << ", " << b.rect.height
+                  << ") conf=" << b.prob << std::endl;
+    }
+    
+    if (!fake_yolo.empty()) {
+        auto refined = detector.refine_yolo_detections(test_frame, fake_yolo);
+        std::cout << "  Two-stage produced " << refined.size() << " OBBs" << std::endl;
+        
+        cv::Mat two_stage_img;
+        std::vector<std::vector<unsigned int>> ts_colors = {
+            {0, 200, 255},  // orange for class 0
+            {0, 255, 0},    // green for class 1
+            {255, 100, 0}   // blue for class 2
+        };
+        OBBDetector::draw_obb_objects(test_frame, two_stage_img, refined,
+                                     class_names, ts_colors, 2);
+        std::string ts_out = "../csv/frame_200_two_stage.jpg";
+        cv::imwrite(ts_out, two_stage_img);
+        std::cout << "  Saved two-stage result: " << ts_out << std::endl;
+        
+        for (size_t i = 0; i < refined.size(); i++) {
+            auto xywhr = detector.obb_to_xywhr(refined[i]);
+            std::cout << "  OBB " << i << ": cx=" << xywhr.x << " cy=" << xywhr.y
+                      << " w=" << xywhr.w << " h=" << xywhr.h
+                      << " theta=" << xywhr.r << "°" << std::endl;
+        }
+    } else {
+        std::cout << "  Skipped (no background-subtraction detections to seed from)" << std::endl;
+    }
+
+    std::cout << "\nOBB detector test completed successfully!" << std::endl;
     return 0;
 }

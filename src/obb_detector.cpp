@@ -137,37 +137,8 @@ void OBBDetector::thread_loop() {
             continue;
         }
         
-        // Build background model from first few frames (true median like Python)
-        if (!background_initialized) {
-            if (frames_processed == 0) {
-                // Initialize background frames collection
-                background_frames.clear();
-                std::cout << "OBB: Building background from " << params.bg_frames << " frames..." << std::endl;
-            }
-            
-            if (frames_processed < params.bg_frames) {
-                // Collect frames for median background
-                background_frames.push_back(frame.clone());
-                if ((frames_processed + 1) % 10 == 0 || frames_processed == params.bg_frames - 1) {
-                    std::cout << "OBB: Background progress: " << (frames_processed + 1) << "/" << params.bg_frames << std::endl;
-                }
-            } else {
-                // Compute true median background (like Python)
-                if (!background_frames.empty()) {
-                    background_model = compute_median_background(background_frames);
-                    background_initialized = true;
-                    std::cout << "OBB: Background ready - detection can start" << std::endl;
-                } else {
-                    std::cerr << "OBB: No background frames collected!" << std::endl;
-                    background_initialized = true; // Continue anyway
-                }
-            }
-            frames_processed++;
-            continue;
-        }
-        
-        // Two-stage path: if YOLO boxes are available, refine them with local mask + priors.
-        // Otherwise fall back to pure background-subtraction detection.
+        // Two-stage path: YOLO boxes don't need background, so check first.
+        // This lets detections work immediately without waiting for bg build.
         std::vector<OBB> detections;
         {
             std::lock_guard<std::mutex> ylock(yolo_mtx);
@@ -176,7 +147,35 @@ void OBBDetector::thread_loop() {
                 yolo_boxes_pending.clear();
             }
         }
-        if (detections.empty()) {
+        
+        if (!detections.empty()) {
+            // YOLO two-stage produced results; skip background-subtraction path
+        } else {
+            // Fallback: background-subtraction detection (needs bg model)
+            if (!background_initialized) {
+                if (frames_processed == 0) {
+                    background_frames.clear();
+                    std::cout << "OBB: Building background from " << params.bg_frames << " frames..." << std::endl;
+                }
+                
+                if (frames_processed < params.bg_frames) {
+                    background_frames.push_back(frame.clone());
+                    if ((frames_processed + 1) % 10 == 0 || frames_processed == params.bg_frames - 1) {
+                        std::cout << "OBB: Background progress: " << (frames_processed + 1) << "/" << params.bg_frames << std::endl;
+                    }
+                } else {
+                    if (!background_frames.empty()) {
+                        background_model = compute_median_background(background_frames);
+                        background_initialized = true;
+                        std::cout << "OBB: Background ready - detection can start" << std::endl;
+                    } else {
+                        std::cerr << "OBB: No background frames collected!" << std::endl;
+                        background_initialized = true;
+                    }
+                }
+                frames_processed++;
+                continue;
+            }
             detections = detect_objects(frame);
         }
         

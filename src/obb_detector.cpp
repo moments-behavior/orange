@@ -8,7 +8,6 @@
 #include <cuda_runtime.h>
 #include <opencv2/opencv.hpp>
 
-// Simple CUDA error checking macro
 #define CUDA_CHECK(call) do { \
     cudaError_t err = call; \
     if (err != cudaSuccess) { \
@@ -17,11 +16,17 @@
     } \
 } while(0)
 
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
 OBBDetector::OBBDetector(CameraParams* params, const std::vector<std::string>& csv_paths, 
                          const OBBDetectorParams& detector_params)
     : camera_params(params), csv_paths(csv_paths), params(detector_params),
-      background_initialized(false), running(false), frame_ready(false), frames_processed(0), detections_found(0),
-      d_frame_original(nullptr), h_frame_cpu(nullptr), detections_stable(false), frames_since_change(0) {
+      running(false), frame_ready(false), frames_processed(0), detections_found(0),
+      d_frame_original(nullptr), h_frame_cpu(nullptr),
+      detections_stable(false), frames_since_change(0),
+      yolo_has_update(false) {
     
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     stream = nullptr;
@@ -35,7 +40,6 @@ OBBDetector::~OBBDetector() {
     }
     cudaEventDestroy(copy_done_event);
     if (stream) {
-        // Don't use CUDA_CHECK in destructor to avoid std::terminate
         cudaStreamSynchronize(stream);
         cudaStreamDestroy(stream);
     }
@@ -43,7 +47,6 @@ OBBDetector::~OBBDetector() {
 
 bool OBBDetector::initialize() {
     try {
-        // Learn priors from CSV files
         learn_priors_from_csvs();
         
         if (priors.empty()) {
@@ -51,11 +54,7 @@ bool OBBDetector::initialize() {
             return false;
         }
         
-        std::cout << "OBBDetector initialized with priors for classes: ";
-        for (const auto& p : priors) {
-            std::cout << p.first << " ";
-        }
-        std::cout << std::endl;
+        // Priors loaded successfully
         
         return true;
     } catch (const std::exception& e) {
@@ -66,7 +65,6 @@ bool OBBDetector::initialize() {
 
 void OBBDetector::start() {
     if (running.load()) return;
-    
     running.store(true);
     worker_thread = std::thread(&OBBDetector::thread_loop, this);
 }
@@ -75,21 +73,17 @@ void OBBDetector::stop() {
     if (running.load()) {
         running.store(false);
         cv.notify_all();
-        if (worker_thread.joinable()) {
-            worker_thread.join();
-        }
+        if (worker_thread.joinable()) worker_thread.join();
     }
 }
 
+// ---------------------------------------------------------------------------
+// Frame / YOLO interface
+// ---------------------------------------------------------------------------
+
 void OBBDetector::notify_frame_ready(void* device_image_ptr, cudaStream_t copy_stream) {
-    // Safety check: don't process if we're shutting down
-    if (!running.load()) {
-        return;
-    }
-    
-    // Store the device pointer directly - no need to copy since we'll copy to CPU later
+    if (!running.load()) return;
     d_frame_original = device_image_ptr;
-    
     cudaEventRecord(copy_done_event, copy_stream);
     frame_ready = true;
     cv.notify_one();
@@ -98,113 +92,86 @@ void OBBDetector::notify_frame_ready(void* device_image_ptr, cudaStream_t copy_s
 void OBBDetector::set_yolo_boxes(const std::vector<Bbox>& boxes) {
     std::lock_guard<std::mutex> lock(yolo_mtx);
     yolo_boxes_pending = boxes;
+    yolo_has_update = true;
 }
+
+// ---------------------------------------------------------------------------
+// Worker thread -- pure YOLO+OBB refinement, no background subtraction
+// ---------------------------------------------------------------------------
 
 void OBBDetector::thread_loop() {
     CUDA_CHECK(cudaSetDevice(camera_params->gpu_id));
     CUDA_CHECK(cudaStreamCreate(&stream));
     
-    // Allocate CPU memory for frame copy (3 bytes per pixel - BGR)
     size_t cpu_frame_size = camera_params->width * camera_params->height * 3 * sizeof(unsigned char);
     CUDA_CHECK(cudaMallocHost(&h_frame_cpu, cpu_frame_size));
     
-    std::cout << "OBBDetector thread started for camera: " << camera_params->camera_serial << std::endl;
+    
     
     while (running.load()) {
         std::unique_lock<std::mutex> lock(mtx);
         cv.wait(lock, [&] { return !running.load() || frame_ready; });
-        
         if (!running.load()) break;
         
-        // Reset frame ready flag
         frame_ready = false;
         lock.unlock();
         
-        // Wait for frame copy to complete
         cudaStreamWaitEvent(stream, copy_done_event, 0);
+        if (!running.load() || !d_frame_original) continue;
         
-        // Safety check: don't process if we're shutting down or d_frame_original is invalid
-        if (!running.load() || !d_frame_original) {
-            continue;
-        }
-        
-        // Process frame
-        cv::Mat frame;
-        copy_frame_to_cpu(d_frame_original, frame);
-        
-        if (frame.empty()) {
-            std::cerr << "Failed to copy frame to CPU" << std::endl;
-            continue;
-        }
-        
-        // Two-stage path: YOLO boxes don't need background, so check first.
-        // This lets detections work immediately without waiting for bg build.
-        std::vector<OBB> detections;
+        // Consume YOLO boxes
+        std::vector<Bbox> boxes;
+        bool got_update = false;
         {
             std::lock_guard<std::mutex> ylock(yolo_mtx);
-            if (!yolo_boxes_pending.empty()) {
-                detections = refine_yolo_detections(frame, yolo_boxes_pending);
+            if (yolo_has_update) {
+                boxes = std::move(yolo_boxes_pending);
                 yolo_boxes_pending.clear();
+                yolo_has_update = false;
+                got_update = true;
             }
         }
         
-        if (!detections.empty()) {
-            // YOLO two-stage produced results; skip background-subtraction path
-        } else {
-            // Fallback: background-subtraction detection (needs bg model)
-            if (!background_initialized) {
-                if (frames_processed == 0) {
-                    background_frames.clear();
-                    std::cout << "OBB: Building background from " << params.bg_frames << " frames..." << std::endl;
-                }
-                
-                if (frames_processed < params.bg_frames) {
-                    background_frames.push_back(frame.clone());
-                    if ((frames_processed + 1) % 10 == 0 || frames_processed == params.bg_frames - 1) {
-                        std::cout << "OBB: Background progress: " << (frames_processed + 1) << "/" << params.bg_frames << std::endl;
-                    }
-                } else {
-                    if (!background_frames.empty()) {
-                        background_model = compute_median_background(background_frames);
-                        background_initialized = true;
-                        std::cout << "OBB: Background ready - detection can start" << std::endl;
-                    } else {
-                        std::cerr << "OBB: No background frames collected!" << std::endl;
-                        background_initialized = true;
-                    }
-                }
-                frames_processed++;
-                continue;
-            }
-            detections = detect_objects(frame);
+        if (!got_update) {
+            frames_processed++;
+            continue;
         }
         
-        // Only update if we should (objects actually moved)
+        // Copy frame to CPU only when we have boxes to refine
+        std::vector<OBB> detections;
+        if (!boxes.empty()) {
+            cv::Mat frame;
+            copy_frame_to_cpu(d_frame_original, frame);
+            if (!frame.empty()) {
+                detections = refine_yolo_detections(frame, boxes);
+            }
+        }
+        
         if (should_update_detections(detections)) {
             {
-                std::lock_guard<std::mutex> lock(detections_mtx);
+                std::lock_guard<std::mutex> dlock(detections_mtx);
                 latest_detections = detections;
                 stable_detections = detections;
                 detections_stable = true;
                 frames_since_change = 0;
             }
-            std::cout << "OBB: Updated detections - " << detections.size() << " objects" << std::endl;
+            
         } else {
-            // Use stable detections
-            {
-                std::lock_guard<std::mutex> lock(detections_mtx);
-                latest_detections = stable_detections;
-                frames_since_change++;
-            }
+            std::lock_guard<std::mutex> dlock(detections_mtx);
+            latest_detections = stable_detections;
+            frames_since_change++;
         }
         
         frames_processed++;
         detections_found += detections.size();
     }
     
-    std::cout << "OBBDetector thread finished. Total frames: " << frames_processed 
-              << ", Total detections: " << detections_found << std::endl;
+    
 }
+
+// ---------------------------------------------------------------------------
+// CSV parsing & prior learning
+// ---------------------------------------------------------------------------
 
 bool OBBDetector::parse_labels_csv(const std::string& csv_path, 
                                    std::vector<std::pair<int, std::vector<cv::Point2f>>>& labels) {
@@ -220,7 +187,6 @@ bool OBBDetector::parse_labels_csv(const std::string& csv_path,
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         
-        // Skip header lines
         if (!header_found) {
             if (line.find("frame") != std::string::npos || 
                 line.find("OrientedBoundingBox") != std::string::npos) {
@@ -232,64 +198,44 @@ bool OBBDetector::parse_labels_csv(const std::string& csv_path,
         std::istringstream iss(line);
         std::string token;
         std::vector<std::string> tokens;
+        while (std::getline(iss, token, ',')) tokens.push_back(token);
         
-        while (std::getline(iss, token, ',')) {
-            tokens.push_back(token);
-        }
-        
-        if (tokens.size() < 11) continue; // Need at least frame, obb_id, class_id, 8 coordinates
+        if (tokens.size() < 11) continue;
         
         try {
             int class_id = std::stoi(tokens[2]);
             std::vector<cv::Point2f> points;
-            
             for (int i = 0; i < 4; i++) {
                 float x = std::stof(tokens[3 + i * 2]);
                 float y = std::stof(tokens[4 + i * 2]);
                 points.emplace_back(x, y);
             }
-            
             labels.emplace_back(class_id, points);
         } catch (const std::exception& e) {
-            std::cerr << "Error parsing line: " << line << " - " << e.what() << std::endl;
             continue;
         }
     }
-    
     return true;
 }
 
 void OBBDetector::learn_priors_from_csvs() {
-    std::cout << "=== OBB CSV Learning Debug ===" << std::endl;
-    std::cout << "Number of CSV files to process: " << csv_paths.size() << std::endl;
-    
     std::map<int, std::vector<std::vector<cv::Point2f>>> class_samples;
     
     for (const auto& csv_path : csv_paths) {
-        std::cout << "Processing CSV file: " << csv_path << std::endl;
         std::vector<std::pair<int, std::vector<cv::Point2f>>> labels;
         if (parse_labels_csv(csv_path, labels)) {
-            std::cout << "Successfully parsed " << labels.size() << " labels from " << csv_path << std::endl;
-            for (const auto& label : labels) {
+            for (const auto& label : labels)
                 class_samples[label.first].push_back(label.second);
-            }
-        } else {
-            std::cout << "Failed to parse CSV file: " << csv_path << std::endl;
         }
     }
     
-    std::cout << "Total classes found: " << class_samples.size() << std::endl;
     for (const auto& class_data : class_samples) {
         priors[class_data.first] = compute_class_prior(class_data.second);
-        std::cout << "Learned priors for class " << class_data.first 
-                  << " from " << class_data.second.size() << " samples" << std::endl;
     }
-    std::cout << "=== End CSV Learning Debug ===" << std::endl;
 }
 
 ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Point2f>>& class_samples) {
     ClassPrior prior;
-    
     if (class_samples.empty()) return prior;
     
     std::vector<float> areas, aspects, angles, widths, heights;
@@ -299,7 +245,6 @@ ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Po
         float area = wh.first * wh.second;
         float aspect = wh.first / std::max(wh.second, 1e-6f);
         float angle = long_axis_angle_deg(sample);
-        
         areas.push_back(area);
         aspects.push_back(aspect);
         angles.push_back(angle);
@@ -307,37 +252,31 @@ ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Po
         heights.push_back(wh.second);
     }
     
-    // Compute IQR bounds for area and aspect
     std::sort(areas.begin(), areas.end());
     std::sort(aspects.begin(), aspects.end());
     
     size_t n = areas.size();
-    float q1_idx = n * 0.25f;
-    float q3_idx = n * 0.75f;
+    size_t q1 = (size_t)(n * 0.25f);
+    size_t q3 = std::min((size_t)(n * 0.75f), n - 1);
     
     prior.area_median = areas[n / 2];
-    prior.area_iqr = areas[std::min((size_t)q3_idx, n-1)] - areas[std::min((size_t)q1_idx, n-1)];
+    prior.area_iqr = areas[q3] - areas[q1];
     prior.area_lo = std::max(0.0f, prior.area_median - 2.0f * prior.area_iqr);
     prior.area_hi = prior.area_median + 2.0f * prior.area_iqr;
     
     prior.aspect_median = aspects[n / 2];
-    prior.aspect_iqr = aspects[std::min((size_t)q3_idx, n-1)] - aspects[std::min((size_t)q1_idx, n-1)];
+    prior.aspect_iqr = aspects[q3] - aspects[q1];
     prior.aspect_lo = std::max(0.0f, prior.aspect_median - 2.0f * prior.aspect_iqr);
     prior.aspect_hi = prior.aspect_median + 2.0f * prior.aspect_iqr;
     
-    // Compute angular statistics
     std::sort(angles.begin(), angles.end());
     prior.angle_median = angles[n / 2];
     
-    // Compute angular IQR (wrapped)
     std::vector<float> angular_diffs;
-    for (float angle : angles) {
-        angular_diffs.push_back(circular_diff(angle, prior.angle_median));
-    }
+    for (float a : angles) angular_diffs.push_back(circular_diff(a, prior.angle_median));
     std::sort(angular_diffs.begin(), angular_diffs.end());
-    prior.angle_iqr = angular_diffs[std::min((size_t)q3_idx, n-1)] - angular_diffs[std::min((size_t)q1_idx, n-1)];
+    prior.angle_iqr = angular_diffs[q3] - angular_diffs[q1];
     
-    // Width/height medians (long side, short side)
     std::sort(widths.begin(), widths.end());
     std::sort(heights.begin(), heights.end());
     prior.width_median = widths[n / 2];
@@ -346,82 +285,64 @@ ClassPrior OBBDetector::compute_class_prior(const std::vector<std::vector<cv::Po
     return prior;
 }
 
+// ---------------------------------------------------------------------------
+// Geometry utilities
+// ---------------------------------------------------------------------------
+
 cv::Point2f OBBDetector::compute_centroid(const std::vector<cv::Point2f>& points) {
-    cv::Point2f centroid(0, 0);
-    for (const auto& p : points) {
-        centroid += p;
-    }
-    return centroid / static_cast<float>(points.size());
+    cv::Point2f c(0, 0);
+    for (const auto& p : points) c += p;
+    return c / static_cast<float>(points.size());
 }
 
 std::vector<cv::Point2f> OBBDetector::order_corners_clockwise_start_tl(const std::vector<cv::Point2f>& points) {
     if (points.size() != 4) return points;
     
-    cv::Point2f centroid = OBBDetector::compute_centroid(points);
+    cv::Point2f centroid = compute_centroid(points);
     
-    // Sort by angle from centroid
     std::vector<std::pair<float, cv::Point2f>> angle_points;
     for (const auto& p : points) {
         float angle = std::atan2(p.y - centroid.y, p.x - centroid.x);
         angle_points.emplace_back(angle, p);
     }
-    
-    // Custom comparator for sorting by angle
-    std::sort(angle_points.begin(), angle_points.end(), 
-              [](const std::pair<float, cv::Point2f>& a, const std::pair<float, cv::Point2f>& b) {
-                  return a.first < b.first;
-              });
+    std::sort(angle_points.begin(), angle_points.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
     
     std::vector<cv::Point2f> ordered;
-    for (const auto& ap : angle_points) {
-        ordered.push_back(ap.second);
-    }
+    for (const auto& ap : angle_points) ordered.push_back(ap.second);
     
-    // Find top-left corner (minimum y, then minimum x)
     int tl_idx = 0;
     for (int i = 1; i < 4; i++) {
         if (ordered[i].y < ordered[tl_idx].y || 
-            (ordered[i].y == ordered[tl_idx].y && ordered[i].x < ordered[tl_idx].x)) {
+            (ordered[i].y == ordered[tl_idx].y && ordered[i].x < ordered[tl_idx].x))
             tl_idx = i;
-        }
     }
-    
-    // Rotate to start from top-left
     std::rotate(ordered.begin(), ordered.begin() + tl_idx, ordered.end());
-    
     return ordered;
 }
 
 float OBBDetector::long_axis_angle_deg(const std::vector<cv::Point2f>& points) {
     if (points.size() != 4) return 0.0f;
-    
     auto ordered = order_corners_clockwise_start_tl(points);
     
-    // Compute edge vectors
     cv::Point2f e01 = ordered[1] - ordered[0];
     cv::Point2f e12 = ordered[2] - ordered[1];
-    
     float len01 = std::sqrt(e01.x * e01.x + e01.y * e01.y);
     float len12 = std::sqrt(e12.x * e12.x + e12.y * e12.y);
     
     cv::Point2f v = (len01 >= len12) ? e01 : e12;
     float angle = std::atan2(v.y, v.x);
-    
-    // Convert to degrees and wrap to [0, 180)
     return std::fmod(std::fabs(angle * 180.0f / M_PI), 180.0f);
 }
 
 std::pair<float, float> OBBDetector::rect_wh_from_pts(const std::vector<cv::Point2f>& points) {
     if (points.size() != 4) return {0.0f, 0.0f};
-    
     auto ordered = order_corners_clockwise_start_tl(points);
     
     cv::Point2f e01 = ordered[1] - ordered[0];
     cv::Point2f e12 = ordered[2] - ordered[1];
-    
     float len01 = std::sqrt(e01.x * e01.x + e01.y * e01.y);
     float len12 = std::sqrt(e12.x * e12.x + e12.y * e12.y);
-    
     return (len01 >= len12) ? std::make_pair(len01, len12) : std::make_pair(len12, len01);
 }
 
@@ -431,190 +352,18 @@ float OBBDetector::circular_diff(float a, float b) {
 }
 
 OBBDetector::XYWHR OBBDetector::obb_to_xywhr(const OBB& obb) {
-    // Convert 4 corner points to center, width, height, and rotation
-    std::vector<cv::Point2f> points = {
-        cv::Point2f(obb.x1, obb.y1),
-        cv::Point2f(obb.x2, obb.y2),
-        cv::Point2f(obb.x3, obb.y3),
-        cv::Point2f(obb.x4, obb.y4)
+    std::vector<cv::Point2f> pts = {
+        {obb.x1, obb.y1}, {obb.x2, obb.y2}, {obb.x3, obb.y3}, {obb.x4, obb.y4}
     };
-    
-    // Compute center point
-    cv::Point2f center = compute_centroid(points);
-    
-    // Compute width and height
-    auto wh = rect_wh_from_pts(points);
-    
-    // Compute rotation angle
-    float angle = long_axis_angle_deg(points);
-    
+    cv::Point2f center = compute_centroid(pts);
+    auto wh = rect_wh_from_pts(pts);
+    float angle = long_axis_angle_deg(pts);
     return {center.x, center.y, wh.first, wh.second, angle};
 }
 
-bool OBBDetector::build_background(cv::VideoCapture& cap, cv::Mat& background) {
-    if (params.bg_mode == "first") {
-        cap.set(cv::CAP_PROP_POS_FRAMES, 0);
-        return cap.read(background);
-    } else if (params.bg_mode == "median") {
-        cap.set(cv::CAP_PROP_POS_FRAMES, 0);
-        std::vector<cv::Mat> frames;
-        
-        for (int i = 0; i < params.bg_frames; i++) {
-            cv::Mat frame;
-            if (!cap.read(frame)) break;
-            frames.push_back(frame);
-        }
-        
-        if (frames.empty()) return false;
-        
-        // Compute median
-        std::vector<cv::Mat> channels;
-        cv::split(frames[0], channels);
-        
-        for (int c = 0; c < channels.size(); c++) {
-            std::vector<cv::Mat> channel_frames;
-            for (const auto& frame : frames) {
-                std::vector<cv::Mat> frame_channels;
-                cv::split(frame, frame_channels);
-                channel_frames.push_back(frame_channels[c]);
-            }
-            cv::Mat median_channel;
-            cv::merge(channel_frames, median_channel);
-            // Compute median manually since REDUCE_MEDIAN is not available
-            cv::Mat median_result = cv::Mat::zeros(median_channel.rows, median_channel.cols, CV_32F);
-            for (int r = 0; r < median_channel.rows; r++) {
-                for (int c = 0; c < median_channel.cols; c++) {
-                    std::vector<float> values;
-                    for (int ch = 0; ch < median_channel.channels(); ch++) {
-                        values.push_back(median_channel.at<float>(r, c * median_channel.channels() + ch));
-                    }
-                    std::sort(values.begin(), values.end());
-                    median_result.at<float>(r, c) = values[values.size() / 2];
-                }
-            }
-            channels[c] = median_result;
-        }
-        
-        cv::merge(channels, background);
-        return true;
-    }
-    
-    return false;
-}
-
-cv::Mat OBBDetector::compute_median_background(const std::vector<cv::Mat>& frames) {
-    if (frames.empty()) {
-        return cv::Mat();
-    }
-    
-    // Validate all frames have the same size
-    cv::Size frame_size = frames[0].size();
-    int frame_channels = frames[0].channels();
-    
-    for (const auto& frame : frames) {
-        if (frame.size() != frame_size || frame.channels() != frame_channels) {
-            std::cerr << "OBB: Frame size mismatch! Expected " << frame_size.width << "x" << frame_size.height 
-                      << " channels=" << frame_channels << ", got " << frame.size().width << "x" << frame.size().height 
-                      << " channels=" << frame.channels() << std::endl;
-            return cv::Mat();
-        }
-    }
-    
-    // Convert all frames to float32
-    std::vector<cv::Mat> float_frames;
-    for (const auto& frame : frames) {
-        cv::Mat float_frame;
-        frame.convertTo(float_frame, CV_32F);
-        float_frames.push_back(float_frame);
-    }
-    
-    // Compute median pixel-wise (like Python: np.median(np.stack(imgs,0), axis=0))
-    cv::Mat median_result = cv::Mat::zeros(frame_size, CV_32FC3);
-    
-    for (int r = 0; r < frame_size.height; r++) {
-        for (int c = 0; c < frame_size.width; c++) {
-            for (int ch = 0; ch < frame_channels; ch++) {
-                std::vector<float> values;
-                for (const auto& frame : float_frames) {
-                    values.push_back(frame.at<cv::Vec3f>(r, c)[ch]);
-                }
-                std::sort(values.begin(), values.end());
-                median_result.at<cv::Vec3f>(r, c)[ch] = values[values.size() / 2];
-            }
-        }
-    }
-    
-    // Convert back to uint8
-    cv::Mat result;
-    median_result.convertTo(result, CV_8UC3);
-    return result;
-}
-
-std::vector<std::vector<cv::Point2f>> OBBDetector::detect_candidates(const cv::Mat& frame, const cv::Mat& background) {
-    std::vector<std::vector<cv::Point2f>> candidates;
-    
-    if (frame.empty() || background.empty()) return candidates;
-    
-    // Compute difference
-    cv::Mat diff;
-    cv::subtract(frame, background, diff);
-    
-    // Use green channel for motion detection
-    std::vector<cv::Mat> channels;
-    cv::split(diff, channels);
-    cv::Mat green_channel = channels[1];
-    
-    // Threshold for motion detection
-    cv::Mat mask;
-    cv::threshold(green_channel, mask, params.threshold, 255, cv::THRESH_BINARY);
-    
-    // If no motion detected, try lower threshold
-    if (cv::countNonZero(mask) == 0) {
-        cv::threshold(green_channel, mask, params.threshold * 0.5, 255, cv::THRESH_BINARY);
-    }
-    
-    // Morphological operations - use smaller kernels to avoid removing all motion
-    cv::Mat kernel = create_disk_kernel(1);  // Smaller erosion kernel
-    cv::erode(mask, mask, kernel, cv::Point(-1, -1), 1);
-    
-    kernel = create_disk_kernel(3);  // Smaller dilation kernel
-    cv::dilate(mask, mask, kernel, cv::Point(-1, -1), 1);
-    
-    // If morphological operations removed all pixels, try without them
-    if (cv::countNonZero(mask) == 0) {
-        // Re-threshold and skip morphological operations
-        cv::threshold(green_channel, mask, params.threshold, 255, cv::THRESH_BINARY);
-    }
-    
-    // Find contours
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-    
-    // Convert to oriented bounding boxes
-    for (const auto& contour : contours) {
-        if (contour.size() < 5) continue;
-        
-        cv::RotatedRect rect = cv::minAreaRect(contour);
-        cv::Point2f rect_points[4];
-        rect.points(rect_points);
-        
-        std::vector<cv::Point2f> points(rect_points, rect_points + 4);
-        auto ordered_points = order_corners_clockwise_start_tl(points);
-        candidates.push_back(ordered_points);
-    }
-    
-    return candidates;
-}
-
-cv::Mat OBBDetector::create_disk_kernel(int radius) {
-    int size = 2 * radius + 1;
-    cv::Mat kernel = cv::Mat::zeros(size, size, CV_8UC1);
-    
-    cv::Point center(radius, radius);
-    cv::circle(kernel, center, radius, cv::Scalar(255), -1);
-    
-    return kernel;
-}
+// ---------------------------------------------------------------------------
+// Classification with priors
+// ---------------------------------------------------------------------------
 
 int OBBDetector::classify_with_priors(const std::vector<cv::Point2f>& points) {
     if (priors.empty() || points.size() != 4) return -1;
@@ -627,84 +376,47 @@ int OBBDetector::classify_with_priors(const std::vector<cv::Point2f>& points) {
     int best_class = -1;
     float best_score = std::numeric_limits<float>::max();
     
-    for (const auto& prior_pair : priors) {
-        int class_id = prior_pair.first;
-        const ClassPrior& prior = prior_pair.second;
-        
-        // Check gates
-        float area_lo_bound = prior.area_lo * params.area_lo_gate;
-        float area_hi_bound = prior.area_hi * params.area_hi_gate;
-        if (area < area_lo_bound || area > area_hi_bound) {
+    for (const auto& [class_id, prior] : priors) {
+        if (area < prior.area_lo * params.area_lo_gate || area > prior.area_hi * params.area_hi_gate)
             continue;
-        }
-        
-        float aspect_lo_bound = prior.aspect_lo * params.aspect_lo_gate;
-        float aspect_hi_bound = prior.aspect_hi * params.aspect_hi_gate;
-        if (aspect < aspect_lo_bound || aspect > aspect_hi_bound) {
+        if (aspect < prior.aspect_lo * params.aspect_lo_gate || aspect > prior.aspect_hi * params.aspect_hi_gate)
             continue;
-        }
-        
         float ang_dev = circular_diff(angle, prior.angle_median);
-        float ang_threshold = params.angle_k_gate * std::max(prior.angle_iqr, 5.0f);
-        if (ang_dev > ang_threshold) {
+        if (ang_dev > params.angle_k_gate * std::max(prior.angle_iqr, 5.0f))
             continue;
-        }
         
-        // Compute score
         float score = compute_classification_score(points, class_id);
-        
-        if (score < best_score) {
-            best_score = score;
-            best_class = class_id;
-        }
+        if (score < best_score) { best_score = score; best_class = class_id; }
     }
-    
     return best_class;
-}
-
-void OBBDetector::print_priors() {
-    for (const auto& prior_pair : priors) {
-        int class_id = prior_pair.first;
-        const ClassPrior& prior = prior_pair.second;
-        
-        std::cout << "Class " << class_id << ":" << std::endl;
-        std::cout << "  Area: median=" << prior.area_median << ", iqr=" << prior.area_iqr 
-                  << ", range=[" << prior.area_lo << ", " << prior.area_hi << "]" << std::endl;
-        std::cout << "  Aspect: median=" << prior.aspect_median << ", iqr=" << prior.aspect_iqr 
-                  << ", range=[" << prior.aspect_lo << ", " << prior.aspect_hi << "]" << std::endl;
-        std::cout << "  Angle: median=" << prior.angle_median << ", iqr=" << prior.angle_iqr << std::endl;
-        std::cout << "  Size: width_median=" << prior.width_median << ", height_median=" << prior.height_median << std::endl;
-        std::cout << std::endl;
-    }
 }
 
 float OBBDetector::compute_classification_score(const std::vector<cv::Point2f>& points, int class_id) {
     if (priors.find(class_id) == priors.end()) return std::numeric_limits<float>::max();
-    
     const ClassPrior& prior = priors[class_id];
+    
     auto wh = rect_wh_from_pts(points);
     float area = wh.first * wh.second;
     float aspect = wh.first / std::max(wh.second, 1e-6f);
     float angle = long_axis_angle_deg(points);
     
-    // Normalized deviations
     float s_area = std::abs(area - prior.area_median) / std::max(prior.area_iqr, 1e-6f);
     float s_aspect = std::abs(aspect - prior.aspect_median) / std::max(prior.aspect_iqr, 1e-6f);
     float s_angle = circular_diff(angle, prior.angle_median) / std::max(prior.angle_iqr, 5.0f);
-    
     return s_area + s_aspect + s_angle;
 }
 
+void OBBDetector::print_priors() {
+    // Intentionally empty; kept for API compatibility with test code.
+}
+
+// ---------------------------------------------------------------------------
+// CUDA frame copy
+// ---------------------------------------------------------------------------
+
 void OBBDetector::copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame) {
-    // Safety check: don't process if we're shutting down or device_ptr is invalid
-    if (!running.load() || !device_ptr || !h_frame_cpu) {
-        return;
-    }
+    if (!running.load() || !device_ptr || !h_frame_cpu) return;
     
-    // Use the same GPU-to-CPU conversion pattern as the working branch
-    // First convert RGBA to BGR on GPU, then copy to CPU
-    
-    // Allocate temporary GPU buffer for BGR conversion
     unsigned char* d_convert;
     cudaError_t err = cudaMalloc(&d_convert, camera_params->width * camera_params->height * 3);
     if (err != cudaSuccess) {
@@ -712,13 +424,11 @@ void OBBDetector::copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame) {
         return;
     }
     
-    // Convert RGBA to BGR on GPU (like the working branch)
     rgba2bgr_convert(d_convert, (unsigned char*)device_ptr, camera_params->width, camera_params->height, 0);
     
-    // Copy BGR frame from GPU to CPU (async)
     err = cudaMemcpy2DAsync(
-        h_frame_cpu, camera_params->width * 3,  // 3 bytes per pixel (BGR)
-        d_convert, camera_params->width * 3,    // same pitch on device
+        h_frame_cpu, camera_params->width * 3,
+        d_convert, camera_params->width * 3,
         camera_params->width * 3, camera_params->height,
         cudaMemcpyDeviceToHost, stream);
     if (err != cudaSuccess) {
@@ -734,11 +444,8 @@ void OBBDetector::copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame) {
         return;
     }
     
-    // Create OpenCV Mat from CPU frame (BGR format) - same as working branch
     cpu_frame = cv::Mat(camera_params->width * camera_params->height * 3, 1, CV_8U, h_frame_cpu)
                 .reshape(3, camera_params->height).clone();
-    
-    // Clean up temporary GPU buffer
     cudaFree(d_convert);
 }
 
@@ -747,74 +454,9 @@ std::vector<OBB> OBBDetector::get_latest_detections() {
     return latest_detections;
 }
 
-std::vector<OBB> OBBDetector::process_frame_sync(const cv::Mat& frame) {
-    if (frame.empty()) {
-        std::cout << "OBB: Empty frame received" << std::endl;
-        return std::vector<OBB>();
-    }
-    
-    // Build background from first N frames if not ready
-    if (!background_initialized) {
-        if (frames_processed < params.bg_frames) {
-            // Add frame to background building
-            if (frames_processed == 0) {
-                // Ensure background_model has same type and channels as input frame
-                frame.convertTo(background_model, CV_32F);
-                std::cout << "OBB: Started background building, frame size: " << frame.cols << "x" << frame.rows 
-                          << ", channels: " << frame.channels() << ", type: " << frame.type() << std::endl;
-            } else {
-                // Running average for background - convert frame to float32 first
-                cv::Mat frame_f32;
-                frame.convertTo(frame_f32, CV_32F);
-                double alpha = 1.0 / (frames_processed + 1);
-                cv::accumulateWeighted(frame_f32, background_model, alpha);
-            }
-            frames_processed++;
-            
-            std::cout << "OBB: Background building progress: " << frames_processed << "/" << params.bg_frames << std::endl;
-            
-            if (frames_processed >= params.bg_frames) {
-                background_initialized = true;
-                std::cout << "OBB: Background ready after " << frames_processed << " frames" << std::endl;
-            }
-        }
-        return std::vector<OBB>();
-    }
-    
-    // Detect candidates (returns contour points)
-    // Convert background_model back to CV_8U for detection
-    cv::Mat background_u8;
-    background_model.convertTo(background_u8, CV_8U);
-    auto candidates = detect_candidates(frame, background_u8);
-    std::cout << "OBB: Found " << candidates.size() << " motion candidates" << std::endl;
-    
-    // Classify candidates against learned priors
-    std::vector<OBB> detections;
-    for (size_t i = 0; i < candidates.size(); i++) {
-        const auto& candidate = candidates[i];
-        int class_id = classify_with_priors(candidate);
-        std::cout << "OBB: Candidate " << i << " classified as class " << class_id << std::endl;
-        
-        if (class_id >= 0) {
-            // Convert contour points to OBB structure
-            OBB obb(candidate[0].x, candidate[0].y, candidate[1].x, candidate[1].y,
-                   candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
-                   class_id, 1.0f);
-            detections.push_back(obb);
-            std::cout << "OBB: Added detection at (" << obb.x1 << "," << obb.y1 << ") to (" << obb.x3 << "," << obb.y3 << ")" << std::endl;
-        }
-    }
-    
-    std::cout << "OBB: Total detections: " << detections.size() << std::endl;
-    
-    // Update latest detections (thread-safe)
-    {
-        std::lock_guard<std::mutex> lock(detections_mtx);
-        latest_detections = detections;
-    }
-    
-    return detections;
-}
+// ---------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------
 
 void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
                                    const std::vector<OBB>& obbs,
@@ -824,111 +466,42 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
     res = image.clone();
     
     for (const auto& obb : obbs) {
-        // Create vector of points for the oriented bounding box
-        std::vector<cv::Point2f> obb_points = {
-            cv::Point2f(obb.x1, obb.y1),
-            cv::Point2f(obb.x2, obb.y2),
-            cv::Point2f(obb.x3, obb.y3),
-            cv::Point2f(obb.x4, obb.y4)
+        std::vector<cv::Point> int_points = {
+            {(int)std::round(obb.x1), (int)std::round(obb.y1)},
+            {(int)std::round(obb.x2), (int)std::round(obb.y2)},
+            {(int)std::round(obb.x3), (int)std::round(obb.y3)},
+            {(int)std::round(obb.x4), (int)std::round(obb.y4)}
         };
         
-        // Convert to integer points for drawing
-        std::vector<cv::Point> int_points;
-        for (const auto& pt : obb_points) {
-            int_points.emplace_back(static_cast<int>(std::round(pt.x)), 
-                                   static_cast<int>(std::round(pt.y)));
-        }
+        cv::Scalar color = (obb.class_id >= 0 && obb.class_id < (int)colors.size())
+            ? cv::Scalar(colors[obb.class_id][0], colors[obb.class_id][1], colors[obb.class_id][2])
+            : cv::Scalar(0, 255, 0);
         
-        // Get color for this class
-        cv::Scalar color;
-        if (obb.class_id >= 0 && obb.class_id < colors.size()) {
-            color = cv::Scalar(colors[obb.class_id][0], 
-                              colors[obb.class_id][1], 
-                              colors[obb.class_id][2]);
-        } else {
-            color = cv::Scalar(0, 255, 0); // Default green color
-        }
-        
-        // Draw the oriented bounding box as a polygon
         cv::polylines(res, int_points, true, color, line_thickness);
         
-        // Draw class label and confidence
-        if (obb.class_id >= 0 && obb.class_id < class_names.size()) {
+        if (obb.class_id >= 0 && obb.class_id < (int)class_names.size()) {
             char text[256];
-            sprintf(text, "%s %.1f%%", class_names[obb.class_id].c_str(), 
-                    obb.confidence * 100);
+            sprintf(text, "%s %.1f%%", class_names[obb.class_id].c_str(), obb.confidence * 100);
             
-            // Position label at the first corner (top-left)
-            int x = static_cast<int>(std::round(obb.x1));
-            int y = static_cast<int>(std::round(obb.y1)) - 5;
+            int x = (int)std::round(obb.x1);
+            int y = (int)std::round(obb.y1) - 5;
+            if (y < 0) y = (int)std::round(obb.y1) + 15;
+            x = std::max(0, std::min(x, res.cols - 100));
             
-            // Ensure label is within image bounds
-            if (y < 0) y = static_cast<int>(std::round(obb.y1)) + 15;
-            if (x < 0) x = 0;
-            if (x > res.cols - 100) x = res.cols - 100;
-            
-            // Get text size for background rectangle
             int baseLine = 0;
-            cv::Size label_size = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 
-                                                 0.4, 1, &baseLine);
-            
-            // Draw background rectangle for text
-            cv::rectangle(res, 
-                         cv::Rect(x, y - label_size.height - baseLine, 
-                                 label_size.width, label_size.height + baseLine),
-                         color, -1);
-            
-            // Draw text
-            cv::putText(res, text, cv::Point(x, y), 
-                       cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
+            cv::Size label_size = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 0.4, 1, &baseLine);
+            cv::rectangle(res, cv::Rect(x, y - label_size.height - baseLine, 
+                         label_size.width, label_size.height + baseLine), color, -1);
+            cv::putText(res, text, cv::Point(x, y), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
         }
         
-        // Draw corner markers for better visibility
-        for (const auto& pt : int_points) {
-            cv::circle(res, pt, 3, color, -1);
-        }
+        for (const auto& pt : int_points) cv::circle(res, pt, 3, color, -1);
     }
 }
 
-std::vector<OBB> OBBDetector::detect_objects(const cv::Mat& frame) {
-    std::vector<OBB> detections;
-    
-    // Convert background model back to CV_8U for detection
-    cv::Mat background_u8;
-    background_model.convertTo(background_u8, CV_8U);
-    
-    // Detect candidates using motion detection
-    auto candidates = detect_candidates(frame, background_u8);
-    
-    // Process each candidate
-    for (const auto& candidate : candidates) {
-        // Classify using CSV priors
-        int class_id = classify_with_priors(candidate);
-        if (class_id < 0) continue;
-        
-        // Reject class 1 (Ball) - only accept class 0 (CylinderVertical) and class 2 (CylinderSide)
-        if (class_id == 1) {
-            std::cout << "OBB: Rejecting detection classified as class 1 (Ball)" << std::endl;
-            continue;
-        }
-        
-        // Create initial OBB from candidate
-        OBB obb(candidate[0].x, candidate[0].y, candidate[1].x, candidate[1].y,
-               candidate[2].x, candidate[2].y, candidate[3].x, candidate[3].y,
-               class_id, 1.0f);
-        
-        // Use the oriented bounding box directly from motion detection
-        // No shape verification - just use the detected oriented bounding box
-        std::cout << "OBB: Using oriented bounding box from motion detection, class_id=" << class_id << std::endl;
-        
-        detections.push_back(obb);
-    }
-    
-    return detections;
-}
-
-
-
+// ---------------------------------------------------------------------------
+// Two-stage: local mask angle extraction
+// ---------------------------------------------------------------------------
 
 float OBBDetector::extract_angle_from_local_mask(
     const cv::Mat& frame, float cx, float cy,
@@ -966,18 +539,21 @@ float OBBDetector::extract_angle_from_local_mask(
     return rect.angle;
 }
 
+// ---------------------------------------------------------------------------
+// Two-stage: YOLO box → OBB refinement
+// ---------------------------------------------------------------------------
+
 std::vector<OBB> OBBDetector::refine_yolo_detections(
     const cv::Mat& frame, const std::vector<Bbox>& yolo_boxes, int target_class_id) {
     
     std::vector<OBB> results;
     if (frame.empty() || yolo_boxes.empty()) return results;
 
-    // Get prior for the target class (CylinderSide = 2 by default)
     float prior_w = 0, prior_h = 0;
     if (priors.find(target_class_id) != priors.end()) {
         const ClassPrior& p = priors[target_class_id];
-        prior_w = p.width_median;   // long side
-        prior_h = p.height_median;  // short side
+        prior_w = p.width_median;
+        prior_h = p.height_median;
     }
 
     for (const auto& bbox : yolo_boxes) {
@@ -988,22 +564,18 @@ std::vector<OBB> OBBDetector::refine_yolo_detections(
         float cx  = bx1 + bw / 2.0f;
         float cy  = by1 + bh / 2.0f;
 
-        // Use prior size if available, otherwise fall back to YOLO box size
         float obb_w = (prior_w > 0) ? prior_w : bw;
         float obb_h = (prior_h > 0) ? prior_h : bh;
 
-        // Extract angle from the local foreground mask
         float angle = extract_angle_from_local_mask(frame, cx, cy,
                                                      std::max(bw, obb_w),
                                                      std::max(bh, obb_h));
 
-        // Build the final OBB: YOLO center, prior size, mask angle
         cv::RotatedRect rrect(cv::Point2f(cx, cy), cv::Size2f(obb_w, obb_h), angle);
         cv::Point2f pts[4];
         rrect.points(pts);
 
-        auto ordered = order_corners_clockwise_start_tl(
-            {pts[0], pts[1], pts[2], pts[3]});
+        auto ordered = order_corners_clockwise_start_tl({pts[0], pts[1], pts[2], pts[3]});
 
         OBB obb(ordered[0].x, ordered[0].y,
                 ordered[1].x, ordered[1].y,
@@ -1012,75 +584,43 @@ std::vector<OBB> OBBDetector::refine_yolo_detections(
                 target_class_id, bbox.prob, -1, true);
         results.push_back(obb);
     }
-
     return results;
 }
 
+// ---------------------------------------------------------------------------
+// Stable detection tracking
+// ---------------------------------------------------------------------------
+
 bool OBBDetector::should_update_detections(const std::vector<OBB>& new_detections) {
-    // If we don't have stable detections yet, always update
-    if (!detections_stable) {
-        return true;
-    }
+    if (!detections_stable) return true;
     
-    // If detection count changed significantly, update
-    if (std::abs((int)new_detections.size() - (int)stable_detections.size()) > 0) {
-        std::cout << "OBB: Detection count changed: " << stable_detections.size() << " -> " << new_detections.size() << std::endl;
-        return true;
-    }
+    if ((int)new_detections.size() != (int)stable_detections.size()) return true;
     
-    // If no detections, keep stable detections
-    if (new_detections.empty()) {
-        return false;
-    }
+    if (new_detections.empty()) return false;
     
-    // Find best matches between new and stable detections
     std::vector<bool> stable_used(stable_detections.size(), false);
-    bool significant_movement = false;
     
-    for (const auto& new_detection : new_detections) {
-        // Calculate center of new detection
-        cv::Point2f new_center = compute_centroid({
-            cv::Point2f(new_detection.x1, new_detection.y1),
-            cv::Point2f(new_detection.x2, new_detection.y2),
-            cv::Point2f(new_detection.x3, new_detection.y3),
-            cv::Point2f(new_detection.x4, new_detection.y4)
+    for (const auto& nd : new_detections) {
+        cv::Point2f nc = compute_centroid({
+            {nd.x1, nd.y1}, {nd.x2, nd.y2}, {nd.x3, nd.y3}, {nd.x4, nd.y4}
         });
         
-        // Find closest stable detection
-        float min_distance = std::numeric_limits<float>::max();
-        int best_match_idx = -1;
-        
+        float min_dist = std::numeric_limits<float>::max();
+        int best = -1;
         for (size_t i = 0; i < stable_detections.size(); i++) {
-            if (stable_used[i]) continue;  // Already matched
-            
-            cv::Point2f stable_center = compute_centroid({
-                cv::Point2f(stable_detections[i].x1, stable_detections[i].y1),
-                cv::Point2f(stable_detections[i].x2, stable_detections[i].y2),
-                cv::Point2f(stable_detections[i].x3, stable_detections[i].y3),
-                cv::Point2f(stable_detections[i].x4, stable_detections[i].y4)
+            if (stable_used[i]) continue;
+            cv::Point2f sc = compute_centroid({
+                {stable_detections[i].x1, stable_detections[i].y1},
+                {stable_detections[i].x2, stable_detections[i].y2},
+                {stable_detections[i].x3, stable_detections[i].y3},
+                {stable_detections[i].x4, stable_detections[i].y4}
             });
-            
-            float distance = cv::norm(new_center - stable_center);
-            if (distance < min_distance) {
-                min_distance = distance;
-                best_match_idx = i;
-            }
+            float d = cv::norm(nc - sc);
+            if (d < min_dist) { min_dist = d; best = (int)i; }
         }
         
-        // Check if the best match moved significantly
-        if (best_match_idx >= 0 && min_distance > 50.0f) {
-            std::cout << "OBB: Object moved significantly: " << min_distance << " pixels" << std::endl;
-            significant_movement = true;
-            break;
-        }
-        
-        // Mark this stable detection as used
-        if (best_match_idx >= 0) {
-            stable_used[best_match_idx] = true;
-        }
+        if (best >= 0 && min_dist > 50.0f) return true;
+        if (best >= 0) stable_used[best] = true;
     }
-    
-    return significant_movement;
+    return false;
 }
-
-

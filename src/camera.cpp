@@ -230,6 +230,13 @@ void update_focus_value(Emergent::CEmergentCamera *camera, int focus_value,
         focus_value <= camera_params->focus_max) {
         EVT_CameraSetUInt32Param(camera, "Focus", focus_value);
         camera_params->focus = focus_value;
+    } else {
+        printf("WARNING [%s]: focus value %d is outside range [%u, %u] — "
+               "focus NOT applied, camera uses factory default. "
+               "Fix 'focus' in config/%s.json.\n",
+               camera_params->camera_serial.c_str(), focus_value,
+               camera_params->focus_min, camera_params->focus_max,
+               camera_params->camera_serial.c_str());
     }
 }
 

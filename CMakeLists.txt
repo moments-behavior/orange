@@ -37,6 +37,12 @@ file(GLOB ORANGE_CLIENT_SOURCES
 )
 list(REMOVE_ITEM ORANGE_CLIENT_SOURCES ${SRC_DIR}/orange.cpp ${SRC_DIR}/yolo_offline.cpp ${SRC_DIR}/yolov8_det.cpp ${SRC_DIR}/opengldisplay.cpp ${SRC_DIR}/FrameDetector.cpp ${SRC_DIR}/realtime_tool.cpp ${SRC_DIR}/detect3d.cpp ${SRC_DIR}/obb_detector_simple_test.cpp ${SRC_DIR}/obb_detector_example.cpp)
 
+# focus_check: lightweight standalone binary (no GPU, no network, no encoding)
+set(FOCUS_CHECK_SOURCES
+    ${SRC_DIR}/focus_check.cpp
+    ${SRC_DIR}/camera.cpp
+)
+
 set(YOLO_OFFLINE_SOURCES
     src/yolo_offline.cpp
     src/yolov8_det.cpp
@@ -113,6 +119,10 @@ add_executable(orange_client
 add_executable(yolo_offline
     ${YOLO_OFFLINE_SOURCES}
     ${CUDA_SOURCES}
+)
+
+add_executable(focus_check
+    ${FOCUS_CHECK_SOURCES}
 )
 
 # Link libraries
@@ -193,6 +203,18 @@ target_link_libraries(yolo_offline
     nppig
     nppial
 )
+
+target_link_libraries(focus_check
+    EmergentCamera
+    EmergentGenICam
+    EmergentGigEVision
+    opencv_core
+    opencv_imgproc
+    opencv_imgcodecs
+    pthread
+    m
+)
+target_compile_features(focus_check PRIVATE cxx_std_17)
 
 # Link pkg-config libraries
 find_package(PkgConfig REQUIRED)

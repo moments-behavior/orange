@@ -21,4 +21,4 @@ g++ -DHEADLESS -Ofast -ffast-math -std=c++17 $targets_folder/kernel.o \
     -I$HOME/build/FFmpeg/build/include/ \
     -L$HOME/build/FFmpeg/build/lib/ -lavformat -lswscale -lswresample -lavutil -lavcodec \
     -I/usr/local/include/opencv4 \
-    -lopencv_core -lopencv_imgcodecs -lopencv_imgproc
+    -lopencv_core -lopencv_imgcodecs -lopencv_imgproc -lopencv_videoio

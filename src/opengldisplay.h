@@ -26,20 +26,20 @@ class COpenGLDisplay : public CThreadWorker {
     Debayer debayer;
     INDIGOSignalBuilder *indigo_signal_builder;
     // for real time: refactor this
-    unsigned char *d_convert;
-    YOLOv8 *yolov8;
+    unsigned char *d_convert = nullptr;
+    YOLOv8 *yolov8 = nullptr;
     FrameCPU frame_cpu;
     NppiSize input_image_size;
     NppiRect input_image_roi;
     NppiSize output_image_size;
     NppiRect output_image_roi;
-    float *d_points;
-    unsigned int *d_skeleton;
-    unsigned int *d_resize;
+    float *d_points = nullptr;
+    unsigned int *d_skeleton = nullptr;
+    unsigned int *d_resize = nullptr;
     
     // OBB Detection
     OBBDetector *obb_detector = nullptr;
-    float *d_obb_points;  // GPU buffer for OBB corner points
+    float *d_obb_points = nullptr;  // GPU buffer for OBB corner points
     // Stable slot assignment for two objects across frames based on centroid proximity
     int obb_slot_valid[2] = {0, 0};
     float obb_slot_cx[2] = {0.0f, 0.0f};

@@ -143,6 +143,7 @@ target_link_libraries(orange
     opencv_imgcodecs
     opencv_imgproc
     opencv_calib3d
+    opencv_videoio
     nvinfer
     nvinfer_plugin
     nvToolsExt
@@ -172,6 +173,7 @@ target_link_libraries(orange_client
     opencv_core
     opencv_imgcodecs
     opencv_imgproc
+    opencv_videoio
 )
 target_compile_definitions(orange_client PRIVATE HEADLESS)
 

@@ -1,8 +1,64 @@
 #include "yolov8_det.h"
 #include "common.hpp"
 #include "utils.h"
+#include <cuda_fp16.h>
 #include <npp.h>
 #include <nvToolsExt.h>
+#include <sstream>
+
+namespace {
+const char *dtype_to_cstr(nvinfer1::DataType dt) {
+    switch (dt) {
+    case nvinfer1::DataType::kFLOAT:
+        return "kFLOAT";
+    case nvinfer1::DataType::kHALF:
+        return "kHALF";
+    case nvinfer1::DataType::kINT32:
+        return "kINT32";
+    case nvinfer1::DataType::kINT8:
+        return "kINT8";
+    case nvinfer1::DataType::kBOOL:
+        return "kBOOL";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+float read_as_float(const void *ptr, nvinfer1::DataType dt, int idx) {
+    switch (dt) {
+    case nvinfer1::DataType::kFLOAT:
+        return static_cast<const float *>(ptr)[idx];
+    case nvinfer1::DataType::kHALF:
+        return __half2float(static_cast<const __half *>(ptr)[idx]);
+    case nvinfer1::DataType::kINT32:
+        return static_cast<float>(static_cast<const int32_t *>(ptr)[idx]);
+    case nvinfer1::DataType::kINT8:
+        return static_cast<float>(static_cast<const int8_t *>(ptr)[idx]);
+    case nvinfer1::DataType::kBOOL:
+        return static_cast<const bool *>(ptr)[idx] ? 1.0f : 0.0f;
+    default:
+        return 0.0f;
+    }
+}
+
+int read_as_int(const void *ptr, nvinfer1::DataType dt, int idx) {
+    switch (dt) {
+    case nvinfer1::DataType::kINT32:
+        return static_cast<const int32_t *>(ptr)[idx];
+    case nvinfer1::DataType::kINT8:
+        return static_cast<int>(static_cast<const int8_t *>(ptr)[idx]);
+    case nvinfer1::DataType::kBOOL:
+        return static_cast<const bool *>(ptr)[idx] ? 1 : 0;
+    case nvinfer1::DataType::kFLOAT:
+        return static_cast<int>(std::round(static_cast<const float *>(ptr)[idx]));
+    case nvinfer1::DataType::kHALF:
+        return static_cast<int>(
+            std::round(__half2float(static_cast<const __half *>(ptr)[idx])));
+    default:
+        return 0;
+    }
+}
+} // namespace
 
 YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
                cudaStream_t stream, unsigned char *d_input_image,
@@ -47,6 +103,7 @@ YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
             this->engine->getTensorDataType(this->engine->getIOTensorName(i));
         binding.name = name;
         binding.dsize = type_to_size(dtype);
+        binding.dtype = dtype;
 
         nvinfer1::TensorIOMode ioMode = this->engine->getTensorIOMode(name);
         if (ioMode == nvinfer1::TensorIOMode::kINPUT) {
@@ -65,6 +122,34 @@ YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
             this->output_bindings.push_back(binding);
             this->num_outputs += 1;
         }
+    }
+
+    std::cout << "YOLOv8 engine: " << engine_file_path << std::endl;
+    std::cout << "YOLOv8 I/O tensors: inputs=" << this->num_inputs
+              << " outputs=" << this->num_outputs << std::endl;
+    for (int i = 0; i < this->num_bindings; ++i) {
+        const char *name = this->engine->getIOTensorName(i);
+        const bool is_input =
+            this->engine->getTensorIOMode(name) == nvinfer1::TensorIOMode::kINPUT;
+        nvinfer1::DataType dtype = this->engine->getTensorDataType(name);
+        nvinfer1::Dims dims = is_input ? this->engine->getProfileShape(
+                                            name, 0, nvinfer1::OptProfileSelector::kMAX)
+                                       : this->context->getTensorShape(name);
+        std::ostringstream dims_ss;
+        dims_ss << "[";
+        for (int d = 0; d < dims.nbDims; ++d) {
+            if (d) dims_ss << "x";
+            dims_ss << dims.d[d];
+        }
+        dims_ss << "]";
+        std::cout << "  " << (is_input ? "IN " : "OUT") << " " << name
+                  << " shape=" << dims_ss.str()
+                  << " dtype=" << dtype_to_cstr(dtype) << std::endl;
+    }
+    if (this->num_outputs < 4) {
+        std::cerr << "YOLOv8 warning: this pipeline expects >=4 outputs "
+                     "(num_dets/boxes/scores/labels). Loaded engine has "
+                  << this->num_outputs << " outputs." << std::endl;
     }
 
     auto &in_binding = this->input_bindings[0];
@@ -402,22 +487,149 @@ void YOLOv8::infer_capture_only() {
 
 void YOLOv8::postprocess(std::vector<Bbox> &objs) {
     objs.clear();
-    int *num_dets = static_cast<int *>(this->host_ptrs[0]);
-    auto *boxes = static_cast<float *>(this->host_ptrs[1]);
-    auto *scores = static_cast<float *>(this->host_ptrs[2]);
-    int *labels = static_cast<int *>(this->host_ptrs[3]);
+    if (this->num_outputs <= 0 || this->host_ptrs.empty()) {
+        return;
+    }
+
+    // Support single-output engines with shape like [1, N, 6]:
+    // [x1, y1, x2, y2, score, class]
+    if (this->num_outputs == 1 && this->output_bindings.size() == 1) {
+        const void *out_ptr = this->host_ptrs[0];
+        const auto out_type = this->output_bindings[0].dtype;
+        const auto &dims = this->output_bindings[0].dims;
+        const int total_vals = static_cast<int>(this->output_bindings[0].size);
+        if (total_vals <= 0) {
+            return;
+        }
+
+        int n = total_vals / 6;
+        if (dims.nbDims >= 2 && dims.d[dims.nbDims - 1] == 6 &&
+            dims.d[dims.nbDims - 2] > 0) {
+            n = dims.d[dims.nbDims - 2];
+        }
+        if (n <= 0) {
+            return;
+        }
+
+        auto &dw = this->pparam.dw;
+        auto &dh = this->pparam.dh;
+        auto &width = this->pparam.width;
+        auto &height = this->pparam.height;
+        auto &ratio = this->pparam.ratio;
+
+        constexpr float kConfThreshold = 0.25f;
+        static int debug_single_prints = 0;
+        for (int i = 0; i < n; i++) {
+            const float x0_raw = read_as_float(out_ptr, out_type, i * 6 + 0);
+            const float y0_raw = read_as_float(out_ptr, out_type, i * 6 + 1);
+            const float x1_raw = read_as_float(out_ptr, out_type, i * 6 + 2);
+            const float y1_raw = read_as_float(out_ptr, out_type, i * 6 + 3);
+            const float score = read_as_float(out_ptr, out_type, i * 6 + 4);
+            const int label = static_cast<int>(
+                std::round(read_as_float(out_ptr, out_type, i * 6 + 5)));
+
+            if (debug_single_prints < 12 && i < 3) {
+                std::cout << "YOLO raw (1xNx6): i=" << i
+                          << " score=" << score << " label=" << label
+                          << " box=(" << x0_raw << "," << y0_raw << ","
+                          << x1_raw << "," << y1_raw << ")" << std::endl;
+                debug_single_prints++;
+            }
+
+            if (score < kConfThreshold) {
+                continue;
+            }
+
+            float x0 = (x0_raw - dw) * ratio;
+            float y0 = (y0_raw - dh) * ratio;
+            float x1 = (x1_raw - dw) * ratio;
+            float y1 = (y1_raw - dh) * ratio;
+
+            x0 = clamp(x0, 0.f, width);
+            y0 = clamp(y0, 0.f, height);
+            x1 = clamp(x1, 0.f, width);
+            y1 = clamp(y1, 0.f, height);
+            if (x1 <= x0 || y1 <= y0) {
+                continue;
+            }
+
+            Bbox obj;
+            obj.rect.x = x0;
+            obj.rect.y = y0;
+            obj.rect.width = x1 - x0;
+            obj.rect.height = y1 - y0;
+            obj.prob = score;
+            obj.label = label;
+            objs.push_back(obj);
+        }
+        return;
+    }
+
+    if (this->num_outputs < 4 || this->host_ptrs.size() < 4) {
+        return;
+    }
+
+    int idx_num_dets = -1;
+    int idx_boxes = -1;
+    int idx_scores = -1;
+    int idx_labels = -1;
+    for (int i = 0; i < static_cast<int>(this->output_bindings.size()); ++i) {
+        const auto &name = this->output_bindings[i].name;
+        if (name == "num_dets")
+            idx_num_dets = i;
+        else if (name == "bboxes")
+            idx_boxes = i;
+        else if (name == "scores")
+            idx_scores = i;
+        else if (name == "labels")
+            idx_labels = i;
+    }
+    if (idx_num_dets < 0 || idx_boxes < 0 || idx_scores < 0 || idx_labels < 0) {
+        return;
+    }
+
+    const void *num_dets_ptr = this->host_ptrs[idx_num_dets];
+    const void *boxes_ptr = this->host_ptrs[idx_boxes];
+    const void *scores_ptr = this->host_ptrs[idx_scores];
+    const void *labels_ptr = this->host_ptrs[idx_labels];
+    const auto num_dets_type = this->output_bindings[idx_num_dets].dtype;
+    const auto boxes_type = this->output_bindings[idx_boxes].dtype;
+    const auto scores_type = this->output_bindings[idx_scores].dtype;
+    const auto labels_type = this->output_bindings[idx_labels].dtype;
+
+    const int n = read_as_int(num_dets_ptr, num_dets_type, 0);
+    static int debug_raw_prints = 0;
+    if (debug_raw_prints < 40) {
+        std::cout << "YOLO raw: num_dets=" << n
+                  << " score0=" << read_as_float(scores_ptr, scores_type, 0)
+                  << " label0=" << read_as_int(labels_ptr, labels_type, 0)
+                  << " box0=("
+                  << read_as_float(boxes_ptr, boxes_type, 0) << ","
+                  << read_as_float(boxes_ptr, boxes_type, 1) << ","
+                  << read_as_float(boxes_ptr, boxes_type, 2) << ","
+                  << read_as_float(boxes_ptr, boxes_type, 3) << ")"
+                  << std::endl;
+        debug_raw_prints++;
+    }
     auto &dw = this->pparam.dw;
     auto &dh = this->pparam.dh;
     auto &width = this->pparam.width;
     auto &height = this->pparam.height;
     auto &ratio = this->pparam.ratio;
-    for (int i = 0; i < num_dets[0]; i++) {
-        float *ptr = boxes + i * 4;
-
-        float x0 = *ptr++ - dw;
-        float y0 = *ptr++ - dh;
-        float x1 = *ptr++ - dw;
-        float y1 = *ptr - dh;
+    if (n < 0 || n > 10000) {
+        static bool warned_bad_num_dets = false;
+        if (!warned_bad_num_dets) {
+            std::cerr << "YOLOv8 warning: unexpected num_dets=" << n
+                      << " (engine output layout likely mismatched)." << std::endl;
+            warned_bad_num_dets = true;
+        }
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        float x0 = read_as_float(boxes_ptr, boxes_type, i * 4 + 0) - dw;
+        float y0 = read_as_float(boxes_ptr, boxes_type, i * 4 + 1) - dh;
+        float x1 = read_as_float(boxes_ptr, boxes_type, i * 4 + 2) - dw;
+        float y1 = read_as_float(boxes_ptr, boxes_type, i * 4 + 3) - dh;
 
         x0 = clamp(x0 * ratio, 0.f, width);
         y0 = clamp(y0 * ratio, 0.f, height);
@@ -428,8 +640,8 @@ void YOLOv8::postprocess(std::vector<Bbox> &objs) {
         obj.rect.y = y0;
         obj.rect.width = x1 - x0;
         obj.rect.height = y1 - y0;
-        obj.prob = *(scores + i);
-        obj.label = *(labels + i);
+        obj.prob = read_as_float(scores_ptr, scores_type, i);
+        obj.label = read_as_int(labels_ptr, labels_type, i);
         objs.push_back(obj);
     }
 }

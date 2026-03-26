@@ -10,11 +10,29 @@
 #include "realtime_tool.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
+#include <fstream>
 #include <iostream>
+#include <mutex>
+#include <opencv2/opencv.hpp>
 #include <sys/stat.h>
 
 simplelogger::Logger *logger =
     simplelogger::LoggerFactory::CreateConsoleLogger();
+
+// Remote camera preview shared state (enet_thread writes, render reads)
+std::mutex g_remote_preview_mu;
+std::vector<uint8_t> g_remote_preview_jpeg;
+bool g_remote_preview_updated = false;
+static GLuint g_remote_tex = 0;
+static int g_remote_tex_w = 0, g_remote_tex_h = 0;
+static bool g_stream_mode = false;
+
+struct RemoteCamInfo {
+    std::string serial;
+    int focus;
+    bool selected;
+};
+static std::vector<RemoteCamInfo> g_remote_cams;
 
 #define display_gpu_id 0
 
@@ -234,6 +252,20 @@ int main(int argc, char **args) {
                     update_camera_configs(
                         camera_config_files,
                         network_config_folders[network_config_select]);
+                    // Build remote camera list from ALL config files
+                    g_remote_cams.clear();
+                    for (auto &cfg : camera_config_files) {
+                        std::ifstream f(cfg);
+                        if (!f.is_open()) continue;
+                        json j = json::parse(f, nullptr, false);
+                        if (j.is_discarded()) continue;
+                        RemoteCamInfo rc;
+                        rc.serial = j.value("name", "");
+                        rc.focus = j.value("focus", 300);
+                        rc.selected = false;
+                        if (!rc.serial.empty())
+                            g_remote_cams.push_back(rc);
+                    }
                     select_cameras_have_configs(camera_config_files,
                                                 device_info, check, cam_count);
                     host_broadcast_open_cameras(
@@ -372,9 +404,12 @@ int main(int argc, char **args) {
                 if (ptp_params->ptp_counter == num_cameras) {
                     ImGui::PushStyleColor(ImGuiCol_Button,
                                           ImVec4{0, 0.5f, 0, 1.0f});
+                    ImGui::SameLine();
+                    if (ImGui::Button("Test Focus")) {
+                        host_broadcast_test_focus(fb_builder, &server);
+                    }
+                    ImGui::SameLine();
                     if (ImGui::Button("Start Recording")) {
-                        // get the host ready, and then set global ptp time to
-                        // start recording
                         unsigned long long ptp_time =
                             get_current_PTP_time(&ecams[0].camera);
                         int delay_in_second = 3;
@@ -384,29 +419,33 @@ int main(int argc, char **args) {
                         host_broadcast_set_start_ptp(
                             fb_builder, &server, ptp_params->ptp_global_time);
                         ptp_params->network_set_start_ptp = true;
+                        g_stream_mode = false;
+                    }
+                    ImGui::SameLine();
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          ImVec4{0, 0.3f, 0.6f, 1.0f});
+                    if (ImGui::Button("Start Stream (no save)")) {
+                        unsigned long long ptp_time =
+                            get_current_PTP_time(&ecams[0].camera);
+                        int delay_in_second = 3;
+                        ptp_params->ptp_global_time =
+                            ((unsigned long long)delay_in_second) * 1000000000 +
+                            ptp_time;
+                        host_broadcast_start_stream(
+                            fb_builder, &server, ptp_params->ptp_global_time);
+                        ptp_params->network_set_start_ptp = true;
+                        g_stream_mode = true;
                     }
                     ImGui::PopStyleColor(1);
+                    ImGui::PopStyleColor(1);
+
                 }
             }
 
-            // Debug: Log button condition check
-            static int button_check_counter = 0;
-            bool button_should_show = (!ptp_params->network_set_stop_ptp &&
-                                      ptp_params->ptp_start_reached &&
-                                      my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP &&
-                                      my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP);
-            
-            if (++button_check_counter % 60 == 0 || !button_should_show) {  // Log every 60 frames OR when button should not show
-                std::cout << "DEBUG BUTTON CHECK: network_set_stop_ptp=" << ptp_params->network_set_stop_ptp 
-                          << ", ptp_start_reached=" << ptp_params->ptp_start_reached
-                          << ", server0_state=" << (int)my_servers[0].server_state 
-                          << " (" << FetchGame::EnumNamesManagerState()[my_servers[0].server_state] << ")"
-                          << ", server1_state=" << (int)my_servers[1].server_state
-                          << " (" << FetchGame::EnumNamesManagerState()[my_servers[1].server_state] << ")"
-                          << ", button_should_show=" << button_should_show << std::endl;
-            }
-            
-            if (button_should_show) {
+            if (!ptp_params->network_set_stop_ptp &&
+                ptp_params->ptp_start_reached &&
+                my_servers[0].server_state == FetchGame::ManagerState_WAITSTOP &&
+                my_servers[1].server_state == FetchGame::ManagerState_WAITSTOP) {
                 ImGui::PushStyleColor(ImGuiCol_Button,
                                       ImVec4{0, 0.5f, 0, 1.0f});
                 if (ImGui::Button("Stop Recording")) {
@@ -435,6 +474,77 @@ int main(int argc, char **args) {
                     std::cout << "DEBUG SERVER: STOPRECORDING broadcast complete" << std::endl;
                 }
                 ImGui::PopStyleColor(1);
+            }
+
+            // Remote camera focus control — visible during WAITSTART and stream mode
+            bool show_remote_focus =
+                !g_remote_cams.empty() &&
+                (g_stream_mode ||
+                 (my_servers[0].server_state ==
+                      FetchGame::ManagerState_WAITSTART &&
+                  my_servers[1].server_state ==
+                      FetchGame::ManagerState_WAITSTART));
+            if (show_remote_focus) {
+                ImGui::Separator();
+                ImGui::Text("Remote Camera Focus");
+                static int rsel = -1;
+                for (int i = 0; i < (int)g_remote_cams.size(); i++) {
+                    char lbl[64];
+                    snprintf(lbl, sizeof(lbl), "##rcam%d", i);
+                    bool sel = (rsel == i);
+                    if (ImGui::Checkbox(lbl, &sel))
+                        rsel = sel ? i : -1;
+                    ImGui::SameLine();
+                    ImGui::Text("%s", g_remote_cams[i].serial.c_str());
+                    if ((i + 1) % 4 != 0 &&
+                        i + 1 < (int)g_remote_cams.size())
+                        ImGui::SameLine();
+                }
+                if (rsel >= 0 && rsel < (int)g_remote_cams.size()) {
+                    auto &rc = g_remote_cams[rsel];
+                    ImGui::SetNextItemWidth(300);
+                    char slbl[64];
+                    snprintf(slbl, sizeof(slbl), "Focus %s",
+                             rc.serial.c_str());
+                    ImGui::SliderInt(slbl, &rc.focus, 0, 500);
+                    ImGui::SameLine();
+                    static bool waiting_preview = false;
+                    if (ImGui::Button("Set Focus & Preview")) {
+                        // Send to dosa0/dosa1
+                        host_broadcast_setfocus(fb_builder, &server,
+                                                rc.serial.c_str(), rc.focus);
+                        // Also apply to local cameras on this machine
+                        if (cameras_params && ecams && camera_control) {
+                            for (int li = 0; li < num_cameras; li++) {
+                                if (cameras_params[li].camera_serial ==
+                                    rc.serial) {
+                                    update_focus_value(&ecams[li].camera,
+                                                       rc.focus,
+                                                       &cameras_params[li]);
+                                    // Trigger local camera thread to grab
+                                    // preview
+                                    camera_control->setfocus.focus_value =
+                                        rc.focus;
+                                    camera_control->setfocus.camera_serial =
+                                        rc.serial;
+                                    camera_control->setfocus.generation
+                                        .fetch_add(1);
+                                    printf("SETFOCUS local cam %s focus=%d\n",
+                                           rc.serial.c_str(), rc.focus);
+                                    fflush(stdout);
+                                }
+                            }
+                        }
+                        waiting_preview = true;
+                    }
+                    if (waiting_preview) {
+                        ImGui::Text("Waiting for preview... "
+                                    "(start recording for IR light)");
+                    } else if (g_remote_tex == 0) {
+                        ImGui::Text("Set focus then start recording "
+                                    "to see preview");
+                    }
+                }
             }
 
             if (my_servers[0].server_state == FetchGame::ManagerState_IDLE &&
@@ -1140,6 +1250,12 @@ int main(int argc, char **args) {
             }
 
             if (camera_control->open) {
+                if (camera_control->subscribe) {
+                    if (ImGui::Button("Test Focus")) {
+                        camera_control->focus_test_generation.fetch_add(1);
+                    }
+                    ImGui::SameLine();
+                }
                 if (ImGui::Button(camera_control->stop_record ? ICON_FK_PAUSE
                                                               : ICON_FK_PLAY)) {
                     (camera_control->stop_record) =
@@ -1460,6 +1576,90 @@ int main(int argc, char **args) {
             }
 
             ImGui::EndPopup();
+        }
+
+        // Pick up local camera preview (no ENet needed)
+        if (camera_control) {
+            std::vector<uint8_t> local_jpg;
+            {
+                std::lock_guard<std::mutex> lk(
+                    camera_control->setfocus.reply_mu);
+                if (camera_control->setfocus.reply_ready) {
+                    local_jpg = camera_control->setfocus.reply_jpeg;
+                    camera_control->setfocus.reply_ready = false;
+                }
+            }
+            if (!local_jpg.empty()) {
+                std::lock_guard<std::mutex> lk(g_remote_preview_mu);
+                g_remote_preview_jpeg = std::move(local_jpg);
+                g_remote_preview_updated = true;
+            }
+        }
+
+        // Remote camera preview window (separate floating window)
+        // Try ENet first, fall back to sshfs file
+        {
+            bool got_new = false;
+            cv::Mat img;
+
+            // Check ENet path
+            {
+                std::lock_guard<std::mutex> lk(g_remote_preview_mu);
+                if (g_remote_preview_updated) {
+                    img = cv::imdecode(g_remote_preview_jpeg,
+                                       cv::IMREAD_COLOR);
+                    g_remote_preview_updated = false;
+                    got_new = !img.empty();
+                    if (got_new)
+                        printf("GUI: preview via ENet %dx%d\n",
+                               img.cols, img.rows);
+                }
+            }
+
+            // Fallback: check sshfs file
+            static int file_check_counter = 0;
+            static time_t last_mtime = 0;
+            if (!got_new && g_remote_tex == 0) file_check_counter++;
+            if (!got_new && file_check_counter % 60 == 1) {
+                const char *path =
+                    "/home/ratan/orange_data_dosa0/remote_preview.jpg";
+                struct stat st;
+                if (stat(path, &st) == 0 && st.st_mtime != last_mtime) {
+                    last_mtime = st.st_mtime;
+                    img = cv::imread(path, cv::IMREAD_COLOR);
+                    got_new = !img.empty();
+                    if (got_new)
+                        printf("GUI: preview via file %dx%d\n",
+                               img.cols, img.rows);
+                }
+            }
+
+            if (got_new) {
+                cv::cvtColor(img, img, cv::COLOR_BGR2RGBA);
+                if (g_remote_tex == 0)
+                    glGenTextures(1, &g_remote_tex);
+                glBindTexture(GL_TEXTURE_2D, g_remote_tex);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.cols,
+                             img.rows, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                             img.data);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                                GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                                GL_LINEAR);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                g_remote_tex_w = img.cols;
+                g_remote_tex_h = img.rows;
+            }
+        }
+        if (g_remote_tex != 0) {
+            ImGui::SetNextWindowSize(
+                ImVec2(g_remote_tex_w + 20, g_remote_tex_h + 40),
+                ImGuiCond_FirstUseEver);
+            if (ImGui::Begin("Remote Camera Preview")) {
+                ImGui::Image((void *)(intptr_t)g_remote_tex,
+                             ImVec2(g_remote_tex_w, g_remote_tex_h));
+            }
+            ImGui::End();
         }
 
         render_a_frame(window);

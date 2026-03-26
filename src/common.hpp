@@ -95,6 +95,7 @@ inline bool IsFolder(const std::string &path) {
 struct Binding {
     size_t size = 1;
     size_t dsize = 1;
+    nvinfer1::DataType dtype = nvinfer1::DataType::kFLOAT;
     nvinfer1::Dims dims;
     std::string name;
 };

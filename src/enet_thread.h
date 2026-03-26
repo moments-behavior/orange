@@ -4,6 +4,12 @@
 #include "global.h"
 #include "obj_generated.h"
 #include "camera.h"
+#include <mutex>
+
+// Shared remote preview buffer — written here, read by render loop
+extern std::mutex g_remote_preview_mu;
+extern std::vector<uint8_t> g_remote_preview_jpeg;
+extern bool g_remote_preview_updated;
 
 void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGOSignalBuilder* indigo_signal_builder, bool* quit_enet, PTPParams* ptp_params)
 {
@@ -18,6 +24,21 @@ void create_enet_thread(EnetContext* server, ConnectedServer* my_servers, INDIGO
 
             case ENET_EVENT_TYPE_RECEIVE:
                 {
+                    // Check for JPGF preview frame packet
+                    if (evnt.packet->dataLength > 4 &&
+                        memcmp(evnt.packet->data, "JPGF", 4) == 0) {
+                        printf("ENET_THREAD: got JPGF %zu bytes\n",
+                               evnt.packet->dataLength);
+                        fflush(stdout);
+                        std::lock_guard<std::mutex> lk(g_remote_preview_mu);
+                        g_remote_preview_jpeg.assign(
+                            evnt.packet->data + 4,
+                            evnt.packet->data + evnt.packet->dataLength);
+                        g_remote_preview_updated = true;
+                        enet_packet_destroy(evnt.packet);
+                        break;
+                    }
+
                     uint8_t* buffer_pointer = evnt.packet->data;
                     bool is_camera_client = false;
                     

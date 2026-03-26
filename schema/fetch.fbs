@@ -6,7 +6,10 @@ enum ServerControl : byte {
     STARTTHREAD,
     STARTRECORDING,
     STOPRECORDING,
-    QUIT
+    QUIT,
+    TESTFOCUS,
+    SETFOCUS,
+    STARTSTREAM
 }
 
 enum SignalType: byte {
@@ -48,6 +51,8 @@ table Server {
     encoder_setup:string;
     ptp_global_time:ulong;
     server_state:ManagerState = IDLE;
+    focus_value:int;
+    camera_serial:string;
 }
 
 root_type Server;

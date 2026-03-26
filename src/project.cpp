@@ -67,8 +67,8 @@ void intialize_servers(ConnectedServer *my_servers) {
     my_servers[0].peer = nullptr;
     my_servers[0].ip_add[0] = 192;
     my_servers[0].ip_add[1] = 168;
-    my_servers[0].ip_add[2] = 1;
-    my_servers[0].ip_add[3] = 100;
+    my_servers[0].ip_add[2] = 98;
+    my_servers[0].ip_add[3] = 40;
     my_servers[0].port = 3333;
     my_servers[0].connected = false;
     strcpy(my_servers[0].name, "dosa-0");
@@ -78,8 +78,8 @@ void intialize_servers(ConnectedServer *my_servers) {
     my_servers[1].peer = nullptr;
     my_servers[1].ip_add[0] = 192;
     my_servers[1].ip_add[1] = 168;
-    my_servers[1].ip_add[2] = 1;
-    my_servers[1].ip_add[3] = 110;
+    my_servers[1].ip_add[2] = 98;
+    my_servers[1].ip_add[3] = 41;
     my_servers[1].port = 3333;
     my_servers[1].connected = false;
     strcpy(my_servers[1].name, "dosa-1");
@@ -552,6 +552,54 @@ void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder *builder,
     FetchGame::ServerBuilder server_builder(*builder);
     server_builder.add_control(FetchGame::ServerControl_STARTRECORDING);
     server_builder.add_ptp_global_time(ptp_global_time);
+    auto my_server = server_builder.Finish();
+    builder->Finish(my_server);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
+    ENetPacket *enet_packet =
+        enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_host_broadcast(server->m_pNetwork, 0, enet_packet);
+}
+
+void host_broadcast_start_stream(flatbuffers::FlatBufferBuilder *builder,
+                                 EnetContext *server,
+                                 unsigned long long ptp_global_time) {
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
+    server_builder.add_control(FetchGame::ServerControl_STARTSTREAM);
+    server_builder.add_ptp_global_time(ptp_global_time);
+    auto my_server = server_builder.Finish();
+    builder->Finish(my_server);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
+    ENetPacket *enet_packet =
+        enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_host_broadcast(server->m_pNetwork, 0, enet_packet);
+}
+
+void host_broadcast_test_focus(flatbuffers::FlatBufferBuilder *builder,
+                               EnetContext *server) {
+    builder->Clear();
+    FetchGame::ServerBuilder server_builder(*builder);
+    server_builder.add_control(FetchGame::ServerControl_TESTFOCUS);
+    auto my_server = server_builder.Finish();
+    builder->Finish(my_server);
+    uint8_t *server_buffer = builder->GetBufferPointer();
+    int server_buf_size = builder->GetSize();
+    ENetPacket *enet_packet =
+        enet_packet_create(server_buffer, server_buf_size, 0);
+    enet_host_broadcast(server->m_pNetwork, 0, enet_packet);
+}
+
+void host_broadcast_setfocus(flatbuffers::FlatBufferBuilder *builder,
+                             EnetContext *server, const char *serial,
+                             int focus_value) {
+    builder->Clear();
+    auto serial_off = builder->CreateString(serial);
+    FetchGame::ServerBuilder server_builder(*builder);
+    server_builder.add_control(FetchGame::ServerControl_SETFOCUS);
+    server_builder.add_focus_value(focus_value);
+    server_builder.add_camera_serial(serial_off);
     auto my_server = server_builder.Finish();
     builder->Finish(my_server);
     uint8_t *server_buffer = builder->GetBufferPointer();

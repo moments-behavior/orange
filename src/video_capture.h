@@ -3,12 +3,27 @@
 #include "camera.h"
 #include "network_base.h"
 #include <atomic>
+#include <mutex>
+#include <vector>
 
 enum PictureState {
     State_Frame_Idle,
     State_Copy_New_Frame,
     State_Frame_Copy_Done,
     State_Frame_Detection_Ready
+};
+
+// Pending remote focus + frame grab request (set by ENet thread, consumed by
+// camera thread in start_ptp_sync wait loop).
+struct SetFocusRequest {
+    std::atomic<int> generation{0};
+    int focus_value{0};
+    std::string camera_serial;
+    // Reply: camera thread writes JPEG here, ENet thread sends it
+    std::mutex reply_mu;
+    std::vector<uint8_t> reply_jpeg;
+    bool reply_ready{false};
+    ENetPeer *reply_peer{nullptr};
 };
 
 struct CameraControl {
@@ -18,6 +33,8 @@ struct CameraControl {
     bool record_video = false;
     bool sync_camera = false;
     bool trigger_mode = false;
+    std::atomic<int> focus_test_generation{0};
+    SetFocusRequest setfocus;
 };
 
 enum DetectMode {
@@ -50,7 +67,10 @@ struct CameraEachSelect {
     std::string obb_csv_path = "";
     float obb_threshold = 30.0f;
     int obb_bg_frames = 10;
-    
+
+    // Tracks which focus_test_generation was last processed post-recording
+    int focus_test_gen_processed{0};
+
     CameraEachSelect()
         : frame_save_state(State_Frame_Idle),
           frame_detect_state(State_Frame_Idle) {}
@@ -90,9 +110,13 @@ struct PTPState {
 void report_statistics(CameraParams *camera_params, CameraState *camera_state,
                        double time_diff);
 void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam);
+class MjpegServer; // forward declaration
 void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params,
                     CameraParams *camera_params, CameraEmergent *ecam,
-                    unsigned int delay_in_second);
+                    unsigned int delay_in_second,
+                    CameraControl *camera_control = nullptr,
+                    CameraEachSelect *camera_select = nullptr,
+                    MjpegServer *mjpeg_server = nullptr);
 void grab_frames_after_countdown(PTPState *ptp_state, CameraEmergent *ecam);
 bool try_start_timer();
 bool try_stop_timer();

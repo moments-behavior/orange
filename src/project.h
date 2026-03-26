@@ -77,5 +77,13 @@ void host_broadcast_start_threads(flatbuffers::FlatBufferBuilder *builder,
 void host_broadcast_set_start_ptp(flatbuffers::FlatBufferBuilder *builder,
                                   EnetContext *server,
                                   unsigned long long ptp_global_time);
+void host_broadcast_test_focus(flatbuffers::FlatBufferBuilder *builder,
+                               EnetContext *server);
+void host_broadcast_setfocus(flatbuffers::FlatBufferBuilder *builder,
+                             EnetContext *server, const char *serial,
+                             int focus_value);
+void host_broadcast_start_stream(flatbuffers::FlatBufferBuilder *builder,
+                                 EnetContext *server,
+                                 unsigned long long ptp_global_time);
 
 #endif

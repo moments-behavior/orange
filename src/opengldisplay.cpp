@@ -14,6 +14,7 @@
 #include <iomanip>
 #include <fstream>
 #include <chrono>
+#include <iostream>
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
@@ -45,16 +46,44 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
         workerEntriesFreeQueue[i] = &workerEntries[i];
     }
     
+    if (camera_select->detect_mode == Detect2D_GLThread &&
+        camera_select->yolo_model.empty()) {
+        std::cerr << "COpenGLDisplay: Detect2D_GLThread selected but YOLO model "
+                     "path is empty for camera "
+                  << camera_params->camera_serial << std::endl;
+    }
+
+    if (camera_select->enable_obb &&
+        camera_select->detect_mode != Detect2D_GLThread) {
+        std::cerr
+            << "COpenGLDisplay: OBB is enabled for camera "
+            << camera_params->camera_serial
+            << " but stream overlay path only feeds YOLO boxes in Detect2D_GLThread mode."
+            << std::endl;
+    }
+
     // Initialize OBB detector if enabled
     if (camera_select->enable_obb) {
+        if (camera_select->obb_csv_path.empty()) {
+            std::cerr
+                << "COpenGLDisplay: OBB is enabled but obb_csv_path is empty for camera "
+                << camera_params->camera_serial << std::endl;
+            return;
+        }
+
         OBBDetectorParams obb_params;
         std::vector<std::string> csv_paths = {camera_select->obb_csv_path};
         obb_detector = new OBBDetector(camera_params, csv_paths, obb_params);
         
         if (!obb_detector->initialize()) {
+            std::cerr << "COpenGLDisplay: Failed to initialize OBB detector with CSV "
+                      << camera_select->obb_csv_path << " for camera "
+                      << camera_params->camera_serial << std::endl;
             delete obb_detector;
             obb_detector = nullptr;
         } else {
+            std::cout << "COpenGLDisplay: OBB detector initialized for camera "
+                      << camera_params->camera_serial << std::endl;
             obb_detector->start();
         }
     }
@@ -98,7 +127,9 @@ void COpenGLDisplay::ThreadRunning() {
     unsigned int skeleton[8] = {0, 1, 1, 2, 2, 3, 3, 0}; // box
     NppStreamContext npp_ctx =
         make_npp_stream_context(camera_params->gpu_id, 0);
-    if (camera_select->detect_mode == Detect2D_GLThread) {
+    const bool yolo_glthread_enabled =
+        (camera_select->detect_mode == Detect2D_GLThread);
+    if (yolo_glthread_enabled) {
         printf("YOLO initialization...\n");
 
         const std::string engine_file_path = camera_select->yolo_model;
@@ -113,7 +144,14 @@ void COpenGLDisplay::ThreadRunning() {
     }
     
     // Allocate OBB GPU resources if needed
-    if (camera_select->enable_obb && obb_detector) {
+    const bool obb_overlay_enabled =
+        (camera_select->enable_obb && obb_detector && yolo_glthread_enabled);
+    if (camera_select->enable_obb && obb_detector && !yolo_glthread_enabled) {
+        std::cerr << "COpenGLDisplay: OBB detector is running but will not receive "
+                     "YOLO boxes until detect mode is Detect2D_GLThread."
+                  << std::endl;
+    }
+    if (obb_overlay_enabled) {
         cudaMalloc((void **)&d_obb_points, sizeof(float) * 8 * 10); // Support up to 10 OBBs
     }
 
@@ -135,6 +173,12 @@ void COpenGLDisplay::ThreadRunning() {
 
     int frameCount = 0;
     auto lastFPSUpdate = clock::now();
+    auto lastDetectionStatsUpdate = clock::now();
+    uint64_t yolo_frame_counter = 0;
+    uint64_t yolo_nonempty_counter = 0;
+    uint64_t obb_nonempty_counter = 0;
+    size_t last_yolo_obj_count = 0;
+    size_t last_obb_obj_count = 0;
 
     while (IsMachineOn()) {
         auto frameStart = clock::now();
@@ -159,8 +203,9 @@ void COpenGLDisplay::ThreadRunning() {
             }
             // nvtxRangePop();
 
-            if (camera_select->detect_mode == Detect2D_GLThread) {
-                rgba2rgb_convert(d_convert, debayer.d_debayer,
+            if (yolo_glthread_enabled) {
+                // Match yolo_offline input layout (OpenCV frames are BGR).
+                rgba2bgr_convert(d_convert, debayer.d_debayer,
                                  camera_params->width, camera_params->height,
                                  0);
 
@@ -175,16 +220,22 @@ void COpenGLDisplay::ThreadRunning() {
                 }
 
                 yolov8->postprocess(objs);
-                if (objs.size() > 0) {
-
-                    for (int obj = 0; obj < objs.size(); obj++) {
-                        // draw all bounding boxes when objects are detected
-                        // default to highlighting by class color
-                        yolov8->copy_keypoints_gpu(d_points, objs[obj]);
-                        gpu_draw_box(debayer.d_debayer, camera_params->width,
-                                     camera_params->height, d_points,
-                                     objs[obj].label, yolov8->stream);
+                yolo_frame_counter++;
+                last_yolo_obj_count = objs.size();
+                if (!objs.empty()) {
+                    yolo_nonempty_counter++;
+                    // Print a few early detections to validate runtime coordinates.
+                    if (yolo_nonempty_counter <= 5) {
+                        const auto &b0 = objs[0];
+                        std::cout << "YOLO sample [" << camera_params->camera_serial
+                                  << "]: n=" << objs.size() << " first=("
+                                  << b0.rect.x << "," << b0.rect.y << ","
+                                  << b0.rect.width << "," << b0.rect.height
+                                  << ") conf=" << b0.prob
+                                  << " label=" << b0.label << std::endl;
                     }
+                }
+                if (objs.size() > 0) {
 
                     // std::cout << objs[0].rect.x << ", " << objs[0].rect.y <<
                     // std::endl; f32 bbox_center_x = objs[0].rect.x +
@@ -210,11 +261,15 @@ void COpenGLDisplay::ThreadRunning() {
             }
             
             // OBB Detection (async, non-blocking)
-            if (camera_select->enable_obb && obb_detector) {
+            if (obb_overlay_enabled) {
                 obb_detector->set_yolo_boxes(objs);
                 obb_detector->notify_frame_ready(debayer.d_debayer, 0);
                 
                 std::vector<OBB> obb_detections = obb_detector->get_latest_detections();
+                last_obb_obj_count = obb_detections.size();
+                if (!obb_detections.empty()) {
+                    obb_nonempty_counter++;
+                }
                 
                 if (obb_detections.size() > 0) {
                     // Check if detections changed significantly
@@ -336,6 +391,20 @@ void COpenGLDisplay::ThreadRunning() {
             streaming_fps.store(frameCount / timeSinceLastFPSUpdate.count());
             frameCount = 0;
             lastFPSUpdate = now;
+        }
+        std::chrono::duration<double> timeSinceLastDetStatsUpdate =
+            now - lastDetectionStatsUpdate;
+        if (timeSinceLastDetStatsUpdate.count() >= 1.0 && yolo_glthread_enabled) {
+            std::cout << "Detection stats [" << camera_params->camera_serial
+                      << "]: yolo_nonempty=" << yolo_nonempty_counter << "/"
+                      << yolo_frame_counter << " last_yolo_n=" << last_yolo_obj_count;
+            if (obb_overlay_enabled) {
+                std::cout << " obb_nonempty=" << obb_nonempty_counter << "/"
+                          << yolo_frame_counter << " last_obb_n="
+                          << last_obb_obj_count;
+            }
+            std::cout << std::endl;
+            lastDetectionStatsUpdate = now;
         }
         // Frame duration (GPU time included)
         std::chrono::duration<double, std::milli> frameDuration =

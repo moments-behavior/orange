@@ -7,6 +7,8 @@
 #include "utils.h"
 #include "video_capture.h"
 #include <cstring>
+#include <cuda_runtime.h>
+#include <opencv2/opencv.hpp>
 #include <filesystem>
 #include <iostream>
 #include <signal.h>
@@ -108,6 +110,10 @@ static void interruptHandler(const int signal) {
 struct ManagerContext {
     FetchGame::ManagerState state;
     bool quit;
+    std::atomic<bool> focus_test_requested{false};
+    CameraEmergent *ecams{nullptr};
+    CameraParams *cameras_params{nullptr};
+    CameraControl *camera_control{nullptr};
 };
 
 struct RecordingContext {
@@ -127,6 +133,7 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
     std::vector<std::thread> camera_threads;
     CameraEachSelect *cameras_select;
     CameraControl *camera_control = new CameraControl;
+    manager_context->camera_control = camera_control;
     INDIGOSignalBuilder indigo_signal_builder{};
     manager_context->state = FetchGame::ManagerState_IDLE;
     while (!manager_context->quit) {
@@ -143,6 +150,8 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
             cameras_select = new CameraEachSelect[*cam_count];
             if (open_cameras(cameras_params, ecams, cameras_select, device_info,
                              *cam_count, *config_folder)) {
+                manager_context->ecams = ecams;
+                manager_context->cameras_params = cameras_params;
                 manager_context->state = FetchGame::ManagerState_CAMERAOPENED;
             } else {
                 manager_context->state = FetchGame::ManagerState_ERROR;
@@ -167,10 +176,13 @@ void create_camera_manager(int *cam_count, ManagerContext *manager_context,
             break;
         }
 
+        if (manager_context->focus_test_requested.load()) {
+            std::cout << "TESTFOCUS propagating to camera threads" << std::endl;
+            manager_context->focus_test_requested.store(false);
+            camera_control->focus_test_generation.fetch_add(1);
+        }
+
         if (ptp_params->network_set_stop_ptp && ptp_params->ptp_stop_reached) {
-            std::cout << "DEBUG CAMERA CLIENT: Stopping recording, transitioning to RECORDSTOPPED" << std::endl;
-            std::cout << "DEBUG CAMERA CLIENT: Current state before stop=" << (int)manager_context->state 
-                      << " (" << FetchGame::EnumNamesManagerState()[manager_context->state] << ")" << std::endl;
             ptp_params->network_set_stop_ptp = false;
             for (auto &t : camera_threads)
                 t.join();
@@ -329,9 +341,6 @@ int main(int argc, char *argv[]) {
                     
                     // If it's an obj_msg, ignore it immediately (before trying to parse as Server)
                     if (is_obj_msg) {
-                        std::cout << "DEBUG CAMERA CLIENT: Received obj_msg (OBB detection data), ignoring. "
-                                  << "Camera clients should not receive obj_msg messages. Packet size: " 
-                                  << packet_size << std::endl;
                         enet_packet_destroy(evnt.packet);
                         break;
                     }
@@ -350,8 +359,6 @@ int main(int argc, char *argv[]) {
                     }
                     
                     if (!is_valid_server) {
-                        std::cout << "DEBUG CAMERA CLIENT: Message failed Server verification, ignoring. "
-                                  << "Packet size: " << packet_size << std::endl;
                         enet_packet_destroy(evnt.packet);
                         break;
                     }
@@ -359,7 +366,6 @@ int main(int argc, char *argv[]) {
                     // Parse as Server message (we know it's valid now)
                     auto server_control = FetchGame::GetServer(buffer_pointer);
                     if (!server_control) {
-                        std::cout << "DEBUG CAMERA CLIENT: Failed to parse message as Server, ignoring" << std::endl;
                         enet_packet_destroy(evnt.packet);
                         break;
                     }
@@ -367,19 +373,10 @@ int main(int argc, char *argv[]) {
                     // CRITICAL: Check if control() value is valid BEFORE using it
                     // This is the final safety check - obj_msg messages will have invalid control() values
                     auto server_signal = server_control->control();
-                    if (::flatbuffers::IsOutRange(server_signal, FetchGame::ServerControl_IDLE, FetchGame::ServerControl_QUIT)) {
-                        std::cout << "DEBUG CAMERA CLIENT: Invalid ServerControl value: " << (int)server_signal 
-                                  << ", might be misparsed obj_msg. Ignoring. Packet size: " 
-                                  << packet_size << std::endl;
+                    if (::flatbuffers::IsOutRange(server_signal, FetchGame::ServerControl_IDLE, FetchGame::ServerControl_STARTSTREAM)) {
                         enet_packet_destroy(evnt.packet);
                         break;
                     }
-                    
-                    // Message passed all checks - it's a valid Server message with valid control() value
-                    std::cout << "DEBUG CAMERA CLIENT: Valid Server message received. control()=" 
-                              << (int)server_signal << " (" 
-                              << FetchGame::EnumNamesServerControl()[(int)server_signal] << "), "
-                              << "packet size: " << packet_size << std::endl;
 
                     if (server_signal == FetchGame::ServerControl_OPENCAMERA) {
                         config_folder =
@@ -410,44 +407,46 @@ int main(int argc, char *argv[]) {
                                                          manager_context.state);
                     } else if (server_signal ==
                                FetchGame::ServerControl_STOPRECORDING) {
-                        // stop recording
-                        printf("stop signal\n");
-                        std::cout << "DEBUG CAMERA CLIENT: Received STOPRECORDING signal" << std::endl;
-                        std::cout << "DEBUG CAMERA CLIENT: Current state=" << (int)manager_context.state 
-                                  << " (" << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
-                        std::cout << "DEBUG CAMERA CLIENT: ptp_start_reached=" << ptp_params->ptp_start_reached 
-                                  << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached << std::endl;
-                        
-                        // CRITICAL SAFETY CHECK: Only process STOPRECORDING if we're actively recording
-                        // Check if we're actively recording (ptp_start_reached && !ptp_stop_reached)
-                        // This is more reliable than checking state, as state might have changed due to timing
-                        // or state synchronization issues
                         bool is_actively_recording = ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached;
-                        
-                        if (!is_actively_recording) {
-                            std::cout << "DEBUG CAMERA CLIENT: IGNORING STOPRECORDING signal - not actively recording. "
-                                      << "Current state=" << (int)manager_context.state 
-                                      << " (" << FetchGame::EnumNamesManagerState()[manager_context.state] << "), "
-                                      << "ptp_start_reached=" << ptp_params->ptp_start_reached 
-                                      << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached 
-                                      << ". This signal should only be processed when actively recording." << std::endl;
-                        } else {
-                            // We're actively recording - process the stop signal
-                            // Note: State might be IDLE if there was a timing/state sync issue, but if we're 
-                            // actively recording, we should still process the stop signal
-                            std::cout << "DEBUG CAMERA CLIENT: Processing STOPRECORDING signal. "
-                                      << "Current state=" << (int)manager_context.state 
-                                      << " (" << FetchGame::EnumNamesManagerState()[manager_context.state] << "), "
-                                      << "ptp_start_reached=" << ptp_params->ptp_start_reached 
-                                      << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached << std::endl;
-                            std::cout << server_control->ptp_global_time() << std::endl;
+                        if (is_actively_recording) {
                             ptp_params->ptp_stop_time =
                                 server_control->ptp_global_time();
-                            std::cout << ptp_params->ptp_stop_time << std::endl;
                             ptp_params->network_set_stop_ptp = true;
-                            std::cout << "DEBUG CAMERA CLIENT: Set network_set_stop_ptp=true, current state=" 
-                                      << (int)manager_context.state << " (" 
-                                      << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
+                        }
+                    } else if (server_signal ==
+                               FetchGame::ServerControl_STARTSTREAM) {
+                        // Same as STARTRECORDING but disable video saving
+                        ptp_params->ptp_global_time =
+                            server_control->ptp_global_time();
+                        std::cout << "STARTSTREAM " << ptp_params->ptp_global_time << std::endl;
+                        if (manager_context.camera_control)
+                            manager_context.camera_control->record_video = false;
+                        ptp_params->network_set_start_ptp = true;
+                        manager_context.state =
+                            FetchGame::ManagerState_WAITSTOP;
+                        client_send_state_update_message(&client, fb_builder,
+                                                         evnt.peer,
+                                                         manager_context.state);
+                    } else if (server_signal ==
+                               FetchGame::ServerControl_TESTFOCUS) {
+                        std::cout << "TESTFOCUS signal received" << std::endl;
+                        manager_context.focus_test_requested.store(true);
+                    } else if (server_signal ==
+                               FetchGame::ServerControl_SETFOCUS) {
+                        int fv = server_control->focus_value();
+                        const char *serial =
+                            server_control->camera_serial()
+                                ? server_control->camera_serial()->c_str()
+                                : "";
+                        printf("SETFOCUS %s -> %d\n", serial, fv);
+                        // Store the request — the camera thread in
+                        // start_ptp_sync will pick it up safely.
+                        if (manager_context.camera_control) {
+                            auto &sf = manager_context.camera_control->setfocus;
+                            sf.focus_value = fv;
+                            sf.camera_serial = serial;
+                            sf.reply_peer = evnt.peer;
+                            sf.generation.fetch_add(1);
                         }
                     }
                     enet_packet_destroy(evnt.packet);
@@ -463,82 +462,35 @@ int main(int argc, char *argv[]) {
         // coordinate with other thread
         if (manager_context.state == FetchGame::ManagerState_CONNECTED) {
             manager_context.state = FetchGame::ManagerState_IDLE;
-            std::cout << "DEBUG CAMERA CLIENT: Transitioning CONNECTED->IDLE, sending bringup message" << std::endl;
             client_send_bringup_message(&client, fb_builder,
                                         &client.m_pNetwork->peers[0], cam_count,
                                         manager_context.state);
         }
         if (manager_context.state == FetchGame::ManagerState_CAMERAOPENED) {
             manager_context.state = FetchGame::ManagerState_WAITTHREAD;
-            std::cout << "DEBUG CAMERA CLIENT: Transitioning CAMERAOPENED->WAITTHREAD" << std::endl;
             client_send_state_update_message(&client, fb_builder,
                                              &client.m_pNetwork->peers[0],
                                              manager_context.state);
         } else if (manager_context.state ==
                    FetchGame::ManagerState_THREADREADY) {
             manager_context.state = FetchGame::ManagerState_WAITSTART;
-            std::cout << "DEBUG CAMERA CLIENT: Transitioning THREADREADY->WAITSTART" << std::endl;
             client_send_state_update_message(&client, fb_builder,
                                              &client.m_pNetwork->peers[0],
                                              manager_context.state);
         } else if (manager_context.state ==
                    FetchGame::ManagerState_RECORDSTOPPED) {
-            // RECORDSTOPPED state means recording has stopped and cameras are closed
-            // We should transition to IDLE to allow reopening cameras
-            std::cout << "DEBUG CAMERA CLIENT: In RECORDSTOPPED, checking if should transition to IDLE" << std::endl;
-            std::cout << "DEBUG CAMERA CLIENT: network_set_start_ptp=" << ptp_params->network_set_start_ptp 
-                      << ", network_set_stop_ptp=" << ptp_params->network_set_stop_ptp 
-                      << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached
-                      << ", ptp_start_reached=" << ptp_params->ptp_start_reached << std::endl;
-            
-            // CRITICAL SAFETY CHECK: Only transition to IDLE if:
-            // 1. We're not starting a new recording (network_set_start_ptp is false)
-            // 2. We're not actively recording (ptp_start_reached is false OR ptp_stop_reached is true)
-            // This prevents transitioning to IDLE during active recording
-            if (ptp_params->network_set_start_ptp) {
-                // Don't transition if a new recording is starting
-                std::cout << "DEBUG CAMERA CLIENT: New recording starting, NOT transitioning to IDLE" << std::endl;
-            } else if (ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached) {
-                // CRITICAL: We're actively recording! This should never happen in RECORDSTOPPED
-                // If we're here, something is wrong - the state should be WAITSTOP, not RECORDSTOPPED
-                std::cout << "DEBUG CAMERA CLIENT: ERROR - In RECORDSTOPPED but actively recording! "
-                          << "ptp_start_reached=true, ptp_stop_reached=false. "
-                          << "This is a bug - state should be WAITSTOP, not RECORDSTOPPED. "
-                          << "NOT transitioning to IDLE." << std::endl;
-            } else {
-                // When we're in RECORDSTOPPED, cameras are closed (see lines 198-200 where cameras are closed)
-                // And we're not actively recording, so we can safely transition to IDLE
-                // This allows transition to IDLE after stop_recording is pressed and processed
-                // FINAL SAFETY CHECK: Double-check we're not actively recording before sending IDLE
-                if (ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached) {
-                    std::cout << "DEBUG CAMERA CLIENT: ERROR - Attempted to send IDLE but still actively recording! "
-                              << "ptp_start_reached=" << ptp_params->ptp_start_reached 
-                              << ", ptp_stop_reached=" << ptp_params->ptp_stop_reached 
-                              << ". NOT sending IDLE state update." << std::endl;
-                } else {
-                    std::cout << "DEBUG CAMERA CLIENT: Transitioning from RECORDSTOPPED to IDLE (cameras closed, not recording)" << std::endl;
-                    manager_context.state = FetchGame::ManagerState_IDLE;
-                    client_send_state_update_message(&client, fb_builder,
-                                                     &client.m_pNetwork->peers[0],
-                                                     manager_context.state);
-                }
+            if (!ptp_params->network_set_start_ptp &&
+                !(ptp_params->ptp_start_reached && !ptp_params->ptp_stop_reached)) {
+                manager_context.state = FetchGame::ManagerState_IDLE;
+                client_send_state_update_message(&client, fb_builder,
+                                                 &client.m_pNetwork->peers[0],
+                                                 manager_context.state);
             }
         }
         
         // CRITICAL: Before sending ANY state update, verify we're not actively recording
         // This is a final safety check to prevent sending IDLE during active recording
         // regardless of what state we think we're in
-        static FetchGame::ManagerState last_sent_state = FetchGame::ManagerState_IDLE;
-        if (manager_context.state != last_sent_state) {
-            // State changed - log it
-            std::cout << "DEBUG CAMERA CLIENT: State changed from " 
-                      << (int)last_sent_state << " (" 
-                      << FetchGame::EnumNamesManagerState()[last_sent_state] << ") to "
-                      << (int)manager_context.state << " (" 
-                      << FetchGame::EnumNamesManagerState()[manager_context.state] << ")" << std::endl;
-            last_sent_state = manager_context.state;
-        }
-        
         // CRITICAL SAFETY CHECK: If we're in WAITSTOP (actively recording), ensure we stay in WAITSTOP
         // This prevents the button from disappearing during active recording
         // The only way out of WAITSTOP should be through RECORDSTOPPED (after stop_recording is processed)
@@ -549,6 +501,25 @@ int main(int argc, char *argv[]) {
                 // We're actively recording - ensure we stay in WAITSTOP
                 // This is a safety check to prevent the button from disappearing
                 // The state should already be WAITSTOP, but this ensures it doesn't change
+            }
+        }
+
+        // Send SETFOCUS preview reply if ready
+        if (manager_context.camera_control) {
+            auto &sf = manager_context.camera_control->setfocus;
+            std::lock_guard<std::mutex> lk(sf.reply_mu);
+            if (sf.reply_ready && sf.reply_peer) {
+                auto &jpg = sf.reply_jpeg;
+                std::vector<uint8_t> pkt(4 + jpg.size());
+                memcpy(pkt.data(), "JPGF", 4);
+                memcpy(pkt.data() + 4, jpg.data(), jpg.size());
+                ENetPacket *ep = enet_packet_create(
+                    pkt.data(), pkt.size(), ENET_PACKET_FLAG_RELIABLE);
+                enet_peer_send(sf.reply_peer, 0, ep);
+                enet_host_flush(client.m_pNetwork);
+                sf.reply_ready = false;
+                printf("SETFOCUS preview sent (%zu bytes)\n", jpg.size());
+                fflush(stdout);
             }
         }
 

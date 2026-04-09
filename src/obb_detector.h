@@ -112,12 +112,25 @@ private:
     float circular_diff(float a, float b);
     float compute_classification_score(const std::vector<cv::Point2f>& points, int class_id);
     
-    // Local mask angle extraction for two-stage refinement
+    // Local angle extraction for two-stage refinement
     float extract_angle_from_local_mask(const cv::Mat& frame,
                                         float cx, float cy,
                                         float crop_w, float crop_h,
-                                        float pad_factor = 1.2f);
-    
+                                        float pad_factor = 2.0f);
+    float extract_angle_and_rect(const cv::Mat& frame,
+                                 float cx, float cy,
+                                 float crop_w, float crop_h,
+                                 float pad_factor,
+                                 cv::RotatedRect& out_rect);
+    float extract_angle_hough(const cv::Mat& frame,
+                              float cx, float cy,
+                              float crop_w, float crop_h,
+                              float pad_factor = 2.0f);
+
+    // Angle smoothing helpers
+    float smooth_angle(float cx, float cy, float raw_angle);
+    int find_nearest_track(float cx, float cy);
+
     void copy_frame_to_cpu(void* device_ptr, cv::Mat& cpu_frame);
     
     CameraParams* camera_params;
@@ -155,6 +168,17 @@ private:
     std::vector<Bbox> yolo_boxes_pending;
     bool yolo_has_update;
     std::mutex yolo_mtx;
+
+    // Per-object angle smoothing (EMA)
+    struct AngleTrack {
+        float cx, cy;
+        float smoothed_angle;
+        int age;  // frames since last match
+    };
+    std::vector<AngleTrack> angle_tracks;
+    static constexpr float ANGLE_EMA_ALPHA = 0.5f;   // weight of new measurement
+    static constexpr float TRACK_MATCH_DIST = 80.0f;  // max pixels to match
+    static constexpr int   TRACK_MAX_AGE = 30;         // drop after N unmatched frames
 };
 
 #endif // ORANGE_OBB_DETECTOR

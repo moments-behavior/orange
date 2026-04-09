@@ -500,13 +500,26 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
 }
 
 // ---------------------------------------------------------------------------
-// Two-stage: local mask angle extraction
+// Two-stage: local angle extraction
 // ---------------------------------------------------------------------------
 
+// Segment the bright cylinder using a percentile-based threshold
+// (adapts to any lighting), then fit the shape.  Returns the
+// RotatedRect of the cylinder contour via out_rect if non-null.
 float OBBDetector::extract_angle_from_local_mask(
     const cv::Mat& frame, float cx, float cy,
     float crop_w, float crop_h, float pad_factor) {
-    
+
+    // Overload without out_rect
+    cv::RotatedRect dummy;
+    return extract_angle_and_rect(frame, cx, cy, crop_w, crop_h, pad_factor, dummy);
+}
+
+float OBBDetector::extract_angle_and_rect(
+    const cv::Mat& frame, float cx, float cy,
+    float crop_w, float crop_h, float pad_factor,
+    cv::RotatedRect& out_rect) {
+
     int h = frame.rows, w = frame.cols;
     float pw = crop_w * pad_factor;
     float ph = crop_h * pad_factor;
@@ -519,24 +532,92 @@ float OBBDetector::extract_angle_from_local_mask(
     cv::Mat patch = frame(cv::Rect(x1p, y1p, x2p - x1p + 1, y2p - y1p + 1));
     cv::Mat gray, blur, mask;
     cv::cvtColor(patch, gray, cv::COLOR_BGR2GRAY);
-    cv::GaussianBlur(gray, blur, cv::Size(5, 5), 0);
-    cv::threshold(blur, mask, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
-    if (cv::mean(mask)[0] > 127) cv::bitwise_not(mask, mask);
+    cv::GaussianBlur(gray, blur, cv::Size(3, 3), 0);
 
-    cv::Mat kern = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
-    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kern, cv::Point(-1, -1), 1);
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kern, cv::Point(-1, -1), 1);
+    // Percentile-based threshold: the cylinder is the brightest region
+    // in the crop.  Use the 85th percentile as the cutoff — this adapts
+    // automatically to any exposure or lighting condition.
+    std::vector<uchar> pixels(blur.begin<uchar>(), blur.end<uchar>());
+    std::nth_element(pixels.begin(), pixels.begin() + (int)(pixels.size() * 0.85f), pixels.end());
+    int thresh = pixels[(int)(pixels.size() * 0.85f)];
+    cv::threshold(blur, mask, thresh, 255, cv::THRESH_BINARY);
 
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     if (contours.empty()) return 0.0f;
 
-    auto cnt = *std::max_element(contours.begin(), contours.end(),
-        [](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
-    if (cv::contourArea(cnt) < 20) return 0.0f;
+    // Pick the contour closest to patch center (where YOLO says the cylinder is)
+    cv::Point2f patch_center(patch.cols / 2.0f, patch.rows / 2.0f);
+    int best_idx = -1;
+    float best_dist = std::numeric_limits<float>::max();
+    for (size_t i = 0; i < contours.size(); i++) {
+        if (cv::contourArea(contours[i]) < 30) continue;
+        cv::Moments m = cv::moments(contours[i]);
+        if (m.m00 < 1) continue;
+        cv::Point2f centroid(m.m10 / m.m00, m.m01 / m.m00);
+        float d = cv::norm(centroid - patch_center);
+        if (d < best_dist) { best_dist = d; best_idx = (int)i; }
+    }
+    if (best_idx < 0) return 0.0f;
 
+    const auto& cnt = contours[best_idx];
     cv::RotatedRect rect = cv::minAreaRect(cnt);
+
+    // Translate rect center back to frame coordinates
+    out_rect = cv::RotatedRect(
+        cv::Point2f(rect.center.x + x1p, rect.center.y + y1p),
+        rect.size, rect.angle);
+
     return rect.angle;
+}
+
+// Not used — kept for API compatibility
+float OBBDetector::extract_angle_hough(
+    const cv::Mat& frame, float cx, float cy,
+    float crop_w, float crop_h, float pad_factor) {
+    return extract_angle_from_local_mask(frame, cx, cy, crop_w, crop_h, pad_factor);
+}
+
+// ---------------------------------------------------------------------------
+// Angle smoothing (EMA per tracked object)
+// ---------------------------------------------------------------------------
+
+int OBBDetector::find_nearest_track(float cx, float cy) {
+    float best_dist = TRACK_MATCH_DIST;
+    int best_idx = -1;
+    for (size_t i = 0; i < angle_tracks.size(); i++) {
+        float dx = angle_tracks[i].cx - cx;
+        float dy = angle_tracks[i].cy - cy;
+        float d = std::sqrt(dx * dx + dy * dy);
+        if (d < best_dist) { best_dist = d; best_idx = (int)i; }
+    }
+    return best_idx;
+}
+
+float OBBDetector::smooth_angle(float cx, float cy, float raw_angle) {
+    int idx = find_nearest_track(cx, cy);
+
+    if (idx < 0) {
+        // New object — start a fresh track
+        angle_tracks.push_back({cx, cy, raw_angle, 0});
+        return raw_angle;
+    }
+
+    AngleTrack& t = angle_tracks[idx];
+    // EMA with circular-aware blending
+    float diff = raw_angle - t.smoothed_angle;
+    // Wrap to [-90, 90] for RotatedRect angle range
+    while (diff > 90.0f)  diff -= 180.0f;
+    while (diff < -90.0f) diff += 180.0f;
+    t.smoothed_angle += ANGLE_EMA_ALPHA * diff;
+    // Keep in [-90, 90)
+    while (t.smoothed_angle > 90.0f)  t.smoothed_angle -= 180.0f;
+    while (t.smoothed_angle < -90.0f) t.smoothed_angle += 180.0f;
+
+    t.cx = cx;
+    t.cy = cy;
+    t.age = 0;
+    return t.smoothed_angle;
 }
 
 // ---------------------------------------------------------------------------
@@ -545,7 +626,7 @@ float OBBDetector::extract_angle_from_local_mask(
 
 std::vector<OBB> OBBDetector::refine_yolo_detections(
     const cv::Mat& frame, const std::vector<Bbox>& yolo_boxes, int target_class_id) {
-    
+
     std::vector<OBB> results;
     if (frame.empty() || yolo_boxes.empty()) return results;
 
@@ -556,6 +637,9 @@ std::vector<OBB> OBBDetector::refine_yolo_detections(
         prior_h = p.height_median;
     }
 
+    // Age all tracks; stale ones will be pruned below
+    for (auto& t : angle_tracks) t.age++;
+
     for (const auto& bbox : yolo_boxes) {
         float bx1 = bbox.rect.x;
         float by1 = bbox.rect.y;
@@ -564,12 +648,26 @@ std::vector<OBB> OBBDetector::refine_yolo_detections(
         float cx  = bx1 + bw / 2.0f;
         float cy  = by1 + bh / 2.0f;
 
-        float obb_w = (prior_w > 0) ? prior_w : bw;
-        float obb_h = (prior_h > 0) ? prior_h : bh;
+        // Segment the bright cylinder and get its actual shape
+        float crop_w = std::max(bw, (prior_w > 0) ? prior_w : bw);
+        float crop_h = std::max(bh, (prior_h > 0) ? prior_h : bh);
+        cv::RotatedRect measured;
+        float raw_angle = extract_angle_and_rect(frame, cx, cy,
+                                                 crop_w, crop_h, 2.0f, measured);
 
-        float angle = extract_angle_from_local_mask(frame, cx, cy,
-                                                     std::max(bw, obb_w),
-                                                     std::max(bh, obb_h));
+        // Temporal smoothing via EMA
+        float angle = smooth_angle(cx, cy, raw_angle);
+
+        // Use the actual measured size from the contour if we got one,
+        // otherwise fall back to priors
+        float obb_w, obb_h;
+        if (measured.size.width > 0 && measured.size.height > 0) {
+            obb_w = measured.size.width;
+            obb_h = measured.size.height;
+        } else {
+            obb_w = (prior_w > 0) ? prior_w : bw;
+            obb_h = (prior_h > 0) ? prior_h : bh;
+        }
 
         cv::RotatedRect rrect(cv::Point2f(cx, cy), cv::Size2f(obb_w, obb_h), angle);
         cv::Point2f pts[4];
@@ -584,6 +682,13 @@ std::vector<OBB> OBBDetector::refine_yolo_detections(
                 target_class_id, bbox.prob, -1, true);
         results.push_back(obb);
     }
+
+    // Prune stale tracks
+    angle_tracks.erase(
+        std::remove_if(angle_tracks.begin(), angle_tracks.end(),
+                        [](const AngleTrack& t) { return t.age > TRACK_MAX_AGE; }),
+        angle_tracks.end());
+
     return results;
 }
 

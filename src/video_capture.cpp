@@ -646,7 +646,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                       &frame_saver, nullptr, &mjpeg_server);
 #endif
         if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
-            if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {
+            if (ptp_state.frame_ts > ptp_params->ptp_stop_time) {
                 uint64_t ptp_stop_conuter =
                     sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
                 printf("%lu\n", ptp_stop_conuter);

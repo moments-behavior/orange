@@ -82,6 +82,7 @@ struct CameraState {
     unsigned short dropped_frames = 0;
     unsigned int frames_recd = 0;
     unsigned long long frame_count = 0;
+    unsigned int encoder_drops = 0;
 };
 
 struct PTPState {

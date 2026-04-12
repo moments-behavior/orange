@@ -127,6 +127,8 @@ void report_statistics(CameraParams *camera_params, CameraState *camera_state,
         ", Frame received: " + std::to_string(camera_state->frames_recd);
     print_out +=
         ", Dropped Frames: " + std::to_string(camera_state->dropped_frames);
+    print_out +=
+        ", Encoder Drops: " + std::to_string(camera_state->encoder_drops);
     float calc_frame_rate = camera_state->frames_recd / time_diff;
     print_out += ", Calculated Frame Rate: " + std::to_string(calc_frame_rate);
     std::cout << print_out << std::endl;
@@ -411,11 +413,20 @@ inline void get_one_frame(CameraState *camera_state,
 
         // push the image data to encode, or display
         if (camera_control->record_video && camera_select->record) {
-            gpu_encoder->PushToDisplay(
+            bool queued = gpu_encoder->PushToDisplay(
                 ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize,
                 ecam->frame_recv.size_x, ecam->frame_recv.size_y,
                 ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
                 camera_state->frame_count, real_time);
+            if (!queued) {
+                camera_state->encoder_drops++;
+                if (camera_state->encoder_drops % 100 == 1)
+                    printf("WARNING: cam %s encoder queue full, frame %llu "
+                           "dropped (total encoder drops: %u)\n",
+                           camera_params->camera_serial.c_str(),
+                           camera_state->frame_count,
+                           camera_state->encoder_drops);
+            }
         }
 
 #ifndef HEADLESS
@@ -439,7 +450,10 @@ inline void get_one_frame(CameraState *camera_state,
         }
 
         // SETFOCUS: apply focus, wait for motor to settle, then grab preview
-        if (camera_control) {
+        // Skip during recording -- camera API calls and cudaMemcpy2D stall
+        // the capture thread and cause frame drops.
+        if (camera_control &&
+            !(camera_control->record_video && camera_select->record)) {
             thread_local int sf_rec_gen = 0;
             thread_local int sf_wait_frames = 0;
 
@@ -488,7 +502,10 @@ inline void get_one_frame(CameraState *camera_state,
         }
 
         // Push preview JPEG to any connected MJPEG viewers (every 15 frames)
-        if (mjpeg_server && camera_state->frame_count % 15 == 0) {
+        // Only when NOT recording -- the synchronous cudaMemcpy2D stalls the
+        // capture thread and causes frame drops on cross-NUMA GPUs.
+        if (mjpeg_server && camera_state->frame_count % 15 == 0 &&
+            !(camera_control->record_video && camera_select->record)) {
             auto jpeg = make_preview_jpeg(
                 (const unsigned char *)ecam->frame_recv.imagePtr,
                 camera_params->width, camera_params->height,

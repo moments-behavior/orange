@@ -146,10 +146,25 @@ YOLOv8::YOLOv8(const std::string &engine_file_path, int width, int height,
                   << " shape=" << dims_ss.str()
                   << " dtype=" << dtype_to_cstr(dtype) << std::endl;
     }
-    if (this->num_outputs < 4) {
+    if (this->num_outputs < 4 && this->num_outputs != 2) {
         std::cerr << "YOLOv8 warning: this pipeline expects >=4 outputs "
-                     "(num_dets/boxes/scores/labels). Loaded engine has "
+                     "(num_dets/boxes/scores/labels) or 2 outputs (seg). Loaded engine has "
                   << this->num_outputs << " outputs." << std::endl;
+    }
+
+    // Detect seg mask prototype output: look for a 4D output [1, 32, H, W]
+    for (int i = 0; i < (int)this->output_bindings.size(); i++) {
+        const auto &dims = this->output_bindings[i].dims;
+        if (dims.nbDims == 4 && dims.d[1] == 32) {
+            mask_proto_idx = i;
+            mask_num_protos = dims.d[1];
+            mask_proto_h = dims.d[2];
+            mask_proto_w = dims.d[3];
+            std::cout << "YOLOv8 seg: detected mask prototypes output[" << i
+                      << "] shape=" << mask_num_protos << "x" << mask_proto_h
+                      << "x" << mask_proto_w << std::endl;
+            break;
+        }
     }
 
     auto &in_binding = this->input_bindings[0];
@@ -491,25 +506,32 @@ void YOLOv8::postprocess(std::vector<Bbox> &objs) {
         return;
     }
 
-    // Support single-output engines with shape like [1, N, 6]:
-    // [x1, y1, x2, y2, score, class]
-    if (this->num_outputs == 1 && this->output_bindings.size() == 1) {
-        const void *out_ptr = this->host_ptrs[0];
-        const auto out_type = this->output_bindings[0].dtype;
-        const auto &dims = this->output_bindings[0].dims;
-        const int total_vals = static_cast<int>(this->output_bindings[0].size);
-        if (total_vals <= 0) {
-            return;
+    // Support single/two-output engines with shape [1, N, 6] (detect)
+    // or [1, N, 38] (seg: 6 detect + 32 mask coefficients).
+    // Find the detection output (not the mask prototype output).
+    int det_out_idx = -1;
+    for (int i = 0; i < (int)this->output_bindings.size(); i++) {
+        if (i == mask_proto_idx) continue;  // skip prototype tensor
+        const auto &dims = this->output_bindings[i].dims;
+        // Match [1, N, 6] or [1, N, 38]
+        if (dims.nbDims >= 2) {
+            int last = dims.d[dims.nbDims - 1];
+            if (last == 6 || last == 38) {
+                det_out_idx = i;
+                break;
+            }
         }
+    }
 
-        int n = total_vals / 6;
-        if (dims.nbDims >= 2 && dims.d[dims.nbDims - 1] == 6 &&
-            dims.d[dims.nbDims - 2] > 0) {
-            n = dims.d[dims.nbDims - 2];
-        }
-        if (n <= 0) {
-            return;
-        }
+    if (det_out_idx >= 0) {
+        const void *out_ptr = this->host_ptrs[det_out_idx];
+        const auto out_type = this->output_bindings[det_out_idx].dtype;
+        const auto &dims = this->output_bindings[det_out_idx].dims;
+        const int stride = dims.d[dims.nbDims - 1];  // 6 or 38
+        const int num_mask_coeffs = stride - 6;       // 0 or 32
+
+        int n = dims.d[dims.nbDims - 2];
+        if (n <= 0) return;
 
         auto &dw = this->pparam.dw;
         auto &dh = this->pparam.dh;
@@ -518,40 +540,22 @@ void YOLOv8::postprocess(std::vector<Bbox> &objs) {
         auto &ratio = this->pparam.ratio;
 
         constexpr float kConfThreshold = 0.25f;
-        static int debug_single_prints = 0;
         for (int i = 0; i < n; i++) {
-            const float x0_raw = read_as_float(out_ptr, out_type, i * 6 + 0);
-            const float y0_raw = read_as_float(out_ptr, out_type, i * 6 + 1);
-            const float x1_raw = read_as_float(out_ptr, out_type, i * 6 + 2);
-            const float y1_raw = read_as_float(out_ptr, out_type, i * 6 + 3);
-            const float score = read_as_float(out_ptr, out_type, i * 6 + 4);
+            const float x0_raw = read_as_float(out_ptr, out_type, i * stride + 0);
+            const float y0_raw = read_as_float(out_ptr, out_type, i * stride + 1);
+            const float x1_raw = read_as_float(out_ptr, out_type, i * stride + 2);
+            const float y1_raw = read_as_float(out_ptr, out_type, i * stride + 3);
+            const float score  = read_as_float(out_ptr, out_type, i * stride + 4);
             const int label = static_cast<int>(
-                std::round(read_as_float(out_ptr, out_type, i * 6 + 5)));
+                std::round(read_as_float(out_ptr, out_type, i * stride + 5)));
 
-            if (debug_single_prints < 12 && i < 3) {
-                std::cout << "YOLO raw (1xNx6): i=" << i
-                          << " score=" << score << " label=" << label
-                          << " box=(" << x0_raw << "," << y0_raw << ","
-                          << x1_raw << "," << y1_raw << ")" << std::endl;
-                debug_single_prints++;
-            }
+            if (score < kConfThreshold) continue;
 
-            if (score < kConfThreshold) {
-                continue;
-            }
-
-            float x0 = (x0_raw - dw) * ratio;
-            float y0 = (y0_raw - dh) * ratio;
-            float x1 = (x1_raw - dw) * ratio;
-            float y1 = (y1_raw - dh) * ratio;
-
-            x0 = clamp(x0, 0.f, width);
-            y0 = clamp(y0, 0.f, height);
-            x1 = clamp(x1, 0.f, width);
-            y1 = clamp(y1, 0.f, height);
-            if (x1 <= x0 || y1 <= y0) {
-                continue;
-            }
+            float x0 = clamp((x0_raw - dw) * ratio, 0.f, width);
+            float y0 = clamp((y0_raw - dh) * ratio, 0.f, height);
+            float x1 = clamp((x1_raw - dw) * ratio, 0.f, width);
+            float y1 = clamp((y1_raw - dh) * ratio, 0.f, height);
+            if (x1 <= x0 || y1 <= y0) continue;
 
             Bbox obj;
             obj.rect.x = x0;
@@ -560,6 +564,15 @@ void YOLOv8::postprocess(std::vector<Bbox> &objs) {
             obj.rect.height = y1 - y0;
             obj.prob = score;
             obj.label = label;
+
+            // Extract mask coefficients for seg models
+            if (num_mask_coeffs > 0) {
+                obj.mask_coeffs.resize(num_mask_coeffs);
+                for (int k = 0; k < num_mask_coeffs; k++) {
+                    obj.mask_coeffs[k] = read_as_float(out_ptr, out_type, i * stride + 6 + k);
+                }
+            }
+
             objs.push_back(obj);
         }
         return;
@@ -717,4 +730,9 @@ void YOLOv8::draw_objects(
         cv::putText(res, text, cv::Point(x, y + label_size.height),
                     cv::FONT_HERSHEY_SIMPLEX, 0.4, {255, 255, 255}, 1);
     }
+}
+
+const float* YOLOv8::get_mask_protos() const {
+    if (mask_proto_idx < 0) return nullptr;
+    return static_cast<const float*>(host_ptrs[mask_proto_idx]);
 }

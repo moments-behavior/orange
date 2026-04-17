@@ -692,6 +692,117 @@ std::vector<OBB> OBBDetector::refine_yolo_detections(
 }
 
 // ---------------------------------------------------------------------------
+// Seg-based OBB: reconstruct mask from coefficients × prototypes
+// ---------------------------------------------------------------------------
+
+std::vector<OBB> OBBDetector::refine_from_seg_masks(
+    const std::vector<Bbox>& yolo_boxes,
+    const float* mask_protos,
+    int proto_h, int proto_w, int num_protos,
+    const PreParam& pparam,
+    int target_class_id) {
+
+    std::vector<OBB> results;
+    if (yolo_boxes.empty() || !mask_protos || num_protos <= 0) return results;
+
+    // Coordinate chain:
+    //   image coords → (/ ratio + dw/dh) → input 640 coords → (/ 4) → proto 160 coords
+    // pparam: postprocess did  x_img = (x_raw - dw) * ratio
+    // so reverse:              x_raw = x_img / ratio + dw
+    //                          x_proto = x_raw / 4
+    float ratio = pparam.ratio;
+    float dw = pparam.dw;
+    float dh = pparam.dh;
+
+    for (const auto& bbox : yolo_boxes) {
+        if (bbox.mask_coeffs.empty() || (int)bbox.mask_coeffs.size() != num_protos)
+            continue;
+
+        // Reconstruct mask: coeffs (32) × protos (32 × 160 × 160) → mask (160 × 160)
+        cv::Mat mask_f(proto_h, proto_w, CV_32F, cv::Scalar(0));
+        for (int k = 0; k < num_protos; k++) {
+            float c = bbox.mask_coeffs[k];
+            if (std::abs(c) < 1e-6f) continue;
+            const float* proto_plane = mask_protos + k * proto_h * proto_w;
+            for (int y = 0; y < proto_h; y++) {
+                float* row = mask_f.ptr<float>(y);
+                const float* proto_row = proto_plane + y * proto_w;
+                for (int x = 0; x < proto_w; x++) {
+                    row[x] += c * proto_row[x];
+                }
+            }
+        }
+
+        // Sigmoid
+        for (int y = 0; y < proto_h; y++) {
+            float* row = mask_f.ptr<float>(y);
+            for (int x = 0; x < proto_w; x++) {
+                row[x] = 1.0f / (1.0f + std::exp(-row[x]));
+            }
+        }
+
+        // Threshold at 0.3 for wider coverage
+        cv::Mat mask_bin;
+        cv::threshold(mask_f, mask_bin, 0.3f, 255.0f, cv::THRESH_BINARY);
+        mask_bin.convertTo(mask_bin, CV_8U);
+
+        // Upscale mask from 160×160 to 640×640 before contour fitting —
+        // this gives much better resolution for minAreaRect.
+        cv::Mat mask_up;
+        cv::resize(mask_bin, mask_up, cv::Size(proto_w * 4, proto_h * 4), 0, 0, cv::INTER_LINEAR);
+        cv::threshold(mask_up, mask_up, 127, 255, cv::THRESH_BINARY);
+
+        // Map bbox from image coords → input640 coords (upscaled mask space)
+        float bx1_up = bbox.rect.x / ratio + dw;
+        float by1_up = bbox.rect.y / ratio + dh;
+        float bx2_up = (bbox.rect.x + bbox.rect.width) / ratio + dw;
+        float by2_up = (bbox.rect.y + bbox.rect.height) / ratio + dh;
+
+        int rx1 = std::max(0, (int)std::floor(bx1_up));
+        int ry1 = std::max(0, (int)std::floor(by1_up));
+        int rx2 = std::min(proto_w * 4, (int)std::ceil(bx2_up));
+        int ry2 = std::min(proto_h * 4, (int)std::ceil(by2_up));
+        if (rx2 <= rx1 || ry2 <= ry1) continue;
+
+        // Zero out mask outside the bbox
+        cv::Mat crop_mask = cv::Mat::zeros(proto_h * 4, proto_w * 4, CV_8U);
+        mask_up(cv::Rect(rx1, ry1, rx2 - rx1, ry2 - ry1))
+            .copyTo(crop_mask(cv::Rect(rx1, ry1, rx2 - rx1, ry2 - ry1)));
+
+        // Find contours
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(crop_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        if (contours.empty()) continue;
+
+        // Pick largest contour
+        auto best_it = std::max_element(contours.begin(), contours.end(),
+            [](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
+        if (cv::contourArea(*best_it) < 10) continue;
+
+        // Fit minAreaRect in input640 space, then map to image space
+        cv::RotatedRect rrect = cv::minAreaRect(*best_it);
+
+        // input640 → image: (x - dw) * ratio
+        rrect.center.x = (rrect.center.x - dw) * ratio;
+        rrect.center.y = (rrect.center.y - dh) * ratio;
+        rrect.size.width *= ratio;
+        rrect.size.height *= ratio;
+
+        cv::Point2f pts[4];
+        rrect.points(pts);
+        auto ordered = order_corners_clockwise_start_tl({pts[0], pts[1], pts[2], pts[3]});
+
+        OBB obb(ordered[0].x, ordered[0].y,
+                ordered[1].x, ordered[1].y,
+                ordered[2].x, ordered[2].y,
+                ordered[3].x, ordered[3].y,
+                target_class_id, bbox.prob, -1, true);
+        results.push_back(obb);
+    }
+    return results;
+}
+
+// ---------------------------------------------------------------------------
 // Stable detection tracking
 // ---------------------------------------------------------------------------
 

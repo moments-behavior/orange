@@ -105,6 +105,7 @@ struct Bbox {
     int label = 0;
     float prob = 0.0;
     std::vector<float> kps;
+    std::vector<float> mask_coeffs;  // 32 mask prototype coefficients (seg models)
 };
 
 struct PreParam {

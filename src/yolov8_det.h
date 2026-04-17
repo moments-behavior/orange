@@ -26,6 +26,14 @@ class YOLOv8 {
     void copy_keypoints_gpu(float *d_points, const Bbox &obj);
     void infer_capture_only();
 
+    // Seg mask support: check if model has mask prototypes
+    bool has_mask_protos() const { return mask_proto_idx >= 0; }
+    // Get mask prototypes (32 x 160 x 160) and the preprocessing params
+    const float* get_mask_protos() const;
+    int get_mask_proto_h() const { return mask_proto_h; }
+    int get_mask_proto_w() const { return mask_proto_w; }
+    int get_mask_num_protos() const { return mask_num_protos; }
+
     int num_bindings;
     int num_inputs = 0;
     int num_outputs = 0;
@@ -59,6 +67,12 @@ class YOLOv8 {
     nvinfer1::IRuntime *runtime = nullptr;
     nvinfer1::IExecutionContext *context = nullptr;
     Logger gLogger{nvinfer1::ILogger::Severity::kERROR};
+
+    // Seg mask prototype output
+    int mask_proto_idx = -1;
+    int mask_num_protos = 0;
+    int mask_proto_h = 0;
+    int mask_proto_w = 0;
 };
 
 #endif // DETECT_END2END_YOLOV8_HPP

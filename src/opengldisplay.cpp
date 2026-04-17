@@ -260,12 +260,27 @@ void COpenGLDisplay::ThreadRunning() {
                 }
             }
             
-            // OBB Detection (async, non-blocking)
+            // OBB Detection
             if (obb_overlay_enabled) {
-                obb_detector->set_yolo_boxes(objs);
-                obb_detector->notify_frame_ready(debayer.d_debayer, 0);
-                
-                std::vector<OBB> obb_detections = obb_detector->get_latest_detections();
+                std::vector<OBB> obb_detections;
+
+                // If the YOLO model provides seg masks, use them directly
+                // for OBB fitting (no frame copy needed).
+                if (yolov8 && yolov8->has_mask_protos() &&
+                    !objs.empty() && !objs[0].mask_coeffs.empty()) {
+                    obb_detections = obb_detector->refine_from_seg_masks(
+                        objs,
+                        yolov8->get_mask_protos(),
+                        yolov8->get_mask_proto_h(),
+                        yolov8->get_mask_proto_w(),
+                        yolov8->get_mask_num_protos(),
+                        yolov8->pparam);
+                } else {
+                    // Fallback: two-stage CV-based refinement
+                    obb_detector->set_yolo_boxes(objs);
+                    obb_detector->notify_frame_ready(debayer.d_debayer, 0);
+                    obb_detections = obb_detector->get_latest_detections();
+                }
                 last_obb_obj_count = obb_detections.size();
                 if (!obb_detections.empty()) {
                     obb_nonempty_counter++;

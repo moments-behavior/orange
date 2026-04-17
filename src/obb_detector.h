@@ -2,6 +2,7 @@
 #define ORANGE_OBB_DETECTOR
 
 #include "camera.h"
+#include "common.hpp"
 #include "types.h"
 #include <opencv2/opencv.hpp>
 #include <cuda_runtime.h>
@@ -95,6 +96,14 @@ public:
     std::vector<OBB> refine_yolo_detections(const cv::Mat& frame,
                                             const std::vector<Bbox>& yolo_boxes,
                                             int target_class_id = 2);
+
+    // Seg-based: reconstruct mask from coefficients + prototypes → fit OBB
+    // pparam carries the letterbox preprocessing info (ratio, dw, dh)
+    std::vector<OBB> refine_from_seg_masks(const std::vector<Bbox>& yolo_boxes,
+                                           const float* mask_protos,
+                                           int proto_h, int proto_w, int num_protos,
+                                           const PreParam& pparam,
+                                           int target_class_id = 2);
     
     bool should_update_detections(const std::vector<OBB>& new_detections);
     

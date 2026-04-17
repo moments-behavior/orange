@@ -504,13 +504,14 @@ void OBBDetector::draw_obb_objects(const cv::Mat& image, cv::Mat& res,
 // ---------------------------------------------------------------------------
 
 // Segment the bright cylinder using a percentile-based threshold
-// (adapts to any lighting), then fit the shape.  Returns the
-// RotatedRect of the cylinder contour via out_rect if non-null.
+// (adapts to any lighting), then compute orientation from image
+// moments (PCA).  Moments are far more stable than minAreaRect
+// for near-square objects because they weight ALL pixels in the
+// blob, not just the boundary.
 float OBBDetector::extract_angle_from_local_mask(
     const cv::Mat& frame, float cx, float cy,
     float crop_w, float crop_h, float pad_factor) {
 
-    // Overload without out_rect
     cv::RotatedRect dummy;
     return extract_angle_and_rect(frame, cx, cy, crop_w, crop_h, pad_factor, dummy);
 }
@@ -534,9 +535,7 @@ float OBBDetector::extract_angle_and_rect(
     cv::cvtColor(patch, gray, cv::COLOR_BGR2GRAY);
     cv::GaussianBlur(gray, blur, cv::Size(3, 3), 0);
 
-    // Percentile-based threshold: the cylinder is the brightest region
-    // in the crop.  Use the 85th percentile as the cutoff — this adapts
-    // automatically to any exposure or lighting condition.
+    // Percentile threshold: isolate the brightest ~15% (the cylinder)
     std::vector<uchar> pixels(blur.begin<uchar>(), blur.end<uchar>());
     std::nth_element(pixels.begin(), pixels.begin() + (int)(pixels.size() * 0.85f), pixels.end());
     int thresh = pixels[(int)(pixels.size() * 0.85f)];
@@ -546,7 +545,7 @@ float OBBDetector::extract_angle_and_rect(
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     if (contours.empty()) return 0.0f;
 
-    // Pick the contour closest to patch center (where YOLO says the cylinder is)
+    // Pick contour closest to patch center
     cv::Point2f patch_center(patch.cols / 2.0f, patch.rows / 2.0f);
     int best_idx = -1;
     float best_dist = std::numeric_limits<float>::max();
@@ -561,14 +560,20 @@ float OBBDetector::extract_angle_and_rect(
     if (best_idx < 0) return 0.0f;
 
     const auto& cnt = contours[best_idx];
-    cv::RotatedRect rect = cv::minAreaRect(cnt);
 
-    // Translate rect center back to frame coordinates
+    // Use image moments (PCA) for angle — weights every pixel in the
+    // blob equally, much more stable than minAreaRect for near-square shapes.
+    cv::Moments m = cv::moments(cnt);
+    float angle_rad = 0.5f * std::atan2(2.0f * m.mu11, m.mu20 - m.mu02);
+    float angle_deg = angle_rad * 180.0f / (float)M_PI;
+
+    // Fill out_rect with minAreaRect for callers that need it
+    cv::RotatedRect rect = cv::minAreaRect(cnt);
     out_rect = cv::RotatedRect(
         cv::Point2f(rect.center.x + x1p, rect.center.y + y1p),
         rect.size, rect.angle);
 
-    return rect.angle;
+    return angle_deg;
 }
 
 // Not used — kept for API compatibility
@@ -648,26 +653,20 @@ std::vector<OBB> OBBDetector::refine_yolo_detections(
         float cx  = bx1 + bw / 2.0f;
         float cy  = by1 + bh / 2.0f;
 
-        // Segment the bright cylinder and get its actual shape
-        float crop_w = std::max(bw, (prior_w > 0) ? prior_w : bw);
-        float crop_h = std::max(bh, (prior_h > 0) ? prior_h : bh);
+        // Size is locked to the CSV prior — this is the known cylinder
+        // dimension and keeps the OBB a perfect fit.
+        float obb_w = (prior_w > 0) ? prior_w : bw;
+        float obb_h = (prior_h > 0) ? prior_h : bh;
+
+        // Extract angle from the bright cylinder contour (moments/PCA)
+        float crop_w = std::max(bw, obb_w);
+        float crop_h = std::max(bh, obb_h);
         cv::RotatedRect measured;
         float raw_angle = extract_angle_and_rect(frame, cx, cy,
                                                  crop_w, crop_h, 2.0f, measured);
 
         // Temporal smoothing via EMA
         float angle = smooth_angle(cx, cy, raw_angle);
-
-        // Use the actual measured size from the contour if we got one,
-        // otherwise fall back to priors
-        float obb_w, obb_h;
-        if (measured.size.width > 0 && measured.size.height > 0) {
-            obb_w = measured.size.width;
-            obb_h = measured.size.height;
-        } else {
-            obb_w = (prior_w > 0) ? prior_w : bw;
-            obb_h = (prior_h > 0) ? prior_h : bh;
-        }
 
         cv::RotatedRect rrect(cv::Point2f(cx, cy), cv::Size2f(obb_w, obb_h), angle);
         cv::Point2f pts[4];

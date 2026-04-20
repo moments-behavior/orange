@@ -130,6 +130,20 @@ The recorded videos are saved at `orange_data/exp/unsorted` by default. But it c
 Please refer to [`docs/ptp.md`](docs/ptp.md) for detailed instruction for configure PTP. 
 
 
+## Citation
+**Orange** is devloped by Jinyao Yan, with contributionos from Diptodip Deb, Wilson Chen, Ratan Othayoth and Rob Johnson. If you use **Orange**, please cite the software 
+
+```bibtex
+@software{Orange,
+  author = {Jinyao Yan, Diptodip Deb, Wilson Chen, Ratan Othayoth, Jeremy Delahanty, Rob Jonhson},
+  title = {Moments-behavior:orange},
+  url = {https://github.com/moments-behavior/orange},
+  date = {2026-04-20}
+}
+```
+
+Contact [Jinyao Yan](yanj11@janelia.hhmi.org) if you have questions about the software 
+
 ## Contribute
 
 Please open an issue for bug fix or feature request. If you wish to make changes to the source code, you can fork the repo. To contribute to the project, please create a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).

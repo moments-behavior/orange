@@ -131,7 +131,7 @@ Please refer to [`docs/ptp.md`](docs/ptp.md) for detailed instruction for config
 
 
 ## Citation
-**Orange** is devloped by Jinyao Yan, with contributionos from Diptodip Deb, Wilson Chen, Ratan Othayoth and Rob Johnson. If you use **Orange**, please cite the software 
+**Orange** is devloped by Jinyao Yan, with contributionos from Diptodip Deb, Wilson Chen, Ratan Othayoth, Jeremy Delahanty, and Rob Johnson. If you use **Orange**, please cite the software 
 
 ```bibtex
 @software{Orange,

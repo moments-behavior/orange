@@ -3,8 +3,6 @@ A multi-camera capture, streaming and recording GUI application for emergent cam
 
 [![DOI](https://zenodo.org/badge/441315991.svg)](https://doi.org/10.5281/zenodo.19688149)
 
-Contact [Jinyao Yan](yanj11@janelia.hhmi.org) if you have questions about the software 
-
 ![gui](images/gui.png)
 
 ## Video demo 

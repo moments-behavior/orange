@@ -140,7 +140,9 @@ Please refer to [`docs/ptp.md`](docs/ptp.md) for detailed instruction for config
   author = {Jinyao Yan, Diptodip Deb, Wilson Chen, Ratan Othayoth, Jeremy Delahanty, Rob Jonhson},
   title = {Moments-behavior:orange},
   url = {https://github.com/moments-behavior/orange},
-  date = {2026-04-20}
+  date = {2026-04-20},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.19688150},
 }
 ```
 

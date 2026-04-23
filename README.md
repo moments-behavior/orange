@@ -1,4 +1,4 @@
-# orange :orange: 
+# orange capture :orange: 
 A multi-camera capture, streaming and recording GUI application for emergent cameras in C++
 
 ![gui](images/gui.png)

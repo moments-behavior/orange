@@ -221,7 +221,7 @@ For multi-host capture, the GUI host runs `orange` and each capture host runs `r
    - `port` can be set per server; otherwise `default_port` is used.
    - `name` is the logical id (matches the argv `cam_server` is started with).
 
-   If this file is missing or malformed, `orange` exits at startup with a specific error.
+   The file is only needed for network mode. If it's absent, `orange` starts up normally and network features are unavailable; if it's present but malformed, `orange` prints a warning and continues.
 
 2. On every host (GUI host + capture hosts), create a matching `orange_data/config/network/<preset>/` folder containing one JSON per camera in the rig (named after the camera serial). The folder can be identical across hosts.
 

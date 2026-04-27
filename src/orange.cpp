@@ -144,11 +144,14 @@ int main(int argc, char **args) {
         orange_root_dir_str + "/config/network/endpoints.json";
 
     std::vector<ServerEndpoint> endpoints;
-    try {
-        endpoints = load_server_endpoints(endpoints_path);
-    } catch (const std::exception &e) {
-        fprintf(stderr, "fatal: %s\n", e.what());
-        return 1;
+    if (std::filesystem::exists(endpoints_path)) {
+        try {
+            endpoints = load_server_endpoints(endpoints_path);
+        } catch (const std::exception &e) {
+            fprintf(stderr, "warning: %s\n", e.what());
+            fprintf(stderr,
+                    "network mode unavailable until endpoints.json is fixed\n");
+        }
     }
 
     std::vector<std::pair<std::string, int>> cams;

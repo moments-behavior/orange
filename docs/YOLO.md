@@ -47,6 +47,8 @@ pip install -r requirements.txt
 pip install tensorrt==10.11.0.33
 ```
 
+> **Pin `tensorrt` to match your `orange` build.** The Python wheel used here compiles the `.engine` file, and the C++ TensorRT runtime that `orange` is linked against must load it. They have to match at the same major.minor version. `orange` has been tested with TensorRT 8.6.1.6, 10.0.1.6, and 10.11.0.33 — replace the pin above with whichever runtime version you installed (see [`install_tensorrt.md`](install_tensorrt.md)).
+
 Now we convert the `.pt` to `.onnx`:
 ```
 python3 export-det.py \

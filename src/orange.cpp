@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include "implot.h"
 #include "realtime_tool.h"
+#include "server_endpoints.h"
 #include "utils.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
@@ -138,10 +139,24 @@ int main(int argc, char **args) {
     bool ptp_stream_sync = false;
 
     AppContext ctx; // ENetGuard constructed here (enet_initialize)
-    // std::vector<std::pair<std::string, int>> cams = {{"127.0.0.1", 34001},
-    //                                                  {"127.0.0.1", 34002}};
-    std::vector<std::pair<std::string, int>> cams = {{"192.168.20.60", 34001},
-                                                     {"192.168.20.61", 34001}};
+
+    const std::string endpoints_path =
+        orange_root_dir_str + "/config/network/endpoints.json";
+
+    std::vector<ServerEndpoint> endpoints;
+    try {
+        endpoints = load_server_endpoints(endpoints_path);
+    } catch (const std::exception &e) {
+        fprintf(stderr, "fatal: %s\n", e.what());
+        return 1;
+    }
+
+    std::vector<std::pair<std::string, int>> cams;
+    cams.reserve(endpoints.size());
+    for (const auto &ep : endpoints) {
+        cams.emplace_back(ep.host, ep.port);
+    }
+
     host_client_start_net_thread(ctx); // start dispatcher thread
     host_client_init(ctx, cams);
 
@@ -174,7 +189,6 @@ int main(int argc, char **args) {
     std::vector<std::string> color_temps = {"CT_Off",   "CT_2800K", "CT_3000K",
                                             "CT_4000K", "CT_5000K", "CT_6500K",
                                             "CT_Custom"};
-    std::vector<std::string> server_names = {"waffle-0", "waffle-1"};
     std::thread detection3d_thread;
     bool show_error = false;
     std::string error_message;

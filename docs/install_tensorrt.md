@@ -1,5 +1,9 @@
 - [tensor-rt (depends on nvidia-driver and CUDA)](#install-tensor-rt)
 
+> `orange` has been tested with TensorRT **8.6.1.6**, **10.0.1.6**, and **10.11.0.33**. Pick the version that matches your CUDA: 8.6.x for CUDA 12.0, 10.x for CUDA 12.2+. The version examples below are illustrative — substitute the version that matches your CUDA install.
+>
+> **Important:** the `tensorrt` Python wheel used to compile a YOLO `.engine` file (see [`YOLO.md`](YOLO.md)) must match the C++ TensorRT runtime that `orange` was built against, at the same major.minor version. Engines are not portable across TensorRT versions.
+
 ### install tensor-rt
 this is based on [these instructions](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html#installing-tar) (has more details if needed)
 

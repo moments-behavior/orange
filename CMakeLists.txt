@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 project(OrangeApp LANGUAGES CXX CUDA)
 
-# CUDA
-set(CMAKE_CUDA_ARCHITECTURES 80)
+# CUDA — build for both tested architectures (Turing 7.5, Ampere 8.0) by default.
+# Override at configure time with e.g. -DCMAKE_CUDA_ARCHITECTURES=86 for a single arch.
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75 80)
+endif()
 
 # ---- Options ---------------------------------------------------------------
 option(BUILD_ORANGE         "Build GUI 'orange' app"        ON)

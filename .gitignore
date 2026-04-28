@@ -42,6 +42,9 @@ targets*/
 # Editor files
 *#*
 
+# OS files
+.DS_Store
+
 # Media file
 *.mp4
 *.avi

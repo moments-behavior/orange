@@ -1,135 +1,39 @@
-# orange capture 🎥 
-A multi-camera capture, streaming and recording GUI application for emergent cameras in C++
+# orange capture 🎥
+
+A high-performance, GPU-accelerated multi-camera capture, streaming and recording application for Emergent GigE Vision cameras, built in C++.
 
 ![gui](images/gui.png)
 
-## Video demo 
-Please see this [link](https://youtu.be/ahceluqBYj8) for a video demo of the app. 
+## Overview
 
-## Features 
-1. Multiple cameras streaming 
-2. PTP synchronization 
-3. GPU accelerated encoding (h264, h265)
-3. Support mono and color Emergent cameras
-4. Multiple servers communication
+`orange` is built for high-throughput, time-synchronized multi-camera recording. Encoding is GPU-accelerated and scales with the number of GPUs in the host. PTP keeps cameras aligned to sub-frame precision, and a multi-host architecture (one GUI host coordinating any number of headless `cam_server` nodes over ENet) lets a recording rig scale beyond what a single machine can drive — both in camera count and aggregate pixel rate. Optional TensorRT-based YOLO detection runs on the live streams when a model is provided.
 
-## Benchmark
-Encoding performance using GPU A6000 with 7MP Emergent camera
+## Documentation
 
-![encoding_benchmark](images/encoding_benchmark.png)
+Full documentation — installation, system requirements, configuration, network mode, real-time detection, PTP — lives at the [moments-behavior docs site](https://moments-behavior.github.io/docs/orange/).
 
-## Dependencies
-1. Emergent SDK
-2. CUDA Toolkit
-3. FFmpeg 
-4. OpenCV 
-5. OpenGL and GLEW 
-6. DearImGUI and related repos
-7. TensorRT 
-8. ENET
+[Video demo](https://youtu.be/ahceluqBYj8)
 
-## Build instructions 
-0. If you wish to skip the build process, an Ubuntu image is available with preinstalled `orange` and the labeling app `red`. Please contact the developer for accessing the image and follow instructions [here](docs/clonezilla_image.md). 
+## Quick build
 
-1. Install CUDA (the software has been tested with version 12.x) and Emergent camera SDK. Follow instructions in [`docs/install_linux_cuda_eSDK.md`](docs/install_linux_cuda_eSDK.md). Make sure you can stream all cameras individually with Emergent `eCapture`.  
+Linux-only. Requires an NVIDIA GPU with NVENC. See the docs for full system requirements and the dependency install walkthrough.
 
-2. Install FFmpeg 4.4
-
-Refer to [`docs/install_ffmpeg.md`](docs/install_ffmpeg.md) for detailed instruction for building FFmpeg 4.4. 
-
-The project build file [`build.sh`](build.sh) assumes FFmpeg is installed at `$HOME/nvidia/ffmpeg`, if you installed it at a different location, please change the `build.sh` `DIR_FFMPEG` to match your install directory. 
-
-3. Install OpenGL and GLEW
-```
-sudo apt-get install libglfw3
-sudo apt-get install libglfw3-dev
-sudo apt-get install libglew-dev
+```bash
+git clone --recursive https://github.com/moments-behavior/orange.git
+cd orange
+./build.sh    # builds release/orange, release/cam_server, release/yolo_offline
+./run.sh      # sudo release/orange
 ```
 
-4. Install OpenCV
-Refer to [`docs/install_opencv.md`](docs/install_opencv.md) for detailed instruction for building OpenCV. 
+## Authors
 
-5. Install TensorRT 
-Followings instruction: [`docs/install_tensorrt.md`](docs/install_tensorrt.md). The project build assumes TensorRT installed at `$HOME/nvidia/TensorRT`. If you installed in at a different location, please change the [`build.sh`](build.sh) `DIR_TENSORRT` to match your install directory.
+**Orange** is developed by Jinyao Yan, with contributions from Diptodip Deb, Wilson Chen, Ratan Othayoth, Jeremy Delahanty, and Rob Johnson.
 
-6. Install ENET
-Follow instruction: http://enet.bespin.org/Installation.html. You might need to run `sudo ldconfig` in terminal after installation, or simply reboot your computer. 
-
-7. Clone the repo and submodules
-
-```
-git clone --recursive https://github.com/JohnsonLabJanelia/orange.git
-```
-
-8. If you are building the project for the first time, uncomment [`line 15 ~ line 25`](https://github.com/JohnsonLabJanelia/orange/blob/5d7a1b9ec4738f8075895a2a0b27cff556aca834/build.sh#L15) for building `ImGui` and `ImPlot` object files. Run
-```
-./build.sh
-```
-Comment out Line 15 ~ line 25 to reduce compiling time afterwards. 
-
-Once built, it will make a folder called `targets`. The executable `orange` is the application. Start the program using the run script. 
-
-```
-./run.sh
-```
-
-## Use the Application
-When first time open the program, `orange` creates folders with the following structure
-
-```
-orange_data
-├── config
-│   ├── local
-│   └── network
-├── detect
-├── exp
-│   └── unsorted
-└── pictures
-
-```
-
-The are two modes of using the application: local vs network. Local means all cameras are connected to one server, while network can support multiple servers. 
-
-### Local mode
-One could save preconfigued camera settings in a folder under `local`, for instance
-
-```
-orange_data
-├── config
-│   ├── local
-│   │   ├── 5cam
-│   │   │   ├── 2002488.json
-│   │   │   ├── 2002489.json
-│   │   │   ├── 2002490.json
-│   │   │   ├── 2002496.json
-│   │   │   └── 710038.json
-│   │   └── center_ceiling
-│   │       └── 710038.json
-│   └── network
-├── detect
-│   └── rat_bbox.engine
-├── exp
-│   └── unsorted
-│       └── 2024_10_31_13_09_41
-│           ├── Cam710038_meta.csv
-│           └── Cam710038.mp4
-└── pictures
-    └── 710038_0.tiff
-
-```
-In the node folder (like `5cam` folder), it contains 1 or more camera configs `[camera serial].json`. An example config file is in the `config` folder. Please name the file after the serial number of your cameras and set the config according to your camera specifications. To enable `gpu_direct`, set `gpu_direct` to true, and set the `gpu_id` to select which gpu to use for image processing of the camera. 
-
-### Network mode
-One can network multiple PCs to scale up to more cameras. 
-
-The recorded videos are saved at `orange_data/exp/unsorted` by default. But it can be easily changed while using the app. 
-
-### PTP setting
-Please refer to [`docs/ptp.md`](docs/ptp.md) for detailed instruction for configure PTP. 
-
+Contact [Jinyao Yan](mailto:yanj11@janelia.hhmi.org) with questions about the software.
 
 ## Citation
-**Orange** is devloped by Jinyao Yan, with contributions from Diptodip Deb, Wilson Chen, Ratan Othayoth, Jeremy Delahanty, and Rob Johnson. If you use **Orange**, please cite the software 
+
+If you use **Orange**, please cite the software:
 
 ```bibtex
 @software{moments_behavior_orange_2026,
@@ -149,10 +53,6 @@ Please refer to [`docs/ptp.md`](docs/ptp.md) for detailed instruction for config
 }
 ```
 
-Contact [Jinyao Yan](yanj11@janelia.hhmi.org) if you have questions about the software 
-
 ## Contribute
 
-Please open an issue for bug fix or feature request. If you wish to make changes to the source code, you can fork the repo. To contribute to the project, please create a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
-
-
+Please open an issue for bug fixes or feature requests. If you wish to make changes to the source code, fork the repo and open a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).

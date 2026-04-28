@@ -1,0 +1,7 @@
+{
+  "default_port": 34001,
+  "servers": [
+    { "name": "waffle-0", "host": "192.168.20.60" },
+    { "name": "waffle-1", "host": "192.168.20.61" }
+  ]
+}

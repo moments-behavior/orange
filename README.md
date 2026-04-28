@@ -1,4 +1,4 @@
-# orange capture 🎥
+# <img src="icon.png" alt="" height="48"> orange capture
 
 A high-performance, GPU-accelerated multi-camera capture, streaming and recording application for Emergent GigE Vision cameras, built in C++.
 

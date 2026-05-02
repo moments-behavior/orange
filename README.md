@@ -1,6 +1,6 @@
 # <img src="icon.png" alt="" height="48"> orange capture
 
-A high-performance, GPU-accelerated multi-camera capture, streaming and recording application for [Emergent GigE Vision](https://emergentvisiontec.com/) cameras.
+A high-performance, GPU-accelerated multi-camera capture, streaming and recording application for [Emergent Vision](https://emergentvisiontec.com/) GigE cameras.
 
 ![gui](images/gui.png)
 

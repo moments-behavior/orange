@@ -223,7 +223,8 @@ int main(int argc, char **args) {
                              &encoder_preset,
                              &evt_buffer_size,
                              &display_gpu_id,
-                             &tex_gl};
+                             &tex_gl,
+                             &ptp_stream_sync};
 
     set_host_client_ctx(&client_ctx);
 
@@ -864,12 +865,6 @@ int main(int argc, char **args) {
                         std::string folder_name =
                             input_folder + "/" + get_current_date_time();
                         make_folder(folder_name);
-                        // if (num_cameras > 1) {
-                        ptp_stream_sync = true;
-                        // } else {
-                        //     ptp_stream_sync = false;
-                        // }
-
                         cudaSetDevice(display_gpu_id);
                         tex_gl = new GL_Texture[num_cameras];
                         for (int i = 0; i < num_cameras; i++) {
@@ -897,7 +892,6 @@ int main(int argc, char **args) {
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, num_cameras,
                             evt_buffer_size, ptp_params, detection3d_thread);
-                        ptp_stream_sync = false;
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =

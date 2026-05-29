@@ -69,6 +69,15 @@ void start_camera_streaming(
     std::string calib_yaml_folder, std::thread &detection3d_thread,
     AppContext *ctx) {
     detector_counter.store(0);
+    const bool network_sync_requested = ptp_params->network_sync;
+    camera_control->sync_camera = false;
+    ptp_params->network_sync = false;
+    ptp_params->network_set_start_ptp = false;
+    ptp_params->network_set_stop_ptp = false;
+    ptp_params->ptp_start_reached = false;
+    ptp_params->ptp_stop_reached = false;
+    ptp_params->ptp_counter = 0;
+    ptp_params->ptp_stop_counter = 0;
     detection2d = new DetectionDataPerCam[num_cameras];
     int idx3d = 0;
     int total_standoff_detector = 0;
@@ -118,6 +127,7 @@ void start_camera_streaming(
         for (int i = 0; i < num_cameras; i++) {
             ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
         }
+        ptp_params->network_sync = network_sync_requested;
         camera_control->sync_camera = true;
     }
 

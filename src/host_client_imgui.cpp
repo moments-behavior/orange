@@ -92,6 +92,8 @@ static void on_startthread_phase_start(std::string encoder_setup,
     std::thread &detection3d_thread = *g_clientctx->detection3d_thread;
     std::string &calib_yaml_folder = *g_clientctx->calib_yaml_folder;
     PTPParams *ptp_params = g_clientctx->ptp_params;
+    bool ptp_stream_sync = g_clientctx->ptp_stream_sync &&
+                           *g_clientctx->ptp_stream_sync;
     int &num_cameras = *g_clientctx->num_cameras;
     int &evt_buffer_size = *g_clientctx->evt_buffer_size;
     int &display_gpu_id = *g_clientctx->display_gpu_id;
@@ -103,7 +105,7 @@ static void on_startthread_phase_start(std::string encoder_setup,
 
     // functionality
     make_folder(folder_name);
-    ptp_params->network_sync = true;
+    ptp_params->network_sync = ptp_stream_sync;
     CameraControl *camera_control = g_clientctx->camera_control;
     camera_control->record_video = true;
     camera_control->subscribe = true;
@@ -122,11 +124,13 @@ static void on_startthread_phase_start(std::string encoder_setup,
 
     start_camera_streaming(
         *camera_threads, camera_control, ecams, cameras_params, cameras_select,
-        tex_gl, num_cameras, evt_buffer_size, true, encoder_setup, folder_name,
-        ptp_params, calib_yaml_folder, detection3d_thread, g_ctxp);
+        tex_gl, num_cameras, evt_buffer_size, ptp_stream_sync, encoder_setup,
+        folder_name, ptp_params, calib_yaml_folder, detection3d_thread, g_ctxp);
 }
 
 static bool is_startthread_ready() {
+    if (!g_clientctx->ptp_stream_sync || !*g_clientctx->ptp_stream_sync)
+        return true;
     auto num_cameras = *g_clientctx->num_cameras;
     PTPParams *ptp_params = g_clientctx->ptp_params;
     return ptp_params->ptp_counter == num_cameras;
@@ -189,12 +193,24 @@ static void on_startstreaming_phase_start(std::string folder_name,
 
 static void on_startrecord_phase_start(unsigned long long ptp_global_time) {
     PTPParams *ptp_params = g_clientctx->ptp_params;
+    const bool ptp_stream_sync = g_clientctx->ptp_stream_sync &&
+                                 *g_clientctx->ptp_stream_sync;
+    if (!ptp_stream_sync) {
+        return;
+    }
     ptp_params->ptp_global_time = ptp_global_time;
     ptp_params->network_set_start_ptp = true;
 }
 
 static void on_stoprecord_phase_start(unsigned long long ptp_global_time) {
     PTPParams *ptp_params = g_clientctx->ptp_params;
+    const bool ptp_stream_sync = g_clientctx->ptp_stream_sync &&
+                                 *g_clientctx->ptp_stream_sync;
+    if (!ptp_stream_sync) {
+        CameraControl *camera_control = g_clientctx->camera_control;
+        camera_control->subscribe = false;
+        return;
+    }
     ptp_params->ptp_stop_time = ptp_global_time;
     ptp_params->network_set_stop_ptp = true;
 }
@@ -298,6 +314,8 @@ static void cleanup_host_client_resources() {
 }
 
 static bool is_stoprecording_ready() {
+    if (!g_clientctx->ptp_stream_sync || !*g_clientctx->ptp_stream_sync)
+        return true;
     const PTPParams *ptp = g_clientctx->ptp_params;
     return ptp && ptp->network_set_stop_ptp && ptp->ptp_stop_reached;
 }
@@ -342,13 +360,14 @@ static std::vector<uint8_t> build_cmd_open(const std::string &job_id,
 static std::vector<uint8_t>
 build_cmd_startthreads(const std::string &job_id, uint32_t epoch, uint32_t seq,
                        const std::string &record_folder,
-                       const std::string &encoder_setup) {
+                       const std::string &encoder_setup,
+                       bool ptp_stream_sync) {
     using namespace camnet::v1;
     flatbuffers::FlatBufferBuilder b(256);
     auto jid = b.CreateString(job_id);
     auto rec = b.CreateString(record_folder);
     auto enc = b.CreateString(encoder_setup);
-    auto args = CreateStartThreadsArgs(b, rec, enc);
+    auto args = CreateStartThreadsArgs(b, rec, enc, ptp_stream_sync);
     auto msg =
         CreateServer(b, Kind_KindCommand, ServerControl_STARTTHREAD, jid, epoch,
                      seq, CommandBody_StartThreadsArgs, args.Union(), 0);
@@ -874,8 +893,10 @@ static void broadcast_current_phase() {
             g_folder_name =
                 *g_clientctx->input_folder + "/" + get_current_date_time();
         }
+        const bool ptp_stream_sync = g_clientctx->ptp_stream_sync &&
+                                     *g_clientctx->ptp_stream_sync;
         bytes = build_cmd_startthreads(g_jid, g_epoch, g_seq, g_folder_name,
-                                       encoder_setup);
+                                       encoder_setup, ptp_stream_sync);
         if (!g_phase_started) {
             on_startthread_phase_start(encoder_setup, g_folder_name);
             g_phase_started = true;
@@ -884,12 +905,18 @@ static void broadcast_current_phase() {
     }
     case Phase_Start: {
         if (!g_phase_started) {
-            CameraEmergent *&ecams = *g_clientctx->ecams;
-            unsigned long long ptp_time =
-                get_current_PTP_time(&ecams[0].camera);
-            int delay_in_second = 3;
-            g_ptp_start_time =
-                ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+            const bool ptp_stream_sync = g_clientctx->ptp_stream_sync &&
+                                         *g_clientctx->ptp_stream_sync;
+            if (ptp_stream_sync) {
+                CameraEmergent *&ecams = *g_clientctx->ecams;
+                unsigned long long ptp_time =
+                    get_current_PTP_time(&ecams[0].camera);
+                int delay_in_second = 3;
+                g_ptp_start_time =
+                    ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+            } else {
+                g_ptp_start_time = 0;
+            }
         }
         bytes = build_cmd_start(g_jid, g_epoch, g_seq, g_ptp_start_time);
 
@@ -901,12 +928,18 @@ static void broadcast_current_phase() {
     }
     case Phase_Stop: {
         if (!g_phase_started) {
-            CameraEmergent *&ecams = *g_clientctx->ecams;
-            unsigned long long ptp_time =
-                get_current_PTP_time(&ecams[0].camera);
-            int delay_in_second = 3;
-            g_ptp_stop_time =
-                ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+            const bool ptp_stream_sync = g_clientctx->ptp_stream_sync &&
+                                         *g_clientctx->ptp_stream_sync;
+            if (ptp_stream_sync) {
+                CameraEmergent *&ecams = *g_clientctx->ecams;
+                unsigned long long ptp_time =
+                    get_current_PTP_time(&ecams[0].camera);
+                int delay_in_second = 3;
+                g_ptp_stop_time =
+                    ((unsigned long long)delay_in_second) * 1000000000 + ptp_time;
+            } else {
+                g_ptp_stop_time = 0;
+            }
         }
 
         bytes = build_cmd_stop(g_jid, g_epoch, g_seq, g_ptp_stop_time);
@@ -1201,8 +1234,10 @@ void host_client_tick() {
         break;
     case camnet::v1::ServerControl_STARTTHREAD:
         ready_now = is_startthread_ready();
+        break;
     case camnet::v1::ServerControl_STARTSTREAMING:
         ready_now = is_startstreaming_ready();
+        break;
     default:
         ready_now = true;
         break;

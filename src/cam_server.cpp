@@ -209,7 +209,8 @@ static bool open_cameras(const std::string &config_folder) {
 }
 
 static bool start_camera_thread(std::string record_folder,
-                                std::string encoder_basic_setup) {
+                                std::string encoder_basic_setup,
+                                bool ptp_stream_sync) {
 
     // RAII guard: if we exit false, join any threads we created.
     struct Joiner {
@@ -245,16 +246,18 @@ static bool start_camera_thread(std::string record_folder,
 
     camera_control.record_video = true;
     camera_control.subscribe = true;
-    camera_control.sync_camera = true;
-    ptp_params.network_sync = true;
+    camera_control.sync_camera = ptp_stream_sync;
+    ptp_params.network_sync = ptp_stream_sync;
 
     if (!make_folder(record_folder)) {
         std::cout << "Error creating recording folder." << std::endl;
         return false;
     }
 
-    for (int i = 0; i < cam_count; i++) {
-        ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+    if (ptp_stream_sync) {
+        for (int i = 0; i < cam_count; i++) {
+            ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+        }
     }
 
     for (int i = 0; i < cam_count; i++) {
@@ -276,7 +279,7 @@ static bool start_camera_thread(std::string record_folder,
     auto t0 = steady_clock::now();
     const auto timeout = 180s; // tune for your hardware
 
-    while (ptp_params.ptp_counter != cam_count) {
+    while (ptp_stream_sync && ptp_params.ptp_counter != cam_count) {
         if (steady_clock::now() - t0 > timeout) {
             // give up gracefully: flip subscribe so threads can finish politely
             camera_control.subscribe = false;
@@ -439,9 +442,11 @@ static bool ctrl_action(camnet::v1::ServerControl c,
             return false;
         std::string record_folder = sta->record_folder()->str();
         std::string encoder_setup = sta->encoder_setup()->str();
+        bool ptp_stream_sync = sta->ptp_stream_sync();
         std::cout << record_folder << std::endl;
         std::cout << encoder_setup << std::endl;
-        return start_camera_thread(record_folder, encoder_setup);
+        return start_camera_thread(record_folder, encoder_setup,
+                                   ptp_stream_sync);
     }
 
     case camnet::v1::ServerControl_STARTRECORDING: {
@@ -461,6 +466,11 @@ static bool ctrl_action(camnet::v1::ServerControl c,
             return false;
         unsigned long long ptp_stop_time = record_stop->ptp_time();
         std::cout << ptp_stop_time << std::endl;
+        if (!ptp_params.network_sync) {
+            camera_control.subscribe = false;
+            cleanup_host_server_resources();
+            return true;
+        }
         ptp_params.ptp_stop_time = ptp_stop_time;
         ptp_params.network_set_stop_ptp = true;
         // check if it has stopped

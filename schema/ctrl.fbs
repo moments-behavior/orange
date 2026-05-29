@@ -28,7 +28,7 @@ table BringupMessage {
 
 // ---- Command payloads ----
 table OpenArgs           { config_folder:string; }
-table StartThreadsArgs   { record_folder:string; encoder_setup:string; }
+table StartThreadsArgs   { record_folder:string; encoder_setup:string; ptp_stream_sync:bool = false; }
 table StartArgs          { ptp_time:uint64; }
 table StopArgs           { ptp_time:uint64; }
 table StartStreamingArgs { calib_folder:string; save_format:string;}
@@ -61,4 +61,3 @@ table Server {
 }
 
 root_type Server;
-

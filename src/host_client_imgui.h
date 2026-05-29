@@ -33,6 +33,7 @@ struct HostClientCtx {
     int *evt_buffer_size = nullptr;
     int *display_gpu_id = nullptr;
     GL_Texture **tex_gl = nullptr;
+    bool *ptp_stream_sync = nullptr;
 };
 
 void host_client_start_net_thread(AppContext &ctx); // starts dispatcher thread

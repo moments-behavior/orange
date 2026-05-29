@@ -336,13 +336,17 @@ struct StartThreadsArgs FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef StartThreadsArgsBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_RECORD_FOLDER = 4,
-    VT_ENCODER_SETUP = 6
+    VT_ENCODER_SETUP = 6,
+    VT_PTP_STREAM_SYNC = 8
   };
   const ::flatbuffers::String *record_folder() const {
     return GetPointer<const ::flatbuffers::String *>(VT_RECORD_FOLDER);
   }
   const ::flatbuffers::String *encoder_setup() const {
     return GetPointer<const ::flatbuffers::String *>(VT_ENCODER_SETUP);
+  }
+  bool ptp_stream_sync() const {
+    return GetField<uint8_t>(VT_PTP_STREAM_SYNC, 0) != 0;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -364,6 +368,9 @@ struct StartThreadsArgsBuilder {
   void add_encoder_setup(::flatbuffers::Offset<::flatbuffers::String> encoder_setup) {
     fbb_.AddOffset(StartThreadsArgs::VT_ENCODER_SETUP, encoder_setup);
   }
+  void add_ptp_stream_sync(bool ptp_stream_sync) {
+    fbb_.AddElement<uint8_t>(StartThreadsArgs::VT_PTP_STREAM_SYNC, static_cast<uint8_t>(ptp_stream_sync), 0);
+  }
   explicit StartThreadsArgsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -378,8 +385,10 @@ struct StartThreadsArgsBuilder {
 inline ::flatbuffers::Offset<StartThreadsArgs> CreateStartThreadsArgs(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> record_folder = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> encoder_setup = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> encoder_setup = 0,
+    bool ptp_stream_sync = false) {
   StartThreadsArgsBuilder builder_(_fbb);
+  builder_.add_ptp_stream_sync(ptp_stream_sync);
   builder_.add_encoder_setup(encoder_setup);
   builder_.add_record_folder(record_folder);
   return builder_.Finish();
@@ -388,13 +397,15 @@ inline ::flatbuffers::Offset<StartThreadsArgs> CreateStartThreadsArgs(
 inline ::flatbuffers::Offset<StartThreadsArgs> CreateStartThreadsArgsDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *record_folder = nullptr,
-    const char *encoder_setup = nullptr) {
+    const char *encoder_setup = nullptr,
+    bool ptp_stream_sync = false) {
   auto record_folder__ = record_folder ? _fbb.CreateString(record_folder) : 0;
   auto encoder_setup__ = encoder_setup ? _fbb.CreateString(encoder_setup) : 0;
   return camnet::v1::CreateStartThreadsArgs(
       _fbb,
       record_folder__,
-      encoder_setup__);
+      encoder_setup__,
+      ptp_stream_sync);
 }
 
 struct StartArgs FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

@@ -11,6 +11,7 @@
 #include <EvtParamAttribute.h>
 #include <emergentcameradef.h>
 #include <emergentgigevisiondef.h>
+#include <stdexcept>
 #include <string>
 #include <unistd.h>
 
@@ -70,6 +71,19 @@ struct CameraParams {
 
 std::string get_evt_error_string(EVT_ERROR error);
 
+struct CameraError : public std::runtime_error {
+    EVT_ERROR error_code;
+    std::string camera_serial;
+    std::string file;
+    int line;
+
+    CameraError(EVT_ERROR error, const char *serial, const char *source_file,
+                int source_line)
+        : std::runtime_error(get_evt_error_string(error)), error_code(error),
+          camera_serial(serial ? serial : ""),
+          file(source_file ? source_file : ""), line(source_line) {}
+};
+
 #define check_camera_errors(err, camera_serial)                                \
     __check_camera_errors(err, camera_serial, __FILE__, __LINE__)
 
@@ -84,7 +98,7 @@ inline void __check_camera_errors(EVT_ERROR err, const char *camera_serial,
                 "file <%s>, "
                 "line %i.\n",
                 camera_serial, err, errorStr, file, line);
-        throw(EXIT_FAILURE);
+        throw CameraError(err, camera_serial, file, line);
     }
 }
 
@@ -164,7 +178,8 @@ void update_focus_value(Emergent::CEmergentCamera *camera, int focus_value,
                         CameraParams *camera_params);
 void update_iris_value(Emergent::CEmergentCamera *camera, int iris_value,
                        CameraParams *camera_params);
-int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
+int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info,
+                 bool log_empty = true);
 void allocate_frame_reorder_buffer(Emergent::CEmergentCamera *camera,
                                    Emergent::CEmergentFrame *frame_reorder,
                                    CameraParams *camera_params);

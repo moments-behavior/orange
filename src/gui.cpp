@@ -503,13 +503,38 @@ void open_selected_cameras(const std::vector<bool> &check, int cam_count,
             }
         }
 
-        ecams = new CameraEmergent[num_cameras];
-        for (int i = 0; i < num_cameras; i++) {
-            open_camera_with_params(&ecams[i].camera,
-                                    &device_info[cameras_params[i].camera_id],
-                                    &cameras_params[i]);
-        }
+        int opened_cameras = 0;
+        int attempted_camera = -1;
+        try {
+            ecams = new CameraEmergent[num_cameras];
+            for (int i = 0; i < num_cameras; i++) {
+                attempted_camera = i;
+                open_camera_with_params(
+                    &ecams[i].camera,
+                    &device_info[cameras_params[i].camera_id],
+                    &cameras_params[i]);
+                opened_cameras++;
+            }
 
-        realtime_plot_data = new ScrollingBuffer[num_cameras];
+            realtime_plot_data = new ScrollingBuffer[num_cameras];
+        } catch (...) {
+            for (int i = 0; i < opened_cameras; i++) {
+                EVT_CameraClose(&ecams[i].camera);
+            }
+            if (attempted_camera >= opened_cameras &&
+                attempted_camera < num_cameras) {
+                EVT_CameraClose(&ecams[attempted_camera].camera);
+            }
+            delete[] realtime_plot_data;
+            delete[] cameras_params;
+            delete[] cameras_select;
+            delete[] ecams;
+            realtime_plot_data = nullptr;
+            cameras_params = nullptr;
+            cameras_select = nullptr;
+            ecams = nullptr;
+            num_cameras = 0;
+            throw;
+        }
     }
 }

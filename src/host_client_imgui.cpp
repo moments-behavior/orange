@@ -36,6 +36,8 @@ static void logf(const char *fmt, ...) {
     g_logs.emplace_back(buf);
 }
 static bool g_phase_started = false;
+static bool g_network_error_popup = false;
+static std::string g_network_error_message;
 
 // persistent to handle missing messages
 static int g_picture_id;
@@ -84,6 +86,14 @@ static void on_open_phase_start(std::string job_id) {
         ImGuiFileDialog::Instance()->OpenDialog(
             "ChooseRecordingDir", "Choose a Directory", nullptr, config);
     }
+}
+
+static std::string camera_open_error_message(const CameraError &e) {
+    if (e.error_code == EVT_ERROR_GVCP_ACK) {
+        return "Camera communication failed with a GVCP ACK error.\n\nPower "
+               "cycle the cameras, then try opening them again.";
+    }
+    return "Camera open failed for " + e.camera_serial + ":\n" + e.what();
 }
 
 static void on_startthread_phase_start(std::string encoder_setup,
@@ -862,8 +872,25 @@ static void broadcast_current_phase() {
         bytes = build_cmd_open(g_jid, g_epoch, g_seq,
                                *g_clientctx->selected_network_folder);
         if (!g_phase_started) {
-            on_open_phase_start(g_jid);
-            g_phase_started = true;
+            try {
+                on_open_phase_start(g_jid);
+                g_phase_started = true;
+            } catch (const CameraError &e) {
+                g_network_error_message = camera_open_error_message(e);
+                g_network_error_popup = true;
+                g_phase = Phase_Done;
+                g_waiting = false;
+                logf("%s", g_network_error_message.c_str());
+                return;
+            } catch (const std::exception &e) {
+                g_network_error_message =
+                    std::string("Camera open failed:\n") + e.what();
+                g_network_error_popup = true;
+                g_phase = Phase_Done;
+                g_waiting = false;
+                logf("%s", g_network_error_message.c_str());
+                return;
+            }
         }
         break;
     }
@@ -1544,6 +1571,21 @@ void host_client_draw_gui() {
         }
 
         ImGui::EndTabBar();
+    }
+
+    if (g_network_error_popup) {
+        ImGui::OpenPopup("Camera Error");
+        g_network_error_popup = false;
+    }
+
+    if (ImGui::BeginPopupModal("Camera Error", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("%s", g_network_error_message.c_str());
+        ImGui::Separator();
+        if (ImGui::Button("OK")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 
     // Auto-advance logic

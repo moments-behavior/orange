@@ -10,6 +10,9 @@
 #include "utils.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
+#include <algorithm>
+#include <chrono>
+#include <cstring>
 #include <iostream>
 #include <sys/stat.h>
 
@@ -20,6 +23,76 @@ std::atomic<bool> g_workerShouldStop{false};
 // Optional: store last measurement for UI display
 std::mutex g_resultsMutex;
 std::vector<int> g_lastOffsets; // size = num_cameras
+
+namespace {
+constexpr std::chrono::seconds kIdleCameraRefreshInterval{3};
+
+bool same_camera_device(const GigEVisionDeviceInfo &a,
+                        const GigEVisionDeviceInfo &b) {
+    return std::strcmp(a.serialNumber, b.serialNumber) == 0 &&
+           std::strcmp(a.currentIp, b.currentIp) == 0 &&
+           std::strcmp(a.nic.ip4Address, b.nic.ip4Address) == 0;
+}
+
+bool same_camera_list(const GigEVisionDeviceInfo *a, int a_count,
+                      const GigEVisionDeviceInfo *b, int b_count) {
+    if (a_count != b_count) {
+        return false;
+    }
+    for (int i = 0; i < a_count; i++) {
+        if (!same_camera_device(a[i], b[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void refresh_idle_camera_list(int max_cameras,
+                              GigEVisionDeviceInfo *unsorted_device_info,
+                              GigEVisionDeviceInfo *device_info,
+                              int &cam_count, std::vector<bool> &check,
+                              bool select_all_cameras) {
+    std::vector<GigEVisionDeviceInfo> refreshed_unsorted(max_cameras);
+    std::vector<GigEVisionDeviceInfo> refreshed_sorted(max_cameras);
+    int refreshed_count =
+        scan_cameras(max_cameras, refreshed_unsorted.data(), false);
+    sort_cameras_ip(refreshed_unsorted.data(), refreshed_sorted.data(),
+                    refreshed_count);
+
+    if (same_camera_list(device_info, cam_count, refreshed_sorted.data(),
+                         refreshed_count)) {
+        return;
+    }
+
+    std::vector<std::string> selected_serials;
+    selected_serials.reserve(check.size());
+    for (int i = 0; i < cam_count && i < static_cast<int>(check.size()); i++) {
+        if (check[i]) {
+            selected_serials.emplace_back(device_info[i].serialNumber);
+        }
+    }
+
+    cam_count = refreshed_count;
+    for (int i = 0; i < cam_count; i++) {
+        device_info[i] = refreshed_sorted[i];
+    }
+    for (int i = 0; i < cam_count; i++) {
+        unsorted_device_info[i] = refreshed_unsorted[i];
+    }
+
+    check.assign(cam_count, false);
+    for (int i = 0; i < cam_count; i++) {
+        check[i] =
+            select_all_cameras ||
+            std::find(selected_serials.begin(), selected_serials.end(),
+                      std::string(device_info[i].serialNumber)) !=
+                selected_serials.end();
+    }
+
+    std::cout << "Camera list refreshed: " << cam_count << " camera"
+              << (cam_count == 1 ? "" : "s") << " found." << std::endl;
+}
+} // namespace
 
 void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
                               CameraParams *cameras_params) {
@@ -119,9 +192,9 @@ int main(int argc, char **args) {
     for (int i = 0; i < cam_count; i++) {
         check.push_back(false);
     }
-    CameraParams *cameras_params;
-    CameraEachSelect *cameras_select;
-    CameraEmergent *ecams;
+    CameraParams *cameras_params = nullptr;
+    CameraEachSelect *cameras_select = nullptr;
+    CameraEmergent *ecams = nullptr;
     std::vector<std::thread> camera_threads;
     GL_Texture *tex_gl = nullptr;
     int num_cameras = 0;
@@ -134,7 +207,7 @@ int main(int argc, char **args) {
 
     std::string encoder_preset = "p1";
 
-    ScrollingBuffer *realtime_plot_data;
+    ScrollingBuffer *realtime_plot_data = nullptr;
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
 
@@ -227,9 +300,23 @@ int main(int argc, char **args) {
 
     set_host_client_ctx(&client_ctx);
 
+    auto last_idle_camera_refresh =
+        std::chrono::steady_clock::now() - kIdleCameraRefreshInterval;
+
     while (!glfwWindowShouldClose(window->render_target)) {
         host_client_tick();
         create_new_frame();
+
+        if (!camera_control->open) {
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_idle_camera_refresh >=
+                kIdleCameraRefreshInterval) {
+                refresh_idle_camera_list(max_cameras, unsorted_device_info,
+                                         device_info, cam_count, check,
+                                         select_all_cameras);
+                last_idle_camera_refresh = now;
+            }
+        }
 
         host_client_draw_gui();
 
@@ -680,72 +767,140 @@ int main(int argc, char **args) {
                         }
                     }
                     if (num_cameras > 0) {
-                        camera_control->open = true;
-                        cameras_params = new CameraParams[num_cameras];
-                        cameras_select = new CameraEachSelect[num_cameras];
+                        int opened_cameras = 0;
+                        int attempted_camera = -1;
+                        try {
+                            cameras_params = new CameraParams[num_cameras];
+                            cameras_select =
+                                new CameraEachSelect[num_cameras];
 
-                        std::vector<int> selected_cameras;
-                        for (int i = 0; i < cam_count; i++) {
-                            if (check[i]) {
-                                selected_cameras.push_back(i);
+                            std::vector<int> selected_cameras;
+                            for (int i = 0; i < cam_count; i++) {
+                                if (check[i]) {
+                                    selected_cameras.push_back(i);
+                                }
                             }
-                        }
 
-                        std::vector<bool> skip_setting_params;
-                        skip_setting_params.resize(num_cameras);
-                        for (int i = 0; i < num_cameras; i++) {
-                            if (!set_camera_params(
-                                    &cameras_params[i], &cameras_select[i],
-                                    &device_info[selected_cameras[i]],
-                                    camera_config_files, selected_cameras[i],
-                                    num_cameras)) {
-                                skip_setting_params[i] = true;
-                                cameras_params[i].camera_id =
-                                    selected_cameras[i];
-                                cameras_params[i].num_cameras = num_cameras;
+                            std::vector<bool> skip_setting_params;
+                            skip_setting_params.resize(num_cameras);
+                            for (int i = 0; i < num_cameras; i++) {
+                                if (!set_camera_params(
+                                        &cameras_params[i], &cameras_select[i],
+                                        &device_info[selected_cameras[i]],
+                                        camera_config_files,
+                                        selected_cameras[i], num_cameras)) {
+                                    skip_setting_params[i] = true;
+                                    cameras_params[i].camera_id =
+                                        selected_cameras[i];
+                                    cameras_params[i].num_cameras =
+                                        num_cameras;
+                                } else {
+                                    skip_setting_params[i] = false;
+                                }
+                            }
+
+                            for (int i = 0; i < num_cameras; i++) {
+                                cameras_select[i].stream_on = false;
+                                if (cameras_params[i].camera_name ==
+                                    "ceiling_center") {
+                                    cameras_select[i].stream_on = true;
+                                    cameras_select[i].detect_mode =
+                                        Detect2D_GLThread;
+                                }
+
+                                if (cameras_params[i].camera_name ==
+                                    "shelter") {
+                                    cameras_select[i].stream_on = true;
+                                }
+                            }
+
+                            ecams = new CameraEmergent[num_cameras];
+                            for (int i = 0; i < num_cameras; i++) {
+                                attempted_camera = i;
+                                if (!skip_setting_params[i]) {
+                                    open_camera_with_params(
+                                        &ecams[i].camera,
+                                        &device_info
+                                            [cameras_params[i].camera_id],
+                                        &cameras_params[i]);
+                                } else {
+                                    update_camera_params(
+                                        &ecams[i].camera,
+                                        &device_info
+                                            [cameras_params[i].camera_id],
+                                        &cameras_params[i]);
+                                }
+                                opened_cameras++;
+                            }
+                            realtime_plot_data =
+                                new ScrollingBuffer[num_cameras];
+                            camera_control->open = true;
+                        } catch (const CameraError &e) {
+                            for (int i = 0; i < opened_cameras; i++) {
+                                EVT_CameraClose(&ecams[i].camera);
+                            }
+                            if (attempted_camera >= opened_cameras &&
+                                attempted_camera < num_cameras) {
+                                EVT_CameraClose(
+                                    &ecams[attempted_camera].camera);
+                            }
+                            delete[] realtime_plot_data;
+                            delete[] cameras_params;
+                            delete[] cameras_select;
+                            delete[] ecams;
+                            realtime_plot_data = nullptr;
+                            cameras_params = nullptr;
+                            cameras_select = nullptr;
+                            ecams = nullptr;
+                            camera_control->open = false;
+                            num_cameras = 0;
+
+                            if (e.error_code == EVT_ERROR_GVCP_ACK) {
+                                error_message =
+                                    "Camera communication failed with a GVCP "
+                                    "ACK error.\n\nPower cycle the cameras, "
+                                    "then try opening them again.";
                             } else {
-                                skip_setting_params[i] = false;
+                                error_message =
+                                    "Camera open failed for " +
+                                    e.camera_serial + ":\n" + e.what();
                             }
-                        }
+                            show_error = true;
+                        } catch (const std::exception &e) {
+                            for (int i = 0; i < opened_cameras; i++) {
+                                EVT_CameraClose(&ecams[i].camera);
+                            }
+                            delete[] realtime_plot_data;
+                            delete[] cameras_params;
+                            delete[] cameras_select;
+                            delete[] ecams;
+                            realtime_plot_data = nullptr;
+                            cameras_params = nullptr;
+                            cameras_select = nullptr;
+                            ecams = nullptr;
+                            camera_control->open = false;
+                            num_cameras = 0;
 
-                        for (int i = 0; i < num_cameras; i++) {
-                            cameras_select[i].stream_on = false;
-                            if (cameras_params[i].camera_name ==
-                                "ceiling_center") {
-                                cameras_select[i].stream_on = true;
-                                cameras_select[i].detect_mode =
-                                    Detect2D_GLThread;
-                            }
-
-                            if (cameras_params[i].camera_name == "shelter") {
-                                cameras_select[i].stream_on = true;
-                            }
+                            error_message =
+                                std::string("Camera open failed:\n") +
+                                e.what();
+                            show_error = true;
                         }
-
-                        ecams = new CameraEmergent[num_cameras];
-                        for (int i = 0; i < num_cameras; i++) {
-                            if (!skip_setting_params[i]) {
-                                open_camera_with_params(
-                                    &ecams[i].camera,
-                                    &device_info[cameras_params[i].camera_id],
-                                    &cameras_params[i]);
-                            } else {
-                                update_camera_params(
-                                    &ecams[i].camera,
-                                    &device_info[cameras_params[i].camera_id],
-                                    &cameras_params[i]);
-                            }
-                        }
-                        realtime_plot_data = new ScrollingBuffer[num_cameras];
                     }
                 } else {
                     camera_control->open = false;
                     for (int i = 0; i < num_cameras; i++) {
                         close_camera(&ecams[i].camera, &cameras_params[i]);
                     }
+                    delete[] realtime_plot_data;
                     delete[] cameras_params;
                     delete[] cameras_select;
                     delete[] ecams;
+                    realtime_plot_data = nullptr;
+                    cameras_params = nullptr;
+                    cameras_select = nullptr;
+                    ecams = nullptr;
+                    num_cameras = 0;
                 }
             }
             if (camera_control->subscribe) {

@@ -767,13 +767,16 @@ void quick_print_camera(GigEVisionDeviceInfo *device_info, int camera_idx) {
               << std::endl;
 }
 
-int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info) {
+int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info,
+                 bool log_empty) {
     unsigned int listcam_buf_size = max_cameras;
     unsigned int count;
 
     Emergent::EVT_ListDevices(device_info, &listcam_buf_size, &count);
     if (count == 0) {
-        printf("Enumerate Cameras: \tNo cameras found.\n");
+        if (log_empty) {
+            printf("Enumerate Cameras: \tNo cameras found.\n");
+        }
         return 0;
     } else {
         return count;

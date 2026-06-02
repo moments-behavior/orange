@@ -65,43 +65,7 @@ void start_camera_streaming(
     CameraEmergent *ecams, CameraParams *cameras_params,
     CameraEachSelect *cameras_select, GL_Texture *tex, int num_cameras,
     int evt_buffer_size, bool ptp_stream_sync, const std::string &encoder_setup,
-    const std::string &folder_name, PTPParams *ptp_params,
-    std::string calib_yaml_folder, std::thread &detection3d_thread,
-    AppContext *ctx) {
-    detector_counter.store(0);
-    detection2d = new DetectionDataPerCam[num_cameras];
-    int idx3d = 0;
-    int total_standoff_detector = 0;
-    for (int i = 0; i < num_cameras; i++) {
-        detection2d[i].calibration_file = calib_yaml_folder + "/Cam" +
-                                          cameras_params[i].camera_serial +
-                                          ".yaml";
-        detection2d[i].has_calibration_results =
-            load_camera_calibration_results(detection2d[i].calibration_file,
-                                            &detection2d[i].camera_calib);
-        if (detection2d[i].has_calibration_results) {
-            std::cout << detection2d[i].calibration_file << std::endl;
-        }
-        cameras_select[i].idx2d = i;
-        if (cameras_select[i].detect_mode == Detect3D_Standoff) {
-            cameras_select[i].idx3d = idx3d;
-            idx3d++;
-        }
-        if (cameras_select[i].detect_mode == Detect3D_Standoff ||
-            cameras_select[i].detect_mode == Detect2D_Standoff) {
-            total_standoff_detector++;
-        }
-    }
-
-    for (int i = 0; i < num_cameras; i++) {
-        cameras_select[i].total_standoff_detector = total_standoff_detector;
-    }
-
-    if (idx3d >= 2) {
-        detection3d_thread = std::thread(&detection3d_proc, camera_control,
-                                         cameras_select, num_cameras);
-    }
-
+    const std::string &folder_name, PTPParams *ptp_params) {
     for (int i = 0; i < num_cameras; i++) {
         camera_open_stream(&ecams[i].camera, &cameras_params[i]);
         ecams[i].evt_frame = new Emergent::CEmergentFrame[evt_buffer_size];
@@ -131,7 +95,7 @@ void start_camera_streaming(
         camera_threads.emplace_back(
             &acquire_frames, &ecams[i], &cameras_params[i], &cameras_select[i],
             camera_control, tex[i].cuda_buffer, encoder_setup, folder_name,
-            ptp_params, ctx);
+            ptp_params);
     }
 }
 
@@ -140,8 +104,7 @@ void stop_camera_streaming(std::vector<std::thread> &camera_threads,
                            CameraParams *cameras_params,
                            CameraEachSelect *cameras_select,
                            const int num_cameras, const int evt_buffer_size,
-                           PTPParams *ptp_params,
-                           std::thread &detection3d_thread) {
+                           PTPParams *ptp_params) {
     for (auto &t : camera_threads)
         t.join();
 
@@ -164,25 +127,12 @@ void stop_camera_streaming(std::vector<std::thread> &camera_threads,
         camera_control->sync_camera = false;
     }
 
-    cv3d.notify_all();
-
-    if (detection3d_thread.joinable()) {
-        detection3d_thread.join();
-    }
-    delete[] detection2d;
-    detection2d = nullptr;
-
     for (int i = 0; i < num_cameras; i++) {
-        cameras_select[i].sigs->frame_detect_state.store(State_Frame_Idle);
-        cameras_select[i].total_standoff_detector = 0;
-        cameras_select[i].idx2d = 0;
-        cameras_select[i].idx3d = 0;
         cameras_select[i].encoder_fps_estimator.reset();
         cameras_select[i].capture_fps_estimator.reset();
         cameras_select[i].dropped_frames = 0;
         cameras_select[i].pictures_counter = 0;
     }
-    detector_counter.store(0);
 }
 
 bool input_text(const char *label, std::string &str,
@@ -244,7 +194,6 @@ void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
         HelpMarker("Set keyframe interval as a multiple of the framerate. "
                    "Default is set to 1 second.");
 
-        input_text("YOLO", cameras_select->yolo_model);
         ImGui::Checkbox("GPU Direct",
                         &cameras_params[selected_camera].gpu_direct);
         if (cameras_params[selected_camera].gpu_direct) {
@@ -352,154 +301,5 @@ void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
         }
 
         ImGui::TreePop();
-    }
-}
-
-void gui_plot_world_coordinates(CameraCalibResults *cvp,
-                                CameraParams *camera_params) {
-    double axis_x_values[4];
-    double axis_y_values[4];
-    world_coordinates_projection_points(cvp, axis_x_values, axis_y_values, 50,
-                                        camera_params);
-    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0,
-                               ImVec4(1.0, 1.0, 1.0, 1.0));
-    ImPlot::SetNextLineStyle(ImVec4(1.0, 1.0, 1.0, 1.0), 3.0);
-    std::string name = "World Origin";
-
-    std::vector<triple_f> node_colors = {{1.0f, 1.0f, 1.0f},
-                                         {1.0f, 0.0f, 0.0f},
-                                         {0.0f, 1.0f, 0.0f},
-                                         {0.0f, 0.0f, 1.0f}};
-
-    for (u32 edge = 0; edge < 3; edge++) {
-        double xs[2]{axis_x_values[0], axis_x_values[edge + 1]};
-        double ys[2]{axis_y_values[0], axis_y_values[edge + 1]};
-
-        ImVec4 my_color;
-        my_color.w = 1.0f;
-        my_color.x = node_colors[edge + 1].x;
-        my_color.y = node_colors[edge + 1].y;
-        my_color.z = node_colors[edge + 1].z;
-
-        ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 6.0, my_color);
-        ImPlot::SetNextLineStyle(my_color, 3.0);
-
-        if (edge == 0) {
-            // Only call once for the first series with this label
-            ImPlot::HideNextItem(true);
-        }
-        ImPlot::PlotLine(name.c_str(), xs, ys, 2, ImPlotLineFlags_Segments);
-    }
-}
-
-void draw_aruco_markers(Aruco2d *aruco_marker, int frame_height) {
-    double x[5] = {(double)aruco_marker->proj_corners[0].x,
-                   (double)aruco_marker->proj_corners[1].x,
-                   (double)aruco_marker->proj_corners[2].x,
-                   (double)aruco_marker->proj_corners[3].x,
-                   (double)aruco_marker->proj_corners[0].x};
-
-    double y[5] = {
-        (double)frame_height - (double)aruco_marker->proj_corners[0].y,
-        (double)frame_height - (double)aruco_marker->proj_corners[1].y,
-        (double)frame_height - (double)aruco_marker->proj_corners[2].y,
-        (double)frame_height - (double)aruco_marker->proj_corners[3].y,
-        (double)frame_height - (double)aruco_marker->proj_corners[0].y};
-
-    ImPlot::SetNextLineStyle(ImVec4(1.0, 0.0, 1.0, 1.0), 3.0);
-    ImPlot::PlotLine("Aruco", x, y, 5);
-}
-
-void draw_ball_center(cv::Point2f ball_center, int frame_height, ImVec4 color,
-                      std::string name, ImPlotMarker marker, float pt_size) {
-    double ball_center_x = (double)ball_center.x;
-    double ball_center_y = (double)frame_height - (double)ball_center.y;
-    ImPlot::PushStyleColor(ImPlotCol_MarkerFill, color);
-    ImPlot::PushStyleColor(ImPlotCol_MarkerOutline, color);
-    ImPlot::SetNextMarkerStyle(marker, pt_size, color, 2.5);
-    ImPlot::PlotScatter(name.c_str(), &ball_center_x, &ball_center_y, 1);
-    ImPlot::PopStyleColor();
-}
-
-void draw_box(cv::Rect_<float> bbox, int frame_height, ImVec4 color,
-              std::string name, ImPlotMarker marker, float pt_size) {
-    double x[5] = {(double)bbox.x, (double)bbox.x + bbox.width,
-                   (double)bbox.x + bbox.width, (double)bbox.x, (double)bbox.x};
-
-    double y[5] = {(double)frame_height - ((double)bbox.y),
-                   (double)frame_height - ((double)bbox.y),
-                   (double)frame_height - ((double)bbox.y + bbox.height),
-                   (double)frame_height - ((double)bbox.y + bbox.height),
-                   (double)frame_height - ((double)bbox.y)};
-
-    ImPlot::SetNextLineStyle(color, 2.0);
-    ImPlot::PlotLine(name.c_str(), x, y, 5);
-}
-
-void draw_boxes(std::vector<cv::Rect_<float>> bboxes, int frame_height,
-                ImVec4 color, std::string name, ImPlotMarker marker,
-                float pt_size) {
-    for (size_t i = 0; i < bboxes.size(); i++) {
-        draw_box(bboxes[i], frame_height, color, name + std::to_string(i),
-                 marker, pt_size);
-    }
-}
-
-void open_selected_cameras(const std::vector<bool> &check, int cam_count,
-                           GigEVisionDeviceInfo *device_info,
-                           std::vector<std::string> &camera_config_files,
-                           int &num_cameras, CameraParams *&cameras_params,
-                           CameraEachSelect *&cameras_select,
-                           CameraEmergent *&ecams,
-                           ScrollingBuffer *&realtime_plot_data,
-                           bool is_calib) {
-
-    num_cameras = 0;
-    for (int i = 0; i < cam_count; i++) {
-        if (check[i]) {
-            num_cameras++;
-        }
-    }
-    if (num_cameras > 0) {
-        cameras_params = new CameraParams[num_cameras]();
-        cameras_select = new CameraEachSelect[num_cameras]();
-
-        std::vector<int> selected_cameras;
-        for (int i = 0; i < cam_count; i++) {
-            if (check[i]) {
-                selected_cameras.push_back(i);
-            }
-        }
-        for (int i = 0; i < num_cameras; i++) {
-            set_camera_params(&cameras_params[i], &cameras_select[i],
-                              &device_info[selected_cameras[i]],
-                              camera_config_files, selected_cameras[i],
-                              num_cameras);
-        }
-
-        for (int i = 0; i < num_cameras; i++) {
-            cameras_select[i].stream_on = false;
-            if (cameras_params[i].camera_name == "Cam16") {
-                cameras_select[i].stream_on = true;
-                if (is_calib) {
-                    cameras_select[i].detect_mode = Detect_OFF;
-
-                } else {
-                    cameras_select[i].detect_mode = Detect2D_Standoff;
-                }
-            }
-            if (cameras_params[i].camera_name == "shelter") {
-                cameras_select[i].stream_on = true;
-            }
-        }
-
-        ecams = new CameraEmergent[num_cameras];
-        for (int i = 0; i < num_cameras; i++) {
-            open_camera_with_params(&ecams[i].camera,
-                                    &device_info[cameras_params[i].camera_id],
-                                    &cameras_params[i]);
-        }
-
-        realtime_plot_data = new ScrollingBuffer[num_cameras];
     }
 }

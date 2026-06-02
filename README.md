@@ -6,11 +6,13 @@ A high-performance, GPU-accelerated multi-camera capture, streaming and recordin
 
 ## Overview
 
-`orange` is built for high-throughput, time-synchronized multi-camera recording. Encoding is GPU-accelerated and scales with the number of GPUs in the host. PTP keeps cameras aligned to sub-frame precision, and a multi-host architecture (one GUI host coordinating any number of headless `cam_server` nodes over ENet) lets a recording rig scale beyond what a single machine can drive — both in camera count and aggregate pixel rate. Optional TensorRT-based YOLO detection runs on the live streams when a model is provided.
+`orange` is built for high-throughput, time-synchronized multi-camera recording on a single host. Encoding is GPU-accelerated (NVENC) and scales with the number of GPUs in the machine. PTP keeps cameras aligned to sub-frame precision. Each camera's H.264/HEVC stream is muxed to its own `.mp4` alongside a sidecar CSV of per-frame PTP and host timestamps for later alignment.
+
+This is the minimal recording build: a single GUI executable, with no real-time inference and no OpenCV dependency. The pipeline is camera (Emergent eSDK) → CUDA/NPP debayer → NVENC encode → FFmpeg mux. Live preview is rendered with OpenGL/ImGui; still-image snapshots are written with `stb_image_write`.
 
 ## Documentation
 
-Full documentation — installation, system requirements, configuration, network mode, real-time detection, PTP — lives at the [moments-behavior docs site](https://moments-behavior.github.io/docs/orange/).
+Full documentation — installation, system requirements, configuration, PTP — lives at the [moments-behavior docs site](https://moments-behavior.github.io/docs/orange/).
 
 [Video demo](https://youtu.be/ahceluqBYj8)
 
@@ -21,9 +23,13 @@ Linux-only. Requires an NVIDIA GPU with NVENC. See the docs for full system requ
 ```bash
 git clone --recursive https://github.com/moments-behavior/orange.git
 cd orange
-./build.sh    # builds release/orange, release/cam_server, release/yolo_offline
+./build.sh    # builds release/orange
 ./run.sh      # sudo release/orange
 ```
+
+### Dependencies
+
+The minimal build requires: CUDA toolkit (with NPP + NVENC), the Emergent eSDK (`/opt/EVT/eSDK`), FFmpeg (used only for `.mp4` muxing), and the GUI stack (GLFW, GLEW, OpenGL). ImGui/ImPlot/ImGuiFileDialog/IconFontCppHeaders are vendored as git submodules. There is no OpenCV, TensorRT, ENet, or FlatBuffers dependency.
 
 ## Authors
 

@@ -6,7 +6,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include <opencv2/opencv.hpp>
 #include <thread>
 
 class FrameSaver {

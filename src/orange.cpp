@@ -1,12 +1,8 @@
 #include "camera.h"
-#include "enet_utils.h"
 #include "global.h"
 #include "gui.h"
-#include "host_client_imgui.h"
 #include "imgui.h"
 #include "implot.h"
-#include "realtime_tool.h"
-#include "server_endpoints.h"
 #include "utils.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
@@ -113,7 +109,6 @@ int main(int argc, char **args) {
                                 encoder_codec);
 
     std::string input_folder = recording_root_dir_str + "/exp/unsorted";
-    std::string calib_yaml_folder = orange_root_dir_str + "/calib_yaml";
 
     std::vector<bool> check;
     for (int i = 0; i < cam_count; i++) {
@@ -138,41 +133,6 @@ int main(int argc, char **args) {
     bool show_realtime_plot = false;
     bool ptp_stream_sync = false;
 
-    AppContext ctx; // ENetGuard constructed here (enet_initialize)
-
-    const std::string endpoints_path =
-        orange_root_dir_str + "/config/network/endpoints.json";
-
-    std::vector<ServerEndpoint> endpoints;
-    if (std::filesystem::exists(endpoints_path)) {
-        try {
-            endpoints = load_server_endpoints(endpoints_path);
-        } catch (const std::exception &e) {
-            fprintf(stderr, "warning: %s\n", e.what());
-            fprintf(stderr,
-                    "network mode unavailable until endpoints.json is fixed\n");
-        }
-    }
-
-    std::vector<std::pair<std::string, int>> cams;
-    cams.reserve(endpoints.size());
-    for (const auto &ep : endpoints) {
-        cams.emplace_back(ep.host, ep.port);
-    }
-
-    host_client_start_net_thread(ctx); // start dispatcher thread
-    host_client_init(ctx, cams);
-
-    std::vector<std::string> network_config_folders;
-    int network_config_select = -1;
-    std::string selected_network_folder = "rig_new";
-    std::string network_start_folder_name =
-        orange_root_dir_str + "/config/network";
-    for (const auto &entry :
-         std::filesystem::directory_iterator(network_start_folder_name)) {
-        network_config_folders.push_back(entry.path().string());
-    }
-
     std::vector<std::string> local_config_folders;
     std::string local_start_folder_name = orange_root_dir_str + "/config/local";
     for (const auto &entry :
@@ -181,7 +141,6 @@ int main(int argc, char **args) {
     }
     std::string picture_save_folder =
         orange_root_dir_str + "/pictures/" + get_current_date();
-    std::string calib_save_folder = recording_root_dir_str + "/exp";
 
     int local_config_select = 0;
     bool select_all_cameras = false;
@@ -192,46 +151,15 @@ int main(int argc, char **args) {
     std::vector<std::string> color_temps = {"CT_Off",   "CT_2800K", "CT_3000K",
                                             "CT_4000K", "CT_5000K", "CT_6500K",
                                             "CT_Custom"};
-    std::thread detection3d_thread;
     bool show_error = false;
     std::string error_message;
 
     int current_picture_format = 0;
-    const char *picture_format_items[] = {"jpg", "tiff", "png"};
+    const char *picture_format_items[] = {"jpg", "png"};
     std::string selected_picture_format = picture_format_items[0];
 
-    HostClientCtx client_ctx{&selected_picture_format,
-                             &calib_save_folder,
-                             &network_config_select,
-                             &network_config_folders,
-                             &selected_network_folder,
-                             device_info,
-                             &cam_count,
-                             &check,
-                             &num_cameras,
-                             &cameras_params,
-                             &cameras_select,
-                             &ecams,
-                             &realtime_plot_data,
-                             camera_control,
-                             &detection3d_thread,
-                             &calib_yaml_folder,
-                             &input_folder,
-                             &camera_threads,
-                             ptp_params,
-                             &encoder_codec,
-                             &encoder_preset,
-                             &evt_buffer_size,
-                             &display_gpu_id,
-                             &tex_gl};
-
-    set_host_client_ctx(&client_ctx);
-
     while (!glfwWindowShouldClose(window->render_target)) {
-        host_client_tick();
         create_new_frame();
-
-        host_client_draw_gui();
 
         if (ImGui::Begin("Orange", nullptr)) {
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
@@ -379,7 +307,7 @@ int main(int argc, char **args) {
                     }
                 }
 
-                if (ImGui::BeginTable("Camera Control Setting", 5,
+                if (ImGui::BeginTable("Camera Control Setting", 4,
                                       ImGuiTableFlags_Resizable |
                                           ImGuiTableFlags_NoSavedSettings |
                                           ImGuiTableFlags_Borders)) {
@@ -417,8 +345,6 @@ int main(int argc, char **args) {
                             }
                         }
                     }
-                    ImGui::TableNextColumn();
-                    ImGui::Text("yolo");
 
                     for (int i = 0; i < num_cameras; i++) {
                         ImGui::TableNextRow();
@@ -470,24 +396,6 @@ int main(int argc, char **args) {
                         ImGui::TableNextColumn();
                         sprintf(temp_string, "##checkbox_record%d", i);
                         ImGui::Checkbox(temp_string, &cameras_select[i].record);
-                        ImGui::TableNextColumn();
-
-                        int current_index =
-                            static_cast<int>(cameras_select[i].detect_mode);
-                        sprintf(temp_string, "##detection_mode%d", i);
-                        if (ImGui::Combo(temp_string, &current_index,
-                                         DetectModeNames,
-                                         IM_ARRAYSIZE(DetectModeNames))) {
-                            if (current_index != 0 &&
-                                cameras_select[i].yolo_model.empty()) {
-                                current_index = 0;
-                                error_message = "Specify YOLO model first in "
-                                                "Camera Property.";
-                                show_error = true;
-                            }
-                            cameras_select[i].detect_mode =
-                                static_cast<DetectMode>(current_index);
-                        }
                     }
                     ImGui::EndTable();
                 }
@@ -713,8 +621,6 @@ int main(int argc, char **args) {
                             if (cameras_params[i].camera_name ==
                                 "ceiling_center") {
                                 cameras_select[i].stream_on = true;
-                                cameras_select[i].detect_mode =
-                                    Detect2D_GLThread;
                             }
 
                             if (cameras_params[i].camera_name == "shelter") {
@@ -786,13 +692,12 @@ int main(int argc, char **args) {
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, "", "",
-                            ptp_params, calib_yaml_folder, detection3d_thread,
-                            &ctx);
+                            ptp_params);
                     } else {
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, num_cameras,
-                            evt_buffer_size, ptp_params, detection3d_thread);
+                            evt_buffer_size, ptp_params);
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =
@@ -838,8 +743,7 @@ int main(int argc, char **args) {
                             stop_camera_streaming(
                                 camera_threads, camera_control, ecams,
                                 cameras_params, cameras_select, num_cameras,
-                                evt_buffer_size, ptp_params,
-                                detection3d_thread);
+                                evt_buffer_size, ptp_params);
                             for (int i = 0; i < num_cameras; i++) {
                                 if (cameras_select[i].stream_on) {
                                     int camera_width =
@@ -889,14 +793,13 @@ int main(int argc, char **args) {
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, tex_gl, num_cameras,
                             evt_buffer_size, ptp_stream_sync, encoder_setup,
-                            folder_name, ptp_params, calib_yaml_folder,
-                            detection3d_thread, &ctx);
+                            folder_name, ptp_params);
                     } else {
                         camera_control->subscribe = false;
                         stop_camera_streaming(
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, num_cameras,
-                            evt_buffer_size, ptp_params, detection3d_thread);
+                            evt_buffer_size, ptp_params);
                         ptp_stream_sync = false;
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
@@ -1011,19 +914,6 @@ int main(int argc, char **args) {
                             << cameras_select[i]
                                    .encoder_fps_estimator.get_fps();
                     }
-                    if (cameras_select[i].detect_mode == Detect2D_Standoff) {
-                        oss << "  |  "
-                            << "Detection2D FPS: "
-                            << detection2d[i].fps_estimator.get_fps();
-                    } else if (cameras_select[i].detect_mode ==
-                               Detect3D_Standoff) {
-                        oss << "  |  "
-                            << "Detection2D FPS: "
-                            << detection2d[i].fps_estimator.get_fps();
-                        oss << "  |  "
-                            << "Detection3D FPS: "
-                            << detection3d.fps_estimator.get_fps();
-                    }
                     std::string text = oss.str();
                     ImGui::Text("%s", text.c_str());
 
@@ -1048,36 +938,6 @@ int main(int argc, char **args) {
                                           ImVec2(0, 0),
                                           ImVec2(cameras_params[i].width,
                                                  cameras_params[i].height));
-
-                        if (cameras_select[i].detect_mode ==
-                                Detect3D_Standoff ||
-                            cameras_select[i].detect_mode ==
-                                Detect2D_Standoff) {
-                            if (detection2d[i].ball2d.find_ball.load()) {
-                                std::string ball2d_name =
-                                    "##ball##" + std::to_string(i);
-                                draw_boxes(
-                                    detection2d[i].ball2d.rects,
-                                    cameras_params[i].height,
-                                    (ImVec4)ImColor::HSV(0.0, 1.0f, 1.0f),
-                                    ball2d_name, ImPlotMarker_Circle, 6.0);
-                            }
-                        }
-
-                        if (detection2d[i].has_calibration_results) {
-                            gui_plot_world_coordinates(
-                                &detection2d[i].camera_calib,
-                                &cameras_params[i]);
-                            if (detection3d.ball3d.new_detection.load()) {
-                                std::string ball_proj_name =
-                                    "ball_proj##" + std::to_string(i);
-                                draw_ball_center(
-                                    detection2d[i].ball2d.proj_center[0],
-                                    cameras_params[i].height,
-                                    (ImVec4)ImColor::HSV(0.5, 1.0f, 1.0f),
-                                    ball_proj_name, ImPlotMarker_Cross, 8.0);
-                            }
-                        }
 
                         ImPlot::EndPlot();
                     }
@@ -1155,11 +1015,9 @@ int main(int argc, char **args) {
         delete[] cameras_select;
     }
 
-    host_client_stop_net_thread();
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();
-    ctx.net.stop();
 
     return 0;
 }

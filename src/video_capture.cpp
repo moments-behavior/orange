@@ -3,11 +3,8 @@
 #include "NvEncoder/NvCodecUtils.h"
 #include "global.h"
 #include "gpu_video_encoder.h"
-#include "utils.h"
-#ifndef HEADLESS
-#include "FrameDetector.h"
 #include "opengldisplay.h"
-#endif
+#include "utils.h"
 
 void load_camera_json_config_files(std::string file_name,
                                    CameraParams *camera_params,
@@ -38,9 +35,6 @@ void load_camera_json_config_files(std::string file_name,
         camera_params->gop = camera_config["gop"];
     } else {
         camera_params->gop = 1;
-    }
-    if (camera_config.contains("yolo")) {
-        camera_select->yolo_model = camera_config["yolo"];
     }
     if (camera_config.contains("offsetx")) {
         camera_params->offsetx = camera_config["offsetx"];
@@ -130,28 +124,19 @@ void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam) {
 void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params,
                     CameraParams *camera_params, CameraEmergent *ecam,
                     unsigned int delay_in_second) {
-    if (ptp_params->network_sync) {
-        uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
-        printf("%lu\n", ptp_counter);
-        std::cout << ptp_params->ptp_global_time << std::endl;
-        while (!ptp_params->network_set_start_ptp) {
-            usleep(10); // sleep 1ms
-        }
+    // Local multi-camera barrier: the last camera to arrive latches the
+    // current PTP time and broadcasts a common gate time; all cameras then
+    // wait until every camera has programmed the gate before proceeding.
+    if (ptp_params->ptp_counter == camera_params->num_cameras - 1) {
         ptp_state->ptp_time = get_current_PTP_time(&ecam->camera);
-    } else {
-        if (ptp_params->ptp_counter == camera_params->num_cameras - 1) {
-            ptp_state->ptp_time = get_current_PTP_time(&ecam->camera);
-            ptp_params->ptp_global_time =
-                ((unsigned long long)delay_in_second) * 1000000000 +
-                ptp_state->ptp_time;
-        }
-        uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
-        printf("%lu\n", ptp_counter);
-        while (ptp_params->ptp_counter != camera_params->num_cameras) {
-            // printf(".");
-            // fflush(stdout);
-            usleep(10);
-        }
+        ptp_params->ptp_global_time =
+            ((unsigned long long)delay_in_second) * 1000000000 +
+            ptp_state->ptp_time;
+    }
+    uint64_t ptp_counter = sync_fetch_and_add(&ptp_params->ptp_counter, 1);
+    printf("%lu\n", ptp_counter);
+    while (ptp_params->ptp_counter != camera_params->num_cameras) {
+        usleep(10);
     }
 
     unsigned long long ptp_time_plus_delta_to_start =
@@ -229,7 +214,7 @@ inline void get_one_frame(CameraState *camera_state,
                           CameraControl *camera_control, CameraEmergent *ecam,
                           CameraParams *camera_params, PTPState *ptp_state,
                           void *openGLDisplay, GPUVideoEncoder *gpu_encoder,
-                          FrameSaver *frame_saver, void *frame_detector) {
+                          FrameSaver *frame_saver) {
     if (camera_control->trigger_mode) {
         std::cout << "trigger" << std::endl;
         check_camera_errors(
@@ -282,7 +267,6 @@ inline void get_one_frame(CameraState *camera_state,
                 camera_state->frame_count, real_time, ptp_offset);
         }
 
-#ifndef HEADLESS
         COpenGLDisplay *display = static_cast<COpenGLDisplay *>(openGLDisplay);
         if (display) {
             display->PushToDisplay(
@@ -291,12 +275,6 @@ inline void get_one_frame(CameraState *camera_state,
                 ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
                 camera_state->frame_count);
         }
-        FrameDetector *detector = static_cast<FrameDetector *>(frame_detector);
-        if (detector && camera_select->sigs->frame_detect_state.load() ==
-                            State_Copy_New_Frame) {
-            detector->notify_frame_ready(ecam->frame_recv.imagePtr, 0);
-        }
-#endif
 
         if (camera_select->sigs->frame_save_state.load() ==
             State_Copy_New_Frame) {
@@ -335,37 +313,18 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraEachSelect *camera_select,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
-                    std::string folder_name, PTPParams *ptp_params,
-                    AppContext *ctx) {
+                    std::string folder_name, PTPParams *ptp_params) {
     CHECK(cudaSetDevice(camera_params->gpu_id));
     CameraState camera_state;
     PTPState ptp_state;
     StopWatch w;
 
-#ifndef HEADLESS
-    FrameDetector *frame_detector = nullptr;
-    if (camera_select->detect_mode == Detect3D_Standoff ||
-        camera_select->detect_mode == Detect2D_Standoff) {
-        frame_detector =
-            new FrameDetector(camera_params, camera_select, ctx, folder_name);
-        frame_detector->start();
-
-        while (detector_counter.load() !=
-               camera_select->total_standoff_detector) {
-            // printf(".");
-            // fflush(stdout);
-            usleep(10);
-        }
-        camera_select->sigs->frame_detect_state.store(State_Copy_New_Frame);
-    }
-
     COpenGLDisplay *openGLDisplay = nullptr;
     if (camera_select->stream_on) {
         openGLDisplay = new COpenGLDisplay("gl", camera_params, camera_select,
-                                           display_buffer, ctx);
+                                           display_buffer);
         openGLDisplay->StartThread();
     }
-#endif
 
     FrameSaver frame_saver(camera_params, camera_select);
     frame_saver.start();
@@ -407,42 +366,9 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     // int offset = 0;
     // int phase = 1;
     while (camera_control->subscribe) {
-        // int OFFSET_Y_VAL = 1300 + offset * 4;
-        // EVT_CameraSetUInt32Param(&ecam->camera, "OffsetY", OFFSET_Y_VAL);
-#ifndef HEADLESS
         get_one_frame(&camera_state, camera_select, camera_control, ecam,
                       camera_params, &ptp_state, openGLDisplay, gpu_encoder,
-                      &frame_saver, frame_detector);
-#else
-        get_one_frame(&camera_state, camera_select, camera_control, ecam,
-                      camera_params, &ptp_state, nullptr, gpu_encoder,
-                      &frame_saver, nullptr);
-#endif
-        if (ptp_params->network_sync && ptp_params->network_set_stop_ptp) {
-            if (ptp_state.ptp_time > ptp_params->ptp_stop_time) {
-                uint64_t ptp_stop_conuter =
-                    sync_fetch_and_add(&ptp_params->ptp_stop_counter, 1);
-                printf("%lu\n", ptp_stop_conuter);
-                while (ptp_params->ptp_stop_counter !=
-                       camera_params->num_cameras) {
-                    // printf(".");
-                    // fflush(stdout);
-                    usleep(10);
-                }
-                ptp_params->ptp_stop_reached = true;
-                camera_control->subscribe = false;
-                break;
-            }
-        }
-        // if (offset == 200) {
-        //     phase = -1;
-        // }
-        // if (offset == 0) {
-        //     phase = 1;
-        // }
-        // if (phase == -1) {
-        //     offset--;
-        // } else { offset++; }
+                      &frame_saver);
     }
 
     check_camera_errors(
@@ -451,18 +377,10 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     try_stop_timer();
     double time_diff = w.Stop();
 
-#ifndef HEADLESS
     if (camera_select->stream_on) {
         openGLDisplay->StopThread();
         delete openGLDisplay;
     }
-
-    if (camera_select->detect_mode == Detect3D_Standoff ||
-        camera_select->detect_mode == Detect2D_Standoff) {
-        frame_detector->stop();
-        delete frame_detector;
-    }
-#endif
 
     frame_saver.stop();
 

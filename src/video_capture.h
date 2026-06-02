@@ -1,7 +1,6 @@
 #ifndef ORANGE_VIDEO_CAPTURE
 #define ORANGE_VIDEO_CAPTURE
 #include "camera.h"
-#include "enet_utils.h"
 #include "json.hpp"
 #include <atomic>
 #include <chrono>
@@ -49,8 +48,7 @@ class FPSEstimator {
 enum PictureState {
     State_Frame_Idle,
     State_Copy_New_Frame,
-    State_Frame_Copy_Done,
-    State_Frame_Detection_Ready
+    State_Frame_Copy_Done
 };
 
 struct CameraControl {
@@ -62,18 +60,8 @@ struct CameraControl {
     bool trigger_mode = false;
 };
 
-enum DetectMode {
-    Detect_OFF,
-    Detect2D_GLThread,
-    Detect2D_Standoff,
-    Detect3D_Standoff
-};
-constexpr const char *DetectModeNames[] = {"OFF", "2DGLThread", "2DStandoff",
-                                           "3DStandoff"};
-
 struct CameraSignals {
     std::atomic<PictureState> frame_save_state{State_Frame_Idle};
-    std::atomic<PictureState> frame_detect_state{State_Frame_Idle};
 };
 
 struct CameraTrackState {
@@ -89,9 +77,7 @@ struct CameraEachSelect {
     int downsample = 1;
     std::string frame_save_format, frame_save_name;
     int pictures_counter = 0;
-    std::string picture_save_folder, yolo_model;
-    DetectMode detect_mode = Detect_OFF;
-    int idx2d = 0, idx3d = 0, total_standoff_detector = 0;
+    std::string picture_save_folder;
     int dropped_frames = 0;
     FPSEstimator encoder_fps_estimator, capture_fps_estimator;
 
@@ -145,8 +131,7 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
                     CameraEachSelect *camera_select,
                     CameraControl *camera_control,
                     unsigned char *display_buffer, std::string encoder_setup,
-                    std::string folder_name, PTPParams *ptp_params,
-                    AppContext *ctx);
+                    std::string folder_name, PTPParams *ptp_params);
 
 void load_camera_json_config_files(std::string file_name,
                                    CameraParams *camera_params,

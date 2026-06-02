@@ -3,10 +3,7 @@
 #if defined(__GNUC__)
 #include <unistd.h>
 #endif
-#include "ctrl_generated.h"
-#include "enet_utils.h"
 #include "global.h"
-#include "kernel.cuh"
 #include "opengldisplay.h"
 #include "utils.h"
 #include <cuda_runtime_api.h>
@@ -17,9 +14,9 @@
 
 COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
                                CameraEachSelect *camera_select,
-                               unsigned char *display_buffer, AppContext *ctx)
+                               unsigned char *display_buffer)
     : CThreadWorker(name), camera_params(camera_params),
-      camera_select(camera_select), display_buffer(display_buffer), ctx(ctx) {
+      camera_select(camera_select), display_buffer(display_buffer) {
     input_image_size.width = camera_params->width;
     input_image_size.height = camera_params->height;
     input_image_roi.x = 0;
@@ -47,9 +44,6 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
 COpenGLDisplay::~COpenGLDisplay() {
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
-    if (camera_select->detect_mode == Detect2D_GLThread) {
-        delete yolov8;
-    }
 }
 
 void COpenGLDisplay::ThreadRunning() {
@@ -64,29 +58,6 @@ void COpenGLDisplay::ThreadRunning() {
 
     initalize_gpu_frame_async(&frame_original, camera_params, stream);
     initialize_gpu_debayer_async(&debayer, camera_params, 4, stream);
-    initialize_cpu_frame(&frame_cpu, camera_params);
-
-    CHECK(cudaMallocAsync((void **)&d_convert,
-                          camera_params->width * camera_params->height * 3,
-                          stream));
-
-    unsigned int skeleton[8] = {0, 1, 1, 2, 2, 3, 3, 0}; // box
-    if (camera_select->detect_mode == Detect2D_GLThread) {
-        printf("YOLO initialization...\n");
-
-        const std::string engine_file_path = camera_select->yolo_model;
-        yolov8 = new YOLOv8(engine_file_path, camera_params->width,
-                            camera_params->height, stream, d_convert, npp_ctx);
-        yolov8->make_pipe(false);
-        cudaMallocAsync((void **)&d_points, sizeof(float) * 8, stream);
-        cudaMallocAsync((void **)&d_skeleton, sizeof(unsigned int) * 8, stream);
-        CHECK(cudaMemcpyAsync(d_skeleton, skeleton, sizeof(unsigned int) * 8,
-                              cudaMemcpyHostToDevice, stream));
-    }
-    flatbuffers::FlatBufferBuilder flatb_builder(256);
-
-    std::vector<Bbox> objs;
-    std::vector<Bbox> objs_last_frame;
 
     using clock = std::chrono::steady_clock;
 
@@ -128,60 +99,6 @@ void COpenGLDisplay::ThreadRunning() {
                                             &debayer, npp_ctx);
             }
             nvtxRangePop();
-
-            if (camera_select->detect_mode == Detect2D_GLThread) {
-                rgba2rgb_convert(d_convert, debayer.d_debayer,
-                                 camera_params->width, camera_params->height,
-                                 stream);
-
-                if (yolov8->graph_captured) {
-                    // nvtxRangePush("graph");
-                    CHECK(
-                        cudaGraphLaunch(yolov8->inference_graph_exec, stream));
-                    CHECK(cudaStreamSynchronize(stream));
-                    // nvtxRangePop();
-                } else {
-                    yolov8->preprocess_gpu();
-                    yolov8->infer(); // it sync gpu with cpu here
-                }
-
-                yolov8->postprocess(objs);
-                if (objs.size() > 0) {
-
-                    for (int obj = 0; obj < objs.size(); obj++) {
-                        // draw all bounding boxes when objects are detected
-                        // default to highlighting by class color
-                        yolov8->copy_keypoints_gpu(d_points, objs[obj]);
-                        gpu_draw_box(debayer.d_debayer, camera_params->width,
-                                     camera_params->height, d_points,
-                                     objs[obj].label, yolov8->stream);
-                    }
-
-                    // std::cout << objs[0].rect.x << ", " << objs[0].rect.y <<
-                    // std::endl; f32 bbox_center_x = objs[0].rect.x +
-                    // objs[0].rect.width / 2.0; std::cout << bbox_center_x <<
-                    // std::endl; if (objs[0].rect.x < 2260.41 && objs[0].rect.x
-                    // < objs_last_frame[0].rect.x) { if (objs[0].rect.x <
-                    // 2500.0 && objs[0].rect.x > 2100.0) {
-
-                    if (objs[0].rect.x < 2680.0 &&
-                        objs[0].rect.x > 2100.0) { // trigger earlier
-                        // std::cout << "trigger ball drop" << std::endl;
-                        // struct timespec ts_rt1;
-                        // clock_gettime(CLOCK_REALTIME, &ts_rt1);
-                        // uint64_t real_time =
-                        //     (ts_rt1.tv_sec * 1000000000LL) + ts_rt1.tv_nsec;
-
-                        // std::cout << "trigger ball drop: " << real_time
-                        //           << std::endl;
-
-                        // send_indigo_trigger_message(ctx, flatb_builder);
-                    }
-                    objs_last_frame.push_back(objs[0]);
-                } else {
-                    objs_last_frame.clear();
-                }
-            }
 
             nvtxRangePush("dgl_copy_to_interop_buffer");
             if (camera_select->downsample != 1) {
@@ -233,28 +150,22 @@ bool COpenGLDisplay::PushToDisplay(void *imagePtr, size_t bufferSize, int width,
                                    int height, int pixelFormat,
                                    unsigned long long timestamp,
                                    unsigned long long frame_id) {
-    WORKER_ENTRY *entriesOut[WORK_ENTRIES_MAX]; // entris got out from saver
-                                                // thread, their frames should
-                                                // be returned to driver queue.
+    WORKER_ENTRY *entriesOut[WORK_ENTRIES_MAX]; // entries got out from the
+                                                // display thread; their frames
+                                                // should be returned to the
+                                                // driver queue.
     int entriesOutCount = WORK_ENTRIES_MAX;
     GetObjectsFromQueueOut((void **)entriesOut, &entriesOutCount);
     if (entriesOutCount) { // return the frames to driver, and put entries back
                            // to frameSaveEntriesFreeQueue
-        // printf("++++++++++++++++++++++++ %s %s %d get WORKER_ENTRY from out
-        // entriesOutCount: %d\n", __FILE__, __FUNCTION__, __LINE__,
-        // entriesOutCount);
         for (int j = 0; j < entriesOutCount; j++) {
             workerEntriesFreeQueue[workerEntriesFreeQueueCount] = entriesOut[j];
             workerEntriesFreeQueueCount++;
         }
     }
 
-    // get the free entry if there is one and put in to QueueIn, otherwise
-    // EVT_CameraQueueFrame.
+    // get the free entry if there is one and put it into QueueIn
     if (workerEntriesFreeQueueCount) {
-        // printf("++++++++++++++++++++++++ %s %s %d put WORKER_ENTRY to in
-        // workerEntriesFreeQueueCount: %d\n", __FILE__, __FUNCTION__, __LINE__,
-        // workerEntriesFreeQueueCount);
         WORKER_ENTRY *entry =
             workerEntriesFreeQueue[workerEntriesFreeQueueCount - 1];
         workerEntriesFreeQueueCount--;

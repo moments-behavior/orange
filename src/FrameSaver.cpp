@@ -3,7 +3,11 @@
 #include "image_processing.h"
 #include "kernel.cuh"
 #include "utils.h"
+#include <algorithm>
 #include <npp.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 FrameSaver::FrameSaver(CameraParams *params, CameraEachSelect *select)
     : camera_params(params), camera_select(select), running(false) {}
@@ -82,7 +86,7 @@ void FrameSaver::thread_loop() {
                                   &frame_process.debayer);
         }
 
-        rgba2bgr_convert(frame_process.d_convert,
+        rgba2rgb_convert(frame_process.d_convert,
                          frame_process.debayer.d_debayer, camera_params->width,
                          camera_params->height, stream);
 
@@ -94,18 +98,28 @@ void FrameSaver::thread_loop() {
 
         ck(cudaStreamSynchronize(stream));
 
-        // Save to disk
-        cv::Mat view(camera_params->width * camera_params->height * 3, 1, CV_8U,
-                     frame_process.frame_cpu.frame);
-        view = view.reshape(3, camera_params->height);
-
+        // Save to disk (RGB8 interleaved, written without OpenCV via stb).
+        std::string fmt = camera_select->frame_save_format;
+        std::transform(fmt.begin(), fmt.end(), fmt.begin(), ::tolower);
         std::string image_name = camera_select->picture_save_folder + "/" +
                                  camera_params->camera_serial + "_" +
-                                 camera_select->frame_save_name + "." +
-                                 camera_select->frame_save_format;
+                                 camera_select->frame_save_name + "." + fmt;
 
         std::cout << "Saving " << image_name << std::endl;
-        cv::imwrite(image_name, view);
+        const int w = camera_params->width;
+        const int h = camera_params->height;
+        const unsigned char *rgb = frame_process.frame_cpu.frame;
+        int ok = 0;
+        if (fmt == "jpg" || fmt == "jpeg") {
+            ok = stbi_write_jpg(image_name.c_str(), w, h, 3, rgb, 95);
+        } else {
+            // default to PNG (lossless); covers "png" and any other format.
+            ok = stbi_write_png(image_name.c_str(), w, h, 3, rgb, w * 3);
+        }
+        if (!ok) {
+            std::cerr << "FrameSaver: failed to write " << image_name
+                      << std::endl;
+        }
 
         camera_select->pictures_counter++;
         camera_select->sigs->frame_save_state.store(State_Frame_Idle);

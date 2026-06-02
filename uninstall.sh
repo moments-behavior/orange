@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="red"
+APP_NAME="orange"
 
 YES=0
 DRYRUN=0

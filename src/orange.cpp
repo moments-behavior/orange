@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
+#include <cstdlib> // setenv
 #include <iostream>
 #include <sys/stat.h>
 
@@ -83,8 +84,9 @@ void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
 }
 
 int main(int argc, char **args) {
-    int display_gpu_id = 0;
-    CHECK(cudaSetDevice(display_gpu_id));
+    // Deterministic device numbering (matches nvidia-smi) across reboots/machines,
+    // so per-camera gpu_id values in configs stay stable. Must precede any CUDA call.
+    setenv("CUDA_DEVICE_ORDER", "PCI_BUS_ID", 1);
 
     gx_context *window = (gx_context *)malloc(sizeof(gx_context));
     *window =
@@ -95,6 +97,24 @@ int main(int argc, char **args) {
                      .glsl_version = (char *)malloc(100)};
 
     render_initialize_target(window);
+
+    // Display GPU = whichever CUDA device backs the GL context (the monitor's GPU).
+    // Detect it instead of assuming index 0 — portable to any GPU count/ordering.
+    int display_gpu_id = 0;
+    unsigned int gl_dev_count = 0;
+    int gl_devs[16];
+    cudaError_t gl_err =
+        cudaGLGetDevices(&gl_dev_count, gl_devs, 16, cudaGLDeviceListAll);
+    if (gl_err == cudaSuccess && gl_dev_count > 0) {
+        display_gpu_id = gl_devs[0];
+        printf("Display GPU: CUDA device %d drives the GL context\n",
+               display_gpu_id);
+    } else {
+        cudaGetLastError(); // clear the sticky error
+        printf("WARN: cudaGLGetDevices failed (%s); defaulting display to device 0\n",
+               cudaGetErrorString(gl_err));
+    }
+    CHECK(cudaSetDevice(display_gpu_id));
 
     const int max_cameras = 20;
     GigEVisionDeviceInfo unsorted_device_info[max_cameras];

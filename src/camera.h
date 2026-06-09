@@ -32,6 +32,7 @@ struct CameraParams {
     int num_cameras;
     bool gpu_direct;
     bool need_reorder;
+    bool lens_control; // run IrisInit/FocusInit on open so an EF/RF lens is controllable
     unsigned int gain_max;
     unsigned int gain_min;
     unsigned int gain_inc;
@@ -164,6 +165,7 @@ void update_focus_value(Emergent::CEmergentCamera *camera, int focus_value,
                         CameraParams *camera_params);
 void update_iris_value(Emergent::CEmergentCamera *camera, int iris_value,
                        CameraParams *camera_params);
+void lens_init(Emergent::CEmergentCamera *camera, CameraParams *camera_params);
 int scan_cameras(int max_cameras, GigEVisionDeviceInfo *device_info);
 void allocate_frame_reorder_buffer(Emergent::CEmergentCamera *camera,
                                    Emergent::CEmergentFrame *frame_reorder,

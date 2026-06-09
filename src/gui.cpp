@@ -278,6 +278,14 @@ void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
                               &cameras_params[selected_camera]);
         }
 
+        // Re-initialize the EF/RF lens (IrisInit + FocusInit). Needed once after open
+        // before Focus/Iris are controllable; handy as a manual re-init since lens
+        // detection can be flaky.
+        if (ImGui::Button("Init Lens (Iris+Focus)")) {
+            lens_init(&ecams[selected_camera].camera,
+                      &cameras_params[selected_camera]);
+        }
+
         if (ImGui::SliderInt("Exposure", &slider_exposure,
                              cameras_params[selected_camera].exposure_min,
                              cameras_params[selected_camera].exposure_max,

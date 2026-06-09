@@ -200,14 +200,28 @@ void get_senstemp_value(Emergent::CEmergentCamera *camera,
     }
 }
 
+// The gain node name has drifted across firmware/eSDK versions: this camera (FW 3.95,
+// SFNC 2.5) exposes it as "GainRaw" (eCapture labels it "Digital Gain"); older cameras
+// use "Gain". Pick whichever this camera actually exposes (UInt32 with a real max).
+static const char *gain_param(Emergent::CEmergentCamera *camera) {
+    const char *candidates[] = {"GainRaw", "Gain"};
+    for (const char *name : candidates) {
+        unsigned int mx = 0;
+        if (EVT_CameraGetUInt32ParamMax(camera, name, &mx) == 0 && mx > 0)
+            return name;
+    }
+    return "Gain";
+}
+
 void update_gain_value(Emergent::CEmergentCamera *camera, int gain_val,
                        CameraParams *camera_params) {
-    EVT_CameraGetUInt32ParamMax(camera, "Gain", &camera_params->gain_max);
-    EVT_CameraGetUInt32ParamMin(camera, "Gain", &camera_params->gain_min);
-    EVT_CameraGetUInt32ParamInc(camera, "Gain", &camera_params->gain_inc);
+    const char *gp = gain_param(camera);
+    EVT_CameraGetUInt32ParamMax(camera, gp, &camera_params->gain_max);
+    EVT_CameraGetUInt32ParamMin(camera, gp, &camera_params->gain_min);
+    EVT_CameraGetUInt32ParamInc(camera, gp, &camera_params->gain_inc);
     if (gain_val >= camera_params->gain_min &&
         gain_val <= camera_params->gain_max) {
-        EVT_CameraSetUInt32Param(camera, "Gain", gain_val);
+        EVT_CameraSetUInt32Param(camera, gp, gain_val);
         camera_params->gain = gain_val;
     }
 }
@@ -243,6 +257,15 @@ void update_iris_value(Emergent::CEmergentCamera *camera, int iris_value,
         EVT_CameraSetUInt32Param(camera, "Iris", iris_value);
         camera_params->iris = iris_value;
     }
+}
+
+void lens_init(Emergent::CEmergentCamera *camera, CameraParams *camera_params) {
+    // EF/RF lenses must be initialized once after the camera opens before Focus/Iris
+    // become controllable (mirrors eCapture's IrisInit/FocusInit buttons). Error-tolerant:
+    // a camera without a controllable lens just returns an error, which is ignored.
+    (void)camera_params;
+    EVT_CameraExecuteCommand(camera, "IrisInit");
+    EVT_CameraExecuteCommand(camera, "FocusInit");
 }
 
 void update_width_value(Emergent::CEmergentCamera *camera, int width_val,
@@ -431,6 +454,10 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera,
     // camera_params->frame_rate)); printf("FrameRate Set to: \t%d\n",
     // camera_params.frame_rate);
     update_frame_rate_value(camera, camera_params->frame_rate, camera_params);
+    // Initialize the EF/RF lens before applying focus/iris (no-op range otherwise).
+    if (camera_params->lens_control) {
+        lens_init(camera, camera_params);
+    }
     update_focus_value(camera, camera_params->focus, camera_params);
     update_iris_value(camera, camera_params->iris, camera_params);
 }
@@ -478,14 +505,15 @@ void update_camera_params(Emergent::CEmergentCamera *camera,
                                 &camera_params->exposure_min);
     EVT_CameraGetUInt32ParamInc(camera, "Exposure",
                                 &camera_params->exposure_inc);
+    const char *gp_setup = gain_param(camera);
     check_camera_errors(Emergent::EVT_CameraGetUInt32Param(
-                            camera, "Gain", &camera_params->gain),
+                            camera, gp_setup, &camera_params->gain),
                         camera_params->camera_serial.c_str());
     std::cout << "Gain: " << camera_params->gain << std::endl;
-    EVT_CameraGetUInt32ParamMax(camera, "Gain", &camera_params->gain_max);
+    EVT_CameraGetUInt32ParamMax(camera, gp_setup, &camera_params->gain_max);
     std::cout << "Gain max: " << camera_params->gain_max << std::endl;
-    EVT_CameraGetUInt32ParamMin(camera, "Gain", &camera_params->gain_min);
-    EVT_CameraGetUInt32ParamInc(camera, "Gain", &camera_params->gain_inc);
+    EVT_CameraGetUInt32ParamMin(camera, gp_setup, &camera_params->gain_min);
+    EVT_CameraGetUInt32ParamInc(camera, gp_setup, &camera_params->gain_inc);
     check_camera_errors(Emergent::EVT_CameraGetUInt32Param(
                             camera, "Iris", &camera_params->iris),
                         camera_params->camera_serial.c_str());

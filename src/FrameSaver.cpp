@@ -55,6 +55,7 @@ void FrameSaver::notify_frame_ready(void *device_image_ptr) {
 void FrameSaver::thread_loop() {
     ck(cudaSetDevice(camera_params->gpu_id));
     CHECK(cudaStreamCreate(&stream));
+    npp_ctx = make_npp_stream_context(camera_params->gpu_id, stream);
     initalize_gpu_frame_async(&frame_process.frame_original, camera_params,
                               stream);
     initialize_gpu_debayer_async(&frame_process.debayer, camera_params, 4,
@@ -79,11 +80,13 @@ void FrameSaver::thread_loop() {
 
         // GPU processing
         if (camera_params->color) {
-            debayer_frame_gpu(camera_params, &frame_process.frame_original,
-                              &frame_process.debayer);
+            debayer_frame_gpu_rgba_ctx(camera_params,
+                                       &frame_process.frame_original,
+                                       &frame_process.debayer, npp_ctx);
         } else {
-            duplicate_channel_gpu(camera_params, &frame_process.frame_original,
-                                  &frame_process.debayer);
+            duplicate_channel_gpu_4_ctx(camera_params,
+                                        &frame_process.frame_original,
+                                        &frame_process.debayer, npp_ctx);
         }
 
         rgba2rgb_convert(frame_process.d_convert,

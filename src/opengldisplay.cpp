@@ -8,7 +8,7 @@
 #include "utils.h"
 #include <cuda_runtime_api.h>
 #include <npp.h>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h> // header-only NVTX3 (portable: CUDA 12.x and 13)
 #include <stdio.h>
 #include <string.h>
 

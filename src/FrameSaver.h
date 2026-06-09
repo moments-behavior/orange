@@ -23,6 +23,7 @@ class FrameSaver {
     void thread_loop();
 
     cudaStream_t stream;
+    NppStreamContext npp_ctx;   // built once in thread_loop (CUDA 13 NPP needs a stream ctx)
     CameraParams *camera_params;
     CameraEachSelect *camera_select;
     FrameProcess frame_process;

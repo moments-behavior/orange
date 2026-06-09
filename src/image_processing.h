@@ -124,17 +124,9 @@ inline void initialize_gpu_debayer_async(Debayer *debayer,
     }
 }
 
-inline void debayer_frame_gpu(CameraParams *camera_params,
-                              FrameGPU *frame_original, Debayer *debayer) {
-    const NppStatus npp_result = nppiCFAToRGBA_8u_C1AC4R(
-        frame_original->d_orig, camera_params->width * sizeof(unsigned char),
-        debayer->size, debayer->roi, debayer->d_debayer,
-        camera_params->width * sizeof(uchar4), debayer->grid,
-        NPPI_INTER_UNDEFINED, debayer->nAlpha);
-    if (npp_result != 0) {
-        std::cout << "\nNPP error %d \n" << npp_result << std::endl;
-    }
-}
+// CUDA 13 removed the context-less NPP API (nppiCFAToRGBA_8u_C1AC4R, nppiDup_8u_C1AC4R).
+// The _Ctx variants below are the only path now; callers build an NppStreamContext once
+// (see make_npp_stream_context) and pass it in.
 
 inline void debayer_frame_gpu_rgba_ctx(CameraParams *camera_params,
                                        FrameGPU *frame_original,
@@ -159,18 +151,6 @@ inline void debayer_frame_gpu_rgb_ctx(CameraParams *camera_params,
         debayer->size, debayer->roi, debayer->d_debayer,
         camera_params->width * sizeof(uchar3), debayer->grid,
         NPPI_INTER_UNDEFINED, npp_ctx);
-    if (npp_result != 0) {
-        std::cout << "\nNPP error %d \n" << npp_result << std::endl;
-    }
-}
-
-inline void duplicate_channel_gpu(CameraParams *camera_params,
-                                  FrameGPU *frame_original, Debayer *debayer) {
-    const NppStatus npp_result = nppiDup_8u_C1AC4R(
-        frame_original->d_orig, camera_params->width * sizeof(unsigned char),
-        debayer->d_debayer, camera_params->width * sizeof(uchar4),
-        debayer->size);
-
     if (npp_result != 0) {
         std::cout << "\nNPP error %d \n" << npp_result << std::endl;
     }

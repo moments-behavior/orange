@@ -46,6 +46,7 @@ class GPUVideoEncoder : public CThreadWorker {
     unsigned char *display_buffer;
     FrameGPU frame_original; // frame on gpu device
     Debayer debayer;
+    NppStreamContext npp_ctx; // built once in ThreadRunning (CUDA 13 NPP needs a stream ctx)
 
     // encoding
     EncoderContext encoder;

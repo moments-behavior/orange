@@ -3,6 +3,7 @@
 #include <unistd.h>
 #endif
 #include "gpu_video_encoder.h"
+#include "utils.h" // make_npp_stream_context
 #include <cuda_runtime_api.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +36,12 @@ static inline void initialize_encoder(EncoderContext *encoder,
     CUdevice cuDevice;
     ck(cuDeviceGet(&cuDevice, camera_params->gpu_id));
     encoder->cuContext = NULL;
+    // cuCtxCreate gained a CUctxCreateParams* arg in CUDA 13 (_v4); CUDA 12.x is _v2.
+#if CUDA_VERSION >= 13000
+    ck(cuCtxCreate(&encoder->cuContext, NULL, 0, cuDevice));
+#else
     ck(cuCtxCreate(&encoder->cuContext, 0, cuDevice));
+#endif
     encoder->pEnc = new NvEncoderCuda(encoder->cuContext, camera_params->width,
                                       camera_params->height, encoder->eFormat);
     InitializeEncoder(encoder->pEnc, encoder->encodeCLIOptions,
@@ -152,9 +158,11 @@ void GPUVideoEncoder::ProcessOneFrame(void *f) {
                     camera_params->height, cudaMemcpyHostToDevice));
 
     if (camera_params->color) {
-        debayer_frame_gpu(camera_params, &frame_original, &debayer);
+        debayer_frame_gpu_rgba_ctx(camera_params, &frame_original, &debayer,
+                                   npp_ctx);
     } else {
-        duplicate_channel_gpu(camera_params, &frame_original, &debayer);
+        duplicate_channel_gpu_4_ctx(camera_params, &frame_original, &debayer,
+                                    npp_ctx);
     }
 
     encode_frame(&encoder, writer.video, &debayer);
@@ -167,6 +175,8 @@ void GPUVideoEncoder::ThreadRunning() {
     // innitialization
     initalize_gpu_frame(&frame_original, camera_params);
     initialize_gpu_debayer(&debayer, camera_params, 4);
+    // ProcessOneFrame uses the synchronous default stream (0) for its copies/NPP.
+    npp_ctx = make_npp_stream_context(camera_params->gpu_id, 0);
 
     initialize_encoder(&encoder, encoder_setup, camera_params);
     initialize_writer(&writer, camera_params, folder_name, encoder_setup);

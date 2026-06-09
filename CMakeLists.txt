@@ -80,6 +80,12 @@ target_link_libraries(orange
     cudart cuda nppicc nppidei nppc nppig nppial nvidia-encode
     EmergentCamera EmergentGenICam EmergentGigEVision
     avformat swscale swresample avutil avcodec
-    nvToolsExt
+    # NVTX3 (nvtx3/nvToolsExt.h) is header-only on CUDA 12.x and 13 — no nvToolsExt link.
     ${GLFW3_LIBRARIES}
 )
+
+# Emit DT_RPATH instead of DT_RUNPATH: transitively-needed bundled FFmpeg libs
+# (e.g. libswresample.so.3, pulled in by libavcodec.so.58) live in ~/nvidia/ffmpeg/build/lib.
+# RUNPATH only covers orange's *direct* deps, so the loader can't find transitive ones;
+# RPATH covers the whole dependency chain.
+set_target_properties(orange PROPERTIES LINK_FLAGS "-Wl,--disable-new-dtags")

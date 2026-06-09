@@ -101,7 +101,7 @@ void prepare_application_folders(std::string &orange_root_dir,
     }
 
     if (orange_root_dir.empty()) {
-        orange_root_dir = home_dir + "/orange_data_dev";
+        orange_root_dir = home_dir + "/orange_data";
     }
     std::vector<std::string> app_folders = {"config/local", "pictures"};
     create_required_folders(orange_root_dir, app_folders);

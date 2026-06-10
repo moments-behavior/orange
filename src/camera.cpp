@@ -422,8 +422,11 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera,
     update_width_value(camera, camera_params->width, camera_params);
     update_height_value(camera, camera_params->height, camera_params);
 
-    update_offsetX_value(camera, 0, camera_params);
-    update_offsetY_value(camera, 0, camera_params);
+    // Apply the configured ROI offset (set AFTER width/height so the camera's
+    // OffsetX/Y max reflects the new crop). Previously hard-coded to 0, which
+    // ignored offsetx/offsety from the camera config.
+    update_offsetX_value(camera, camera_params->offsetx, camera_params);
+    update_offsetY_value(camera, camera_params->offsety, camera_params);
 
     const char *pixel_format = camera_params->pixel_format.c_str();
     check_camera_errors(

@@ -38,9 +38,13 @@ void load_camera_json_config_files(std::string file_name,
     }
     if (camera_config.contains("offsetx")) {
         camera_params->offsetx = camera_config["offsetx"];
+    } else {
+        camera_params->offsetx = 0;
     }
     if (camera_config.contains("offsety")) {
         camera_params->offsety = camera_config["offsety"];
+    } else {
+        camera_params->offsety = 0;
     }
     if (camera_config.contains("lens_control")) {
         camera_params->lens_control = camera_config["lens_control"];

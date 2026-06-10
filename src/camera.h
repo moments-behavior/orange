@@ -83,9 +83,13 @@ inline void __check_camera_errors(EVT_ERROR err, const char *camera_serial,
         fprintf(stderr,
                 "%s checkCameraErrors() Driver API error = %04d \"%s\" from "
                 "file <%s>, "
-                "line %i.\n",
+                "line %i. (non-fatal; continuing)\n",
                 camera_serial, err, errorStr, file, line);
-        throw(EXIT_FAILURE);
+        // Do NOT throw here. This runs on the per-camera acquire threads; an
+        // exception escaping a std::thread calls std::terminate() and hard-
+        // aborts the whole app (e.g. it killed orange on record-stop). Log and
+        // continue so a transient EVT error is recoverable; errors are captured
+        // in the orange log for diagnosis.
     }
 }
 
@@ -130,8 +134,12 @@ void set_frame_buffer(Emergent::CEmergentFrame *evt_frame,
 void destroy_frame_buffer(Emergent::CEmergentCamera *camera,
                           Emergent::CEmergentFrame *evt_frame, int buffer_size,
                           CameraParams *camera_params);
+// Enable the camera's PTP clock (PtpMode=TwoStep). With gated_start=true also
+// put the camera in triggered/gated acquisition so multiple cameras can start
+// together on a common PtpAcquisitionGateTime; with false the camera free-runs
+// (Continuous) — used for a single camera, which has no peer to sync to.
 void ptp_camera_sync(Emergent::CEmergentCamera *camera,
-                     CameraParams *camera_params);
+                     CameraParams *camera_params, bool gated_start = false);
 void ptp_sync_off(Emergent::CEmergentCamera *camera,
                   CameraParams *camera_params);
 void quick_print_camera(GigEVisionDeviceInfo *device_info, int camera_idx);

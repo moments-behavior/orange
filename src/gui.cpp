@@ -79,8 +79,11 @@ void start_camera_streaming(
     }
 
     if (ptp_stream_sync) {
+        // Cross-camera start gate only makes sense with >1 camera. A single
+        // camera enables PTP (for timestamps) but free-runs — no gate/countdown.
+        bool gated_start = num_cameras > 1;
         for (int i = 0; i < num_cameras; i++) {
-            ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+            ptp_camera_sync(&ecams[i].camera, &cameras_params[i], gated_start);
         }
         camera_control->sync_camera = true;
     }
@@ -118,14 +121,17 @@ void stop_camera_streaming(std::vector<std::thread> &camera_threads,
                             cameras_params[i].camera_serial.c_str());
     }
 
-    if (num_cameras > 1) {
-        for (int i = 0; i < num_cameras; i++) {
-            ptp_sync_off(&ecams[i].camera, cameras_params);
-        }
-        ptp_params->ptp_counter = 0;
-        ptp_params->ptp_global_time = 0;
-        camera_control->sync_camera = false;
+    // Always reset PTP/sync state (not just for >1 camera): return every camera
+    // to free-running and clear the barrier counter + gate time so the NEXT
+    // start — single OR multi camera — begins clean. Previously the single-
+    // camera case left ptp_counter stale, which hung the start barrier on a
+    // second record (stream never re-opened, then a crash on stop).
+    for (int i = 0; i < num_cameras; i++) {
+        ptp_sync_off(&ecams[i].camera, cameras_params);
     }
+    ptp_params->ptp_counter = 0;
+    ptp_params->ptp_global_time = 0;
+    camera_control->sync_camera = false;
 
     for (int i = 0; i < num_cameras; i++) {
         cameras_select[i].encoder_fps_estimator.reset();

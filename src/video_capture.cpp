@@ -394,7 +394,17 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
         std::cout << "encoder ready\n" << std::endl;
     }
 
-    if (camera_control->sync_camera) {
+    // The cross-camera PTP start barrier + countdown only aligns the start of
+    // multiple cameras (locally, or across hosts in network mode — there even
+    // a single local camera must honor the broadcast gate time). For a single
+    // stand-alone camera it is pure dead wait, so skip it. Per-frame PTP
+    // timestamping (gated by sync_camera, below) still runs, so the metadata
+    // CSV keeps its PTP offsets.
+    bool use_ptp_gate =
+        camera_control->sync_camera &&
+        (camera_params->num_cameras > 1 || ptp_params->network_sync);
+
+    if (use_ptp_gate) {
         show_ptp_offset(&ptp_state, ecam);
         start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
     }
@@ -403,9 +413,13 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
         EVT_CameraExecuteCommand(&ecam->camera, "AcquisitionStart"),
         camera_params->camera_serial.c_str());
 
-    if (camera_control->sync_camera) {
+    if (use_ptp_gate) {
         grab_frames_after_countdown(&ptp_state, ecam);
         // Countdown done.
+    }
+    // Start the recording timer regardless of the gate (recording always sets
+    // sync_camera; a single camera just has no countdown to wait through).
+    if (camera_control->sync_camera) {
         try_start_timer();
     }
     ptp_params->ptp_start_reached = true;

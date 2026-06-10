@@ -143,8 +143,12 @@ void set_frame_buffer(Emergent::CEmergentFrame *evt_frame,
 void destroy_frame_buffer(Emergent::CEmergentCamera *camera,
                           Emergent::CEmergentFrame *evt_frame, int buffer_size,
                           CameraParams *camera_params);
+// Enable the camera's PTP clock (PtpMode=TwoStep). With gated_start=true also
+// put the camera in triggered/gated acquisition so multiple cameras can start
+// together on a common PtpAcquisitionGateTime; with false the camera free-runs
+// (Continuous) — used for a single camera, which has no peer to sync to.
 void ptp_camera_sync(Emergent::CEmergentCamera *camera,
-                     CameraParams *camera_params);
+                     CameraParams *camera_params, bool gated_start = false);
 void ptp_sync_off(Emergent::CEmergentCamera *camera,
                   CameraParams *camera_params);
 void quick_print_camera(GigEVisionDeviceInfo *device_info, int camera_idx);

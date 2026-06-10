@@ -565,8 +565,19 @@ void camera_trigger_mode(Emergent::CEmergentCamera *camera,
 
 // **********************************************sync*****************************************************
 void ptp_camera_sync(Emergent::CEmergentCamera *camera,
-                     CameraParams *camera_params) {
-    // ptp triggering configuration settings
+                     CameraParams *camera_params, bool gated_start) {
+    // Always enable the camera's PTP clock so frame timestamps are grandmaster-
+    // disciplined and PtpOffset is meaningful (used for the per-frame metadata
+    // and the PTP-offset logging diagnostic).
+    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"),
+                        camera_params->camera_serial.c_str());
+
+    if (!gated_start)
+        return; // free-running (Continuous); no cross-camera acquisition gate.
+
+    // Gated/triggered acquisition: each camera waits for a common
+    // PtpAcquisitionGateTime (programmed per-camera in start_ptp_sync) so all
+    // cameras begin on the same PTP instant. Only meaningful with >1 camera.
     check_camera_errors(
         EVT_CameraSetEnumParam(camera, "TriggerSource", "Software"),
         camera_params->camera_serial.c_str());
@@ -577,8 +588,6 @@ void ptp_camera_sync(Emergent::CEmergentCamera *camera,
         EVT_CameraSetUInt32Param(camera, "AcquisitionFrameCount", 1),
         camera_params->camera_serial.c_str());
     check_camera_errors(EVT_CameraSetEnumParam(camera, "TriggerMode", "On"),
-                        camera_params->camera_serial.c_str());
-    check_camera_errors(EVT_CameraSetEnumParam(camera, "PtpMode", "TwoStep"),
                         camera_params->camera_serial.c_str());
 }
 

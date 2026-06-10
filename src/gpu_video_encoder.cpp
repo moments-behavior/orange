@@ -97,8 +97,13 @@ static inline void initialize_writer(Writer *writer,
     } else {
         std::cout << "codec not supported" << '\n';
     }
+    // The .mp4 was created by avio_open in the FFmpegWriter ctor above; hand it
+    // back to the invoking user so recordings aren't left root-owned (sudo).
+    chown_to_invoking_user(writer->video_file);
+
     writer->metadata = new std::ofstream();
     open_metadata_file(writer->metadata, writer->metadata_file);
+    chown_to_invoking_user(writer->metadata_file);
 }
 
 static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer,

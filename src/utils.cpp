@@ -11,7 +11,9 @@
 #include <windows.h>
 #pragma comment(lib, "shell32.lib")
 #else
+#include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -53,6 +55,56 @@ std::string get_home_directory() {
 #endif
 }
 
+void chown_to_invoking_user(const std::string &path, bool recursive) {
+#ifndef _WIN32
+    // orange runs under sudo, so anything it creates is owned by root. Hand it
+    // back to the user who invoked sudo so recordings aren't root-owned and the
+    // user doesn't have to `sudo chown` them to open in VLC etc. No-op unless
+    // we're root and were launched via sudo by a non-root user.
+    if (geteuid() != 0)
+        return;
+
+    uid_t uid;
+    gid_t gid;
+    const char *suid = std::getenv("SUDO_UID");
+    const char *sgid = std::getenv("SUDO_GID");
+    if (suid != nullptr && sgid != nullptr) {
+        uid = static_cast<uid_t>(std::strtoul(suid, nullptr, 10));
+        gid = static_cast<gid_t>(std::strtoul(sgid, nullptr, 10));
+    } else {
+        const char *sudo_user = std::getenv("SUDO_USER");
+        if (sudo_user == nullptr)
+            return; // not under sudo — nothing to hand back
+        struct passwd *pw = getpwnam(sudo_user);
+        if (pw == nullptr)
+            return;
+        uid = pw->pw_uid;
+        gid = pw->pw_gid;
+    }
+    if (uid == 0)
+        return; // invoked directly by root — leave ownership as-is
+
+    auto do_chown = [&](const std::string &p) {
+        if (chown(p.c_str(), uid, gid) != 0)
+            std::cerr << "Warning: could not chown " << p << ": "
+                      << std::strerror(errno) << std::endl;
+    };
+
+    std::error_code ec;
+    if (recursive && std::filesystem::is_directory(path, ec)) {
+        do_chown(path);
+        for (auto it = std::filesystem::recursive_directory_iterator(path, ec);
+             !ec && it != std::filesystem::recursive_directory_iterator(); ++it)
+            do_chown(it->path().string());
+    } else {
+        do_chown(path);
+    }
+#else
+    (void)path;
+    (void)recursive;
+#endif
+}
+
 void create_required_folders(const std::string &base_dir,
                              const std::vector<std::string> &app_folders) {
     for (const auto &folder : app_folders) {
@@ -62,6 +114,7 @@ void create_required_folders(const std::string &base_dir,
             if (!std::filesystem::exists(path)) {
                 if (std::filesystem::create_directories(path)) {
                     std::cout << "Created folder: " << path << std::endl;
+                    chown_to_invoking_user(path.string());
                 }
             }
         } catch (const std::filesystem::filesystem_error &e) {
@@ -312,8 +365,10 @@ bool make_folder(std::string folder) {
     fs::path p(folder); // construct a path from the string
     std::error_code ec;
 
-    if (fs::create_directories(p, ec)) // created (including parents)
+    if (fs::create_directories(p, ec)) { // created (including parents)
+        chown_to_invoking_user(p.string());
         return true;
+    }
 
     if (!ec && fs::is_directory(p)) // already exists as a directory
         return true;

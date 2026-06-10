@@ -19,14 +19,23 @@ std::mutex g_resultsMutex;
 std::vector<int> g_lastOffsets; // size = num_cameras
 
 void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
-                              CameraParams *cameras_params) {
-    // Open CSV in append mode; create if not exists
-    std::ofstream ofs("ptp_offsets.csv", std::ios::app);
+                              CameraParams *cameras_params,
+                              const std::string &orange_root_dir) {
+    // One timestamped file per logging run, under <orange_data>/logs/ — a stable
+    // home (not the launch CWD) alongside the rest of orange's output.
+    std::string log_dir = orange_root_dir + "/logs";
+    make_folder(log_dir);
+    std::string csv_path =
+        log_dir + "/ptp_offsets_" + get_current_date_time() + ".csv";
+
+    std::ofstream ofs(csv_path);
     if (!ofs) {
-        printf("Failed to open ptp_offsets.csv\n");
+        printf("Failed to open %s\n", csv_path.c_str());
         g_workerRunning = false;
         return;
     }
+    chown_to_invoking_user(csv_path); // hand back to the user (orange runs as root)
+    printf("Logging PTP offsets to %s\n", csv_path.c_str());
 
     // Check if file is empty -> write header once
     bool needHeader = (ofs.tellp() == std::streampos(0));
@@ -442,9 +451,11 @@ int main(int argc, char **args) {
                         g_workerRunning = true;
 
                         // Start worker thread
-                        std::thread([num_cameras, ecams, cameras_params] {
+                        std::thread([num_cameras, ecams, cameras_params,
+                                     orange_root_dir_str] {
                             poll_ptp_offset_and_dump(num_cameras, ecams,
-                                                     cameras_params);
+                                                     cameras_params,
+                                                     orange_root_dir_str);
                         }).detach();
                     }
                 }
@@ -455,7 +466,7 @@ int main(int argc, char **args) {
                 }
 
                 if (g_workerRunning) {
-                    ImGui::Text("Status: logging to ptp_offsets.csv");
+                    ImGui::Text("Status: logging to orange_data/logs/");
                 } else {
                     ImGui::Text("Status: stopped");
                 }

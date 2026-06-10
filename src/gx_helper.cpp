@@ -29,6 +29,10 @@ GLFWwindow *gx_glfw_init_render_target(u32 marjor_version, u32 minor_version,
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    // Launch maximized (fills the display) instead of a small 1920x1080 window.
+    // Keeps the title bar/taskbar so it's still resizable and alt-tab-able;
+    // pass a monitor to glfwCreateWindow instead for exclusive fullscreen.
+    glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
     // local_glsl_version = "#version 330";
     strcpy(glsl_version, "#version 130");
 
@@ -39,6 +43,23 @@ GLFWwindow *gx_glfw_init_render_target(u32 marjor_version, u32 minor_version,
         glfwTerminate();
         exit(EXIT_FAILURE);
     };
+
+    // Fill the screen on launch. The GLFW_MAXIMIZED hint alone is unreliable
+    // (many window managers map the window before applying it). Size the window
+    // to the monitor work area FIRST (works even on WMs that ignore maximize),
+    // THEN request maximize last: if the WM honors maximize we get a proper
+    // maximized state, otherwise the work-area size still fills the screen.
+    // (Order matters — sizing after maximizing would un-maximize it.)
+    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+    if (monitor != NULL) {
+        int mx = 0, my = 0, mw = 0, mh = 0;
+        glfwGetMonitorWorkarea(monitor, &mx, &my, &mw, &mh);
+        if (mw > 0 && mh > 0) {
+            glfwSetWindowPos(window, mx, my);
+            glfwSetWindowSize(window, mw, mh);
+        }
+    }
+    glfwMaximizeWindow(window);
 
     return window;
 }

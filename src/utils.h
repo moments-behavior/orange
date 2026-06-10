@@ -107,6 +107,11 @@ bool make_folder(std::string folder_name);
 // Hand a path created while running under sudo back to the invoking user
 // (chown to $SUDO_UID/$SUDO_GID). No-op off Linux or when not root-via-sudo.
 void chown_to_invoking_user(const std::string &path, bool recursive = false);
+
+// Resolve an asset path (e.g. "fonts/forkawesome-webfont.ttf") relative to the
+// executable so orange finds its assets regardless of the working directory.
+// Falls back to the path as-given (CWD-relative) if it can't be located.
+std::string resolve_asset_path(const std::string &rel);
 void update_camera_configs(std::vector<std::string> &camera_config_files,
                            std::string input_folder);
 void select_cameras_have_configs(std::vector<std::string> &camera_config_files,

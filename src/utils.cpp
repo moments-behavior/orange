@@ -105,6 +105,43 @@ void chown_to_invoking_user(const std::string &path, bool recursive) {
 #endif
 }
 
+std::string resolve_asset_path(const std::string &rel) {
+    // Locate the executable's directory, then look for the asset relative to
+    // it. orange lives at .../orange/release/orange and ships assets at
+    // .../orange/fonts, so try the exe dir and its parent. Fall back to the
+    // path as-given (CWD-relative, the legacy behavior) if neither exists.
+    std::string exe_dir;
+#if defined(_WIN32)
+    char buf[4096];
+    DWORD n = GetModuleFileNameA(nullptr, buf, sizeof(buf));
+    if (n > 0 && n < sizeof(buf)) {
+        std::string p(buf, n);
+        size_t slash = p.find_last_of("\\/");
+        if (slash != std::string::npos)
+            exe_dir = p.substr(0, slash);
+    }
+#else
+    char buf[4096];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n > 0) {
+        buf[n] = '\0';
+        std::string p(buf);
+        size_t slash = p.find_last_of('/');
+        if (slash != std::string::npos)
+            exe_dir = p.substr(0, slash);
+    }
+#endif
+    if (!exe_dir.empty()) {
+        for (const std::string &base : {exe_dir, exe_dir + "/.."}) {
+            std::filesystem::path cand = std::filesystem::path(base) / rel;
+            std::error_code ec;
+            if (std::filesystem::exists(cand, ec))
+                return cand.string();
+        }
+    }
+    return rel;
+}
+
 void create_required_folders(const std::string &base_dir,
                              const std::vector<std::string> &app_folders) {
     for (const auto &folder : app_folders) {

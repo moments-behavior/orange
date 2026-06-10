@@ -132,7 +132,7 @@ int main(int argc, char **args) {
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
     std::string orange_root_dir_str;
-    std::string encoder_codec;
+    std::string encoder_codec = "hevc"; // default; overridable via config.json "codec"
     std::string recording_root_dir_str;
     prepare_application_folders(orange_root_dir_str, recording_root_dir_str,
                                 encoder_codec);

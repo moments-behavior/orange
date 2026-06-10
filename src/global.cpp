@@ -2,7 +2,7 @@
 #include <chrono>
 
 std::atomic<double> streaming_fps = 0.0;
-std::atomic<int> streaming_target_fps = 60;
+std::atomic<int> streaming_target_fps = 20;
 std::atomic<int64_t> record_start_time_ns{0};
 
 bool try_start_timer() {

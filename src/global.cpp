@@ -4,6 +4,7 @@
 std::atomic<double> streaming_fps = 0.0;
 std::atomic<int> streaming_target_fps = 20;
 std::atomic<int64_t> record_start_time_ns{0};
+std::atomic<int> g_cam_ptp_offset[kMaxCameras] = {};
 
 bool try_start_timer() {
     int64_t expected = record_start_time_ns.load();

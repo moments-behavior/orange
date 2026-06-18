@@ -236,6 +236,11 @@ inline void get_one_frame(CameraState *camera_state,
 
     int ptp_offset = 0;
     EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset", &ptp_offset);
+    // Publish for the PTP-logging worker so it never issues its own (colliding)
+    // GVCP request on this camera. camera_id is this camera's index [0, num).
+    if (camera_params->camera_id >= 0 && camera_params->camera_id < kMaxCameras)
+        g_cam_ptp_offset[camera_params->camera_id].store(
+            ptp_offset, std::memory_order_relaxed);
 
     // get the system clock
     struct timespec ts_rt1;

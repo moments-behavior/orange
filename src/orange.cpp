@@ -50,9 +50,13 @@ void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
         ofs.flush();
     }
 
-    for (int i = 0; i < num_cameras; i++) {
-        ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
-    }
+    // NOTE: this worker must not issue any GVCP request (no ptp_camera_sync, no
+    // EVT_CameraGetInt32Param) — the capture threads already talk GVCP to these
+    // cameras every frame, and a second thread doing concurrent GVCP on the same
+    // camera collides (GVCP ACK error 0300) and crashes the EVT SDK. PtpMode is
+    // enabled via the "PTP Stream Sync" checkbox at stream start (gui.cpp); here
+    // we only READ the cached per-frame offsets the capture threads publish.
+    (void)ecams;
 
     // Prepare buffer for offsets
     std::vector<int> offsets(num_cameras);
@@ -60,10 +64,8 @@ void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
     // Main loop
     while (!g_workerShouldStop.load()) {
 
-        for (int i = 0; i < num_cameras; i++) {
-            int ptp_offset = 0;
-            EVT_CameraGetInt32Param(&ecams[i].camera, "PtpOffset", &ptp_offset);
-            offsets[i] = ptp_offset;
+        for (int i = 0; i < num_cameras && i < kMaxCameras; i++) {
+            offsets[i] = g_cam_ptp_offset[i].load(std::memory_order_relaxed);
         }
 
         // 3) Append row to CSV
@@ -85,8 +87,9 @@ void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
             g_lastOffsets = offsets;
         }
 
-        // 5) Sleep between measurements (tune this)
-        // std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // 5) Throttle: PtpOffset only changes slowly, so ~10 Hz keeps the CSV
+        //    small and readable instead of writing thousands of rows/second.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     g_workerRunning = false;
@@ -160,7 +163,9 @@ int main(int argc, char **args) {
 
     ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
-    bool ptp_stream_sync = false;
+    // PTP sync on by default: the `orange` launcher always runs a PTP grandmaster,
+    // so every preview/record is synchronized. (Recording force-enables it anyway.)
+    bool ptp_stream_sync = true;
 
     std::vector<std::string> local_config_folders;
     std::string local_start_folder_name = orange_root_dir_str + "/config/local";
@@ -693,8 +698,8 @@ int main(int argc, char **args) {
                 if (camera_control->subscribe) {
                     ImGui::BeginDisabled();
                 }
-                ImGui::Checkbox("PTP Stream Sync", &ptp_stream_sync);
-                ImGui::SameLine();
+                // PTP Stream Sync is always on (see ptp_stream_sync init) — the
+                // `orange` launcher always runs a grandmaster — so no toggle here.
                 // ImGui::Checkbox("Trigger Mode",
                 // &camera_control->trigger_mode);
                 if (camera_control->subscribe) {
@@ -831,7 +836,8 @@ int main(int argc, char **args) {
                             camera_threads, camera_control, ecams,
                             cameras_params, cameras_select, num_cameras,
                             evt_buffer_size, ptp_params);
-                        ptp_stream_sync = false;
+                        // Keep PTP sync on for the next preview (always-PTP rig).
+                        ptp_stream_sync = true;
                         for (int i = 0; i < num_cameras; i++) {
                             if (cameras_select[i].stream_on) {
                                 int camera_width =

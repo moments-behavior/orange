@@ -256,7 +256,10 @@ static bool start_camera_thread(std::string record_folder,
 
     if (ptp_stream_sync) {
         for (int i = 0; i < cam_count; i++) {
-            ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+            // Network recording: always gated — this host must start on the
+            // gate time broadcast by the GUI host, even with one local camera.
+            ptp_camera_sync(&ecams[i].camera, &cameras_params[i],
+                            /*gated_start=*/true);
         }
     }
 
@@ -340,7 +343,9 @@ static bool start_camera_streaming(std::string calib_folder,
     }
 
     for (int i = 0; i < cam_count; i++) {
-        ptp_camera_sync(&ecams[i].camera, &cameras_params[i]);
+        // Network calibration capture: gated for the same reason as recording.
+        ptp_camera_sync(&ecams[i].camera, &cameras_params[i],
+                        /*gated_start=*/true);
     }
 
     for (int i = 0; i < cam_count; i++) {

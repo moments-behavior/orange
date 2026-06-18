@@ -13,6 +13,7 @@ GalvoLinkParams galvo_link_params;
 std::atomic<uint64_t> detector_counter{0};
 std::mutex graph_capture_mutex;
 uint64_t save_pics_counter{0};
+std::atomic<int> g_cam_ptp_offset[kMaxCameras] = {};
 
 bool try_start_timer() {
     int64_t expected = record_start_time_ns.load();

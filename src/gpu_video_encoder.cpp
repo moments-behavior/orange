@@ -164,13 +164,15 @@ void GPUVideoEncoder::ProcessOneFrame(void *f) {
                     camera_params->width, camera_params->width,
                     camera_params->height, cudaMemcpyHostToDevice));
 
-    // Average-brightness sample: throttled (~10 Hz) and subsampled, on its own
-    // stream. d_orig is valid here (the copy above ran on the synchronous default
-    // stream) and isn't overwritten until the next sampled frame, so the only
-    // sync is a few-microsecond scalar readback that happens ~10x/second — it
-    // does not gate the NVENC work that follows on the default stream.
+    // Average-brightness sample: wall-clock throttled (~10 Hz) and subsampled, on
+    // its own stream. d_orig is valid here (the copy above ran on the synchronous
+    // default stream) and isn't overwritten until the next sampled frame, so the
+    // only sync is a few-microsecond scalar readback that happens ~10x/second —
+    // it does not gate the NVENC work that follows on the default stream.
+    double bnow = steady_now_seconds();
     if (camera_params->camera_id >= 0 && camera_params->camera_id < kMaxCameras &&
-        ++bright_frame_counter % bright_interval == 0) {
+        bnow >= bright_next_sample_time) {
+        bright_next_sample_time = bnow + kBrightSamplePeriodSec;
         launch_brightness_sum(frame_original.d_orig, camera_params->width,
                               camera_params->height, bright_stride, d_bright_sum,
                               bright_stream);
@@ -211,11 +213,6 @@ void GPUVideoEncoder::ThreadRunning() {
     ck(cudaMalloc((void **)&d_bright_sum, sizeof(unsigned long long)));
     ck(cudaMallocHost((void **)&h_bright_sum, sizeof(unsigned long long)));
     bright_stride = 8;
-    {
-        const int target_hz = 10;
-        int fr = (int)camera_params->frame_rate;
-        bright_interval = fr > target_hz ? fr / target_hz : 1;
-    }
     {
         int nx = (camera_params->width + bright_stride - 1) / bright_stride;
         int ny = (camera_params->height + bright_stride - 1) / bright_stride;

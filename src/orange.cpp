@@ -1032,41 +1032,70 @@ int main(int argc, char **args) {
         }
 
         if (camera_control->open && show_brightness_plot) {
-            // Sample the per-camera average brightness (published by the encoder
-            // threads) into scrolling buffers at ~10 Hz, keyed on elapsed
-            // recording time, and draw one line per camera. Brightness is only
-            // produced while recording (the encoders run only then); traces are
-            // cleared when a new recording starts.
-            static bool bright_was_recording = false;
-            double elapsed = recording_elapsed_seconds();
-            bool recording = elapsed >= 0.0;
-            if (recording && !bright_was_recording && brightness_plot_data)
-                for (int i = 0; i < num_cameras; i++)
-                    brightness_plot_data[i].Erase();
-            bright_was_recording = recording;
+            // Accumulate a per-camera brightness trace from when acquisition
+            // (preview OR record) starts — same style for both, keyed on elapsed
+            // acquisition time. Brightness is published by the display thread
+            // (preview) and the encoder thread (record). The trace resets when a
+            // new acquisition session starts.
+            static bool bright_was_active = false;
+            static double bright_session_start = 0.0;
+            static double bright_next_sample = 0.0;
+            // Running Y extents across ALL plotted cameras this session, so the
+            // axis spans every camera's range (ImPlot per-series AutoFit doesn't
+            // reliably cover multiple lines at different levels).
+            static float bright_ymin = 1e30f, bright_ymax = -1e30f;
+            bool active = camera_control->subscribe;
+            double bnow = steady_now_seconds();
+            if (active && !bright_was_active) {
+                bright_session_start = bnow;
+                bright_next_sample = bnow;
+                if (brightness_plot_data)
+                    for (int i = 0; i < num_cameras; i++)
+                        brightness_plot_data[i].Erase();
+                for (int i = 0; i < num_cameras; i++) // drop last session's value
+                    g_cam_brightness[i].store(-1.0f, std::memory_order_relaxed);
+                bright_ymin = 1e30f;
+                bright_ymax = -1e30f;
+            }
+            bright_was_active = active;
 
-            static float bright_accum = 0.0f;
-            bright_accum += ImGui::GetIO().DeltaTime;
-            if (recording && brightness_plot_data && bright_accum >= 0.1f) {
-                bright_accum = 0.0f;
+            if (active && brightness_plot_data && bnow >= bright_next_sample) {
+                bright_next_sample = bnow + kBrightSamplePeriodSec; // ~10 Hz
+                float elapsed = (float)(bnow - bright_session_start);
                 for (int i = 0; i < num_cameras; i++) {
                     float b =
                         g_cam_brightness[i].load(std::memory_order_relaxed);
-                    if (b >= 0.0f)
-                        brightness_plot_data[i].AddPoint((float)elapsed, b);
+                    if (b >= 0.0f) {
+                        brightness_plot_data[i].AddPoint(elapsed, b);
+                        if (b < bright_ymin)
+                            bright_ymin = b;
+                        if (b > bright_ymax)
+                            bright_ymax = b;
+                    }
                 }
             }
 
             ImGui::Begin("Camera Brightness");
             ImGui::TextUnformatted("Average frame brightness (mono 0-255) over "
-                                   "the recording. A downward drift = dimming.");
-            if (!recording)
-                ImGui::TextDisabled("(waiting for recording to start...)");
+                                   "the acquisition. A downward drift = dimming.");
+            if (!active)
+                ImGui::TextDisabled(
+                    "(waiting for streaming/recording to start...)");
             ImVec2 avail = ImGui::GetContentRegionAvail();
             if (ImPlot::BeginPlot("##brightness", avail)) {
-                ImPlot::SetupAxes("recording time (s)", "avg brightness",
-                                  ImPlotAxisFlags_AutoFit,
-                                  ImPlotAxisFlags_AutoFit);
+                ImPlot::SetupAxes("acquisition time (s)", "avg brightness",
+                                  ImPlotAxisFlags_AutoFit, 0);
+                // Pin Y to span every camera's range (+ a small margin) so no
+                // line is clipped; falls back to 0-255 before any data arrives.
+                if (bright_ymax >= bright_ymin) {
+                    float pad = (bright_ymax - bright_ymin) * 0.08f;
+                    if (pad < 1.0f)
+                        pad = 1.0f;
+                    ImPlot::SetupAxisLimits(ImAxis_Y1, bright_ymin - pad,
+                                            bright_ymax + pad, ImGuiCond_Always);
+                } else {
+                    ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 255, ImGuiCond_Always);
+                }
                 if (brightness_plot_data) {
                     for (int i = 0; i < num_cameras; i++) {
                         if (brightness_plot_data[i].Data.empty())

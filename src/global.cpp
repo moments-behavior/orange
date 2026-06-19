@@ -17,6 +17,13 @@ double recording_elapsed_seconds() {
     return (now_ns - t0) / 1e9;
 }
 
+double steady_now_seconds() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+               .count() /
+           1e9;
+}
+
 bool try_start_timer() {
     int64_t expected = record_start_time_ns.load();
 

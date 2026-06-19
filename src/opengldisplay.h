@@ -29,6 +29,14 @@ class COpenGLDisplay : public CThreadWorker {
     NppiRect output_image_roi;
     unsigned int *d_resize;
 
+    // Average-brightness sampling for the GUI plot during preview (mirrors the
+    // encoder path). Reuses this thread's own `stream`; throttled + subsampled.
+    unsigned long long *d_bright_sum = nullptr;
+    unsigned long long *h_bright_sum = nullptr;
+    double bright_next_sample_time = 0.0; // wall-clock throttle (steady seconds)
+    int bright_stride = 8;
+    long bright_sample_count = 1;
+
   private:
     virtual void
     ThreadRunning(); // overides of COffThreadMachine for worker thread

@@ -54,8 +54,7 @@ class GPUVideoEncoder : public CThreadWorker {
     cudaStream_t bright_stream = nullptr;
     unsigned long long *d_bright_sum = nullptr; // device scalar accumulator
     unsigned long long *h_bright_sum = nullptr; // pinned host readback
-    uint64_t bright_frame_counter = 0;
-    int bright_interval = 1;       // sample every Nth frame (~10 Hz)
+    double bright_next_sample_time = 0.0; // wall-clock throttle (steady seconds)
     int bright_stride = 8;         // subsample every 8th pixel in x & y
     long bright_sample_count = 1;  // pixels summed per sample (for the mean)
 

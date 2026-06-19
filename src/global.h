@@ -21,11 +21,20 @@ extern std::atomic<int> g_cam_ptp_offset[kMaxCameras];
 // light level over a recording. A negative value means "no sample yet".
 extern std::atomic<float> g_cam_brightness[kMaxCameras];
 
+// How often each camera's average brightness is recomputed, wall-clock throttled
+// so the rate is independent of frame rate / streaming FPS. 0.1 s = ~10 Hz.
+constexpr double kBrightSamplePeriodSec = 0.1;
+
 bool try_start_timer();
 bool try_stop_timer();
 
 // Seconds elapsed since recording started (record_start_time_ns), or -1 if not
 // currently recording. Uses the same steady_clock as try_start_timer().
 double recording_elapsed_seconds();
+
+// Monotonic steady_clock "now" in seconds. Used by the GUI to time an
+// acquisition session (preview or record) for the brightness plot without
+// pulling <chrono> into orange.cpp.
+double steady_now_seconds();
 
 #endif // GLOBAL_H

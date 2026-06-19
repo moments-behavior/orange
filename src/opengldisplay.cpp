@@ -4,6 +4,7 @@
 #include <unistd.h>
 #endif
 #include "global.h"
+#include "kernel.cuh" // launch_brightness_sum
 #include "opengldisplay.h"
 #include "utils.h"
 #include <cuda_runtime_api.h>
@@ -44,6 +45,8 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
 COpenGLDisplay::~COpenGLDisplay() {
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
+    cudaFree(d_bright_sum);
+    cudaFreeHost(h_bright_sum);
 }
 
 void COpenGLDisplay::ThreadRunning() {
@@ -58,6 +61,21 @@ void COpenGLDisplay::ThreadRunning() {
 
     initalize_gpu_frame_async(&frame_original, camera_params, stream);
     initialize_gpu_debayer_async(&debayer, camera_params, 4, stream);
+
+    // Brightness sampling resources (reuses this thread's own `stream`).
+    ck(cudaMalloc((void **)&d_bright_sum, sizeof(unsigned long long)));
+    ck(cudaMallocHost((void **)&h_bright_sum, sizeof(unsigned long long)));
+    bright_stride = 8;
+    {
+        int nx = (camera_params->width + bright_stride - 1) / bright_stride;
+        int ny = (camera_params->height + bright_stride - 1) / bright_stride;
+        bright_sample_count = (long)nx * ny;
+        if (bright_sample_count < 1)
+            bright_sample_count = 1;
+    }
+    if (camera_params->camera_id >= 0 && camera_params->camera_id < kMaxCameras)
+        g_cam_brightness[camera_params->camera_id].store(
+            -1.0f, std::memory_order_relaxed); // -1 = no sample yet
 
     using clock = std::chrono::steady_clock;
 
@@ -89,6 +107,30 @@ void COpenGLDisplay::ThreadRunning() {
             nvtxRangePop();
 
             CHECK(cudaStreamSynchronize(stream));
+
+            // Average-brightness sample (wall-clock throttled + subsampled) for
+            // the GUI plot during preview. d_orig is valid (synced just above);
+            // the tiny reduction runs on this display thread's own stream.
+            // Published to g_cam_brightness[]; the encoder path also publishes
+            // while recording (same value — harmless).
+            double bnow = steady_now_seconds();
+            if (camera_params->camera_id >= 0 &&
+                camera_params->camera_id < kMaxCameras &&
+                bnow >= bright_next_sample_time) {
+                bright_next_sample_time = bnow + kBrightSamplePeriodSec;
+                launch_brightness_sum(frame_original.d_orig, camera_params->width,
+                                      camera_params->height, bright_stride,
+                                      d_bright_sum, stream);
+                CHECK(cudaMemcpyAsync(h_bright_sum, d_bright_sum,
+                                      sizeof(unsigned long long),
+                                      cudaMemcpyDeviceToHost, stream));
+                CHECK(cudaStreamSynchronize(stream));
+                float mean = (float)((double)(*h_bright_sum) /
+                                     (double)bright_sample_count);
+                g_cam_brightness[camera_params->camera_id].store(
+                    mean, std::memory_order_relaxed);
+            }
+
             nvtxRangePush("dgl_debayer");
 
             if (camera_params->color) {

@@ -5,6 +5,17 @@ std::atomic<double> streaming_fps = 0.0;
 std::atomic<int> streaming_target_fps = 20;
 std::atomic<int64_t> record_start_time_ns{0};
 std::atomic<int> g_cam_ptp_offset[kMaxCameras] = {};
+std::atomic<float> g_cam_brightness[kMaxCameras] = {};
+
+double recording_elapsed_seconds() {
+    int64_t t0 = record_start_time_ns.load();
+    if (t0 <= 0)
+        return -1.0;
+    int64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                         std::chrono::steady_clock::now().time_since_epoch())
+                         .count();
+    return (now_ns - t0) / 1e9;
+}
 
 bool try_start_timer() {
     int64_t expected = record_start_time_ns.load();

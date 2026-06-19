@@ -297,3 +297,53 @@ void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_point
 }
 
 
+// --- average brightness: strided sum-reduction over a mono8 frame -------------
+// Each thread sums a grid-strided subset of the subsampled pixels into a
+// register, the block reduces in shared memory, and each block contributes one
+// atomicAdd to *out_sum. Cheap: at stride 8 it touches 1/64 of the pixels.
+__global__ void brightness_sum_kernel(const unsigned char* img, int width,
+                                      int height, int stride,
+                                      unsigned long long* out_sum)
+{
+    extern __shared__ unsigned long long sdata[];
+    int nx = (width + stride - 1) / stride;   // sampled columns
+    int ny = (height + stride - 1) / stride;  // sampled rows
+    long total = (long)nx * ny;
+
+    unsigned long long local = 0;
+    long gstride = (long)gridDim.x * blockDim.x;
+    for (long idx = (long)blockIdx.x * blockDim.x + threadIdx.x; idx < total;
+         idx += gstride) {
+        int x = (int)(idx % nx) * stride;
+        int y = (int)(idx / nx) * stride;
+        local += img[(long)y * width + x];
+    }
+
+    sdata[threadIdx.x] = local;
+    __syncthreads();
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (threadIdx.x < s)
+            sdata[threadIdx.x] += sdata[threadIdx.x + s];
+        __syncthreads();
+    }
+    if (threadIdx.x == 0)
+        atomicAdd(out_sum, sdata[0]);
+}
+
+void launch_brightness_sum(const unsigned char* d_img, int width, int height,
+                           int stride, unsigned long long* d_sum, cudaStream_t stream)
+{
+    cudaMemsetAsync(d_sum, 0, sizeof(unsigned long long), stream);
+    const int threads = 256;
+    int nx = (width + stride - 1) / stride;
+    int ny = (height + stride - 1) / stride;
+    long total = (long)nx * ny;
+    int blocks = (int)((total + threads - 1) / threads);
+    if (blocks < 1) blocks = 1;
+    if (blocks > 256) blocks = 256; // cap; the grid-stride loop covers the rest
+    brightness_sum_kernel<<<blocks, threads,
+                            threads * sizeof(unsigned long long), stream>>>(
+        d_img, width, height, stride, d_sum);
+}
+
+

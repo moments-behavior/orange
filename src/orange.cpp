@@ -163,6 +163,8 @@ int main(int argc, char **args) {
 
     ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
+    ScrollingBuffer *brightness_plot_data = nullptr;
+    bool show_brightness_plot = false;
     // PTP sync on by default: the `orange` launcher always runs a PTP grandmaster,
     // so every preview/record is synchronized. (Recording force-enables it anyway.)
     bool ptp_stream_sync = true;
@@ -450,6 +452,7 @@ int main(int argc, char **args) {
                 }
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
+                ImGui::Checkbox("Show camera brightness", &show_brightness_plot);
                 if (ImGui::Button("Start PTP Logging")) {
                     if (!g_workerRunning) {
                         g_workerShouldStop = false;
@@ -679,6 +682,11 @@ int main(int argc, char **args) {
                             }
                         }
                         realtime_plot_data = new ScrollingBuffer[num_cameras];
+                        brightness_plot_data = new ScrollingBuffer[num_cameras];
+                        // Hold the whole recording at the GUI sample rate
+                        // (~10 Hz): ~1 h before the ring starts to scroll.
+                        for (int bi = 0; bi < num_cameras; bi++)
+                            brightness_plot_data[bi].MaxSize = 36000;
                     }
                 } else {
                     camera_control->open = false;
@@ -1022,6 +1030,60 @@ int main(int argc, char **args) {
                 ImGui::End();
             }
         }
+
+        if (camera_control->open && show_brightness_plot) {
+            // Sample the per-camera average brightness (published by the encoder
+            // threads) into scrolling buffers at ~10 Hz, keyed on elapsed
+            // recording time, and draw one line per camera. Brightness is only
+            // produced while recording (the encoders run only then); traces are
+            // cleared when a new recording starts.
+            static bool bright_was_recording = false;
+            double elapsed = recording_elapsed_seconds();
+            bool recording = elapsed >= 0.0;
+            if (recording && !bright_was_recording && brightness_plot_data)
+                for (int i = 0; i < num_cameras; i++)
+                    brightness_plot_data[i].Erase();
+            bright_was_recording = recording;
+
+            static float bright_accum = 0.0f;
+            bright_accum += ImGui::GetIO().DeltaTime;
+            if (recording && brightness_plot_data && bright_accum >= 0.1f) {
+                bright_accum = 0.0f;
+                for (int i = 0; i < num_cameras; i++) {
+                    float b =
+                        g_cam_brightness[i].load(std::memory_order_relaxed);
+                    if (b >= 0.0f)
+                        brightness_plot_data[i].AddPoint((float)elapsed, b);
+                }
+            }
+
+            ImGui::Begin("Camera Brightness");
+            ImGui::TextUnformatted("Average frame brightness (mono 0-255) over "
+                                   "the recording. A downward drift = dimming.");
+            if (!recording)
+                ImGui::TextDisabled("(waiting for recording to start...)");
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            if (ImPlot::BeginPlot("##brightness", avail)) {
+                ImPlot::SetupAxes("recording time (s)", "avg brightness",
+                                  ImPlotAxisFlags_AutoFit,
+                                  ImPlotAxisFlags_AutoFit);
+                if (brightness_plot_data) {
+                    for (int i = 0; i < num_cameras; i++) {
+                        if (brightness_plot_data[i].Data.empty())
+                            continue;
+                        ImPlot::PlotLine(
+                            cameras_params[i].camera_serial.c_str(),
+                            &brightness_plot_data[i].Data[0].x,
+                            &brightness_plot_data[i].Data[0].y,
+                            brightness_plot_data[i].Data.size(), 0,
+                            brightness_plot_data[i].Offset, 2 * sizeof(float));
+                    }
+                }
+                ImPlot::EndPlot();
+            }
+            ImGui::End();
+        }
+
         if (show_error) {
             ImGui::OpenPopup("Error");
             show_error = false; // Reset the flag so it only opens once

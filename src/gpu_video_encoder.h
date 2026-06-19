@@ -48,6 +48,17 @@ class GPUVideoEncoder : public CThreadWorker {
     Debayer debayer;
     NppStreamContext npp_ctx; // built once in ThreadRunning (CUDA 13 NPP needs a stream ctx)
 
+    // Average-brightness sampling. Computed on a dedicated stream (never the
+    // encoder's default stream), throttled to ~10 Hz and subsampled 1/stride^2,
+    // so it can't disturb encode timing. Published to g_cam_brightness[].
+    cudaStream_t bright_stream = nullptr;
+    unsigned long long *d_bright_sum = nullptr; // device scalar accumulator
+    unsigned long long *h_bright_sum = nullptr; // pinned host readback
+    uint64_t bright_frame_counter = 0;
+    int bright_interval = 1;       // sample every Nth frame (~10 Hz)
+    int bright_stride = 8;         // subsample every 8th pixel in x & y
+    long bright_sample_count = 1;  // pixels summed per sample (for the mean)
+
     // encoding
     EncoderContext encoder;
     Writer writer;

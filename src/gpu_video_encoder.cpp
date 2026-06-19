@@ -3,7 +3,9 @@
 #include <unistd.h>
 #endif
 #include "gpu_video_encoder.h"
-#include "utils.h" // make_npp_stream_context
+#include "global.h"   // g_cam_brightness
+#include "kernel.cuh" // launch_brightness_sum
+#include "utils.h"    // make_npp_stream_context
 #include <cuda_runtime_api.h>
 #include <stdio.h>
 #include <string.h>
@@ -162,6 +164,25 @@ void GPUVideoEncoder::ProcessOneFrame(void *f) {
                     camera_params->width, camera_params->width,
                     camera_params->height, cudaMemcpyHostToDevice));
 
+    // Average-brightness sample: throttled (~10 Hz) and subsampled, on its own
+    // stream. d_orig is valid here (the copy above ran on the synchronous default
+    // stream) and isn't overwritten until the next sampled frame, so the only
+    // sync is a few-microsecond scalar readback that happens ~10x/second — it
+    // does not gate the NVENC work that follows on the default stream.
+    if (camera_params->camera_id >= 0 && camera_params->camera_id < kMaxCameras &&
+        ++bright_frame_counter % bright_interval == 0) {
+        launch_brightness_sum(frame_original.d_orig, camera_params->width,
+                              camera_params->height, bright_stride, d_bright_sum,
+                              bright_stream);
+        ck(cudaMemcpyAsync(h_bright_sum, d_bright_sum,
+                           sizeof(unsigned long long), cudaMemcpyDeviceToHost,
+                           bright_stream));
+        ck(cudaStreamSynchronize(bright_stream));
+        float mean = (float)((double)(*h_bright_sum) / (double)bright_sample_count);
+        g_cam_brightness[camera_params->camera_id].store(
+            mean, std::memory_order_relaxed);
+    }
+
     if (camera_params->color) {
         debayer_frame_gpu_rgba_ctx(camera_params, &frame_original, &debayer,
                                    npp_ctx);
@@ -182,6 +203,29 @@ void GPUVideoEncoder::ThreadRunning() {
     initialize_gpu_debayer(&debayer, camera_params, 4);
     // ProcessOneFrame uses the synchronous default stream (0) for its copies/NPP.
     npp_ctx = make_npp_stream_context(camera_params->gpu_id, 0);
+
+    // Brightness sampling resources: a dedicated (non-default) stream so the
+    // tiny reduction never serializes against the encoder's default-stream work,
+    // plus a device accumulator and a pinned host slot for the scalar readback.
+    ck(cudaStreamCreate(&bright_stream));
+    ck(cudaMalloc((void **)&d_bright_sum, sizeof(unsigned long long)));
+    ck(cudaMallocHost((void **)&h_bright_sum, sizeof(unsigned long long)));
+    bright_stride = 8;
+    {
+        const int target_hz = 10;
+        int fr = (int)camera_params->frame_rate;
+        bright_interval = fr > target_hz ? fr / target_hz : 1;
+    }
+    {
+        int nx = (camera_params->width + bright_stride - 1) / bright_stride;
+        int ny = (camera_params->height + bright_stride - 1) / bright_stride;
+        bright_sample_count = (long)nx * ny;
+        if (bright_sample_count < 1)
+            bright_sample_count = 1;
+    }
+    if (camera_params->camera_id >= 0 && camera_params->camera_id < kMaxCameras)
+        g_cam_brightness[camera_params->camera_id].store(
+            -1.0f, std::memory_order_relaxed); // -1 = no sample yet
 
     initialize_encoder(&encoder, encoder_setup, camera_params);
     initialize_writer(&writer, camera_params, folder_name, encoder_setup);
@@ -219,6 +263,10 @@ void GPUVideoEncoder::ThreadRunning() {
     delete encoder.pEnc;
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
+    cudaFree(d_bright_sum);
+    cudaFreeHost(h_bright_sum);
+    if (bright_stream)
+        cudaStreamDestroy(bright_stream);
 }
 
 bool GPUVideoEncoder::PushToDisplay(void *imagePtr, size_t bufferSize,

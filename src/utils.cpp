@@ -142,6 +142,30 @@ std::string resolve_asset_path(const std::string &rel) {
     return rel;
 }
 
+// Create `path` and any missing parents, handing EVERY newly-created directory
+// back to the invoking user — not just the leaf. create_directories() makes the
+// whole missing chain at once, so chowning only the leaf (the old behavior)
+// leaves the intermediate parents root-owned (orange runs under sudo). That
+// blocks non-sudo tools like `red` from creating sibling folders under exp/.
+// Returns create_directories()'s result; `ec` carries any error.
+static bool create_dirs_as_invoking_user(const std::filesystem::path &path,
+                                         std::error_code &ec) {
+    // Record the not-yet-existing ancestors (leaf-first) before creating them,
+    // so we chown exactly the levels we create and leave existing ones alone.
+    std::vector<std::filesystem::path> fresh;
+    for (std::filesystem::path q = path; !q.empty(); q = q.parent_path()) {
+        std::error_code exist_ec;
+        if (std::filesystem::exists(q, exist_ec))
+            break;
+        fresh.push_back(q);
+    }
+    bool created = std::filesystem::create_directories(path, ec);
+    if (!ec)
+        for (const auto &p : fresh)
+            chown_to_invoking_user(p.string());
+    return created;
+}
+
 void create_required_folders(const std::string &base_dir,
                              const std::vector<std::string> &app_folders) {
     for (const auto &folder : app_folders) {
@@ -149,10 +173,12 @@ void create_required_folders(const std::string &base_dir,
 
         try {
             if (!std::filesystem::exists(path)) {
-                if (std::filesystem::create_directories(path)) {
+                std::error_code ec;
+                if (create_dirs_as_invoking_user(path, ec))
                     std::cout << "Created folder: " << path << std::endl;
-                    chown_to_invoking_user(path.string());
-                }
+                else if (ec)
+                    std::cerr << "Error creating " << path << ": "
+                              << ec.message() << std::endl;
             }
         } catch (const std::filesystem::filesystem_error &e) {
             std::cerr << "Error creating " << path << ": " << e.what()
@@ -402,8 +428,7 @@ bool make_folder(std::string folder) {
     fs::path p(folder); // construct a path from the string
     std::error_code ec;
 
-    if (fs::create_directories(p, ec)) { // created (including parents)
-        chown_to_invoking_user(p.string());
+    if (create_dirs_as_invoking_user(p, ec)) { // created (incl. parents), chowned
         return true;
     }
 

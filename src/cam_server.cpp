@@ -10,6 +10,7 @@
 #include "enet_runtime_unified.h" // unified wrapper
 #include "enet_utils.h"
 #include "global.h"
+#include "ptp_master.h"
 #include "utils.h"
 #include "video_capture.h"
 #include <iostream>
@@ -564,6 +565,15 @@ static void server_on_event(const Incoming &evt) {
         cam_count = scan_cameras(max_cameras, unsorted_devices.data());
         sort_cameras_ip(unsorted_devices.data(), sorted_devices.data(),
                         cam_count);
+        // Emergent cameras are PTP slave-only: serve them time from this host
+        // on every NIC port with a camera (no-op if already serving).
+        {
+            std::vector<std::string> ptp_ifaces;
+            for (int i = 0; i < cam_count; i++) {
+                ptp_ifaces.push_back(sorted_devices[i].nic.friendlyName);
+            }
+            start_ptp_master(ptp_ifaces);
+        }
         auto bytes = build_bringup_reply(g_name, /*cams*/ cam_count);
         send_bytes(evt.peer_id, bytes);
         break;

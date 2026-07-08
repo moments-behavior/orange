@@ -1,5 +1,6 @@
 #include "camera.h"
 #include "enet_utils.h"
+#include "ptp_master.h"
 #include "galvo_calib.h"
 #include "global.h"
 #include "gui.h"
@@ -183,6 +184,16 @@ int main(int argc, char **args) {
     GigEVisionDeviceInfo device_info[max_cameras];
     sort_cameras_ip(unsorted_device_info, device_info, cam_count);
 
+    // Emergent cameras are PTP slave-only: serve them time from this host on
+    // every NIC port that has a camera, or PTP-synced starts can never lock.
+    {
+        std::vector<std::string> ptp_ifaces;
+        for (int i = 0; i < cam_count; i++) {
+            ptp_ifaces.push_back(device_info[i].nic.friendlyName);
+        }
+        start_ptp_master(ptp_ifaces);
+    }
+
     std::string orange_root_dir_str;
     std::string encoder_codec;
     std::string recording_root_dir_str;
@@ -213,9 +224,9 @@ int main(int argc, char **args) {
 
     ScrollingBuffer *realtime_plot_data = nullptr;
     bool show_realtime_plot = false;
-    // PTP sync always on: all cameras share the single NIC (one PTP domain) and
-    // elect a master among themselves, so every preview/record is synchronized
-    // without a host-side grandmaster. (Recording force-enabled it anyway.)
+    // PTP sync always on: Emergent cameras are PTP slave-only, so orange spawns
+    // a ptp4l grandmaster on the camera NIC ports at launch (start_ptp_master)
+    // and every preview/record is synchronized against it.
     bool ptp_stream_sync = true;
 
     AppContext ctx; // ENetGuard constructed here (enet_initialize)
@@ -1369,10 +1380,9 @@ int main(int argc, char **args) {
                 if (camera_control->subscribe) {
                     ImGui::BeginDisabled();
                 }
-                // PTP Stream Sync is always on (see ptp_stream_sync init). All
-                // cameras sit on the single NIC, i.e. one PTP domain — they
-                // elect a master among themselves (BMCA), so sync needs no
-                // host-side grandmaster and no toggle here.
+                // PTP Stream Sync is always on (see ptp_stream_sync init):
+                // orange serves PTP time itself (ptp4l grandmaster spawned at
+                // launch on the camera NIC ports), so no toggle here.
                 // ImGui::Checkbox("Trigger Mode",
                 // &camera_control->trigger_mode);
                 if (camera_control->subscribe) {
@@ -1769,6 +1779,7 @@ int main(int argc, char **args) {
     galvo_sender_stop();
     galvo_link_stop();
     host_client_stop_net_thread();
+    stop_ptp_master();
     // Cleanup
     gx_cleanup(window);
     cudaDeviceReset();

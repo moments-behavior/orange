@@ -112,19 +112,58 @@ void report_statistics(CameraParams *camera_params, CameraState *camera_state,
     std::cout << print_out << std::endl;
 }
 
-void show_ptp_offset(PTPState *ptp_state, CameraEmergent *ecam) {
-    // Show raw offsets.
-    for (unsigned int i = 0; i < 5;) {
-        EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset",
-                                &ptp_state->ptp_offset);
-        if (ptp_state->ptp_offset != ptp_state->ptp_offset_prev) {
-            ptp_state->ptp_offset_sum += ptp_state->ptp_offset;
-            i++;
-            // printf("Offset %d: %d\n", i, ptp_offset);
+// Wait (bounded) for this camera's PTP client to lock to the grandmaster:
+// PtpStatus goes Listening -> Calibrating -> Slave. Emergent cameras are PTP
+// slave-only, so if nothing serves time on this camera's NIC port the status
+// never reaches Slave — return false so the caller can fall back to a
+// free-running start instead of hanging forever (the old code spun waiting
+// for PtpOffset to change, which never happens without a master).
+static bool wait_for_ptp_lock(CameraEmergent *ecam,
+                              CameraParams *camera_params, int timeout_sec) {
+    const time_t deadline = time(nullptr) + timeout_sec;
+    char status[32] = {0};
+    char last_logged[32] = {0};
+    unsigned long status_sz = 0;
+
+    while (time(nullptr) < deadline) {
+        status[0] = '\0';
+        EVT_CameraGetEnumParam(&ecam->camera, "PtpStatus", status,
+                               sizeof(status), &status_sz);
+        if (strcmp(status, "Slave") == 0)
+            break;
+        if (strcmp(status, last_logged) != 0) {
+            printf("%s: PtpStatus=%s (waiting for Slave)\n",
+                   camera_params->camera_serial.c_str(),
+                   status[0] ? status : "?");
+            snprintf(last_logged, sizeof(last_logged), "%s", status);
         }
-        ptp_state->ptp_offset_prev = ptp_state->ptp_offset;
+        usleep(200 * 1000);
     }
-    printf("Offset Average: %d\n", ptp_state->ptp_offset_sum / 5);
+    if (strcmp(status, "Slave") != 0) {
+        fprintf(stderr,
+                "WARN: %s never reached PtpStatus=Slave within %d s (last: "
+                "%s). Is a PTP grandmaster serving this camera's NIC port?\n",
+                camera_params->camera_serial.c_str(), timeout_sec,
+                status[0] ? status : "?");
+        return false;
+    }
+
+    // Locked. Offsets update once per sync message (~1/s); watch a couple of
+    // updates so we know sync is live, but never wait more than a few seconds.
+    int prev_offset = 0, offset = 0, updates = 0;
+    EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset", &prev_offset);
+    const time_t offset_deadline = time(nullptr) + 5;
+    while (updates < 2 && time(nullptr) < offset_deadline) {
+        EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset", &offset);
+        if (offset != prev_offset) {
+            updates++;
+            prev_offset = offset;
+        }
+        usleep(100 * 1000);
+    }
+    printf("%s: PTP locked, offset %d ns\n",
+           camera_params->camera_serial.c_str(), prev_offset);
+    return true;
 }
 
 void start_ptp_sync(PTPState *ptp_state, PTPParams *ptp_params,
@@ -410,8 +449,25 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
         (camera_params->num_cameras > 1 || ptp_params->network_sync);
 
     if (use_ptp_gate) {
-        show_ptp_offset(&ptp_state, ecam);
+        bool ptp_locked = wait_for_ptp_lock(ecam, camera_params, 30);
+        // Run the barrier + gate programming even when unlocked — the other
+        // cameras' threads spin in start_ptp_sync until ptp_counter reaches
+        // num_cameras, so skipping it here would hang them.
         start_ptp_sync(&ptp_state, ptp_params, camera_params, ecam, 3);
+        if (!ptp_locked) {
+            // Degrade instead of dying: an unlocked camera's clock makes the
+            // programmed gate time meaningless (it may never fire → 0 fps and
+            // a stop that hangs in join). Free-run this camera and skip its
+            // countdown; the session is unsynchronized but alive.
+            fprintf(stderr,
+                    "WARN: %s starting UNSYNCHRONIZED (free run) — no PTP "
+                    "lock.\n",
+                    camera_params->camera_serial.c_str());
+            EVT_CameraSetEnumParam(&ecam->camera, "TriggerMode", "Off");
+            EVT_CameraSetEnumParam(&ecam->camera, "AcquisitionMode",
+                                   "Continuous");
+            use_ptp_gate = false;
+        }
     }
 
     check_camera_errors(

@@ -237,8 +237,12 @@ inline void get_one_frame(CameraState *camera_state,
             camera_params->camera_serial.c_str());
     }
 
-    camera_state->camera_return =
-        EVT_CameraGetFrame(&ecam->camera, &ecam->frame_recv, EVT_INFINITE);
+    // Bounded timeout (rather than EVT_INFINITE) so a stalled camera can't
+    // block this thread forever -- acquire_frames' stop join() would hang
+    // the whole app otherwise if a camera stops delivering frames.
+    const int kGetFrameTimeoutMs = 1000;
+    camera_state->camera_return = EVT_CameraGetFrame(
+        &ecam->camera, &ecam->frame_recv, kGetFrameTimeoutMs);
 
     int ptp_offset = 0;
     EVT_CameraGetInt32Param(&ecam->camera, "PtpOffset", &ptp_offset);
@@ -294,6 +298,11 @@ inline void get_one_frame(CameraState *camera_state,
         FrameDetector *detector = static_cast<FrameDetector *>(frame_detector);
         if (detector && camera_select->sigs->frame_detect_state.load() ==
                             State_Copy_New_Frame) {
+            timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            camera_select->sigs->frame_capture_mono_ns.store(
+                static_cast<uint64_t>(ts.tv_sec) * 1000000000ull +
+                static_cast<uint64_t>(ts.tv_nsec));
             detector->notify_frame_ready(ecam->frame_recv.imagePtr, 0);
         }
 #endif

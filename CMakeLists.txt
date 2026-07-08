@@ -95,6 +95,8 @@ if(BUILD_CAM_SERVER)
         ${SRC_DIR}/gui.cpp
         ${SRC_DIR}/gx_helper.cpp
         ${SRC_DIR}/host_client_imgui.cpp
+        ${SRC_DIR}/charuco_detect.cpp
+        ${SRC_DIR}/galvo_calib.cpp
     )
 endif()
 
@@ -130,6 +132,7 @@ if(BUILD_ORANGE)
         EmergentCamera EmergentGenICam EmergentGigEVision
         avformat swscale swresample avutil avcodec
         opencv_sfm opencv_core opencv_imgcodecs opencv_imgproc opencv_calib3d
+        opencv_objdetect opencv_aruco
         nvinfer nvinfer_plugin nvToolsExt glfw
         ${GLFW3_LIBRARIES}
     )

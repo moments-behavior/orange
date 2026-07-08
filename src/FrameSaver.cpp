@@ -5,6 +5,10 @@
 #include "utils.h"
 #include <npp.h>
 
+#ifndef HEADLESS
+#include "galvo_calib.h"
+#endif
+
 FrameSaver::FrameSaver(CameraParams *params, CameraEachSelect *select)
     : camera_params(params), camera_select(select), running(false) {}
 
@@ -98,6 +102,16 @@ void FrameSaver::thread_loop() {
         cv::Mat view(camera_params->width * camera_params->height * 3, 1, CV_8U,
                      frame_process.frame_cpu.frame);
         view = view.reshape(3, camera_params->height);
+
+#ifndef HEADLESS
+        // galvo calibration frame tap: hand the frame over in memory instead
+        // of writing a picture
+        if (galvo_calib_frame_wanted(camera_select)) {
+            galvo_calib_deliver_frame(camera_select, view);
+            camera_select->sigs->frame_save_state.store(State_Frame_Idle);
+            continue;
+        }
+#endif
 
         std::string image_name = camera_select->picture_save_folder + "/" +
                                  camera_params->camera_serial + "_" +

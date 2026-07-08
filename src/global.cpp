@@ -8,6 +8,8 @@ std::atomic<int64_t> record_start_time_ns{0};
 std::atomic<CalibState> calib_state{CalibIdle};
 Detection3d detection3d;
 DetectionDataPerCam *detection2d;
+GalvoSenderParams galvo_sender_params;
+GalvoLinkParams galvo_link_params;
 std::atomic<uint64_t> detector_counter{0};
 std::mutex graph_capture_mutex;
 uint64_t save_pics_counter{0};

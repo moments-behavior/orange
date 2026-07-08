@@ -1,6 +1,8 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include "galvo_control_link.h"
+#include "galvo_sender.h"
 #include "realtime_tool.h"
 #include <atomic>
 #include <condition_variable>
@@ -37,4 +39,10 @@ extern std::atomic<CalibState> calib_state;
 // for 3d detection
 extern Detection3d detection3d;
 extern DetectionDataPerCam *detection2d;
+
+// galvo target streaming (UDP sender to the Windows motor-control app)
+extern GalvoSenderParams galvo_sender_params;
+
+// galvo control link (GCC1/GCS1 request-reply channel to the same app)
+extern GalvoLinkParams galvo_link_params;
 #endif // GLOBAL_H

@@ -74,6 +74,10 @@ constexpr const char *DetectModeNames[] = {"OFF", "2DGLThread", "2DStandoff",
 struct CameraSignals {
     std::atomic<PictureState> frame_save_state{State_Frame_Idle};
     std::atomic<PictureState> frame_detect_state{State_Frame_Idle};
+    // CLOCK_MONOTONIC ns of the frame currently in the detector, latched when
+    // it is handed over. The detect state machine serializes handover ->
+    // detect -> consume, so this stays valid until detect3d resets the state.
+    std::atomic<uint64_t> frame_capture_mono_ns{0};
 };
 
 struct CameraTrackState {

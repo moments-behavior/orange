@@ -1,4 +1,5 @@
 #include "detect3d.h"
+#include "galvo_sender.h"
 #include "global.h"
 #include "realtime_tool.h"
 #include "video_capture.h"
@@ -52,7 +53,9 @@ void detection3d_proc(CameraControl *camera_control,
             ball2d_all_cams.calib_results.clear();
         }
 
-        // triangulation calculation
+        // triangulation calculation; latch the oldest contributing capture
+        // timestamp before the states are reset (it stays valid until then)
+        uint64_t capture_mono_ns = 0;
         for (int idx : cam3d_idx) {
             if (detection2d[idx].ball2d.find_ball.load()) {
                 // make a copy
@@ -62,6 +65,11 @@ void detection3d_proc(CameraControl *camera_control,
                 ball2d_all_cams.detected_cameras.push_back(idx);
                 ball2d_all_cams.calib_results.push_back(
                     &detection2d[idx].camera_calib);
+                uint64_t ts =
+                    cameras_select[idx].sigs->frame_capture_mono_ns.load();
+                if (ts != 0 && (capture_mono_ns == 0 || ts < capture_mono_ns)) {
+                    capture_mono_ns = ts;
+                }
             }
         }
 
@@ -71,8 +79,24 @@ void detection3d_proc(CameraControl *camera_control,
                 State_Copy_New_Frame);
         }
 
-        detection3d.ball3d.new_detection.store(
-            find_ball3d(&ball2d_all_cams, &detection3d.ball3d));
+        bool found_ball3d = find_ball3d(&ball2d_all_cams, &detection3d.ball3d);
+        detection3d.ball3d.new_detection.store(found_ball3d);
+
+        // stream the triangulated target to the galvo motor-control app;
+        // valid=0 tells it to hold instead of chasing a stale point. Skipped
+        // while dummy_mode owns the sender. v2 carries the capture-time
+        // position + velocity + measured pipeline age; the receiver
+        // extrapolates to its own aim time.
+        if (galvo_sender_params.enabled && !galvo_sender_params.dummy_mode) {
+            if (found_ball3d) {
+                galvo_sender_send_target_tracked(detection3d.ball3d.center.x,
+                                                 detection3d.ball3d.center.y,
+                                                 detection3d.ball3d.center.z,
+                                                 true, capture_mono_ns);
+            } else {
+                galvo_sender_send_target_tracked(0, 0, 0, false, 0);
+            }
+        }
 
         // project to all the streaming cameras
         if (detection3d.ball3d.new_detection.load()) {

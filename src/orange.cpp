@@ -1,5 +1,6 @@
 #include "camera.h"
 #include "enet_utils.h"
+#include "galvo_calib.h"
 #include "global.h"
 #include "gui.h"
 #include "host_client_imgui.h"
@@ -596,6 +597,456 @@ int main(int argc, char **args) {
                 }
 
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
+
+                if (ImGui::TreeNode("Galvo Target Streaming")) {
+                    static std::string galvo_ip = galvo_sender_params.target_ip;
+                    static int galvo_port = galvo_sender_params.target_port;
+
+                    HelpMarker(
+                        "Streams the triangulated 3D target (world mm) over "
+                        "UDP to the Windows galvo motor-control app. "
+                        "Requires a camera pair with 3DStandoff detection "
+                        "running.");
+
+                    if (galvo_sender_params.enabled) {
+                        ImGui::BeginDisabled();
+                    }
+                    input_text("Target IP", galvo_ip, 0);
+                    ImGui::InputInt("Target Port", &galvo_port);
+                    if (galvo_sender_params.enabled) {
+                        ImGui::EndDisabled();
+                    }
+
+                    bool enabled = galvo_sender_params.enabled;
+                    if (ImGui::Checkbox("Enable target streaming", &enabled)) {
+                        if (enabled) {
+                            if (galvo_sender_start(galvo_ip, galvo_port)) {
+                                galvo_sender_params.target_ip = galvo_ip;
+                                galvo_sender_params.target_port = galvo_port;
+                                galvo_sender_params.enabled = true;
+                            } else {
+                                error_message =
+                                    "Failed to start galvo target sender.";
+                                show_error = true;
+                            }
+                        } else {
+                            galvo_sender_stop_dummy_target();
+                            galvo_sender_params.dummy_mode = false;
+                            galvo_sender_stop();
+                            galvo_sender_params.enabled = false;
+                        }
+                    }
+
+                    if (!galvo_sender_params.enabled) {
+                        ImGui::BeginDisabled();
+                    }
+                    bool dummy_mode = galvo_sender_params.dummy_mode;
+                    if (ImGui::Checkbox("Send dummy target (test circle)",
+                                        &dummy_mode)) {
+                        if (dummy_mode) {
+                            galvo_sender_start_dummy_target();
+                        } else {
+                            galvo_sender_stop_dummy_target();
+                        }
+                        galvo_sender_params.dummy_mode = dummy_mode;
+                    }
+                    HelpMarker(
+                        "For testing the link without cameras: streams a "
+                        "synthetic 300mm-radius circle (z=1000mm) instead of "
+                        "real triangulated points -- the same test pattern "
+                        "the receiver itself draws when idle.");
+                    if (!galvo_sender_params.enabled) {
+                        ImGui::EndDisabled();
+                    }
+
+                    if (galvo_sender_params.enabled) {
+                        ImGui::TextColored(
+                            ImVec4(0.2f, 1.0f, 0.2f, 1.0f),
+                            "Streaming %s to %s:%d",
+                            galvo_sender_params.dummy_mode ? "dummy target"
+                                                           : "3D target",
+                            galvo_sender_params.target_ip.c_str(),
+                            galvo_sender_params.target_port);
+                    }
+
+                    ImGui::TreePop();
+                }
+
+                if (ImGui::TreeNode("Galvo Control Link")) {
+                    static std::string link_ip = galvo_link_params.target_ip;
+                    static int link_port = galvo_link_params.target_port;
+                    static double aim_pan = 0.0, aim_tilt = 0.0;
+
+                    HelpMarker(
+                        "Request/reply control channel (GCC1/GCS1) to the "
+                        "galvo motor-control app: query status, command raw "
+                        "mirror angles, toggle calib mode, upload "
+                        "calibration. Requires 'Allow remote control' "
+                        "enabled on the galvo app.");
+
+                    if (galvo_link_params.enabled) {
+                        ImGui::BeginDisabled();
+                    }
+                    input_text("Control IP", link_ip, 0);
+                    ImGui::InputInt("Control Port", &link_port);
+                    if (galvo_link_params.enabled) {
+                        ImGui::EndDisabled();
+                    }
+
+                    bool link_enabled = galvo_link_params.enabled;
+                    if (ImGui::Checkbox("Enable control link",
+                                        &link_enabled)) {
+                        if (link_enabled) {
+                            if (galvo_link_start(link_ip, link_port)) {
+                                galvo_link_params.target_ip = link_ip;
+                                galvo_link_params.target_port = link_port;
+                                galvo_link_params.enabled = true;
+                            } else {
+                                error_message =
+                                    "Failed to start galvo control link.";
+                                show_error = true;
+                            }
+                        } else {
+                            galvo_link_stop();
+                            galvo_link_params.enabled = false;
+                        }
+                    }
+
+                    if (galvo_link_params.enabled) {
+                        GalvoStatus gstat;
+                        double age = 0.0;
+                        bool have =
+                            galvo_link_last_status(&gstat, &age) && age < 2.0;
+                        if (have) {
+                            ImGui::TextColored(
+                                ImVec4(0.2f, 1.0f, 0.2f, 1.0f),
+                                "Link OK  pan %.2f  tilt %.2f deg  %s%s%s",
+                                gstat.pan_deg, gstat.tilt_deg,
+                                gstat.in_position ? "[in position] " : "",
+                                gstat.calib_mode ? "[calib mode] " : "",
+                                gstat.motors_enabled ? "" : "[motors off] ");
+                            if (!gstat.remote_allowed) {
+                                ImGui::TextColored(
+                                    ImVec4(1.0f, 0.6f, 0.2f, 1.0f),
+                                    "Remote control disabled on the galvo "
+                                    "app -- motion commands will be "
+                                    "refused.");
+                            }
+                            ImGui::Text(
+                                "Travel limits: pan [%.1f, %.1f]  tilt "
+                                "[%.1f, %.1f] deg",
+                                gstat.pan_min, gstat.pan_max, gstat.tilt_min,
+                                gstat.tilt_max);
+                        } else {
+                            ImGui::TextColored(
+                                ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                "No reply from %s:%d",
+                                galvo_link_params.target_ip.c_str(),
+                                galvo_link_params.target_port);
+                        }
+
+                        ImGui::SeparatorText("Manual aim (raw motor deg)");
+                        if (!have) {
+                            ImGui::BeginDisabled();
+                        }
+                        ImGui::InputDouble("pan (deg)", &aim_pan);
+                        ImGui::InputDouble("tilt (deg)", &aim_tilt);
+                        if (ImGui::Button("Move")) {
+                            GalvoStatus rep;
+                            if (!galvo_link_set_angles(aim_pan, aim_tilt,
+                                                       &rep)) {
+                                error_message =
+                                    "Galvo move refused (err " +
+                                    std::to_string(rep.err) + ").";
+                                show_error = true;
+                            }
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Stop Motion")) {
+                            galvo_link_stop_motion();
+                        }
+                        ImGui::SameLine();
+                        bool calib_mode = have && gstat.calib_mode;
+                        if (ImGui::Checkbox("Calib mode", &calib_mode)) {
+                            GalvoStatus rep;
+                            if (!galvo_link_calib_mode(calib_mode, &rep)) {
+                                error_message =
+                                    "Galvo calib mode change refused (err " +
+                                    std::to_string(rep.err) + ").";
+                                show_error = true;
+                            }
+                        }
+                        HelpMarker(
+                            "Calib mode pauses target-stream aiming on the "
+                            "galvo app so manual/sweep moves aren't fought. "
+                            "It auto-expires there after 5s without control "
+                            "traffic; the link's 2 Hz status poll keeps it "
+                            "alive.");
+                        if (!have) {
+                            ImGui::EndDisabled();
+                        }
+                    }
+
+                    ImGui::TreePop();
+                }
+
+                if (ImGui::TreeNode("Galvo Calibration (ChArUco)")) {
+                    static GalvoCalibConfig gcal_cfg;
+                    static int gcal_cam = -1;
+                    static int gcal_dict = 3; // DICT_5X5_100
+                    static bool gcal_inited = false;
+                    static std::string gcal_board_path =
+                        orange_root_dir_str + "/config/galvo_board.json";
+                    int num_dicts;
+                    const char *const *dict_names =
+                        charuco_dictionary_names(&num_dicts);
+                    if (!gcal_inited) {
+                        gcal_inited = true;
+                        charuco_board_spec_load(gcal_board_path,
+                                                &gcal_cfg.board);
+                        for (int i = 0; i < num_dicts; i++) {
+                            if (gcal_cfg.board.dictionary == dict_names[i]) {
+                                gcal_dict = i;
+                            }
+                        }
+                        gcal_cfg.out_folder = calib_yaml_folder;
+                        galvo_calib_load_persisted(gcal_cfg);
+                    }
+                    gcal_cfg.num_cameras = num_cameras;
+                    gcal_cfg.cameras_select = cameras_select;
+                    gcal_cfg.cameras_params = cameras_params;
+                    gcal_cfg.galvo_cam = gcal_cam;
+                    gcal_cfg.out_folder = calib_yaml_folder;
+
+                    GalvoCalibStatusView cs = galvo_calib_status();
+                    bool gcal_busy = galvo_calib_busy();
+
+                    HelpMarker(
+                        "Automated galvo <-> world calibration: the mirrors "
+                        "sweep a pan/tilt grid while a ChArUco board is "
+                        "detected in the galvo camera (gaze point) and a "
+                        "calibrated fixed camera (world pose). The fit is "
+                        "uploaded to the galvo app over the control link. "
+                        "See docs/galvo_calibration_plan.md.");
+
+                    // --- preflight -------------------------------------
+                    GalvoStatus gstat;
+                    double gage = 0.0;
+                    bool link_ok = galvo_link_params.enabled &&
+                                   galvo_link_last_status(&gstat, &gage) &&
+                                   gage < 2.0;
+                    bool streaming = camera_control->subscribe;
+                    bool fixed_ok = false;
+                    if (streaming && detection2d != nullptr) {
+                        for (int i = 0; i < num_cameras; i++) {
+                            if (i != gcal_cam &&
+                                cameras_select[i].stream_on &&
+                                detection2d[i].has_calibration_results) {
+                                fixed_ok = true;
+                            }
+                        }
+                    }
+                    auto checkline = [](bool ok, const char *label) {
+                        ImGui::TextColored(ok ? ImVec4(0.2f, 1.0f, 0.2f, 1.0f)
+                                              : ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                           "%s %s", ok ? "[ok]" : "[--]",
+                                           label);
+                    };
+                    checkline(link_ok, "control link alive");
+                    checkline(link_ok && gstat.remote_allowed,
+                              "remote control allowed on the galvo app");
+                    checkline(streaming, "cameras streaming");
+                    checkline(gcal_cam >= 0, "galvo camera selected");
+                    checkline(fixed_ok,
+                              "a calibrated fixed camera is streaming");
+                    bool preflight = link_ok && gstat.remote_allowed &&
+                                     streaming && gcal_cam >= 0 && fixed_ok;
+
+                    // --- galvo camera + board ---------------------------
+                    const char *cam_preview =
+                        gcal_cam >= 0 && gcal_cam < num_cameras
+                            ? cameras_params[gcal_cam].camera_serial.c_str()
+                            : "(select)";
+                    if (ImGui::BeginCombo("Galvo camera", cam_preview)) {
+                        for (int i = 0; i < num_cameras; i++) {
+                            if (ImGui::Selectable(
+                                    cameras_params[i].camera_serial.c_str(),
+                                    gcal_cam == i)) {
+                                gcal_cam = i;
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    if (ImGui::TreeNode("Board")) {
+                        ImGui::InputInt("squares x", &gcal_cfg.board.squares_x);
+                        ImGui::InputInt("squares y", &gcal_cfg.board.squares_y);
+                        ImGui::InputFloat("square (mm)",
+                                          &gcal_cfg.board.square_mm);
+                        ImGui::InputFloat("marker (mm)",
+                                          &gcal_cfg.board.marker_mm);
+                        if (ImGui::Combo("dictionary", &gcal_dict, dict_names,
+                                         num_dicts)) {
+                            gcal_cfg.board.dictionary = dict_names[gcal_dict];
+                        }
+                        if (ImGui::Button("Save board config")) {
+                            charuco_board_spec_save(gcal_board_path,
+                                                    gcal_cfg.board);
+                        }
+                        ImGui::SameLine();
+                        if (!streaming || gcal_busy) {
+                            ImGui::BeginDisabled();
+                        }
+                        if (ImGui::Button("Test board detection")) {
+                            galvo_calib_test_detection(gcal_cfg);
+                        }
+                        if (!streaming || gcal_busy) {
+                            ImGui::EndDisabled();
+                        }
+                        HelpMarker(
+                            "Grabs one frame from every streaming camera and "
+                            "reports markers/corners found. Zero everywhere "
+                            "almost always means the wrong dictionary; a few "
+                            "markers but zero corners means squares x/y (or "
+                            "their order) doesn't match the print.");
+                        ImGui::TreePop();
+                    }
+
+                    // --- sweep ------------------------------------------
+                    ImGui::SetNextItemWidth(80.0f);
+                    ImGui::InputDouble("pan range +/- deg",
+                                       &gcal_cfg.pan_half_range_deg);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(80.0f);
+                    ImGui::InputDouble("tilt range +/- deg",
+                                       &gcal_cfg.tilt_half_range_deg);
+                    HelpMarker(
+                        "The sweep grid is centered on the zeroed/home pose "
+                        "(0,0) -- home the mirrors facing the arena first. "
+                        "Keep the range within where the camera actually "
+                        "sees out of the mirrors; the travel limits are "
+                        "mechanical, not optical.");
+                    ImGui::SetNextItemWidth(80.0f);
+                    ImGui::InputInt("grid pan", &gcal_cfg.grid_pan);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(80.0f);
+                    ImGui::InputInt("grid tilt", &gcal_cfg.grid_tilt);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(80.0f);
+                    ImGui::InputInt("board positions",
+                                    &gcal_cfg.placements_target);
+
+                    bool can_start = preflight && !gcal_busy;
+                    if (!can_start) {
+                        ImGui::BeginDisabled();
+                    }
+                    if (ImGui::Button("Start calibration sweep")) {
+                        galvo_calib_start_sweep(gcal_cfg);
+                    }
+                    if (!can_start) {
+                        ImGui::EndDisabled();
+                    }
+
+                    if (cs.phase == GalvoCalib_Sweep ||
+                        cs.phase == GalvoCalib_WaitBoard) {
+                        ImGui::SameLine();
+                        if (ImGui::Button("Abort")) {
+                            galvo_calib_abort();
+                        }
+                        ImGui::Text("placement %d  grid %d/%d  accepted %d "
+                                    "(total %d)",
+                                    cs.placement, cs.grid_index, cs.grid_total,
+                                    cs.accepted_this_placement,
+                                    cs.accepted_total);
+                        // coverage map: . pending  x skipped  O accepted
+                        for (int it = 0; it < cs.grid_tilt; it++) {
+                            std::string row;
+                            for (int ip = 0; ip < cs.grid_pan; ip++) {
+                                uint8_t v =
+                                    cs.coverage[it * cs.grid_pan + ip];
+                                row += v == 2 ? " O" : v == 1 ? " x" : " .";
+                            }
+                            ImGui::TextUnformatted(row.c_str());
+                        }
+                    }
+                    if (cs.phase == GalvoCalib_WaitBoard) {
+                        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
+                                           "Move the board (new distance), "
+                                           "then continue.");
+                        if (ImGui::Button("Board moved -- continue")) {
+                            galvo_calib_next_placement();
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Finish with current samples")) {
+                            galvo_calib_finish_collection();
+                        }
+                    }
+
+                    // --- status + result --------------------------------
+                    if (!cs.message.empty()) {
+                        ImGui::TextWrapped("%s", cs.message.c_str());
+                    }
+                    if (cs.fit_valid) {
+                        ImGui::Separator();
+                        ImGui::Text("Fit: RMS %.3f deg   base (%.0f, %.0f, "
+                                    "%.0f) mm   rot (%.1f, %.1f, %.1f) deg",
+                                    cs.fit_rms_deg, cs.model.base[0],
+                                    cs.model.base[1], cs.model.base[2],
+                                    cs.model.rot[0], cs.model.rot[1],
+                                    cs.model.rot[2]);
+                        ImGui::Text(
+                            "pan %.0f x %.3f + %.2f   tilt %.0f x %.3f + %.2f",
+                            cs.model.pan_sign, cs.model.pan_scale,
+                            cs.model.pan_offset, cs.model.tilt_sign,
+                            cs.model.tilt_scale, cs.model.tilt_offset);
+                        static std::string upload_msg;
+                        if (!link_ok || gcal_busy) {
+                            ImGui::BeginDisabled();
+                        }
+                        if (ImGui::Button("Upload to galvo & save")) {
+                            GalvoStatus rep;
+                            if (galvo_link_set_calib(cs.model, &rep) &&
+                                galvo_link_save_config(&rep)) {
+                                upload_msg =
+                                    "Uploaded and saved on the galvo app.";
+                            } else {
+                                upload_msg = "Upload failed (err " +
+                                             std::to_string(rep.err) + ").";
+                            }
+                        }
+                        if (!link_ok || gcal_busy) {
+                            ImGui::EndDisabled();
+                        }
+                        ImGui::SameLine();
+                        bool can_verify = preflight && !gcal_busy &&
+                                          galvo_sender_params.enabled &&
+                                          !galvo_sender_params.dummy_mode;
+                        if (!can_verify) {
+                            ImGui::BeginDisabled();
+                        }
+                        if (ImGui::Button("Verify (board center)")) {
+                            galvo_calib_start_verify(gcal_cfg);
+                        }
+                        if (!can_verify) {
+                            ImGui::EndDisabled();
+                        }
+                        HelpMarker(
+                            "Streams the board center as a normal GCT1 "
+                            "target and measures where it lands in the galvo "
+                            "view. Needs target streaming enabled and 'aim "
+                            "at network target' on the galvo app.");
+                        if (!upload_msg.empty()) {
+                            ImGui::TextUnformatted(upload_msg.c_str());
+                        }
+                        if (cs.verify_err_mm >= 0.0) {
+                            ImGui::Text("verify error: %.1f mm on the board "
+                                        "plane",
+                                        cs.verify_err_mm);
+                        }
+                    }
+
+                    ImGui::TreePop();
+                }
+
                 if (ImGui::Button("Start PTP Logging")) {
                     if (!g_workerRunning) {
                         g_workerShouldStop = false;
@@ -1304,6 +1755,9 @@ int main(int argc, char **args) {
         delete[] cameras_select;
     }
 
+    galvo_sender_stop_dummy_target();
+    galvo_sender_stop();
+    galvo_link_stop();
     host_client_stop_net_thread();
     // Cleanup
     gx_cleanup(window);

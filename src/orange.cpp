@@ -318,6 +318,9 @@ int main(int argc, char **args) {
                 refresh_idle_camera_list(max_cameras, unsorted_device_info,
                                          device_info, cam_count, check,
                                          select_all_cameras);
+                // Servers enumerate their own NICs, so they need asking
+                // separately; each one refuses if its cameras are in use.
+                host_client_rescan_servers();
                 last_idle_camera_refresh = now;
             }
         }
@@ -750,18 +753,6 @@ int main(int argc, char **args) {
 
             if (camera_control->subscribe) {
                 ImGui::BeginDisabled();
-            }
-
-            // Idle rescan is throttled and pauses during networked sessions,
-            // so give the user a way to force one on demand.
-            if (!camera_control->open) {
-                if (ImGui::Button("Refresh Camera List")) {
-                    refresh_idle_camera_list(max_cameras, unsorted_device_info,
-                                             device_info, cam_count, check,
-                                             select_all_cameras);
-                    last_idle_camera_refresh = std::chrono::steady_clock::now();
-                }
-                ImGui::SameLine();
             }
 
             if (ImGui::Button(camera_control->open ? "Close Camera"

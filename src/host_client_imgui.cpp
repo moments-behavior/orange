@@ -349,6 +349,18 @@ static std::vector<uint8_t> build_cmd_open(const std::string &job_id,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+// RESCAN is not a job phase: no job_id, and epoch/seq stay zero so it never
+// interferes with the server's duplicate-detection bookkeeping.
+static std::vector<uint8_t> build_cmd_rescan() {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(64);
+    auto msg = CreateServer(b, Kind_KindCommand, ServerControl_RESCAN,
+                            /*job_id*/ 0, /*epoch*/ 0, /*seq*/ 0,
+                            CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 static std::vector<uint8_t>
 build_cmd_startthreads(const std::string &job_id, uint32_t epoch, uint32_t seq,
                        const std::string &record_folder,
@@ -868,6 +880,20 @@ static void send_bytes(uint32_t pid, const std::vector<uint8_t> &buf) {
     g_ctxp->net.send(o);
 }
 
+void host_client_rescan_servers() {
+    if (g_servers.empty() || host_client_session_active())
+        return;
+    // Servers refuse this while their own cameras are in use, which is the
+    // guard that matters -- it still holds if this client restarted and lost
+    // track of a session the servers are mid-way through.
+    auto bytes = build_cmd_rescan();
+    for (const auto &name : g_servers) {
+        uint32_t pid = g_ctxp->peers.get_pid_by_name(name);
+        if (pid)
+            send_bytes(pid, bytes);
+    }
+}
+
 static void broadcast_current_phase() {
     if (g_phase == Phase_Done || g_servers.empty())
         return;
@@ -1116,9 +1142,19 @@ static void host_on_event(const Incoming &evt) {
         if (auto br = rep->bringup()) {
             const std::string name =
                 br->server_name() ? br->server_name()->str() : "";
+            // RESCAN replies arrive on a timer, so only log a real change --
+            // otherwise this floods the log with identical lines forever.
+            static std::unordered_map<uint32_t, uint16_t> last_cams;
+            auto it = last_cams.find(evt.peer_id);
+            const bool changed =
+                it == last_cams.end() || it->second != br->num_cameras();
+            last_cams[evt.peer_id] = br->num_cameras();
+
             g_ctxp->peers.set_bringup(evt.peer_id, name, br->num_cameras());
-            logf("bringup from %s cams=%d (pid=%u)", name.c_str(),
-                 br->num_cameras(), evt.peer_id);
+            if (changed) {
+                logf("bringup from %s cams=%d (pid=%u)", name.c_str(),
+                     br->num_cameras(), evt.peer_id);
+            }
         }
 
         // phase reply -> queue

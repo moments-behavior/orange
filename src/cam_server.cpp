@@ -59,6 +59,8 @@ static const char *ctrl_name(camnet::v1::ServerControl c) {
         return "GRIMLOCKBALL";
     case camnet::v1::ServerControl_OPTIMUSBALL:
         return "OPTIMUSBALL";
+    case camnet::v1::ServerControl_RESCAN:
+        return "RESCAN";
     default:
         return "NONE";
     }
@@ -559,6 +561,35 @@ static void server_on_event(const Incoming &evt) {
             break;
         if (!cmd || cmd->kind() != camnet::v1::Kind_KindCommand)
             break;
+
+        // RESCAN is a stateless query, not a job phase: it carries no job_id
+        // and must not touch epoch/seq bookkeeping, so handle it before the
+        // session and idempotency gates. It re-enumerates the camera network,
+        // which is only safe while this server's own cameras are idle.
+        if (cmd->control() == camnet::v1::ServerControl_RESCAN) {
+            if (camera_control.open || camera_control.subscribe ||
+                camera_control.record_video) {
+                std::printf("[SRV %s] RESCAN refused (cameras in use)\n",
+                            g_name.c_str());
+                break;
+            }
+            unsorted_devices.clear();
+            sorted_devices.clear();
+            unsorted_devices.resize(max_cameras);
+            sorted_devices.resize(max_cameras);
+            cam_count = scan_cameras(max_cameras, unsorted_devices.data());
+            sort_cameras_ip(unsorted_devices.data(), sorted_devices.data(),
+                            cam_count);
+            // Answer with a bringup reply: build_phase_reply drops the camera
+            // count (it passes bringup=0), and the client already refreshes
+            // its per-server count from bringup.
+            auto bytes = build_bringup_reply(g_name, cam_count);
+            send_bytes(evt.peer_id, bytes);
+            std::printf("[SRV %s] RESCAN -> %d camera%s\n", g_name.c_str(),
+                        cam_count, cam_count == 1 ? "" : "s");
+            break;
+        }
+
         if (!accept_session(cmd))
             break;
 

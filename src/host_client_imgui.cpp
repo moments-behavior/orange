@@ -36,6 +36,8 @@ static void logf(const char *fmt, ...) {
     g_logs.emplace_back(buf);
 }
 static bool g_phase_started = false;
+static bool g_network_error_popup = false;
+static std::string g_network_error_message;
 
 // persistent to handle missing messages
 static int g_picture_id;
@@ -84,6 +86,14 @@ static void on_open_phase_start(std::string job_id) {
         ImGuiFileDialog::Instance()->OpenDialog(
             "ChooseRecordingDir", "Choose a Directory", nullptr, config);
     }
+}
+
+static std::string camera_open_error_message(const CameraError &e) {
+    if (e.error_code == EVT_ERROR_GVCP_ACK) {
+        return "Camera communication failed with a GVCP ACK error.\n\nPower "
+               "cycle the cameras, then try opening them again.";
+    }
+    return "Camera open failed for " + e.camera_serial + ":\n" + e.what();
 }
 
 static void on_startthread_phase_start(std::string encoder_setup,
@@ -339,6 +349,18 @@ static std::vector<uint8_t> build_cmd_open(const std::string &job_id,
     return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
 }
 
+// RESCAN is not a job phase: no job_id, and epoch/seq stay zero so it never
+// interferes with the server's duplicate-detection bookkeeping.
+static std::vector<uint8_t> build_cmd_rescan() {
+    using namespace camnet::v1;
+    flatbuffers::FlatBufferBuilder b(64);
+    auto msg = CreateServer(b, Kind_KindCommand, ServerControl_RESCAN,
+                            /*job_id*/ 0, /*epoch*/ 0, /*seq*/ 0,
+                            CommandBody_NONE, 0, 0);
+    b.Finish(msg);
+    return {b.GetBufferPointer(), b.GetBufferPointer() + b.GetSize()};
+}
+
 static std::vector<uint8_t>
 build_cmd_startthreads(const std::string &job_id, uint32_t epoch, uint32_t seq,
                        const std::string &record_folder,
@@ -552,6 +574,7 @@ enum Phase {
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
 static std::vector<std::string> g_servers; // server names via bringup
 static std::unordered_map<std::string, bool> g_ack_by;
+static bool g_session_running = false; // a command has gone out, not yet Done
 
 static std::string g_jid = "recording";
 static uint32_t g_epoch = 1;
@@ -837,7 +860,12 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
+    g_session_running = false;
     logf("session reset");
+}
+
+bool host_client_session_active() {
+    return g_session_running && g_phase != Phase_Done;
 }
 
 // ============================================================================
@@ -852,9 +880,26 @@ static void send_bytes(uint32_t pid, const std::vector<uint8_t> &buf) {
     g_ctxp->net.send(o);
 }
 
+void host_client_rescan_servers() {
+    if (g_servers.empty() || host_client_session_active())
+        return;
+    // Servers refuse this while their own cameras are in use, which is the
+    // guard that matters -- it still holds if this client restarted and lost
+    // track of a session the servers are mid-way through.
+    auto bytes = build_cmd_rescan();
+    for (const auto &name : g_servers) {
+        uint32_t pid = g_ctxp->peers.get_pid_by_name(name);
+        if (pid)
+            send_bytes(pid, bytes);
+    }
+}
+
 static void broadcast_current_phase() {
     if (g_phase == Phase_Done || g_servers.empty())
         return;
+
+    // From here on the servers are driving a job; keep the camera network quiet.
+    g_session_running = true;
 
     std::vector<uint8_t> bytes;
     switch (g_phase) {
@@ -862,8 +907,25 @@ static void broadcast_current_phase() {
         bytes = build_cmd_open(g_jid, g_epoch, g_seq,
                                *g_clientctx->selected_network_folder);
         if (!g_phase_started) {
-            on_open_phase_start(g_jid);
-            g_phase_started = true;
+            try {
+                on_open_phase_start(g_jid);
+                g_phase_started = true;
+            } catch (const CameraError &e) {
+                g_network_error_message = camera_open_error_message(e);
+                g_network_error_popup = true;
+                g_phase = Phase_Done;
+                g_waiting = false;
+                logf("%s", g_network_error_message.c_str());
+                return;
+            } catch (const std::exception &e) {
+                g_network_error_message =
+                    std::string("Camera open failed:\n") + e.what();
+                g_network_error_popup = true;
+                g_phase = Phase_Done;
+                g_waiting = false;
+                logf("%s", g_network_error_message.c_str());
+                return;
+            }
         }
         break;
     }
@@ -1080,9 +1142,19 @@ static void host_on_event(const Incoming &evt) {
         if (auto br = rep->bringup()) {
             const std::string name =
                 br->server_name() ? br->server_name()->str() : "";
+            // RESCAN replies arrive on a timer, so only log a real change --
+            // otherwise this floods the log with identical lines forever.
+            static std::unordered_map<uint32_t, uint16_t> last_cams;
+            auto it = last_cams.find(evt.peer_id);
+            const bool changed =
+                it == last_cams.end() || it->second != br->num_cameras();
+            last_cams[evt.peer_id] = br->num_cameras();
+
             g_ctxp->peers.set_bringup(evt.peer_id, name, br->num_cameras());
-            logf("bringup from %s cams=%d (pid=%u)", name.c_str(),
-                 br->num_cameras(), evt.peer_id);
+            if (changed) {
+                logf("bringup from %s cams=%d (pid=%u)", name.c_str(),
+                     br->num_cameras(), evt.peer_id);
+            }
         }
 
         // phase reply -> queue
@@ -1544,6 +1616,21 @@ void host_client_draw_gui() {
         }
 
         ImGui::EndTabBar();
+    }
+
+    if (g_network_error_popup) {
+        ImGui::OpenPopup("Camera Error");
+        g_network_error_popup = false;
+    }
+
+    if (ImGui::BeginPopupModal("Camera Error", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("%s", g_network_error_message.c_str());
+        ImGui::Separator();
+        if (ImGui::Button("OK")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 
     // Auto-advance logic

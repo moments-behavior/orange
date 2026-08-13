@@ -25,7 +25,9 @@ std::mutex g_resultsMutex;
 std::vector<int> g_lastOffsets; // size = num_cameras
 
 namespace {
-constexpr std::chrono::seconds kIdleCameraRefreshInterval{3};
+// Idle rescan issues a GVCP discovery broadcast that every camera on the
+// network answers, including cameras owned by other hosts. Keep it infrequent.
+constexpr std::chrono::seconds kIdleCameraRefreshInterval{15};
 
 bool same_camera_device(const GigEVisionDeviceInfo &a,
                         const GigEVisionDeviceInfo &b) {
@@ -307,7 +309,9 @@ int main(int argc, char **args) {
         host_client_tick();
         create_new_frame();
 
-        if (!camera_control->open) {
+        // Only rescan when nothing on the camera network is in use: our own
+        // cameras are closed and no remote host is mid-job.
+        if (!camera_control->open && !host_client_session_active()) {
             auto now = std::chrono::steady_clock::now();
             if (now - last_idle_camera_refresh >=
                 kIdleCameraRefreshInterval) {
@@ -746,6 +750,18 @@ int main(int argc, char **args) {
 
             if (camera_control->subscribe) {
                 ImGui::BeginDisabled();
+            }
+
+            // Idle rescan is throttled and pauses during networked sessions,
+            // so give the user a way to force one on demand.
+            if (!camera_control->open) {
+                if (ImGui::Button("Refresh Camera List")) {
+                    refresh_idle_camera_list(max_cameras, unsorted_device_info,
+                                             device_info, cam_count, check,
+                                             select_all_cameras);
+                    last_idle_camera_refresh = std::chrono::steady_clock::now();
+                }
+                ImGui::SameLine();
             }
 
             if (ImGui::Button(camera_control->open ? "Close Camera"

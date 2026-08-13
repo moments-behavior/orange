@@ -44,3 +44,8 @@ void host_client_init(
 void host_client_tick();
 void host_client_draw_gui();
 void set_host_client_ctx(HostClientCtx *ctx);
+
+// True from the first command broadcast to the servers until the session
+// reaches Phase_Done. Callers use this to avoid touching the camera network
+// (GVCP discovery in particular) while remote hosts are mid-job.
+bool host_client_session_active();

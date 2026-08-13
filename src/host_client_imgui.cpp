@@ -562,6 +562,7 @@ enum Phase {
 static std::vector<std::pair<std::string, int>> g_endpoints; // host:port pairs
 static std::vector<std::string> g_servers; // server names via bringup
 static std::unordered_map<std::string, bool> g_ack_by;
+static bool g_session_running = false; // a command has gone out, not yet Done
 
 static std::string g_jid = "recording";
 static uint32_t g_epoch = 1;
@@ -847,7 +848,12 @@ static void reset_session() {
     g_ptp_start_time = 0;
     g_ptp_stop_time = 0;
     g_picture_id = -1;
+    g_session_running = false;
     logf("session reset");
+}
+
+bool host_client_session_active() {
+    return g_session_running && g_phase != Phase_Done;
 }
 
 // ============================================================================
@@ -865,6 +871,9 @@ static void send_bytes(uint32_t pid, const std::vector<uint8_t> &buf) {
 static void broadcast_current_phase() {
     if (g_phase == Phase_Done || g_servers.empty())
         return;
+
+    // From here on the servers are driving a job; keep the camera network quiet.
+    g_session_running = true;
 
     std::vector<uint8_t> bytes;
     switch (g_phase) {

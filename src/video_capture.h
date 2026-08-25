@@ -91,6 +91,9 @@ struct CameraEachSelect {
     int pictures_counter = 0;
     std::string picture_save_folder, yolo_model;
     DetectMode detect_mode = Detect_OFF;
+    bool focus_peaking = false;
+    float focus_peaking_color[3] = {1.0f, 0.0f, 0.0f};
+    int focus_peaking_threshold = 20;
     int idx2d = 0, idx3d = 0, total_standoff_detector = 0;
     int dropped_frames = 0;
     FPSEstimator encoder_fps_estimator, capture_fps_estimator;

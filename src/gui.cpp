@@ -355,6 +355,62 @@ void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
     }
 }
 
+void focus_peaking_properties(CameraParams *cameras_params,
+                              CameraEachSelect *cameras_select,
+                              const int num_cameras) {
+    if (num_cameras <= 0) {
+        return;
+    }
+
+    if (ImGui::TreeNode("Focus Peaking")) {
+        static int selected_camera = 0;
+        if (selected_camera >= num_cameras) {
+            selected_camera = 0;
+        }
+
+        bool peak_all = true;
+        for (int n = 0; n < num_cameras; n++) {
+            if (!cameras_select[n].focus_peaking) {
+                peak_all = false;
+                break;
+            }
+        }
+        if (ImGui::Checkbox("all##peaking", &peak_all)) {
+            for (int n = 0; n < num_cameras; n++) {
+                cameras_select[n].focus_peaking = peak_all;
+            }
+        }
+        ImGui::SameLine();
+        HelpMarker("Paints sharp edges in the live preview so focus can be set "
+                   "by eye. Preview only -- recordings and saved stills are "
+                   "never marked. Has no effect on cameras that are not "
+                   "streaming.");
+
+        for (int n = 0; n < num_cameras; n++) {
+            char peak_label[32];
+            sprintf(peak_label, "##checkbox_peak%d", n);
+            ImGui::Checkbox(peak_label, &cameras_select[n].focus_peaking);
+            ImGui::SameLine();
+            if (ImGui::Selectable(cameras_params[n].camera_name.c_str(),
+                                  selected_camera == n)) {
+                selected_camera = n;
+            }
+        }
+
+        CameraEachSelect &sel = cameras_select[selected_camera];
+        ImGui::ColorEdit3("Peaking Color", sel.focus_peaking_color,
+                          ImGuiColorEditFlags_NoInputs);
+        ImGui::SliderInt("Peaking Threshold", &sel.focus_peaking_threshold, 1,
+                         255);
+        ImGui::SameLine();
+        HelpMarker("Edge strength needed to mark a pixel. Lower marks more "
+                   "(including sensor noise); raise it under high gain. Colour "
+                   "and threshold apply to the selected camera only.");
+
+        ImGui::TreePop();
+    }
+}
+
 void gui_plot_world_coordinates(CameraCalibResults *cvp,
                                 CameraParams *camera_params) {
     double axis_x_values[4];

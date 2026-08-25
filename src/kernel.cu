@@ -297,3 +297,95 @@ void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_point
 }
 
 
+__device__ __forceinline__ int peaking_luma(const unsigned char* rgba, int width, int x, int y)
+{
+    const unsigned char* p = rgba + ((y * width * 4) + (x * 4));
+    return (p[0] + 2 * p[1] + p[2]) >> 2;
+}
+
+
+__global__ void focus_peaking_mask_kernel(const unsigned char* rgba, unsigned char* mask, const int width, const int height, const int threshold)
+{
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if ((x < width) && (y < height)) {
+        if (x == 0 || y == 0 || x == width - 1 || y == height - 1) {
+            mask[y * width + x] = 0;
+            return;
+        }
+
+        const int tl = peaking_luma(rgba, width, x - 1, y - 1);
+        const int tc = peaking_luma(rgba, width, x,     y - 1);
+        const int tr = peaking_luma(rgba, width, x + 1, y - 1);
+        const int ml = peaking_luma(rgba, width, x - 1, y);
+        const int mr = peaking_luma(rgba, width, x + 1, y);
+        const int bl = peaking_luma(rgba, width, x - 1, y + 1);
+        const int bc = peaking_luma(rgba, width, x,     y + 1);
+        const int br = peaking_luma(rgba, width, x + 1, y + 1);
+
+        const int gx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
+        const int gy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
+
+        int mag = (abs(gx) + abs(gy)) >> 3;
+        if (mag > 255) {
+            mag = 255;
+        }
+        mask[y * width + x] = (mag > threshold) ? 1 : 0;
+    }
+}
+
+
+__global__ void focus_peaking_apply_kernel(unsigned char* rgba, const unsigned char* mask, const int width, const int height, const unsigned char r, const unsigned char g, const unsigned char b, const int mark)
+{
+    const int cell_x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int cell_y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    const int x0 = cell_x * mark;
+    const int y0 = cell_y * mark;
+    if ((x0 >= width) || (y0 >= height)) {
+        return;
+    }
+
+    const int x1 = min(x0 + mark, width);
+    const int y1 = min(y0 + mark, height);
+
+    bool hit = false;
+    for (int y = y0; y < y1 && !hit; y++) {
+        for (int x = x0; x < x1; x++) {
+            if (mask[y * width + x]) {
+                hit = true;
+                break;
+            }
+        }
+    }
+    if (!hit) {
+        return;
+    }
+
+    for (int y = y0; y < y1; y++) {
+        for (int x = x0; x < x1; x++) {
+            unsigned char* p = rgba + ((y * width * 4) + (x * 4));
+            p[0] = r;
+            p[1] = g;
+            p[2] = b;
+            p[3] = 255;
+        }
+    }
+}
+
+
+void gpu_focus_peaking(unsigned char* rgba, unsigned char* d_mask, int width, int height, int threshold, unsigned char r, unsigned char g, unsigned char b, int mark_size, cudaStream_t stream)
+{
+    if (mark_size < 1) {
+        mark_size = 1;
+    }
+    dim3 threads_per_block(32, 32);
+    dim3 num_blocks((width + threads_per_block.x -1) / threads_per_block.x, (height + threads_per_block.y -1) / threads_per_block.y);
+    focus_peaking_mask_kernel <<<num_blocks, threads_per_block, 0, stream>>> (rgba, d_mask, width, height, threshold);
+
+    const int cells_x = (width + mark_size - 1) / mark_size;
+    const int cells_y = (height + mark_size - 1) / mark_size;
+    dim3 num_cell_blocks((cells_x + threads_per_block.x -1) / threads_per_block.x, (cells_y + threads_per_block.y -1) / threads_per_block.y);
+    focus_peaking_apply_kernel <<<num_cell_blocks, threads_per_block, 0, stream>>> (rgba, d_mask, width, height, r, g, b, mark_size);
+}

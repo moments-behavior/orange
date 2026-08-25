@@ -507,6 +507,9 @@ int main(int argc, char **args) {
                     ImGui::EndDisabled();
                 }
 
+                focus_peaking_properties(cameras_params, cameras_select,
+                                         num_cameras);
+
                 ImGui::Checkbox("Show camera temperature", &show_realtime_plot);
                 if (ImGui::Button("Start PTP Logging")) {
                     if (!g_workerRunning) {

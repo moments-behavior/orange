@@ -29,6 +29,7 @@ struct CameraParams {
     int camera_id;
     std::string camera_name;
     std::string camera_serial;
+    std::string config_file;
     int num_cameras;
     bool gpu_direct;
     bool need_reorder;

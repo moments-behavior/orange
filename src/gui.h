@@ -92,7 +92,8 @@ void HelpMarker(const char *desc);
 void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
                            CameraEachSelect *cameras_select,
                            const int num_cameras,
-                           std::vector<std::string> &color_temps);
+                           std::vector<std::string> &color_temps,
+                           const std::string &config_folder);
 
 void gui_plot_world_coordinates(CameraCalibResults *cvp,
                                 CameraParams *camera_params);

@@ -26,6 +26,7 @@ class COpenGLDisplay : public CThreadWorker {
     FrameGPU frame_original;
     Debayer debayer;
     unsigned char *d_convert;
+    unsigned char *d_peak_mask = nullptr;
     YOLOv8 *yolov8;
     FrameCPU frame_cpu;
     NppiSize input_image_size;

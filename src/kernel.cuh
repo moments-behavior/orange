@@ -13,4 +13,5 @@ void gpu_draw_cicles(unsigned char* src, int width, int height, float* d_points,
 void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, cudaStream_t stream);
 void gpu_draw_box(unsigned char* src, int width, int height, float* d_points, int label_id, cudaStream_t stream);
 void gpu_draw_rat_pose(unsigned char* src, int width, int height, float* d_points, unsigned int* d_skeleton, cudaStream_t stream, int num_channels);
+void gpu_focus_peaking(unsigned char* rgba, unsigned char* d_mask, int width, int height, int threshold, unsigned char r, unsigned char g, unsigned char b, int mark_size, cudaStream_t stream);
 #endif // KERNEL_H

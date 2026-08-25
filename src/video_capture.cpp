@@ -48,6 +48,21 @@ void load_camera_json_config_files(std::string file_name,
     if (camera_config.contains("offsety")) {
         camera_params->offsety = camera_config["offsety"];
     }
+    if (camera_config.contains("focus_peaking")) {
+        camera_select->focus_peaking = camera_config["focus_peaking"];
+    }
+    if (camera_config.contains("focus_peaking_threshold")) {
+        camera_select->focus_peaking_threshold =
+            camera_config["focus_peaking_threshold"];
+    }
+    if (camera_config.contains("focus_peaking_color") &&
+        camera_config["focus_peaking_color"].is_array() &&
+        camera_config["focus_peaking_color"].size() == 3) {
+        for (int c = 0; c < 3; c++) {
+            camera_select->focus_peaking_color[c] =
+                camera_config["focus_peaking_color"][c];
+        }
+    }
 }
 
 bool set_camera_params(CameraParams *camera_params,

@@ -47,6 +47,7 @@ COpenGLDisplay::COpenGLDisplay(const char *name, CameraParams *camera_params,
 COpenGLDisplay::~COpenGLDisplay() {
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);
+    cudaFree(d_peak_mask);
     if (camera_select->detect_mode == Detect2D_GLThread) {
         delete yolov8;
     }
@@ -68,6 +69,9 @@ void COpenGLDisplay::ThreadRunning() {
 
     CHECK(cudaMallocAsync((void **)&d_convert,
                           camera_params->width * camera_params->height * 3,
+                          stream));
+    CHECK(cudaMallocAsync((void **)&d_peak_mask,
+                          camera_params->width * camera_params->height,
                           stream));
 
     unsigned int skeleton[8] = {0, 1, 1, 2, 2, 3, 3, 0}; // box
@@ -181,6 +185,20 @@ void COpenGLDisplay::ThreadRunning() {
                 } else {
                     objs_last_frame.clear();
                 }
+            }
+
+            if (camera_select->focus_peaking) {
+                const float *c = camera_select->focus_peaking_color;
+                nvtxRangePush("dgl_focus_peaking");
+                gpu_focus_peaking(
+                    debayer.d_debayer, d_peak_mask, camera_params->width,
+                    camera_params->height,
+                    camera_select->focus_peaking_threshold,
+                    (unsigned char)(c[0] * 255.0f),
+                    (unsigned char)(c[1] * 255.0f),
+                    (unsigned char)(c[2] * 255.0f), camera_select->downsample,
+                    stream);
+                nvtxRangePop();
             }
 
             nvtxRangePush("dgl_copy_to_interop_buffer");

@@ -161,6 +161,12 @@ int main(int argc, char **args) {
 
     std::string encoder_preset = "p1";
 
+    // Max recording duration: when enabled, auto-stop the recording (all cameras,
+    // same path as a manual Stop) once this many hours of real recorded time have
+    // elapsed. Set before starting a recording. 0 disables even if the box is on.
+    bool limit_record_duration = false;
+    float max_record_hours = 6.0f;
+
     ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
     ScrollingBuffer *brightness_plot_data = nullptr;
@@ -316,6 +322,19 @@ int main(int argc, char **args) {
                 if (fps_temp > 240)
                     fps_temp = 240;
                 streaming_target_fps.store(fps_temp);
+            }
+
+            // Auto-stop after a maximum recording duration. Set before recording;
+            // the actual stop is triggered next to the record button below.
+            ImGui::Checkbox("Limit recording", &limit_record_duration);
+            if (limit_record_duration) {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(120.0f);
+                if (ImGui::InputFloat("Max hours", &max_record_hours, 0.5f, 1.0f,
+                                      "%.1f")) {
+                    if (max_record_hours < 0.0f)
+                        max_record_hours = 0.0f;
+                }
             }
 
             if (camera_control->subscribe) {
@@ -777,8 +796,24 @@ int main(int argc, char **args) {
             }
 
             if (camera_control->open) {
-                if (ImGui::Button(camera_control->stop_record ? ICON_FK_PAUSE
-                                                              : ICON_FK_PLAY)) {
+                bool do_toggle = ImGui::Button(camera_control->stop_record
+                                                   ? ICON_FK_PAUSE
+                                                   : ICON_FK_PLAY);
+
+                // Auto-stop: while recording, once the configured max duration is
+                // reached, take the same path as a manual Stop press so all
+                // cameras stop cleanly. recording_elapsed_seconds() measures from
+                // the actual encoder start (real recorded time, not click time).
+                if (!do_toggle && camera_control->stop_record &&
+                    limit_record_duration && max_record_hours > 0.0f) {
+                    double elapsed = recording_elapsed_seconds();
+                    if (elapsed >= 0.0 &&
+                        elapsed >= double(max_record_hours) * 3600.0) {
+                        do_toggle = true;
+                    }
+                }
+
+                if (do_toggle) {
                     (camera_control->stop_record) =
                         !(camera_control->stop_record);
                     if (camera_control->stop_record) {
@@ -882,7 +917,8 @@ int main(int argc, char **args) {
             }
 
             std::string g_formatted_elapsed_time;
-            int64_t start_ns;
+            std::string g_formatted_limit_time;
+            int64_t start_ns = -1;
 
             if (camera_control->record_video) {
                 start_ns = record_start_time_ns.load();
@@ -895,6 +931,13 @@ int main(int argc, char **args) {
                     auto elapsed_sec = std::chrono::seconds(
                         (now_ns - start_ns) / 1'000'000'000);
                     g_formatted_elapsed_time = format_elapsed_time(elapsed_sec);
+
+                    // Show the configured limit alongside the elapsed time.
+                    if (limit_record_duration && max_record_hours > 0.0f) {
+                        auto limit_sec = std::chrono::seconds(
+                            int64_t(double(max_record_hours) * 3600.0));
+                        g_formatted_limit_time = format_elapsed_time(limit_sec);
+                    }
                 }
             }
 
@@ -904,9 +947,16 @@ int main(int argc, char **args) {
                     ImGui::Begin(window_name.c_str());
 
                     if (start_ns > 0) {
-                        ImGui::TextColored(ImVec4{0.0, 1.0f, 0, 1.0f},
-                                           "Elapsed Time: %s",
-                                           g_formatted_elapsed_time.c_str());
+                        if (!g_formatted_limit_time.empty()) {
+                            ImGui::TextColored(ImVec4{0.0, 1.0f, 0, 1.0f},
+                                               "Elapsed Time: %s / %s",
+                                               g_formatted_elapsed_time.c_str(),
+                                               g_formatted_limit_time.c_str());
+                        } else {
+                            ImGui::TextColored(ImVec4{0.0, 1.0f, 0, 1.0f},
+                                               "Elapsed Time: %s",
+                                               g_formatted_elapsed_time.c_str());
+                        }
                     } else {
                         if (camera_control->record_video) {
                             ImGui::TextColored(ImVec4{1.0, 1.0f, 0, 1.0f},

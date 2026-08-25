@@ -213,7 +213,8 @@ void HelpMarker(const char *desc) {
 void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
                            CameraEachSelect *cameras_select,
                            const int num_cameras,
-                           std::vector<std::string> &color_temps) {
+                           std::vector<std::string> &color_temps,
+                           const std::string &config_folder) {
 
     if (ImGui::TreeNode("Camera Property")) {
         static int selected_camera = 0;
@@ -349,6 +350,69 @@ void set_camera_properties(CameraEmergent *ecams, CameraParams *cameras_params,
             update_frame_rate_value(&ecams[selected_camera].camera,
                                     slider_frame_rate,
                                     &cameras_params[selected_camera]);
+        }
+
+        ImGui::Separator();
+
+        auto config_target = [&](int cam) -> std::string {
+            if (!cameras_params[cam].config_file.empty()) {
+                return cameras_params[cam].config_file;
+            }
+            if (config_folder.empty()) {
+                return std::string();
+            }
+            return config_folder + "/" + cameras_params[cam].camera_serial +
+                   ".json";
+        };
+
+        auto save_camera = [&](int cam) -> std::string {
+            std::string target = config_target(cam);
+            if (target.empty()) {
+                return "No config folder selected -- pick one before opening "
+                       "the cameras to save settings.";
+            }
+            std::string error;
+            if (!save_camera_json_config_file(target, &cameras_params[cam],
+                                              &cameras_select[cam], &error)) {
+                return "Save failed (" + target + "): " + error;
+            }
+            cameras_params[cam].config_file = target;
+            return "Saved " + target;
+        };
+
+        static std::string save_status;
+        if (ImGui::Button("Save to Config")) {
+            save_status = save_camera(selected_camera);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save All to Config")) {
+            int saved = 0;
+            std::string last_error;
+            for (int n = 0; n < num_cameras; n++) {
+                std::string result = save_camera(n);
+                if (result.rfind("Saved ", 0) == 0) {
+                    saved++;
+                } else {
+                    last_error = result;
+                }
+            }
+            save_status = "Saved " + std::to_string(saved) + "/" +
+                          std::to_string(num_cameras) + " camera configs" +
+                          (last_error.empty() ? "" : " -- " + last_error);
+        }
+        ImGui::SameLine();
+        {
+            std::string target = config_target(selected_camera);
+            HelpMarker(target.empty()
+                           ? "Writes the current camera settings to the "
+                             "per-camera config JSON. No target file: this "
+                             "camera was opened without a config folder "
+                             "selected."
+                           : ("Writes the current camera settings to " + target)
+                                 .c_str());
+        }
+        if (!save_status.empty()) {
+            ImGui::TextWrapped("%s", save_status.c_str());
         }
 
         ImGui::TreePop();

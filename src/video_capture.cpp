@@ -48,6 +48,107 @@ void load_camera_json_config_files(std::string file_name,
     if (camera_config.contains("offsety")) {
         camera_params->offsety = camera_config["offsety"];
     }
+    if (camera_config.contains("focus_peaking")) {
+        camera_select->focus_peaking = camera_config["focus_peaking"];
+    }
+    if (camera_config.contains("focus_peaking_threshold")) {
+        camera_select->focus_peaking_threshold =
+            camera_config["focus_peaking_threshold"];
+    }
+    if (camera_config.contains("focus_peaking_color") &&
+        camera_config["focus_peaking_color"].is_array() &&
+        camera_config["focus_peaking_color"].size() == 3) {
+        for (int c = 0; c < 3; c++) {
+            camera_select->focus_peaking_color[c] =
+                camera_config["focus_peaking_color"][c];
+        }
+    }
+}
+
+bool save_camera_json_config_file(const std::string &file_name,
+                                  const CameraParams *camera_params,
+                                  const CameraEachSelect *camera_select,
+                                  std::string *error_out) {
+    try {
+        json camera_config = json::object();
+        if (std::filesystem::exists(file_name)) {
+            std::ifstream f(file_name);
+            if (f) {
+                try {
+                    camera_config = json::parse(f);
+                } catch (const std::exception &e) {
+                    std::cerr << "Existing config " << file_name
+                              << " is not valid JSON (" << e.what()
+                              << "); overwriting it.\n";
+                    camera_config = json::object();
+                }
+            }
+        }
+
+        camera_config["name"] = camera_params->camera_name;
+        camera_config["width"] = camera_params->width;
+        camera_config["height"] = camera_params->height;
+        camera_config["offsetx"] = camera_params->offsetx;
+        camera_config["offsety"] = camera_params->offsety;
+        camera_config["frame_rate"] = camera_params->frame_rate;
+        camera_config["gain"] = camera_params->gain;
+        camera_config["iris"] = camera_params->iris;
+        camera_config["focus"] = camera_params->focus;
+        camera_config["exposure"] = camera_params->exposure;
+        camera_config["pixel_format"] = camera_params->pixel_format;
+        camera_config["gpu_id"] = camera_params->gpu_id;
+        camera_config["color_temp"] = camera_params->color_temp;
+        camera_config["gpu_direct"] = camera_params->gpu_direct;
+        camera_config["color"] = camera_params->color;
+        camera_config["gop"] = camera_params->gop;
+        if (camera_select != nullptr && !camera_select->yolo_model.empty()) {
+            camera_config["yolo"] = camera_select->yolo_model;
+        }
+        if (camera_select != nullptr) {
+            camera_config["focus_peaking"] = camera_select->focus_peaking;
+            camera_config["focus_peaking_color"] = {
+                camera_select->focus_peaking_color[0],
+                camera_select->focus_peaking_color[1],
+                camera_select->focus_peaking_color[2]};
+            camera_config["focus_peaking_threshold"] =
+                camera_select->focus_peaking_threshold;
+        }
+
+        std::filesystem::path target(file_name);
+        if (target.has_parent_path()) {
+            std::filesystem::create_directories(target.parent_path());
+        }
+
+        std::filesystem::path tmp = target;
+        tmp += ".tmp";
+        {
+            std::ofstream out(tmp, std::ios::trunc);
+            if (!out) {
+                if (error_out != nullptr) {
+                    *error_out = "cannot open " + tmp.string() + " for writing";
+                }
+                return false;
+            }
+            out << camera_config.dump(4) << std::endl;
+            if (!out) {
+                if (error_out != nullptr) {
+                    *error_out = "write failed for " + tmp.string();
+                }
+                return false;
+            }
+        }
+        std::filesystem::rename(tmp, target);
+
+        std::cout << "Saved camera config: " << file_name << std::endl;
+        return true;
+    } catch (const std::exception &e) {
+        if (error_out != nullptr) {
+            *error_out = e.what();
+        }
+        std::cerr << "Failed to save camera config " << file_name << ": "
+                  << e.what() << std::endl;
+        return false;
+    }
 }
 
 bool set_camera_params(CameraParams *camera_params,
@@ -91,6 +192,7 @@ bool set_camera_params(CameraParams *camera_params,
         auto config_idx = std::distance(camera_config_files.begin(), it);
         std::cout << "Load camera json file: "
                   << camera_config_files[config_idx] << std::endl;
+        camera_params->config_file = camera_config_files[config_idx];
         load_camera_json_config_files(camera_config_files[config_idx],
                                       camera_params, camera_select, camera_idx,
                                       num_cameras);

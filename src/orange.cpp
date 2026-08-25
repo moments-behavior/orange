@@ -500,8 +500,12 @@ int main(int argc, char **args) {
                     ImGui::BeginDisabled();
                 }
 
-                set_camera_properties(ecams, cameras_params, cameras_select,
-                                      num_cameras, color_temps);
+                set_camera_properties(
+                    ecams, cameras_params, cameras_select, num_cameras,
+                    color_temps,
+                    local_config_select < (int)local_config_folders.size()
+                        ? local_config_folders[local_config_select]
+                        : std::string());
 
                 if (camera_control->record_video) {
                     ImGui::EndDisabled();

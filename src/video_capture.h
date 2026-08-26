@@ -93,6 +93,7 @@ struct CameraEachSelect {
     DetectMode detect_mode = Detect_OFF;
     int idx2d = 0, idx3d = 0, total_standoff_detector = 0;
     int dropped_frames = 0;
+    int encoder_queue_full = 0;
     FPSEstimator encoder_fps_estimator, capture_fps_estimator;
 
     // runtime shared between threads

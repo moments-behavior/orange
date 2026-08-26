@@ -7,6 +7,7 @@
 #include "implot.h"
 #include "realtime_tool.h"
 #include "server_endpoints.h"
+#include "sync_plan.h"
 #include "utils.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
@@ -124,6 +125,7 @@ int main(int argc, char **args) {
     CameraEmergent *ecams;
     std::vector<std::thread> camera_threads;
     GL_Texture *tex_gl = nullptr;
+    std::string record_folder_name;
     int num_cameras = 0;
     CameraControl *camera_control =
         new CameraControl{false, false, false, false, false};
@@ -864,6 +866,7 @@ int main(int argc, char **args) {
                         std::string folder_name =
                             input_folder + "/" + get_current_date_time();
                         make_folder(folder_name);
+                        record_folder_name = folder_name;
                         // if (num_cameras > 1) {
                         ptp_stream_sync = true;
                         // } else {
@@ -912,6 +915,18 @@ int main(int argc, char **args) {
                         }
                         delete[] tex_gl;
                         tex_gl = nullptr;
+                        if (camera_control->record_video) {
+                            std::string sync_plan_error;
+                            if (sync_plan::generate(record_folder_name,
+                                                    &sync_plan_error)) {
+                                std::cout << "[sync-plan] wrote "
+                                          << record_folder_name
+                                          << "/sync_plan.json" << std::endl;
+                            } else {
+                                std::cout << "[sync-plan] not written: "
+                                          << sync_plan_error << std::endl;
+                            }
+                        }
                         camera_control->record_video = false;
                     }
                 }

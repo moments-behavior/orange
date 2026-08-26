@@ -20,6 +20,7 @@
 #include "enet_utils.h"
 #include "gui.h"
 #include "imgui.h"
+#include "sync_plan.h"
 #include "utils.h"
 using namespace std::chrono_literals;
 
@@ -275,6 +276,14 @@ static void cleanup_host_client_resources() {
         ptp_sync_off(&ecams[i].camera, &cameras_params[i]);
     }
     camera_control->sync_camera = false;
+    if (camera_control->record_video) {
+        std::string sync_plan_error;
+        if (sync_plan::generate(g_folder_name, &sync_plan_error)) {
+            logf("[sync-plan] wrote %s/sync_plan.json", g_folder_name.c_str());
+        } else {
+            logf("[sync-plan] not written: %s", sync_plan_error.c_str());
+        }
+    }
     camera_control->record_video = false;
 
     ptp_params->ptp_global_time = 0;

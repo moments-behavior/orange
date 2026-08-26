@@ -275,11 +275,13 @@ inline void get_one_frame(CameraState *camera_state,
 
         // push the image data to encode, or display
         if (camera_control->record_video && camera_select->record) {
-            gpu_encoder->PushToDisplay(
-                ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize,
-                ecam->frame_recv.size_x, ecam->frame_recv.size_y,
-                ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
-                camera_state->frame_count, real_time, ptp_offset);
+            if (!gpu_encoder->PushToDisplay(
+                    ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize,
+                    ecam->frame_recv.size_x, ecam->frame_recv.size_y,
+                    ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
+                    camera_state->frame_count, real_time, ptp_offset)) {
+                camera_select->encoder_queue_full++;
+            }
         }
 
 #ifndef HEADLESS

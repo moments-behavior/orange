@@ -1010,6 +1010,9 @@ int main(int argc, char **args) {
                             << "Encoding FPS: "
                             << cameras_select[i]
                                    .encoder_fps_estimator.get_fps();
+                        oss << "  |  "
+                            << "Encoder Backlog Drops: "
+                            << cameras_select[i].encoder_queue_full;
                     }
                     if (cameras_select[i].detect_mode == Detect2D_Standoff) {
                         oss << "  |  "

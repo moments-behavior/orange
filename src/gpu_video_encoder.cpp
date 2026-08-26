@@ -195,6 +195,10 @@ void GPUVideoEncoder::ThreadRunning() {
     std::string print_out;
     print_out += "\n" + camera_params->camera_serial;
     print_out += ", Frame encoded: " + std::to_string(encoder.num_frame_encode);
+    print_out += ", Encoder queue peak: " + std::to_string(GetCountQueueInMax());
+    print_out += "/" + std::to_string(ENCODER_ENTRIES_MAX);
+    print_out += ", Frames dropped (encoder queue full): " +
+                 std::to_string(camera_select->encoder_queue_full);
     std::cout << print_out << std::endl;
 
     delete writer.video;

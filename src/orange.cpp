@@ -3,6 +3,8 @@
 #include "gui.h"
 #include "imgui.h"
 #include "implot.h"
+#include "lighting_control.h"
+#include "lighting_panel.h"
 #include "utils.h"
 #include "video_capture.h"
 #include <ImGuiFileDialog.h>
@@ -13,6 +15,11 @@
 // Control flags
 std::atomic<bool> g_workerRunning{false};
 std::atomic<bool> g_workerShouldStop{false};
+
+// Day/night lighting cycle (see lighting_control.h). orange only ever drives
+// one controller, so a single config + thread is enough.
+static LightingConfig g_lighting_config;
+static std::thread g_lighting_thread;
 
 // Optional: store last measurement for UI display
 std::mutex g_resultsMutex;
@@ -1163,6 +1170,8 @@ int main(int argc, char **args) {
             ImGui::End();
         }
 
+        render_lighting_panel(g_lighting_config, g_lighting_thread);
+
         if (show_error) {
             ImGui::OpenPopup("Error");
             show_error = false; // Reset the flag so it only opens once
@@ -1203,6 +1212,9 @@ int main(int argc, char **args) {
         delete[] ecams;
         delete[] cameras_select;
     }
+
+    if (g_lighting_running.load(std::memory_order_relaxed))
+        stop_lighting_thread(g_lighting_thread);
 
     // Cleanup
     gx_cleanup(window);

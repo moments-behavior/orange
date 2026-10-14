@@ -27,6 +27,24 @@ cd orange
 ./run.sh      # sudo release/orange
 ```
 
+## Chunked recording
+
+For multi-day recordings, tick **Chunk recording** and set **Chunk minutes** before pressing record. The cameras stream continuously; every chunk length, each camera's encoder starts a new file on the same exposure as every other camera, with no frames lost at the boundary:
+
+```
+<recording>/chunk_00000/Cam<serial>.mp4, Cam<serial>_meta.csv, chunk_complete.json
+<recording>/chunk_00001/...
+```
+
+Each chunk folder is laid out like an ordinary single-file recording. `frame_id` in `_meta.csv` keeps counting across chunks. `chunk_complete.json` is written once every camera has closed its files for that chunk, so it is the signal that the folder is safe to move to long-term storage. `python3 tools/check_chunks.py <recording>` validates a chunked recording: continuity across boundaries, cross-camera alignment, and that every file starts on a keyframe. Design notes and test results are in [docs/chunked_recording.md](docs/chunked_recording.md).
+
+Unattended runs from the command line:
+
+```bash
+sudo -E release/orange --preset <config/local folder> --chunk-seconds 1800 \
+    --record-seconds 259200 --record-dir /mnt/data/exp/unsorted
+```
+
 ### Dependencies
 
 The minimal build requires: CUDA toolkit (with NPP + NVENC), the Emergent eSDK (`/opt/EVT/eSDK`), FFmpeg (used only for `.mp4` muxing), and the GUI stack (GLFW, GLEW, OpenGL). ImGui/ImPlot/ImGuiFileDialog/IconFontCppHeaders are vendored as git submodules. There is no OpenCV, TensorRT, ENet, or FlatBuffers dependency.

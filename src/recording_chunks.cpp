@@ -19,42 +19,50 @@ std::string chunk_folder_name(const std::string &session_folder, int chunk) {
 // ---------------------------------------------------------------- ChunkClock
 
 void ChunkClock::configure(double chunk_seconds, int frame_rate) {
-    reference_set = false;
-    last_chunk = 0;
-    ref_ns = 0;
+    started = false;
+    prev_ts = 0;
+    frame_index = 0;
     gate_offset_ns = 0;
+    last_chunk = 0;
     if (chunk_seconds <= 0.0 || frame_rate <= 0) {
-        chunk_ns = 0;
-        period_ns = 0;
+        frames_per_chunk = 0;
+        period_ns = 0.0;
         return;
     }
-    chunk_ns = (long long)std::llround(chunk_seconds * 1e9);
-    period_ns = (long long)std::llround(1e9 / frame_rate);
+    frames_per_chunk = std::max(1LL, (long long)std::llround(chunk_seconds *
+                                                             frame_rate));
+    period_ns = 1e9 / frame_rate;
 }
 
-void ChunkClock::set_reference(unsigned long long first_ts,
-                               unsigned long long gate_ptp_ns) {
-    ref_ns = first_ts;
-    gate_offset_ns = 0;
-    if (gate_ptp_ns > 0 && period_ns > 0) {
-        long long diff = (long long)(first_ts - gate_ptp_ns);
-        gate_offset_ns = diff;
-        // Snap to the gate's frame phase so a camera that lost its very first
-        // frame still uses the same reference as the others. Only trusted when
-        // the first frame arrived within a few seconds of the gate.
-        if (std::llabs(diff) < 10LL * 1000000000LL) {
-            long long n = (long long)std::llround((double)diff / period_ns);
-            ref_ns = first_ts - (unsigned long long)(n * period_ns);
-        }
-    }
-    reference_set = true;
-}
-
-int ChunkClock::chunk_of(unsigned long long ts) {
-    if (chunk_ns <= 0)
+int ChunkClock::chunk_of(unsigned long long ts,
+                         unsigned long long gate_ptp_ns) {
+    if (frames_per_chunk <= 0)
         return 0;
-    long long d = (long long)(ts - ref_ns) + period_ns / 2;
-    int c = d < 0 ? 0 : (int)(d / chunk_ns);
+    if (!started) {
+        started = true;
+        frame_index = 0;
+        if (gate_ptp_ns > 0) {
+            long long diff = (long long)(ts - gate_ptp_ns);
+            gate_offset_ns = diff;
+            // A camera that lost its first frame(s) starts at a later index.
+            // Only trusted for a first frame within a few seconds of the gate.
+            if (diff > 0 && diff < 10LL * 1000000000LL)
+                frame_index = (long long)std::llround(diff / period_ns);
+        }
+    } else {
+        long long dt = (long long)(ts - prev_ts);
+        long long steps = (long long)std::llround(dt / period_ns);
+        if (steps < 1)
+            steps = 1; // timestamp did not advance: still the next frame
+        // Track the camera's real period from consecutive frames, so long
+        // gaps are counted correctly even if the camera runs a little off its
+        // configured rate.
+        if (steps == 1)
+            period_ns += 0.01 * ((double)dt - period_ns);
+        frame_index += steps;
+    }
+    prev_ts = ts;
+    int c = (int)(frame_index / frames_per_chunk);
     if (c < last_chunk)
         c = last_chunk;
     last_chunk = c;

@@ -241,29 +241,30 @@ void GPUVideoEncoder::ProcessOneFrame(void *f) {
                                     npp_ctx);
     }
 
-    // Which chunk does this exposure belong to? The first frame fixes the
-    // PTP reference that every camera shares (see recording_chunks.h).
+    // Which chunk does this exposure belong to? Counted in sync frames from
+    // the shared PTP gate, so every camera agrees (see recording_chunks.h).
     bool force_idr = false;
     if (chunk_clock.enabled()) {
-        if (!chunk_clock.has_reference()) {
-            unsigned long long gate = ptp_params ? ptp_params->ptp_global_time : 0;
-            chunk_clock.set_reference(entry.timestamp, gate);
+        unsigned long long gate = ptp_params ? ptp_params->ptp_global_time : 0;
+        int chunk = chunk_clock.chunk_of(entry.timestamp, gate);
+        if (!chunk_first_frame_logged) {
+            chunk_first_frame_logged = true;
             printf("[chunk] Cam%s first frame ts %llu, gate %llu, offset from "
-                   "gate %lld ns, reference %llu\n",
+                   "gate %lld ns, sync frame %lld, %lld frames per chunk\n",
                    camera_params->camera_serial.c_str(), entry.timestamp, gate,
                    chunk_clock.first_frame_offset_from_gate(),
-                   chunk_clock.reference());
+                   chunk_clock.sync_frame(), chunk_clock.frames_in_chunk());
         }
-        int chunk = chunk_clock.chunk_of(entry.timestamp);
         if (chunk != row_writer->chunk) {
             auto t0 = std::chrono::steady_clock::now();
             row_writer = open_writer(chunk);
             force_idr = true;
-            printf("[chunk] Cam%s -> chunk %05d at frame_id %llu ts %llu "
-                   "(open %.1f ms, encoder queue %d, finalizer backlog %zu)\n",
+            printf("[chunk] Cam%s -> chunk %05d at frame_id %llu sync frame "
+                   "%lld ts %llu (open %.1f ms, encoder queue %d, finalizer "
+                   "backlog %zu)\n",
                    camera_params->camera_serial.c_str(), chunk, entry.frame_id,
-                   entry.timestamp, ms_since(t0), GetCountQueueInSize(),
-                   finalizer->pending());
+                   chunk_clock.sync_frame(), entry.timestamp, ms_since(t0),
+                   GetCountQueueInSize(), finalizer->pending());
         }
     }
 

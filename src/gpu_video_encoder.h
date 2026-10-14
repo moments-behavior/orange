@@ -82,6 +82,7 @@ class GPUVideoEncoder : public CThreadWorker {
     double chunk_seconds = 0.0;
     PTPParams *ptp_params = nullptr;
     ChunkClock chunk_clock;
+    bool chunk_first_frame_logged = false;
     Writer *row_writer = nullptr;
     Writer *packet_writer = nullptr;
     std::deque<Writer *> pending_frames;

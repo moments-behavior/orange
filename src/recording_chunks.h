@@ -7,17 +7,22 @@
 // over. Each chunk folder looks like a normal orange recording folder
 // (Cam<serial>.mp4 + Cam<serial>_meta.csv), so existing tools open it as is.
 //
-// Boundaries are placed in PTP time, not by frame count, so every camera cuts
-// on the same exposure even if one of them dropped a frame earlier:
+// Every camera cuts on the same exposure, even after dropped frames. Each
+// frame gets a sync-frame index n counted from the shared PTP acquisition gate:
 //
-//   chunk(ts) = floor((ts - ref + period/2) / chunk_ns)
+//   n(first frame) = round((ts_first - gate) / period)
+//   n(next frame)  = n(previous) + round((ts - ts_previous) / period)
 //
-// ref is the shared PTP gate time snapped to the frame phase (the first frame's
-// timestamp, measured from the gate, rounded to a whole number of periods).
-// Corresponding frames of different cameras carry PTP timestamps within a few
-// microseconds of each other, and the boundary sits half a frame period before
-// the first frame of the chunk, so all cameras assign each exposure to the same
-// chunk.
+// and chunk = n / frames_per_chunk. Because n advances by the PTP time between
+// frames, a camera that lost frames still numbers the next exposure the same
+// as the cameras that did not. Corresponding frames of the 8 cameras on the
+// rig carry timestamps within ~20 ns of each other (<= 4 us worst case), far
+// below the half-period rounding margin. Counting whole frames (rather than
+// cutting at fixed PTP times) means every chunk holds exactly
+// frames_per_chunk frames and the cut never drifts onto a frame time: the
+// camera's real period (16 666 666 ns at "60 fps") is not an exact divisor of
+// the chunk length, so a time-based cut would slide ~72 us per 30-min chunk
+// across the frame grid and hit a frame after ~2.4 days.
 
 #include <condition_variable>
 #include <cstdint>
@@ -33,23 +38,22 @@ class ChunkClock {
   public:
     // chunk_seconds <= 0 disables chunking (every frame is chunk 0).
     void configure(double chunk_seconds, int frame_rate);
-    bool enabled() const { return chunk_ns > 0; }
-    // gate_ptp_ns: the shared PTP acquisition gate time, or 0 when there was no
-    // gate (single camera); the first frame's timestamp is then the reference.
-    void set_reference(unsigned long long first_ts,
-                       unsigned long long gate_ptp_ns);
-    bool has_reference() const { return reference_set; }
-    // Chunk index of a frame. Never decreases.
-    int chunk_of(unsigned long long ts);
-    unsigned long long reference() const { return ref_ns; }
+    bool enabled() const { return frames_per_chunk > 0; }
+    // Chunk index of the next frame (call once per frame, in order).
+    // gate_ptp_ns: the shared PTP acquisition gate time, or 0 when there was
+    // no gate (single camera); the first frame is then sync frame 0.
+    int chunk_of(unsigned long long ts, unsigned long long gate_ptp_ns);
+    long long sync_frame() const { return frame_index; }
+    long long frames_in_chunk() const { return frames_per_chunk; }
     long long first_frame_offset_from_gate() const { return gate_offset_ns; }
 
   private:
-    long long chunk_ns = 0;
-    long long period_ns = 0;
-    unsigned long long ref_ns = 0;
+    long long frames_per_chunk = 0;
+    double period_ns = 0.0; // tracks the measured single-frame period
+    bool started = false;
+    unsigned long long prev_ts = 0;
+    long long frame_index = 0;
     long long gate_offset_ns = 0;
-    bool reference_set = false;
     int last_chunk = 0;
 };
 

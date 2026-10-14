@@ -226,6 +226,29 @@ void update_gain_value(Emergent::CEmergentCamera *camera, int gain_val,
     }
 }
 
+// LineTime is the sensor readout time per row: a longer line time spreads each
+// frame's packets over more of the frame period. The camera keeps the last
+// value until it is power-cycled, so set it explicitly when the config asks.
+void update_line_time_value(Emergent::CEmergentCamera *camera,
+                            CameraParams *camera_params) {
+    unsigned int line_time_max = 0, line_time_min = 0, current = 0;
+    EVT_CameraGetUInt32ParamMax(camera, "LineTime", &line_time_max);
+    EVT_CameraGetUInt32ParamMin(camera, "LineTime", &line_time_min);
+    if (camera_params->line_time != 0) {
+        if (camera_params->line_time >= line_time_min &&
+            camera_params->line_time <= line_time_max) {
+            EVT_CameraSetUInt32Param(camera, "LineTime",
+                                     camera_params->line_time);
+        } else {
+            printf("WARN: line_time %u outside camera range %u-%u, not set\n",
+                   camera_params->line_time, line_time_min, line_time_max);
+        }
+    }
+    EVT_CameraGetUInt32Param(camera, "LineTime", &current);
+    printf("LineTime: \t\t%u (range %u-%u)\n", current, line_time_min,
+           line_time_max);
+}
+
 void update_color_temperature(Emergent::CEmergentCamera *camera,
                               std::string color_string,
                               CameraParams *camera_params) {
@@ -444,6 +467,8 @@ void open_camera_with_params(Emergent::CEmergentCamera *camera,
     // check_camera_errors(EVT_CameraSetUInt32Param(camera, "Gain",
     // camera_params.gain));
     update_gain_value(camera, camera_params->gain, camera_params);
+    // Before exposure/frame rate: LineTime changes their allowed ranges.
+    update_line_time_value(camera, camera_params);
 
     // check_camera_errors(EVT_CameraSetUInt32Param(camera, "Exposure",
     // camera_params->exposure));

@@ -51,6 +51,11 @@ void load_camera_json_config_files(std::string file_name,
     } else {
         camera_params->lens_control = false;
     }
+    if (camera_config.contains("line_time")) {
+        camera_params->line_time = camera_config["line_time"];
+    } else {
+        camera_params->line_time = 0;
+    }
 }
 
 bool set_camera_params(CameraParams *camera_params,

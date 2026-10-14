@@ -5,6 +5,7 @@
 #include "implot.h"
 #include "utils.h"
 #include "video_capture.h"
+#include <algorithm>
 #include <ImGuiFileDialog.h>
 #include <cstdlib> // setenv
 #include <iostream>
@@ -181,6 +182,7 @@ int main(int argc, char **args) {
          std::filesystem::directory_iterator(local_start_folder_name)) {
         local_config_folders.push_back(entry.path().string());
     }
+    std::sort(local_config_folders.begin(), local_config_folders.end());
     std::string picture_save_folder =
         orange_root_dir_str + "/pictures/" + get_current_date();
 
@@ -609,12 +611,28 @@ int main(int argc, char **args) {
                 ImGui::BeginDisabled();
             }
 
+            // Wrap the preset list: on one row, a box with many presets runs
+            // off the window and the last ones can't be clicked.
+            const float preset_wrap_x =
+                ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
             for (int i = 0; i < local_config_folders.size(); i++) {
                 std::vector<std::string> folder_token =
                     string_split(local_config_folders[i], "/");
                 sprintf(temp_string, "%s", folder_token.back().c_str());
                 ImGui::RadioButton(temp_string, &local_config_select, i);
-                ImGui::SameLine();
+                std::string next_label = "Null";
+                if (i + 1 < local_config_folders.size()) {
+                    next_label =
+                        string_split(local_config_folders[i + 1], "/").back();
+                }
+                const ImGuiStyle &style = ImGui::GetStyle();
+                float next_width = ImGui::GetFrameHeight() +
+                                   style.ItemInnerSpacing.x +
+                                   ImGui::CalcTextSize(next_label.c_str()).x;
+                if (ImGui::GetItemRectMax().x + style.ItemSpacing.x +
+                        next_width < preset_wrap_x) {
+                    ImGui::SameLine();
+                }
             }
             ImGui::RadioButton("Null", &local_config_select,
                                local_config_folders.size());

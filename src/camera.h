@@ -33,6 +33,7 @@ struct CameraParams {
     bool gpu_direct;
     bool need_reorder;
     bool lens_control; // run IrisInit/FocusInit on open so an EF/RF lens is controllable
+    unsigned int line_time; // ns per sensor row; 0 = leave the camera's current value
     unsigned int gain_max;
     unsigned int gain_min;
     unsigned int gain_inc;
@@ -154,6 +155,8 @@ void update_color_temperature(Emergent::CEmergentCamera *camera,
                               CameraParams *camera_params);
 void update_gain_value(Emergent::CEmergentCamera *camera, int gain_val,
                        CameraParams *camera_params);
+void update_line_time_value(Emergent::CEmergentCamera *camera,
+                            CameraParams *camera_params);
 void update_exposure_value(Emergent::CEmergentCamera *camera, int exposure_val,
                            CameraParams *camera_params);
 void update_exposure_framerate_value(Emergent::CEmergentCamera *camera,

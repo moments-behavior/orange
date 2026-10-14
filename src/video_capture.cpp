@@ -115,6 +115,8 @@ void report_statistics(CameraParams *camera_params, CameraState *camera_state,
         ", Frame received: " + std::to_string(camera_state->frames_recd);
     print_out +=
         ", Dropped Frames: " + std::to_string(camera_state->dropped_frames);
+    print_out += ", Encoder queue full: " +
+                 std::to_string(camera_state->encoder_queue_full);
     float calc_frame_rate = camera_state->frames_recd / time_diff;
     print_out += ", Calculated Frame Rate: " + std::to_string(calc_frame_rate);
     std::cout << print_out << std::endl;
@@ -279,11 +281,13 @@ inline void get_one_frame(CameraState *camera_state,
 
         // push the image data to encode, or display
         if (camera_control->record_video && camera_select->record) {
-            gpu_encoder->PushToDisplay(
-                ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize,
-                ecam->frame_recv.size_x, ecam->frame_recv.size_y,
-                ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
-                camera_state->frame_count, real_time, ptp_offset);
+            if (!gpu_encoder->PushToDisplay(
+                    ecam->frame_recv.imagePtr, ecam->frame_recv.bufferSize,
+                    ecam->frame_recv.size_x, ecam->frame_recv.size_y,
+                    ecam->frame_recv.pixel_type, ecam->frame_recv.timestamp,
+                    camera_state->frame_count, real_time, ptp_offset)) {
+                camera_state->encoder_queue_full++;
+            }
         }
 
         COpenGLDisplay *display = static_cast<COpenGLDisplay *>(openGLDisplay);
@@ -351,9 +355,10 @@ void acquire_frames(CameraEmergent *ecam, CameraParams *camera_params,
     GPUVideoEncoder *gpu_encoder = nullptr;
     bool encoder_ready_signal = false;
     if (camera_control->record_video && camera_select->record) {
-        gpu_encoder = new GPUVideoEncoder("encoder", camera_params,
-                                          camera_select, encoder_setup,
-                                          folder_name, &encoder_ready_signal);
+        gpu_encoder = new GPUVideoEncoder(
+            "encoder", camera_params, camera_select, encoder_setup,
+            folder_name, &encoder_ready_signal, camera_control->chunk_seconds,
+            ptp_params);
         gpu_encoder->StartThread();
 
         // wait till encoder is ready

@@ -58,6 +58,9 @@ struct CameraControl {
     bool record_video = false;
     bool sync_camera = false;
     bool trigger_mode = false;
+    // Split each recording into chunks of this many seconds without stopping
+    // the cameras (see recording_chunks.h). 0 = one file per camera.
+    double chunk_seconds = 0.0;
 };
 
 struct CameraSignals {
@@ -93,6 +96,9 @@ struct CameraState {
     unsigned short dropped_frames = 0;
     unsigned int frames_recd = 0;
     unsigned long long frame_count = 0;
+    // Frames received but not recorded because the encoder's input queue was
+    // full (GPUVideoEncoder::PushToDisplay returned false).
+    unsigned long long encoder_queue_full = 0;
 };
 
 struct PTPState {

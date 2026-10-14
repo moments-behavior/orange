@@ -6,6 +6,7 @@
 #include "global.h"   // g_cam_brightness
 #include "kernel.cuh" // launch_brightness_sum
 #include "utils.h"    // make_npp_stream_context
+#include <chrono>
 #include <cuda_runtime_api.h>
 #include <stdio.h>
 #include <string.h>
@@ -69,47 +70,8 @@ static inline void write_metadata(std::ofstream *metadata,
               << ptp_offset << std::endl;
 }
 
-static inline void initialize_writer(Writer *writer,
-                                     CameraParams *camera_params,
-                                     std::string folder_name,
-                                     std::string encoder_str) {
-    // writer->video_file = folder_name + "/Cam" +
-    // std::to_string(camera_params->camera_id) + ".mp4"; writer->metadata_file
-    // = folder_name + "/Cam" + std::to_string(camera_params->camera_id) +
-    // "_meta.csv";
-    writer->video_file =
-        folder_name + "/Cam" + camera_params->camera_serial + ".mp4";
-    writer->metadata_file =
-        folder_name + "/Cam" + camera_params->camera_serial + "_meta.csv";
-    writer->keyframe_file =
-        folder_name + "/Cam" + camera_params->camera_serial + "_keyframe.csv";
-
-    if (encoder_str.find("h264") != std::string::npos) {
-        std::cout << "h264 encoding" << '\n';
-        writer->video = new FFmpegWriter(
-            AV_CODEC_ID_H264, camera_params->width, camera_params->height,
-            camera_params->frame_rate, writer->video_file.c_str(),
-            writer->keyframe_file.c_str());
-    } else if (encoder_str.find("hevc") != std::string::npos) {
-        std::cout << "hevc encoding" << '\n';
-        writer->video = new FFmpegWriter(
-            AV_CODEC_ID_HEVC, camera_params->width, camera_params->height,
-            camera_params->frame_rate, writer->video_file.c_str(),
-            writer->keyframe_file.c_str());
-    } else {
-        std::cout << "codec not supported" << '\n';
-    }
-    // The .mp4 was created by avio_open in the FFmpegWriter ctor above; hand it
-    // back to the invoking user so recordings aren't left root-owned (sudo).
-    chown_to_invoking_user(writer->video_file);
-
-    writer->metadata = new std::ofstream();
-    open_metadata_file(writer->metadata, writer->metadata_file);
-    chown_to_invoking_user(writer->metadata_file);
-}
-
-static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer,
-                                Debayer *debayer) {
+static inline void encode_frame(EncoderContext *encoder, Debayer *debayer,
+                                bool force_idr) {
     // encoding
     const NvEncInputFrame *encoderInputFrame =
         encoder->pEnc->GetNextInputFrame();
@@ -120,32 +82,118 @@ static inline void encode_frame(EncoderContext *encoder, FFmpegWriter *writer,
         CU_MEMORYTYPE_DEVICE, encoderInputFrame->bufferFormat,
         encoderInputFrame->chromaOffsets, encoderInputFrame->numChromaPlanes);
 
-    encoder->pEnc->EncodeFrame(encoder->vPacket);
-    for (std::vector<uint8_t> &packet : encoder->vPacket) {
-        // For each encoded packet
-        writer->write_packet(packet.data(), (int)packet.size(),
-                             encoder->num_frame_encode++);
+    // The first frame of a new chunk must be decodable on its own: force an
+    // IDR and repeat the sequence headers (SPS/PPS, and VPS for HEVC).
+    NV_ENC_PIC_PARAMS pic_params = {};
+    if (force_idr)
+        pic_params.encodePicFlags =
+            NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_OUTPUT_SPSPPS;
+    encoder->pEnc->EncodeFrame(encoder->vPacket,
+                               force_idr ? &pic_params : nullptr);
+}
+
+static double ms_since(std::chrono::steady_clock::time_point t0) {
+    return std::chrono::duration<double, std::milli>(
+               std::chrono::steady_clock::now() - t0)
+        .count();
+}
+
+Writer *GPUVideoEncoder::open_writer(int chunk) {
+    Writer *w = new Writer();
+    w->chunk = chunk;
+    std::string folder = folder_name;
+    if (chunk_clock.enabled()) {
+        folder = chunk_folder_name(folder_name, chunk);
+        make_folder(folder); // every camera calls this; existing is fine
+    }
+    w->video_file = folder + "/Cam" + camera_params->camera_serial + ".mp4";
+    w->metadata_file =
+        folder + "/Cam" + camera_params->camera_serial + "_meta.csv";
+    w->keyframe_file =
+        folder + "/Cam" + camera_params->camera_serial + "_keyframe.csv";
+    w->summary.camera_serial = camera_params->camera_serial;
+
+    if (encoder_setup.find("h264") != std::string::npos) {
+        w->video = new FFmpegWriter(
+            AV_CODEC_ID_H264, camera_params->width, camera_params->height,
+            camera_params->frame_rate, w->video_file.c_str(),
+            w->keyframe_file.c_str());
+    } else if (encoder_setup.find("hevc") != std::string::npos) {
+        w->video = new FFmpegWriter(
+            AV_CODEC_ID_HEVC, camera_params->width, camera_params->height,
+            camera_params->frame_rate, w->video_file.c_str(),
+            w->keyframe_file.c_str());
+    } else {
+        std::cout << "codec not supported" << '\n';
+    }
+    // The .mp4 was created by avio_open in the FFmpegWriter ctor above; hand it
+    // back to the invoking user so recordings aren't left root-owned (sudo).
+    chown_to_invoking_user(w->video_file);
+
+    w->metadata = new std::ofstream();
+    open_metadata_file(w->metadata, w->metadata_file);
+    chown_to_invoking_user(w->metadata_file);
+    return w;
+}
+
+// Mux the packets NVENC just returned. They come out in submission order, one
+// per frame, so each one belongs to the oldest frame in pending_frames. The
+// first packet of a new chunk retires the previous chunk's writer.
+void GPUVideoEncoder::route_packets() {
+    for (std::vector<uint8_t> &packet : encoder.vPacket) {
+        Writer *w = packet_writer;
+        if (!pending_frames.empty()) {
+            w = pending_frames.front();
+            pending_frames.pop_front();
+        }
+        if (w != packet_writer) {
+            retire_writer(packet_writer);
+            packet_writer = w;
+        }
+        bool key = false;
+        w->video->write_packet(packet.data(), (int)packet.size(),
+                               (int)w->packets, &key);
+        if (w->packets == 0)
+            w->summary.first_packet_keyframe = key;
+        w->packets++;
+        encoder.num_frame_encode++;
     }
 }
 
-static inline void close_writer(EncoderContext *encoder, Writer *writer) {
-    encoder->pEnc->EndEncode(encoder->vPacket);
-    for (std::vector<uint8_t> &packet : encoder->vPacket) {
-        writer->video->write_packet(packet.data(), (int)packet.size(),
-                                    encoder->num_frame_encode++);
-    }
-    encoder->pEnc->DestroyEncoder();
-    (*writer->metadata).close();
+// Close a writer's files on the finalizer thread: av_write_trailer writes the
+// mp4 index (several MB for a 30 min file) and must not hold up encoding.
+void GPUVideoEncoder::retire_writer(Writer *w) {
+    if (!w)
+        return;
+    bool report = chunk_clock.enabled();
+    std::string session = folder_name;
+    double seconds = chunk_seconds;
+    finalizer->post([w, report, session, seconds]() {
+        auto t0 = std::chrono::steady_clock::now();
+        delete w->video; // writes the trailer and closes the file
+        w->video = nullptr;
+        w->metadata->close();
+        delete w->metadata;
+        w->metadata = nullptr;
+        w->summary.frames = w->packets;
+        w->summary.finalize_ms = ms_since(t0);
+        if (report)
+            chunk_registry::camera_finished_chunk(session, w->chunk, seconds,
+                                                  w->summary);
+        delete w;
+    });
 }
 
 GPUVideoEncoder::GPUVideoEncoder(const char *name, CameraParams *camera_params,
                                  CameraEachSelect *camera_select,
                                  std::string encoder_setup,
                                  std::string folder_name,
-                                 bool *encoder_ready_signal)
+                                 bool *encoder_ready_signal,
+                                 double chunk_seconds, PTPParams *ptp_params)
     : CThreadWorker(name), camera_params(camera_params),
       camera_select(camera_select), encoder_setup(encoder_setup),
-      folder_name(folder_name), encoder_ready_signal(encoder_ready_signal) {
+      folder_name(folder_name), encoder_ready_signal(encoder_ready_signal),
+      chunk_seconds(chunk_seconds), ptp_params(ptp_params) {
     memset(workerEntries, 0, sizeof(workerEntries));
     workerEntriesFreeQueueCount = ENCODER_ENTRIES_MAX;
     for (int i = 0; i < workerEntriesFreeQueueCount; i++) {
@@ -193,9 +241,46 @@ void GPUVideoEncoder::ProcessOneFrame(void *f) {
                                     npp_ctx);
     }
 
-    encode_frame(&encoder, writer.video, &debayer);
-    write_metadata(writer.metadata, entry.frame_id, entry.timestamp,
+    // Which chunk does this exposure belong to? The first frame fixes the
+    // PTP reference that every camera shares (see recording_chunks.h).
+    bool force_idr = false;
+    if (chunk_clock.enabled()) {
+        if (!chunk_clock.has_reference()) {
+            unsigned long long gate = ptp_params ? ptp_params->ptp_global_time : 0;
+            chunk_clock.set_reference(entry.timestamp, gate);
+            printf("[chunk] Cam%s first frame ts %llu, gate %llu, offset from "
+                   "gate %lld ns, reference %llu\n",
+                   camera_params->camera_serial.c_str(), entry.timestamp, gate,
+                   chunk_clock.first_frame_offset_from_gate(),
+                   chunk_clock.reference());
+        }
+        int chunk = chunk_clock.chunk_of(entry.timestamp);
+        if (chunk != row_writer->chunk) {
+            auto t0 = std::chrono::steady_clock::now();
+            row_writer = open_writer(chunk);
+            force_idr = true;
+            printf("[chunk] Cam%s -> chunk %05d at frame_id %llu ts %llu "
+                   "(open %.1f ms, encoder queue %d, finalizer backlog %zu)\n",
+                   camera_params->camera_serial.c_str(), chunk, entry.frame_id,
+                   entry.timestamp, ms_since(t0), GetCountQueueInSize(),
+                   finalizer->pending());
+        }
+    }
+
+    Writer *w = row_writer;
+    pending_frames.push_back(w);
+    encode_frame(&encoder, &debayer, force_idr);
+    route_packets();
+
+    write_metadata(w->metadata, entry.frame_id, entry.timestamp,
                    entry.timestamp_sys, entry.ptp_offset);
+    if (w->summary.metadata_rows == 0) {
+        w->summary.first_frame_id = entry.frame_id;
+        w->summary.first_timestamp = entry.timestamp;
+    }
+    w->summary.last_frame_id = entry.frame_id;
+    w->summary.last_timestamp = entry.timestamp;
+    w->summary.metadata_rows++;
 }
 
 void GPUVideoEncoder::ThreadRunning() {
@@ -225,7 +310,11 @@ void GPUVideoEncoder::ThreadRunning() {
             -1.0f, std::memory_order_relaxed); // -1 = no sample yet
 
     initialize_encoder(&encoder, encoder_setup, camera_params);
-    initialize_writer(&writer, camera_params, folder_name, encoder_setup);
+    chunk_clock.configure(chunk_seconds, camera_params->frame_rate);
+    if (chunk_clock.enabled())
+        chunk_registry::register_camera(folder_name);
+    finalizer = new ChunkFinalizer();
+    row_writer = packet_writer = open_writer(0);
 
     *encoder_ready_signal = true;
     while (IsMachineOn()) {
@@ -247,16 +336,23 @@ void GPUVideoEncoder::ThreadRunning() {
         }
     }
 
-    close_writer(&encoder, &writer);
+    // Flush the frames still inside NVENC, then close the last chunk.
+    encoder.pEnc->EndEncode(encoder.vPacket);
+    route_packets();
+    encoder.pEnc->DestroyEncoder();
+    retire_writer(packet_writer);
+    if (row_writer != packet_writer) // only if NVENC lost frames at EOS
+        retire_writer(row_writer);
+    row_writer = packet_writer = nullptr;
+    pending_frames.clear();
+    delete finalizer; // waits until every chunk's files are closed
+    finalizer = nullptr;
+
     std::string print_out;
     print_out += "\n" + camera_params->camera_serial;
     print_out += ", Frame encoded: " + std::to_string(encoder.num_frame_encode);
     std::cout << print_out << std::endl;
 
-    delete writer.video;
-    writer.video = nullptr;
-    delete writer.metadata;
-    writer.metadata = nullptr;
     delete encoder.pEnc;
     cudaFree(frame_original.d_orig);
     cudaFree(debayer.d_debayer);

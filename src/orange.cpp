@@ -96,7 +96,44 @@ void poll_ptp_offset_and_dump(int num_cameras, CameraEmergent *ecams,
     g_workerRunning = false;
 }
 
+static void print_usage(const char *prog) {
+    printf("usage: %s [--preset NAME] [--record-seconds N] [--chunk-seconds S]\n"
+           "          [--record-dir DIR]\n"
+           "  --preset NAME        select config/local/NAME at startup\n"
+           "  --chunk-seconds S    start with chunked recording on, S s per chunk\n"
+           "  --record-dir DIR     record into DIR instead of <root>/exp/unsorted\n"
+           "  --record-seconds N   unattended run: with --preset, open every\n"
+           "                       camera, record N s of video, stop and exit\n",
+           prog);
+}
+
 int main(int argc, char **args) {
+    // Command line. Everything here can also be set in the GUI; the options
+    // exist so a recording (e.g. a chunking soak test) can run unattended.
+    std::string cli_preset;
+    std::string cli_record_dir;
+    double cli_record_seconds = 0.0;
+    double cli_chunk_seconds = 0.0;
+    for (int a = 1; a < argc; a++) {
+        std::string opt = args[a];
+        bool has_val = a + 1 < argc;
+        if (opt == "--preset" && has_val) {
+            cli_preset = args[++a];
+        } else if (opt == "--record-seconds" && has_val) {
+            cli_record_seconds = atof(args[++a]);
+        } else if (opt == "--chunk-seconds" && has_val) {
+            cli_chunk_seconds = atof(args[++a]);
+        } else if (opt == "--record-dir" && has_val) {
+            cli_record_dir = args[++a];
+        } else {
+            print_usage(args[0]);
+            return opt == "-h" || opt == "--help" ? 0 : 1;
+        }
+    }
+    if (cli_record_seconds > 0.0 && cli_preset.empty()) {
+        printf("--record-seconds needs --preset\n");
+        return 1;
+    }
     // Deterministic device numbering (matches nvidia-smi) across reboots/machines,
     // so per-camera gpu_id values in configs stay stable. Must precede any CUDA call.
     setenv("CUDA_DEVICE_ORDER", "PCI_BUS_ID", 1);
@@ -142,6 +179,10 @@ int main(int argc, char **args) {
                                 encoder_codec);
 
     std::string input_folder = recording_root_dir_str + "/exp/unsorted";
+    if (!cli_record_dir.empty()) {
+        input_folder = cli_record_dir;
+        make_folder(input_folder);
+    }
 
     std::vector<bool> check;
     for (int i = 0; i < cam_count; i++) {
@@ -168,6 +209,13 @@ int main(int argc, char **args) {
     bool limit_record_duration = false;
     float max_record_hours = 6.0f;
 
+    // Chunked recording: roll every camera's output over to a new chunk folder
+    // every chunk_minutes while the cameras keep streaming (no frames lost, all
+    // cameras cut on the same exposure). Set before starting a recording.
+    bool chunk_recording = cli_chunk_seconds > 0.0;
+    float chunk_minutes =
+        cli_chunk_seconds > 0.0 ? float(cli_chunk_seconds / 60.0) : 30.0f;
+
     ScrollingBuffer *realtime_plot_data;
     bool show_realtime_plot = false;
     ScrollingBuffer *brightness_plot_data = nullptr;
@@ -183,11 +231,38 @@ int main(int argc, char **args) {
         local_config_folders.push_back(entry.path().string());
     }
     std::sort(local_config_folders.begin(), local_config_folders.end());
+
+    // Unattended run (--record-seconds): select the preset and all cameras,
+    // open them, record, stop, exit. Driven from the GUI loop below by
+    // "pressing" the same buttons a user would.
+    enum AutoRun { AUTO_OFF, AUTO_OPEN, AUTO_RECORD, AUTO_RECORDING, AUTO_EXIT };
+    AutoRun autorun = AUTO_OFF;
+    double autorun_t = 0.0;
+    int cli_preset_index = -1;
+    for (int i = 0; i < (int)local_config_folders.size(); i++) {
+        if (std::filesystem::path(local_config_folders[i]).filename() ==
+            cli_preset)
+            cli_preset_index = i;
+    }
+    if (!cli_preset.empty() && cli_preset_index < 0) {
+        printf("preset '%s' not found in %s\n", cli_preset.c_str(),
+               local_start_folder_name.c_str());
+        return 1;
+    }
     std::string picture_save_folder =
         orange_root_dir_str + "/pictures/" + get_current_date();
 
-    int local_config_select = 0;
+    int local_config_select = cli_preset_index >= 0 ? cli_preset_index : 0;
     bool select_all_cameras = false;
+    if (cli_record_seconds > 0.0) {
+        select_all_cameras = true;
+        for (int i = 0; i < cam_count; i++)
+            check[i] = true;
+        autorun = AUTO_OPEN;
+        printf("[autorun] preset %s, record %.1f s, chunk %.1f s, into %s\n",
+               cli_preset.c_str(), cli_record_seconds, cli_chunk_seconds,
+               input_folder.c_str());
+    }
     char *temp_string = (char *)malloc(128);
     *temp_string = '\0';
     bool save_image_all_ready{true};
@@ -336,6 +411,17 @@ int main(int argc, char **args) {
                                       "%.1f")) {
                     if (max_record_hours < 0.0f)
                         max_record_hours = 0.0f;
+                }
+            }
+
+            ImGui::Checkbox("Chunk recording", &chunk_recording);
+            if (chunk_recording) {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(120.0f);
+                if (ImGui::InputFloat("Chunk minutes", &chunk_minutes, 1.0f,
+                                      10.0f, "%.2f")) {
+                    if (chunk_minutes < 0.1f) // 6 s floor
+                        chunk_minutes = 0.1f;
                 }
             }
 
@@ -645,8 +731,14 @@ int main(int argc, char **args) {
                 ImGui::BeginDisabled();
             }
 
-            if (ImGui::Button(camera_control->open ? "Close Camera"
-                                                   : "Open camera")) {
+            bool open_clicked = ImGui::Button(
+                camera_control->open ? "Close Camera" : "Open camera");
+            if (autorun == AUTO_OPEN && !camera_control->open) {
+                open_clicked = true;
+                autorun = AUTO_RECORD;
+                autorun_t = steady_now_seconds();
+            }
+            if (open_clicked) {
                 if (!camera_control->open) {
                     std::vector<std::string> camera_config_files;
                     if (local_config_select < local_config_folders.size()) {
@@ -818,6 +910,19 @@ int main(int argc, char **args) {
                                                    ? ICON_FK_PAUSE
                                                    : ICON_FK_PLAY);
 
+                if (autorun == AUTO_RECORD && !camera_control->stop_record &&
+                    steady_now_seconds() - autorun_t > 3.0) {
+                    do_toggle = true;
+                    autorun = AUTO_RECORDING;
+                } else if (autorun == AUTO_RECORDING &&
+                           camera_control->stop_record) {
+                    double elapsed = recording_elapsed_seconds();
+                    if (elapsed >= cli_record_seconds) {
+                        do_toggle = true;
+                        autorun = AUTO_EXIT;
+                    }
+                }
+
                 // Auto-stop: while recording, once the configured max duration is
                 // reached, take the same path as a manual Stop press so all
                 // cameras stop cleanly. recording_elapsed_seconds() measures from
@@ -858,6 +963,9 @@ int main(int argc, char **args) {
                         }
 
                         camera_control->subscribe = true;
+                        camera_control->chunk_seconds =
+                            chunk_recording ? double(chunk_minutes) * 60.0
+                                            : 0.0;
                         std::string encoder_setup = "-codec " + encoder_codec +
                                                     " -preset " +
                                                     encoder_preset;
@@ -914,6 +1022,8 @@ int main(int argc, char **args) {
                         delete[] tex_gl;
                         tex_gl = nullptr;
                         camera_control->record_video = false;
+                        if (autorun == AUTO_EXIT)
+                            glfwSetWindowShouldClose(window->render_target, 1);
                     }
                 }
             }

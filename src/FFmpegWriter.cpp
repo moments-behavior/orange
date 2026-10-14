@@ -80,7 +80,8 @@ FFmpegWriter::~FFmpegWriter() {
     }
 }
 
-bool FFmpegWriter::write_packet(uint8_t *pData, int nBytes, int nPts) {
+bool FFmpegWriter::write_packet(uint8_t *pData, int nBytes, int nPts,
+                                bool *is_keyframe_out) {
     AVPacket *pkt = av_packet_alloc();
     if (!pkt) {
         std::cerr << "Failed to allocate AVPacket\n";
@@ -109,6 +110,8 @@ bool FFmpegWriter::write_packet(uint8_t *pData, int nBytes, int nPts) {
 
     if (is_keyframe)
         pkt->flags |= AV_PKT_FLAG_KEY;
+    if (is_keyframe_out)
+        *is_keyframe_out = is_keyframe;
 
     // if (metadata && metadata->is_open()) {
     //     *metadata << "frame_id: " << nPts
